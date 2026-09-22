@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="ImageViewer 图像、ROI、分析和 3D/MPR 浏览使用手册。">
+  <title>ImageViewer 使用手册</title>
+  <style>
+    :root {
+      --ink: #152534;
+      --muted: #5f7080;
+      --paper: #f7f8f5;
+      --surface: #ffffff;
+      --line: #d8e0e4;
+      --teal: #087d79;
+      --teal-dark: #045d5b;
+      --gold: #c78920;
+      --soft-teal: #e4f2f0;
+      --soft-gold: #fbf1d8;
+      --code: #132431;
+      --shadow: 0 14px 32px rgba(21, 37, 52, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(90deg, rgba(8, 125, 121, 0.035) 1px, transparent 1px) 0 0 / 28px 28px,
+        var(--paper);
+      font-family: "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+      line-height: 1.7;
+    }
+
+    a { color: var(--teal-dark); text-underline-offset: 0.18em; }
+
+    code, kbd {
+      font-family: Consolas, "Cascadia Code", monospace;
+      font-size: 0.9em;
+    }
+
+    kbd {
+      display: inline-block;
+      min-width: 1.8em;
+      padding: 0.08em 0.42em;
+      color: var(--ink);
+      background: #fff;
+      border: 1px solid #b8c5cc;
+      border-bottom-width: 2px;
+      border-radius: 3px;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .page-header {
+      color: #f8ffff;
+      background: var(--code);
+      border-bottom: 4px solid var(--gold);
+    }
+
+    .header-inner, .layout {
+      width: min(1180px, calc(100% - 40px));
+      margin: 0 auto;
+    }
+
+    .header-inner { padding: 56px 0 46px; }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: #8ed8cf;
+      font-size: 0.83rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3 { line-height: 1.25; }
+
+    h1 {
+      max-width: 760px;
+      margin: 0;
+      font-size: clamp(2rem, 4vw, 3.45rem);
+      font-weight: 750;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      max-width: 700px;
+      margin: 14px 0 0;
+      color: #c5d5dc;
+      font-size: 1.05rem;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 228px minmax(0, 1fr);
+      gap: 52px;
+      align-items: start;
+      padding: 38px 0 72px;
+    }
+
+    .toc {
+      position: sticky;
+      top: 24px;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.8);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+    }
+
+    .toc strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 0.83rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .toc a {
+      display: block;
+      padding: 6px 8px;
+      color: var(--muted);
+      font-size: 0.93rem;
+      text-decoration: none;
+    }
+
+    .toc a:hover, .toc a:focus-visible {
+      color: var(--teal-dark);
+      background: var(--soft-teal);
+      outline: none;
+    }
+
+    main { min-width: 0; }
+
+    section {
+      scroll-margin-top: 24px;
+      padding: 8px 0 36px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    section:last-child { border-bottom: 0; }
+
+    h2 { margin: 0 0 14px; font-size: 1.62rem; }
+    h3 { margin: 28px 0 10px; font-size: 1.14rem; }
+    p { margin: 0 0 14px; }
+    ol, ul { margin: 0 0 16px; padding-left: 1.45rem; }
+    li + li { margin-top: 5px; }
+
+    .lead {
+      max-width: 780px;
+      color: var(--muted);
+      font-size: 1.06rem;
+    }
+
+    .quick-grid, .shortcut-grid, .file-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 20px;
+    }
+
+    .card {
+      padding: 18px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      box-shadow: var(--shadow);
+    }
+
+    .card h3 { margin: 0 0 7px; font-size: 1rem; }
+    .card p { margin: 0; color: var(--muted); font-size: 0.94rem; }
+
+    .step-list { counter-reset: step; list-style: none; padding: 0; }
+
+    .step-list li {
+      position: relative;
+      min-height: 40px;
+      padding: 5px 0 6px 52px;
+    }
+
+    .step-list li::before {
+      position: absolute;
+      top: 4px;
+      left: 0;
+      width: 31px;
+      height: 31px;
+      color: var(--teal-dark);
+      background: var(--soft-teal);
+      border: 1px solid #b3d8d3;
+      border-radius: 50%;
+      content: counter(step);
+      counter-increment: step;
+      font-weight: 700;
+      line-height: 30px;
+      text-align: center;
+    }
+
+    .callout {
+      margin: 20px 0;
+      padding: 15px 17px;
+      background: var(--soft-gold);
+      border-left: 4px solid var(--gold);
+    }
+
+    .callout strong { color: #6a4612; }
+
+    .workflow {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0;
+      margin: 22px 0;
+      overflow: hidden;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+    }
+
+    .workflow div {
+      position: relative;
+      min-height: 114px;
+      padding: 16px;
+      border-right: 1px solid var(--line);
+    }
+
+    .workflow div:last-child { border-right: 0; }
+    .workflow strong { display: block; color: var(--teal-dark); }
+    .workflow span { display: block; margin-top: 5px; color: var(--muted); font-size: 0.9rem; line-height: 1.5; }
+
+    table {
+      width: 100%;
+      margin: 16px 0;
+      border-collapse: collapse;
+      background: var(--surface);
+      border: 1px solid var(--line);
+    }
+
+    th, td { padding: 11px 13px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: #edf3f3; font-size: 0.92rem; }
+    tr:last-child td { border-bottom: 0; }
+
+    pre {
+      overflow-x: auto;
+      padding: 16px;
+      color: #e4f5f3;
+      background: var(--code);
+      border-radius: 5px;
+      line-height: 1.55;
+    }
+
+    .footer {
+      padding: 24px 0 40px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      text-align: center;
+    }
+
+    @media (max-width: 820px) {
+      .layout { grid-template-columns: 1fr; gap: 22px; }
+      .toc { position: static; display: flex; flex-wrap: wrap; gap: 3px; }
+      .toc strong { width: 100%; }
+      .toc a { padding: 5px 7px; }
+      .quick-grid, .shortcut-grid, .file-grid { grid-template-columns: 1fr; }
+      .workflow { grid-template-columns: 1fr 1fr; }
+      .workflow div:nth-child(2) { border-right: 0; }
+      .workflow div:nth-child(-n + 2) { border-bottom: 1px solid var(--line); }
+    }
+
+    @media (max-width: 520px) {
+      .header-inner, .layout { width: min(100% - 28px, 1180px); }
+      .header-inner { padding: 42px 0 35px; }
+      .workflow { grid-template-columns: 1fr; }
+      .workflow div { min-height: 0; border-right: 0; border-bottom: 1px solid var(--line); }
+      .workflow div:nth-child(2) { border-bottom: 1px solid var(--line); }
+      .workflow div:last-child { border-bottom: 0; }
+      th, td { padding: 9px; }
+    }
+
+    @media print {
+      body { background: #fff; }
+      .page-header { color: #152534; background: #fff; border-bottom: 2px solid #c78920; }
+      .subtitle { color: #5f7080; }
+      .layout { display: block; width: auto; padding: 20px 34px; }
+      .toc { display: none; }
+      .card { box-shadow: none; }
+      a { color: inherit; text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="page-header">
+    <div class="header-inner">
+      <p class="eyebrow">ImageViewer / User Guide</p>
+      <h1>ImageViewer 使用手册</h1>
+      <p class="subtitle">图像浏览、ROI 标注、测量分析、3D 体数据与项目交付的操作参考。</p>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="toc" aria-label="手册目录">
+      <strong>目录</strong>
+      <a href="#start">开始使用</a>
+      <a href="#image">图像与视图</a>
+      <a href="#roi">ROI 标注</a>
+      <a href="#analysis">测量与分析</a>
+      <a href="#volume">3D 与 MPR</a>
+      <a href="#files">保存与交付</a>
+      <a href="#shortcuts">快捷键</a>
+      <a href="#integration">宿主集成</a>
+    </nav>
+
+    <main>
+      <section id="start">
+        <h2>开始使用</h2>
+        <p class="lead">在演示程序中打开图像后，即可进行浏览、ROI 绘制、测量、分析和导出。常用任务可通过主菜单或右键菜单完成。</p>
+        <div class="quick-grid">
+          <article class="card">
+            <h3>1. 导入</h3>
+            <p>点击“打开图像”或按 <kbd>Ctrl</kbd> + <kbd>O</kbd>，选择支持的图像文件。</p>
+          </article>
+          <article class="card">
+            <h3>2. 标注</h3>
+            <p>从“绘制”或“测量”菜单选择工具，在图像上创建 ROI。</p>
+          </article>
+          <article class="card">
+            <h3>3. 输出</h3>
+            <p>导出 PNG、CSV、ROI JSON，或保存会话与完整项目包。</p>
+          </article>
+        </div>
+        <h3>支持的图像格式</h3>
+        <p><code>png</code>、<code>jpg</code>、<code>jpeg</code>、<code>bmp</code>、<code>tif</code>、<code>tiff</code>。</p>
+      </section>
+
+      <section id="image">
+        <h2>图像与视图</h2>
+        <ol class="step-list">
+          <li>导入图像后，使用缩放、平移、适配视图、实际尺寸和重置视图等操作检查内容。</li>
+          <li>选中 ROI 后，可缩放到选中区域，以便检查局部细节。</li>
+          <li>打开右键菜单即可直接输入命令名称进行搜索；按 <kbd>↓</kbd> 将焦点移到第一个匹配项。</li>
+          <li>按一次 <kbd>Esc</kbd> 清空菜单搜索，再按一次关闭菜单。</li>
+        </ol>
+        <div class="callout"><strong>提示：</strong>浏览普通图像时，按 <kbd>Ctrl</kbd> + <kbd>F</kbd> 可快速适应窗口。</div>
+      </section>
+
+      <section id="roi">
+        <h2>ROI 标注与管理</h2>
+        <p>ROI 用于标记感兴趣区域、测量对象和承载后续分析结果。</p>
+        <table>
+          <thead><tr><th>入口</th><th>可用对象</th><th>典型用途</th></tr></thead>
+          <tbody>
+            <tr><td>“绘制”菜单</td><td>矩形、圆、椭圆、多边形、折线</td><td>区域标注、边界勾画和局部统计。</td></tr>
+            <tr><td>“测量”菜单</td><td>长度、角度、卡尺、拟合椭圆、梯度检测对齐</td><td>尺寸测量、几何拟合和边缘定位。</td></tr>
+            <tr><td>ROI 列表与右键菜单</td><td>标签、颜色、可见性、锁定、属性编辑</td><td>管理对象状态与组织标注结果。</td></tr>
+          </tbody>
+        </table>
+        <p>删除所选 ROI 或清空全部 ROI 后，可按 <kbd>Ctrl</kbd> + <kbd>Z</kbd> 恢复。锁定的 ROI 不应被意外修改；需要编辑时先在 ROI 列表或属性中解除锁定。</p>
+      </section>
+
+      <section id="analysis">
+        <h2>测量、显示与分析</h2>
+        <ol class="step-list">
+          <li>选择线类 ROI 后，在“像素标定”中设置像素尺寸和物理单位。</li>
+          <li>完成标定后，长度、面积和 CSV 指标会按指定物理单位输出；未标定时单位为 <code>px</code>。</li>
+          <li>在“分析与导出”中查看分析摘要或导出 CSV。</li>
+          <li>在“渲染与伪彩色”中切换常用调色板，或查看智能显示建议。</li>
+        </ol>
+        <p>实时分析选项位于“分析运行”子菜单；大图、缓存和 GPU 相关选项位于“大图与性能”及其“高级性能”子菜单。加载或操作失败时，界面会显示可访问的状态反馈和错误提示。</p>
+      </section>
+
+      <section id="volume">
+        <h2>3D 体数据与 MPR</h2>
+        <p>体数据模式提供 3D 容积视图，以及轴位、冠状和矢状三个正交的多平面重建视图。MPR 位置会和 3D 场景中的交叉平面同步。</p>
+        <div class="workflow" aria-label="三维浏览流程">
+          <div><strong>选择视图</strong><span>使用 Axial、Coronal、Sagittal 或 3D 按钮，键盘可使用 <kbd>1</kbd> 至 <kbd>4</kbd>。</span></div>
+          <div><strong>浏览切片</strong><span>轴位使用滑块或鼠标滚轮；冠状与矢状使用 <kbd>↑</kbd> / <kbd>↓</kbd>。</span></div>
+          <div><strong>观察同步</strong><span>切换 MPR 切片后，对应 3D 交叉平面会同步移动。</span></div>
+          <div><strong>调整场景</strong><span>使用 3D 上下文菜单设置相机预设、切面、透明度，或恢复默认相机。</span></div>
+        </div>
+        <table>
+          <thead><tr><th>操作</th><th>键盘</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td>轴位视图</td><td><kbd>1</kbd></td><td>进入轴位切片浏览。</td></tr>
+            <tr><td>冠状视图</td><td><kbd>2</kbd></td><td>进入冠状 MPR；使用上下方向键浏览切片。</td></tr>
+            <tr><td>矢状视图</td><td><kbd>3</kbd></td><td>进入矢状 MPR；使用上下方向键浏览切片。</td></tr>
+            <tr><td>3D 视图</td><td><kbd>4</kbd></td><td>进入 3D 场景。</td></tr>
+            <tr><td>适配体数据</td><td><kbd>F</kbd></td><td>将 3D 体数据适应当前视图。</td></tr>
+            <tr><td>重置活动视图</td><td><kbd>Home</kbd></td><td>重置 3D 相机，或将 2D 切片回到起始位置。</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="files">
+        <h2>保存、加载与项目交付</h2>
+        <div class="file-grid">
+          <article class="card"><h3>保存 ROI</h3><p>仅保存 ROI 集合与标定信息，适用于算法结果交换。</p></article>
+          <article class="card"><h3>保存会话</h3><p>将图像路径、ROI、标定和视图状态保存为 <code>.ivsession</code>。</p></article>
+          <article class="card"><h3>导出项目包</h3><p>生成包含会话和图像资产的 <code>.ivpkg</code>，适用于交接与归档。</p></article>
+        </div>
+        <h3>选择合适的文件</h3>
+        <table>
+          <thead><tr><th>需求</th><th>建议格式</th></tr></thead>
+          <tbody>
+            <tr><td>只共享 ROI 与标定</td><td>ROI JSON</td></tr>
+            <tr><td>在同一环境中继续工作</td><td><code>.ivsession</code></td></tr>
+            <tr><td>让他人复现当前项目，并一同提供图像</td><td><code>.ivpkg</code></td></tr>
+          </tbody>
+        </table>
+        <div class="callout"><strong>项目包说明：</strong>导出在成功完成后才替换目标文件。打开 <code>.ivpkg</code> 时，程序会验证归档路径、条目数量和解压大小，以减少异常归档带来的风险。</div>
+      </section>
+
+      <section id="shortcuts">
+        <h2>快捷键速查</h2>
+        <div class="shortcut-grid">
+          <article class="card"><h3><kbd>Ctrl</kbd> + <kbd>O</kbd></h3><p>打开图像文件。</p></article>
+          <article class="card"><h3><kbd>Ctrl</kbd> + <kbd>F</kbd></h3><p>普通图像适应窗口。</p></article>
+          <article class="card"><h3><kbd>Ctrl</kbd> + <kbd>Z</kbd></h3><p>恢复最近的 ROI 删除或清空操作。</p></article>
+          <article class="card"><h3><kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd> / <kbd>4</kbd></h3><p>切换轴位、冠状、矢状和 3D 视图。</p></article>
+          <article class="card"><h3><kbd>↑</kbd> / <kbd>↓</kbd></h3><p>在冠状或矢状 MPR 视图中切换切片。</p></article>
+          <article class="card"><h3><kbd>Esc</kbd></h3><p>取消正在执行的操作；在菜单中先清除搜索。</p></article>
+        </div>
+      </section>
+
+      <section id="integration">
+        <h2>嵌入 WPF 宿主</h2>
+        <p>使用依赖注入的宿主可在应用启动时注册 ImageViewer 服务：</p>
+        <pre><code>using ImageViewer.Controls;
+using Microsoft.Extensions.DependencyInjection;
+
+var services = new ServiceCollection();
+services.AddImageViewerHost();
+
+using ServiceProvider serviceProvider = services.BuildServiceProvider();
+ImageViewer viewer = serviceProvider.GetRequiredService&lt;ImageViewer&gt;();</code></pre>
+        <p>宿主可在注册前替换调度器、刷新策略与分析诊断服务；也可使用 <code>AddImageViewerHost(builder =&gt; { ... })</code> 配置 <code>ImageViewerHostBuilder</code>。遥测通过 <code>IImageViewerTelemetry</code> 的 <code>ActivitySource</code> 与 <code>Meter</code> 输出，可接入 OpenTelemetry。</p>
+        <p>更多格式和集成约定请参阅同目录的 <a href="project-file-format.md">项目文件格式说明</a> 与 <a href="import-export-conventions.md">导入导出约定</a>。</p>
+      </section>
+    </main>
+  </div>
+
+  <footer class="footer">ImageViewer 使用手册 · 可离线打开与打印</footer>
+</body>
+</html>

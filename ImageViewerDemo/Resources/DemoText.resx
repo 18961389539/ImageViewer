@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="WindowTitle" xml:space="preserve"><value>ImageViewer Demo</value></data>
+  <data name="ToolbarHint" xml:space="preserve"><value>滚轮缩放，左键拖拽平移，右键打开功能菜单。</value></data>
+  <data name="OpenImageButton" xml:space="preserve"><value>打开图像文件</value></data>
+  <data name="OpenImageDialogTitle" xml:space="preserve"><value>选择图像文件</value></data>
+  <data name="OpenImageDialogFilter" xml:space="preserve"><value>图像文件|*.png;*.jpg;*.jpeg;*.bmp;*.tif;*.tiff|所有文件|*.*</value></data>
+  <data name="OpenImageErrorTitle" xml:space="preserve"><value>无法打开图像文件</value></data>
+</root>

@@ -1,0 +1,99 @@
+name: dotnet
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDKs
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/Directory.Packages.props', '**/*.csproj', '**/packages.lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: dotnet restore ImageViewer.sln --locked-mode
+
+      - name: Audit NuGet dependencies
+        run: dotnet list ImageViewer.sln package --vulnerable --include-transitive
+
+      - name: Build
+        run: dotnet build ImageViewer.sln --configuration Release --no-restore
+
+      - name: Release publish smoke
+        run: dotnet publish ImageViewerDemo/ImageViewerDemo.csproj --configuration Release --no-restore --output ./artifacts/publish-smoke
+
+      - name: Verify published host
+        shell: pwsh
+        run: |
+          $publishedAssembly = Join-Path $PWD "artifacts/publish-smoke/ImageViewerDemo.dll"
+          if (-not (Test-Path $publishedAssembly)) {
+            throw "Expected published host assembly at $publishedAssembly."
+          }
+
+      - name: Trim analyzer build
+        run: dotnet build ImageViewerControl/ImageViewerControl.csproj --configuration Release --no-restore -p:EnableTrimAnalyzer=true
+
+      - name: Host smoke tests
+        run: dotnet test ImageViewerControl.Tests/ImageViewerControl.Tests.csproj --configuration Release --no-build --filter "Category=Smoke" --logger trx
+
+      - name: Full tests with coverage (excluding smoke)
+        run: dotnet test ImageViewer.sln --configuration Release --no-build --filter "Category!=Smoke&Category!=Performance" --logger trx --collect:"XPlat Code Coverage"
+
+      - name: Enforce coverage baseline
+        shell: pwsh
+        run: |
+          $coverageFiles = @(Get-ChildItem -Path . -Filter coverage.cobertura.xml -Recurse)
+          if ($coverageFiles.Count -ne 1) {
+            throw "Expected exactly one Cobertura report, found $($coverageFiles.Count)."
+          }
+          [xml]$coverage = Get-Content $coverageFiles[0].FullName
+          $lineRate = [double]$coverage.coverage.'line-rate'
+          $minimumLineRate = 0.38
+          if ($lineRate -lt $minimumLineRate) {
+            throw "Line coverage $([math]::Round($lineRate * 100, 2))% is below the required baseline $([math]::Round($minimumLineRate * 100, 2))%."
+          }
+          Write-Host "Line coverage: $([math]::Round($lineRate * 100, 2))% (minimum $([math]::Round($minimumLineRate * 100, 2))%)."
+
+      - name: Upload test and coverage results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ github.run_number }}
+          path: |
+            **/TestResults/**/*.trx
+            **/TestResults/**/coverage.cobertura.xml
+          if-no-files-found: warn
+
+      - name: Generate software bill of materials
+        if: always()
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: spdx-json
+          output-file: artifacts/imageviewer.spdx.json
+
+      - name: Upload software bill of materials
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.run_number }}
+          path: artifacts/imageviewer.spdx.json
+          if-no-files-found: warn

@@ -1,0 +1,46 @@
+<UserControl
+    x:Class="ImageViewer.Controls.Volume3DViewer"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helix="http://helix-toolkit.org/wpf/SharpDX">
+    <Grid Background="#11161D">
+        <Grid.ContextMenu>
+            <ContextMenu x:Name="threeDContextMenu">
+                <MenuItem Header="Reset camera" Click="OnResetCameraClick" />
+                <MenuItem Header="Fit volume" Click="OnFitVolumeClick" />
+                <MenuItem Header="Front view" Click="OnFrontViewClick" />
+                <MenuItem Header="Back view" Click="OnBackViewClick" />
+                <MenuItem Header="Top view" Click="OnTopViewClick" />
+                <MenuItem Header="Bottom view" Click="OnBottomViewClick" />
+                <MenuItem Header="Side view" Click="OnSideViewClick" />
+                <MenuItem Header="Opposite side view" Click="OnOppositeSideViewClick" />
+                <MenuItem Header="Isometric view" Click="OnIsometricViewClick" />
+                <MenuItem Header="Show coordinate system" IsCheckable="True" IsChecked="True" Click="OnCoordinateSystemClick" />
+                <MenuItem Header="Show bounding box" IsCheckable="True" IsChecked="True" Click="OnBoundingBoxClick" />
+                <MenuItem Header="Show axial plane" IsCheckable="True" IsChecked="True" Click="OnAxialPlaneClick" />
+                <MenuItem Header="Show coronal plane" IsCheckable="True" Click="OnCoronalPlaneClick" />
+                <MenuItem Header="Show sagittal plane" IsCheckable="True" Click="OnSagittalPlaneClick" />
+                <MenuItem Header="Increase transparency" Click="OnIncreaseTransparencyClick" />
+                <MenuItem Header="Decrease transparency" Click="OnDecreaseTransparencyClick" />
+                <Separator />
+                <MenuItem Header="Switch to axial slice" Click="OnSwitchToAxialSliceClick" />
+            </ContextMenu>
+        </Grid.ContextMenu>
+        <helix:Viewport3DX
+            x:Name="viewport"
+            BackgroundColor="#11161D"
+            CameraRotationMode="Trackball"
+            ShowCoordinateSystem="True"
+            ShowFrameRate="False"
+            IsShadowMappingEnabled="False" />
+        <Border
+            HorizontalAlignment="Left"
+            VerticalAlignment="Top"
+            Margin="12"
+            Padding="8,5"
+            Background="#B8202730"
+            CornerRadius="3">
+            <TextBlock x:Name="volumeStatusText" Foreground="#E8EEF5" />
+        </Border>
+    </Grid>
+</UserControl>
