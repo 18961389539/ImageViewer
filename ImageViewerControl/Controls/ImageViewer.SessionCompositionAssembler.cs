@@ -60,7 +60,8 @@ namespace ImageViewer.Controls
                             GetPhysicalUnit = () => _owner.PhysicalUnit,
                             SessionService = _owner.RuntimeServices.SessionService,
                             GetPluginRegistry = () => _owner.PluginRegistry,
-                            LogNonCriticalError = _owner.LogNonCriticalError
+                            LogNonCriticalError = _owner.LogNonCriticalError,
+                            ShowStatusHint = message => _owner.ShowStatusHint(message)
                         }
                     },
                     _owner.HostServices.PeriodicTaskSchedulerFactory,

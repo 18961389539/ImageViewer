@@ -4,6 +4,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Linq;
 using ImageViewer.Controls;
+using ImageViewer.Localization;
 using ImageViewer.Models;
 using ImageViewer.Services;
 using Xunit;
@@ -28,8 +29,8 @@ namespace ImageViewerControl.Tests
                 coordinator.SelectAxialSlice(2);
 
                 Assert.Equal(2, coordinator.CurrentSliceIndex);
-                ContextMenu menu = WpfTestRunner.GetPrivateField<ContextMenu>(viewer.Volume3DViewer, "threeDContextMenu");
-                menu.Items.OfType<MenuItem>().Single(item => (string)item.Header == "Switch to axial slice")
+                ContextMenu menu = viewer.Volume3DViewer.threeDContextMenu;
+                menu.Items.OfType<MenuItem>().Single(item => (string)item.Header == UiText.Get("Menu3DSwitchToAxialSlice"))
                     .RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
                 Assert.IsType<VolumeViewer>(viewer.ActiveView);
             });

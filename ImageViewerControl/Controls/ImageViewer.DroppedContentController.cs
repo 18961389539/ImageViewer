@@ -10,15 +10,18 @@ namespace ImageViewer.Controls
         private readonly ViewportController _viewportController;
         private readonly ImageViewerSessionController _sessionController;
         private readonly Action _refreshSelectedRoiPropertyPanel;
+        private readonly Action _clearUndoHistory;
 
         public DroppedContentController(
             ViewportController viewportController,
             ImageViewerSessionController sessionController,
-            Action refreshSelectedRoiPropertyPanel)
+            Action refreshSelectedRoiPropertyPanel,
+            Action clearUndoHistory)
         {
             _viewportController = viewportController ?? throw new ArgumentNullException(nameof(viewportController));
             _sessionController = sessionController ?? throw new ArgumentNullException(nameof(sessionController));
             _refreshSelectedRoiPropertyPanel = refreshSelectedRoiPropertyPanel ?? throw new ArgumentNullException(nameof(refreshSelectedRoiPropertyPanel));
+            _clearUndoHistory = clearUndoHistory ?? throw new ArgumentNullException(nameof(clearUndoHistory));
         }
 
         public static void HandleDragOver(DragEventArgs e)
@@ -48,6 +51,8 @@ namespace ImageViewer.Controls
             {
                 case DroppedFileKind.Image:
                     _viewportController.LoadImageFromFile(path, fitToView: true);
+                    // 与对话框打开一致：换图后清空撤销历史，避免上一张图的命令污染新图状态
+                    _clearUndoHistory();
                     break;
                 case DroppedFileKind.Session:
                 case DroppedFileKind.ProjectPackage:

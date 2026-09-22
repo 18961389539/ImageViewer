@@ -87,6 +87,8 @@ namespace ImageViewer.Controls
         public required Func<RoiPluginRegistry> GetPluginRegistry { get; init; }
 
         public required Action<string, Exception> LogNonCriticalError { get; init; }
+
+        public required Action<string> ShowStatusHint { get; init; }
     }
 
     internal sealed class ImageViewerSessionController : IDisposable

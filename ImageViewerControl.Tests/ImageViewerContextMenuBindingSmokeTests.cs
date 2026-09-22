@@ -21,7 +21,7 @@ namespace ImageViewerControl.Tests
             WpfTestRunner.Run(() =>
             {
                 using var viewer = new ImageViewer.Controls.ImageViewer();
-                var menuItem = WpfTestRunner.GetPrivateField<MenuItem>(viewer, "showInfoPanelMenuItem");
+                var menuItem = viewer.showInfoPanelMenuItem;
 
                 WpfTestRunner.InvokePrivate(viewer, "OnViewCommandMenuClick", new MenuItem { Tag = ImageViewerViewMenuTags.ToggleInfoPanel }, new RoutedEventArgs());
                 WpfTestRunner.DrainDispatcher();
@@ -37,7 +37,7 @@ namespace ImageViewerControl.Tests
             WpfTestRunner.Run(() =>
             {
                 using var viewer = new ImageViewer.Controls.ImageViewer();
-                var pseudoColorMenu = WpfTestRunner.GetPrivateField<MenuItem>(viewer, "pseudoColorMenuItem");
+                var pseudoColorMenu = viewer.pseudoColorMenuItem;
 
                 WpfTestRunner.InvokePrivate(viewer, "OnAnalysisCommandMenuClick", new MenuItem { Tag = ImageViewerAnalysisMenuTags.SetPseudoColorPaletteHot }, new RoutedEventArgs());
                 WpfTestRunner.DrainDispatcher();
@@ -57,11 +57,11 @@ namespace ImageViewerControl.Tests
             WpfTestRunner.Run(() =>
             {
                 using var viewer = new ImageViewer.Controls.ImageViewer();
-                var viewMenuItem = WpfTestRunner.GetPrivateField<MenuItem>(viewer, "showInfoPanelMenuItem");
-                var analysisMenuItem = WpfTestRunner.GetPrivateField<MenuItem>(viewer, "showRenderStatusMenuItem");
-                var roiMenuItem = WpfTestRunner.GetPrivateField<MenuItem>(viewer, "undoMenuItem");
-                var fileMenuItem = WpfTestRunner.GetPrivateField<MenuItem>(viewer, "saveSessionMenuItem");
-                var featureMenuItem = WpfTestRunner.GetPrivateField<MenuItem>(viewer, "exportSnapshotMenuItem");
+                var viewMenuItem = viewer.showInfoPanelMenuItem;
+                var analysisMenuItem = viewer.showRenderStatusMenuItem;
+                var roiMenuItem = viewer.undoMenuItem;
+                var fileMenuItem = viewer.saveSessionMenuItem;
+                var featureMenuItem = viewer.exportSnapshotMenuItem;
 
                 Assert.IsType<ImageViewerViewMenuCommandTag>(viewMenuItem.Tag);
                 Assert.IsType<ImageViewerAnalysisMenuCommandTag>(analysisMenuItem.Tag);
@@ -78,7 +78,7 @@ namespace ImageViewerControl.Tests
             WpfTestRunner.Run(() =>
             {
                 using var viewer = new ImageViewer.Controls.ImageViewer();
-                var drawMenuItem = WpfTestRunner.GetPrivateField<MenuItem>(viewer, "drawRoiMenuItem");
+                var drawMenuItem = viewer.drawRoiMenuItem;
 
                 WpfTestRunner.InvokePrivate(viewer, "RefreshRoiDrawingMenuItems");
                 WpfTestRunner.InvokePrivate(viewer, "UpdateContextMenuState");
@@ -98,8 +98,8 @@ namespace ImageViewerControl.Tests
             WpfTestRunner.Run(() =>
             {
                 using var viewer = new ImageViewer.Controls.ImageViewer();
-                var fitToViewMenuItem = WpfTestRunner.GetPrivateField<MenuItem>(viewer, "fitToViewMenuItem");
-                var exportSnapshotMenuItem = WpfTestRunner.GetPrivateField<MenuItem>(viewer, "exportSnapshotMenuItem");
+                var fitToViewMenuItem = viewer.fitToViewMenuItem;
+                var exportSnapshotMenuItem = viewer.exportSnapshotMenuItem;
 
                 WpfTestRunner.InvokePrivate(viewer, "UpdateContextMenuState");
                 WpfTestRunner.DrainDispatcher();
@@ -122,8 +122,8 @@ namespace ImageViewerControl.Tests
             WpfTestRunner.Run(() =>
             {
                 using var viewer = new ImageViewer.Controls.ImageViewer();
-                var resetViewMenuItem = WpfTestRunner.GetPrivateField<MenuItem>(viewer, "resetViewMenuItem");
-                var openImageMenuItem = WpfTestRunner.GetPrivateField<MenuItem>(viewer, "openImageMenuItem");
+                var resetViewMenuItem = viewer.resetViewMenuItem;
+                var openImageMenuItem = viewer.openImageMenuItem;
 
                 Assert.Equal("Ctrl+O", openImageMenuItem.InputGestureText);
                 Assert.Equal("Ctrl+0", resetViewMenuItem.InputGestureText);
@@ -141,8 +141,8 @@ namespace ImageViewerControl.Tests
             WpfTestRunner.Run(() =>
             {
                 using var viewer = new ImageViewer.Controls.ImageViewer();
-                var searchBox = WpfTestRunner.GetPrivateField<TextBox>(viewer, "menuSearchBox");
-                var noResultsText = WpfTestRunner.GetPrivateField<TextBlock>(viewer, "menuSearchNoResultsText");
+                var searchBox = viewer.menuSearchBox;
+                var noResultsText = viewer.menuSearchNoResultsText;
 
                 searchBox.Text = "no-such-command";
                 WpfTestRunner.DrainDispatcher();
@@ -162,9 +162,9 @@ namespace ImageViewerControl.Tests
             WpfTestRunner.Run(() =>
             {
                 using var viewer = new ImageViewer.Controls.ImageViewer();
-                var dismissButton = WpfTestRunner.GetPrivateField<Button>(viewer, "diagnosticErrorDismissButton");
-                var diagnosticText = WpfTestRunner.GetPrivateField<TextBlock>(viewer, "diagnosticErrorTextBlock");
-                var loadStatus = WpfTestRunner.GetPrivateField<TextBlock>(viewer, "imageLoadStatusTextBlock");
+                var dismissButton = viewer.diagnosticErrorDismissButton;
+                var diagnosticText = viewer.diagnosticErrorTextBlock;
+                var loadStatus = viewer.imageLoadStatusTextBlock;
 
                 Assert.Equal(UiText.Get("MenuDismissError"), AutomationProperties.GetName(dismissButton));
                 Assert.Equal(AutomationLiveSetting.Assertive, AutomationProperties.GetLiveSetting(diagnosticText));
@@ -178,8 +178,8 @@ namespace ImageViewerControl.Tests
             WpfTestRunner.Run(() =>
             {
                 using var viewer = new ImageViewer.Controls.ImageViewer();
-                var deleteMenuItem = WpfTestRunner.GetPrivateField<MenuItem>(viewer, "deleteRoiMenuItem");
-                var clearAllMenuItem = WpfTestRunner.GetPrivateField<MenuItem>(viewer, "clearAllMenuItem");
+                var deleteMenuItem = viewer.deleteRoiMenuItem;
+                var clearAllMenuItem = viewer.clearAllMenuItem;
 
                 Assert.Equal(UiText.Get("RoiDestructiveActionUndoHint"), deleteMenuItem.ToolTip);
                 Assert.Equal(UiText.Get("RoiDestructiveActionUndoHint"), clearAllMenuItem.ToolTip);
@@ -188,7 +188,7 @@ namespace ImageViewerControl.Tests
 
         private static MenuItem FindMenuItem(ImageViewer.Controls.ImageViewer viewer, ImageViewerViewMenuCommandTag tag)
         {
-            var contextMenu = WpfTestRunner.GetPrivateField<ContextMenu>(viewer, "mainContextMenu");
+            var contextMenu = viewer.mainContextMenu;
             return FindMenuItem(contextMenu.Items.OfType<MenuItem>(), tag)
                 ?? throw new Xunit.Sdk.XunitException("Menu item was not found.");
         }

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Windows.Threading;
 using ImageViewer.Abstractions;
 using ImageViewer.Controls;
+using ImageViewer.Localization;
 using ImageViewer.Models;
 using ImageViewer.Plugins;
 using ImageViewer.Services;
@@ -141,6 +142,135 @@ namespace ImageViewerControl.Tests
                     schedulerFactory.Scheduler.InvokeCallbackAsync().GetAwaiter().GetResult();
 
                     Assert.Null(sessionService.LastSaveFilePath);
+                }
+                finally
+                {
+                    Directory.Delete(rootPath, recursive: true);
+                }
+            });
+        }
+
+        [Fact]
+        public void AutoSave_WhenSaveFails_ShowsNonBlockingHint()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                string rootPath = CreateTempRoot();
+                try
+                {
+                    var sessionService = new RecordingSessionService { ThrowOnSave = true };
+                    var host = new RecordingSessionHost(sessionService, new RecordingRecentProjectService(), new RecordingProjectPackageService())
+                    {
+                        HasContent = true
+                    };
+                    var schedulerFactory = new RecordingPeriodicTaskSchedulerFactory();
+
+                    using var controller = CreateController(host, schedulerFactory, rootPath);
+                    schedulerFactory.Scheduler.InvokeCallbackAsync().GetAwaiter().GetResult();
+
+                    Assert.Contains(UiText.Get("StatusAutoSaveFailed"), host.StatusHints);
+                }
+                finally
+                {
+                    Directory.Delete(rootPath, recursive: true);
+                }
+            });
+        }
+
+        [Fact]
+        public void AutoSave_WhenSaveSucceedsAfterFailure_ResetsFailureHint()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                string rootPath = CreateTempRoot();
+                try
+                {
+                    var sessionService = new RecordingSessionService();
+                    var host = new RecordingSessionHost(sessionService, new RecordingRecentProjectService(), new RecordingProjectPackageService())
+                    {
+                        HasContent = true
+                    };
+                    var schedulerFactory = new RecordingPeriodicTaskSchedulerFactory();
+
+                    using var controller = CreateController(host, schedulerFactory, rootPath);
+
+                    sessionService.ThrowOnSave = true;
+                    schedulerFactory.Scheduler.InvokeCallbackAsync().GetAwaiter().GetResult();
+                    Assert.Single(host.StatusHints.Where(hint => hint == UiText.Get("StatusAutoSaveFailed")));
+
+                    sessionService.ThrowOnSave = false;
+                    schedulerFactory.Scheduler.InvokeCallbackAsync().GetAwaiter().GetResult();
+                    schedulerFactory.Scheduler.InvokeCallbackAsync().GetAwaiter().GetResult();
+
+                    Assert.Single(host.StatusHints.Where(hint => hint == UiText.Get("StatusAutoSaveFailed")));
+                }
+                finally
+                {
+                    Directory.Delete(rootPath, recursive: true);
+                }
+            });
+        }
+
+        [Fact]
+        public void AutoSave_WhenReEnabledAfterFailure_AllowsNextFailureHint()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                string rootPath = CreateTempRoot();
+                try
+                {
+                    var sessionService = new RecordingSessionService { ThrowOnSave = true };
+                    var host = new RecordingSessionHost(sessionService, new RecordingRecentProjectService(), new RecordingProjectPackageService())
+                    {
+                        HasContent = true
+                    };
+                    var schedulerFactory = new RecordingPeriodicTaskSchedulerFactory();
+
+                    using var controller = CreateController(host, schedulerFactory, rootPath);
+
+                    // 第一次失败提示一次
+                    schedulerFactory.Scheduler.InvokeCallbackAsync().GetAwaiter().GetResult();
+                    Assert.Single(host.StatusHints.Where(hint => hint == UiText.Get("StatusAutoSaveFailed")));
+
+                    // 关闭后再重新开启：失败标记应被重置，下一次失败可再次提示
+                    controller.ToggleAutoSave();
+                    controller.ToggleAutoSave();
+                    schedulerFactory.Scheduler.InvokeCallbackAsync().GetAwaiter().GetResult();
+
+                    Assert.Equal(
+                        2,
+                        host.StatusHints.Count(hint => hint == UiText.Get("StatusAutoSaveFailed")));
+                }
+                finally
+                {
+                    Directory.Delete(rootPath, recursive: true);
+                }
+            });
+        }
+
+        [Fact]
+        public void AutoSave_WithoutProjectPath_StillWritesSessionUsingFallbackName()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                string rootPath = CreateTempRoot();
+                try
+                {
+                    // 从未保存过项目：_currentProjectPath 为 null，验证自动保存仍能真正写入而不崩溃
+                    var sessionService = new RecordingSessionService();
+                    var host = new RecordingSessionHost(sessionService, new RecordingRecentProjectService(), new RecordingProjectPackageService())
+                    {
+                        HasContent = true
+                    };
+                    var schedulerFactory = new RecordingPeriodicTaskSchedulerFactory();
+
+                    using var controller = CreateController(host, schedulerFactory, rootPath);
+
+                    schedulerFactory.Scheduler.InvokeCallbackAsync().GetAwaiter().GetResult();
+
+                    Assert.NotNull(sessionService.LastSaveFilePath);
+                    Assert.Empty(host.LoggedErrors);
+                    Assert.Empty(host.StatusHints);
                 }
                 finally
                 {
@@ -325,7 +455,8 @@ namespace ImageViewerControl.Tests
                     GetPhysicalUnit = () => host.PhysicalUnit,
                     SessionService = host.SessionService,
                     GetPluginRegistry = () => host.PluginRegistry,
-                    LogNonCriticalError = host.LogNonCriticalError
+                    LogNonCriticalError = host.LogNonCriticalError,
+                    ShowStatusHint = message => host.StatusHints.Add(message)
                 }
             };
         }
@@ -452,6 +583,8 @@ namespace ImageViewerControl.Tests
 
             public RoiPluginRegistry? LastLoadPluginRegistry { get; private set; }
 
+            public bool ThrowOnSave { get; set; }
+
             public ImageViewerSessionData LoadResult { get; set; } = new(
                 "session",
                 DateTimeOffset.UtcNow,
@@ -470,6 +603,11 @@ namespace ImageViewerControl.Tests
 
             public Task SaveToFileAsync(string filePath, string? imagePath, IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, double scale, double translateX, double translateY, RoiPluginRegistry? pluginRegistry = null, CancellationToken cancellationToken = default)
             {
+                if (ThrowOnSave)
+                {
+                    return Task.FromException(new IOException("disk full"));
+                }
+
                 LastSaveFilePath = filePath;
                 LastSavePluginRegistry = pluginRegistry;
                 Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);

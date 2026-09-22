@@ -27,6 +27,8 @@ namespace ImageViewer.Controls
         public required Action<bool> SetShowScaleBar { get; init; }
         public required Func<bool> GetShowRoiList { get; init; }
         public required Action<bool> SetShowRoiList { get; init; }
+        public required Func<bool> GetShowToolbar { get; init; }
+        public required Action<bool> SetShowToolbar { get; init; }
         public required Func<bool> GetShowSnapGrid { get; init; }
         public required Action<bool> SetShowSnapGrid { get; init; }
         public required Func<bool> GetEnableSnapToGrid { get; init; }
@@ -104,6 +106,7 @@ namespace ImageViewer.Controls
         bool ShowProfile { get; set; }
         bool ShowScaleBar { get; set; }
         bool ShowRoiList { get; set; }
+        bool ShowToolbar { get; set; }
         bool ShowSnapGrid { get; set; }
         bool EnableSnapToGrid { get; set; }
 

@@ -79,6 +79,14 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
+        public void ViewShortcut_UnmappedKey_ReturnsFalse()
+        {
+            bool handled = InteractionController.TryGetViewShortcut(Key.A, isShiftPressed: false, out ImageViewerViewCommand command);
+
+            Assert.False(handled);
+        }
+
+        [Fact]
         public void EditInteractionFlow_TryBeginEdit_WhenLockedRoiHit_SelectsWithoutDragging()
         {
             WpfTestRunner.Run(() =>

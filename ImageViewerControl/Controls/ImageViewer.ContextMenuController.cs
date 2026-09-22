@@ -25,6 +25,7 @@ namespace ImageViewer.Controls
         bool ShowProfile { get; }
         bool ShowScaleBar { get; }
         bool ShowRoiList { get; }
+        bool ShowToolbar { get; }
         bool ShowSnapGrid { get; }
         bool EnableSnapToGrid { get; }
         bool HasAnalysisBitmap { get; }
@@ -90,6 +91,7 @@ namespace ImageViewer.Controls
                     ShowProfile: _host.ShowProfile,
                     ShowScaleBar: _host.ShowScaleBar,
                     ShowRoiList: _host.ShowRoiList,
+                    ShowToolbar: _host.ShowToolbar,
                     ShowSnapGrid: _host.ShowSnapGrid,
                     EnableSnapToGrid: _host.EnableSnapToGrid));
             ImageViewerAnalysisMenuState analysisMenuState = _host.BuildAnalysisMenuState();

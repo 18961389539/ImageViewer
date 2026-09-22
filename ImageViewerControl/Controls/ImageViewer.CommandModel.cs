@@ -10,6 +10,7 @@ namespace ImageViewer.Controls
         ToggleProfile,
         ToggleScaleBar,
         ToggleRoiList,
+        ToggleToolbar,
         ToggleSnapGrid,
         ToggleSnapToGrid,
         FitToView,

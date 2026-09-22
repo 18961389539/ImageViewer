@@ -106,23 +106,15 @@ namespace ImageViewer.Controls
             _drawRois();
         }
 
-        public void SetSelectedColor(string colorStr)
+        public void SetSelectedColor(Color color)
         {
             if (_viewModel.SelectedRoi is not RoiBase roi)
             {
                 return;
             }
 
-            try
-            {
-                Color color = (Color)ColorConverter.ConvertFromString(colorStr);
-                _viewModel.UndoRedo.Execute(new RoiColorCommand(roi, color));
-                _drawRois();
-            }
-            catch (Exception ex)
-            {
-                _logNonCriticalError("Failed to set ROI color", ex);
-            }
+            _viewModel.UndoRedo.Execute(new RoiColorCommand(roi, color));
+            _drawRois();
         }
     }
 }

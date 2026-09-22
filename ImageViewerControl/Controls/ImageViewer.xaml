@@ -13,6 +13,7 @@
     Focusable="True"
     AllowDrop="True"
     UseLayoutRounding="True"
+    automation:AutomationProperties.Name="{localization:UiText ViewerAccessibleName}"
     mc:Ignorable="d">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
@@ -137,25 +138,25 @@
     </UserControl.Resources>
     <Grid x:Name="rootGrid" Background="{StaticResource ViewerBackdropBrush}" ClipToBounds="True" SnapsToDevicePixels="True" AllowDrop="True">
         <Grid.ContextMenu>
-            <ContextMenu x:Name="mainContextMenu" Opened="OnContextMenuOpened">
+            <ContextMenu x:Name="mainContextMenu" x:FieldModifier="internal" Opened="OnContextMenuOpened">
                 <ContextMenu.Resources>
                     <Style TargetType="MenuItem">
                         <Setter Property="HorizontalContentAlignment" Value="Left" />
                         <Setter Property="VerticalContentAlignment" Value="Center" />
                     </Style>
                 </ContextMenu.Resources>
-                <TextBox x:Name="menuSearchBox"
+                <TextBox x:Name="menuSearchBox" x:FieldModifier="internal"
                          Margin="4"
                          Padding="8,5"
                          ToolTip="{localization:UiText MenuSearch}"
                          TextChanged="OnMenuSearchTextChanged"
                          PreviewKeyDown="OnMenuSearchPreviewKeyDown" />
-                <TextBlock x:Name="menuSearchMatchCountText"
+                <TextBlock x:Name="menuSearchMatchCountText" x:FieldModifier="internal"
                            Margin="12,4,12,2"
                            Foreground="{StaticResource ViewerAccentBrush}"
                            Text="{localization:UiText MenuSearchMatchCount}"
                            Visibility="Collapsed" />
-                <TextBlock x:Name="menuSearchNoResultsText"
+                <TextBlock x:Name="menuSearchNoResultsText" x:FieldModifier="internal"
                            Margin="12,4,12,8"
                            Foreground="{StaticResource ViewerTextSecondaryBrush}"
                            Text="{localization:UiText MenuSearchNoResults}"
@@ -170,14 +171,14 @@
                           Visibility="{Binding PlacementTarget.CanRetryImageLoad, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 <Separator Visibility="{Binding PlacementTarget.ImageLoadHasError, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 <MenuItem x:Name="roiOperationsMenuItem" Header="{localization:UiText MenuRoiOperations}">
-                    <MenuItem x:Name="undoMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.Undo}" Header="{localization:UiText MenuUndo}" IsEnabled="{Binding MenuState.Context.UndoEnabled}" />
+                    <MenuItem x:Name="undoMenuItem" x:FieldModifier="internal" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.Undo}" Header="{localization:UiText MenuUndo}" IsEnabled="{Binding MenuState.Context.UndoEnabled}" />
                     <MenuItem x:Name="redoMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.Redo}" Header="{localization:UiText MenuRedo}" IsEnabled="{Binding MenuState.Context.RedoEnabled}" />
                     <Separator />
-                    <MenuItem x:Name="drawRoiMenuItem" Header="{localization:UiText MenuDraw}" IsEnabled="{Binding MenuState.Context.DrawRoiEnabled}" />
+                    <MenuItem x:Name="drawRoiMenuItem" x:FieldModifier="internal" Header="{localization:UiText MenuDraw}" IsEnabled="{Binding MenuState.Context.DrawRoiEnabled}" />
                     <MenuItem x:Name="measureMenuItem" Header="{localization:UiText MenuMeasure}" />
                     <Separator />
-                    <MenuItem x:Name="deleteRoiMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.DeleteSelected}" Header="{localization:UiText MenuDeleteSelectedRoi}" ToolTip="{localization:UiText RoiDestructiveActionUndoHint}" IsEnabled="{Binding MenuState.Context.DeleteSelectedEnabled}" />
-                    <MenuItem x:Name="clearAllMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.ClearAll}" Header="{localization:UiText MenuClearAllRois}" ToolTip="{localization:UiText RoiDestructiveActionUndoHint}" IsEnabled="{Binding MenuState.Context.ClearAllEnabled}" />
+                    <MenuItem x:Name="deleteRoiMenuItem" x:FieldModifier="internal" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.DeleteSelected}" Header="{localization:UiText MenuDeleteSelectedRoi}" ToolTip="{localization:UiText RoiDestructiveActionUndoHint}" IsEnabled="{Binding MenuState.Context.DeleteSelectedEnabled}" />
+                    <MenuItem x:Name="clearAllMenuItem" x:FieldModifier="internal" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.ClearAll}" Header="{localization:UiText MenuClearAllRois}" ToolTip="{localization:UiText RoiDestructiveActionUndoHint}" IsEnabled="{Binding MenuState.Context.ClearAllEnabled}" />
                     <Separator />
                     <MenuItem x:Name="editPropertiesMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.EditProperties}" Header="{localization:UiText MenuEditProperties}" IsEnabled="{Binding MenuState.Context.EditPropertiesEnabled}" />
                     <MenuItem x:Name="setLabelMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.SetLabel}" Header="{localization:UiText MenuSetLabel}" IsEnabled="{Binding MenuState.Context.SetLabelEnabled}" />
@@ -196,11 +197,11 @@
                     <MenuItem x:Name="zoomToSelectionMenuItem" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ZoomToSelection}" Header="{localization:UiText MenuZoomToSelectedRoi}" IsEnabled="{Binding MenuState.View.ZoomToSelectionEnabled}" />
                 </MenuItem>
                 <MenuItem Header="{localization:UiText MenuFileAndProjects}">
-                    <MenuItem x:Name="openImageMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.OpenImage}" Header="{localization:UiText MenuOpenImageFile}" InputGestureText="Ctrl+O" />
+                    <MenuItem x:Name="openImageMenuItem" x:FieldModifier="internal" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.OpenImage}" Header="{localization:UiText MenuOpenImageFile}" InputGestureText="Ctrl+O" />
                     <MenuItem x:Name="saveRoisMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.SaveRois}" Header="{localization:UiText MenuSaveRois}" IsEnabled="{Binding MenuState.File.SaveRoisEnabled}" />
                     <MenuItem x:Name="loadRoisMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.LoadRois}" Header="{localization:UiText MenuLoadRois}" />
                     <Separator />
-                    <MenuItem x:Name="saveSessionMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.SaveSession}" Header="{localization:UiText MenuSaveSession}" IsEnabled="{Binding MenuState.File.SaveSessionEnabled}" />
+                    <MenuItem x:Name="saveSessionMenuItem" x:FieldModifier="internal" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.SaveSession}" Header="{localization:UiText MenuSaveSession}" IsEnabled="{Binding MenuState.File.SaveSessionEnabled}" />
                     <MenuItem x:Name="loadSessionMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.LoadSession}" Header="{localization:UiText MenuOpenProjectOrSession}" />
                     <MenuItem x:Name="recentProjectsMenuItem" Header="{localization:UiText MenuRecentProjects}" ItemsSource="{Binding MenuState.File.RecentProjects}" IsEnabled="{Binding MenuState.File.RecentProjectsEnabled}">
                         <MenuItem.ItemContainerStyle>
@@ -217,7 +218,7 @@
                     <MenuItem x:Name="autoSaveMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.ToggleAutoSave}" Header="{localization:UiText MenuAutoSave}" IsCheckable="True" IsChecked="{Binding MenuState.File.AutoSaveChecked}" />
                 </MenuItem>
                 <MenuItem Header="{localization:UiText MenuAnalysisAndExport}">
-                    <MenuItem x:Name="exportSnapshotMenuItem" Click="OnFeatureMenuCommandClick" Tag="{x:Static controls:ImageViewerFeatureMenuTags.ExportSnapshot}" Header="{localization:UiText MenuExportCurrentViewPng}" IsEnabled="{Binding MenuState.Context.ExportSnapshotEnabled}" />
+                    <MenuItem x:Name="exportSnapshotMenuItem" x:FieldModifier="internal" Click="OnFeatureMenuCommandClick" Tag="{x:Static controls:ImageViewerFeatureMenuTags.ExportSnapshot}" Header="{localization:UiText MenuExportCurrentViewPng}" IsEnabled="{Binding MenuState.Context.ExportSnapshotEnabled}" />
                     <MenuItem x:Name="exportAnalysisCsvMenuItem" Click="OnFeatureMenuCommandClick" Tag="{x:Static controls:ImageViewerFeatureMenuTags.ExportAnalysisCsv}" Header="{localization:UiText MenuExportAnalysisCsv}" IsEnabled="{Binding MenuState.Context.ExportAnalysisCsvEnabled}" />
                     <MenuItem x:Name="showAnalysisSummaryMenuItem" Click="OnFeatureMenuCommandClick" Tag="{x:Static controls:ImageViewerFeatureMenuTags.ShowAnalysisSummary}" Header="{localization:UiText MenuShowAnalysisSummary}" IsEnabled="{Binding MenuState.Context.ShowAnalysisSummaryEnabled}" />
                     <Separator />
@@ -247,30 +248,31 @@
                         <MenuItem x:Name="preferShaderPseudoColorMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.TogglePreferShaderPseudoColor}" Header="{localization:UiText MenuPreferShaderPseudoColor}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PreferShaderPseudoColorChecked}" />
                         <MenuItem x:Name="allowCpuPseudoColorFallbackMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ToggleAllowCpuPseudoColorFallback}" Header="{localization:UiText MenuAllowCpuFallback}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.AllowCpuPseudoColorFallbackChecked}" />
                     </MenuItem>
-                    <MenuItem x:Name="pseudoColorMenuItem" Header="{localization:UiText MenuPseudoColor}">
+                    <MenuItem x:Name="pseudoColorMenuItem" x:FieldModifier="internal" Header="{localization:UiText MenuPseudoColor}">
                         <MenuItem Header="{localization:UiText MenuPseudoColorOriginal}" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.SetPseudoColorPaletteNone}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PseudoColorNoneChecked}" />
                         <MenuItem Header="{localization:UiText MenuPseudoColorHot}" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.SetPseudoColorPaletteHot}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PseudoColorHotChecked}" />
                         <MenuItem Header="{localization:UiText MenuPseudoColorJet}" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.SetPseudoColorPaletteJet}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PseudoColorJetChecked}" />
                         <MenuItem Header="{localization:UiText MenuPseudoColorViridis}" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.SetPseudoColorPaletteViridis}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PseudoColorViridisChecked}" />
                     </MenuItem>
-                    <MenuItem x:Name="showRenderStatusMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ShowRenderStatus}" Header="{localization:UiText MenuShowRenderStatus}" IsEnabled="{Binding MenuState.Analysis.EnableShowRenderStatus}" />
+                    <MenuItem x:Name="showRenderStatusMenuItem" x:FieldModifier="internal" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ShowRenderStatus}" Header="{localization:UiText MenuShowRenderStatus}" IsEnabled="{Binding MenuState.Analysis.EnableShowRenderStatus}" />
                 </MenuItem>
                 <MenuItem Header="{localization:UiText MenuDisplaySettings}">
+                    <MenuItem x:Name="showToolbarMenuItem" x:FieldModifier="internal" Header="{localization:UiText MenuShowToolbar}" ToolTip="{localization:UiText MenuShowToolbarTooltip}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleToolbar}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowToolbarChecked}" />
                     <MenuItem x:Name="showPixelGridMenuItem" Header="{localization:UiText MenuShowPixelGrid}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.TogglePixelGrid}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowPixelGridChecked}" />
                     <MenuItem x:Name="showSnapGridMenuItem" Header="{localization:UiText MenuShowSnapGrid}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleSnapGrid}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowSnapGridChecked}" />
                     <MenuItem x:Name="enableSnapToGridMenuItem" Header="{localization:UiText MenuEnableSnapToGrid}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleSnapToGrid}" IsCheckable="True" IsChecked="{Binding MenuState.View.EnableSnapToGridChecked}" />
                     <MenuItem x:Name="showCrosshairMenuItem" Header="{localization:UiText MenuShowCrosshair}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleCrosshair}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowCrosshairChecked}" />
                     <MenuItem x:Name="showCaliperScoresMenuItem" Header="{localization:UiText MenuShowCaliperScores}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleCaliperScores}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowCaliperScoresChecked}" />
-                    <MenuItem x:Name="showInfoPanelMenuItem" Header="{localization:UiText MenuShowInfoPanel}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleInfoPanel}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowInfoPanelChecked}" />
+                    <MenuItem x:Name="showInfoPanelMenuItem" x:FieldModifier="internal" Header="{localization:UiText MenuShowInfoPanel}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleInfoPanel}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowInfoPanelChecked}" />
                     <MenuItem x:Name="showHistogramMenuItem" Header="{localization:UiText MenuShowHistogram}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleHistogram}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowHistogramChecked}" />
                     <MenuItem x:Name="showProfileMenuItem" Header="{localization:UiText MenuShowProfile}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleProfile}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowProfileChecked}" />
                     <MenuItem x:Name="showScaleBarMenuItem" Header="{localization:UiText MenuShowScaleBar}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleScaleBar}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowScaleBarChecked}" />
                 </MenuItem>
                 <Separator />
                 <MenuItem Header="{localization:UiText MenuViewControl}">
-                    <MenuItem x:Name="fitToViewMenuItem" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.FitToView}" Header="{localization:UiText MenuFitToView}" InputGestureText="Ctrl+F" IsEnabled="{Binding MenuState.View.FitToViewEnabled}" />
+                    <MenuItem x:Name="fitToViewMenuItem" x:FieldModifier="internal" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.FitToView}" Header="{localization:UiText MenuFitToView}" InputGestureText="Ctrl+F" IsEnabled="{Binding MenuState.View.FitToViewEnabled}" />
                     <MenuItem x:Name="actualSizeMenuItem" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ActualSize}" Header="{localization:UiText MenuActualSize}" IsEnabled="{Binding MenuState.View.ActualSizeEnabled}" />
-                    <MenuItem x:Name="resetViewMenuItem" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ResetView}" Header="{localization:UiText MenuResetView}" InputGestureText="Ctrl+0" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
+                    <MenuItem x:Name="resetViewMenuItem" x:FieldModifier="internal" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ResetView}" Header="{localization:UiText MenuResetView}" InputGestureText="Ctrl+0" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
                     <Separator />
                     <MenuItem Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.RotateLeft}" Header="{localization:UiText MenuRotateLeft}" InputGestureText="Ctrl+Shift+R" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
                     <MenuItem Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.RotateRight}" Header="{localization:UiText MenuRotateRight}" InputGestureText="Ctrl+R" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
@@ -281,7 +283,7 @@
         </Grid.ContextMenu>
         <Canvas x:Name="canvas" SnapsToDevicePixels="True">
             <!-- 图像容器，负责缩放和平移 -->
-            <Canvas x:Name="imageContainer" SnapsToDevicePixels="True">
+            <Canvas x:Name="imageContainer" x:FieldModifier="internal" SnapsToDevicePixels="True">
                 <Canvas.RenderTransform>
                     <TransformGroup>
                         <ScaleTransform x:Name="scaleTransform" />
@@ -292,7 +294,10 @@
                 </Canvas.RenderTransform>
 
                 <!-- 图像显示 -->
-                <Image x:Name="image" RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                <Image x:Name="image" x:FieldModifier="internal"
+                       RenderOptions.BitmapScalingMode="NearestNeighbor"
+                       automation:AutomationProperties.Name="{localization:UiText ImageDisplayAreaName}"
+                       automation:AutomationProperties.HelpText="{localization:UiText ImageDisplayAreaHelpText}" />
 
                 <Canvas x:Name="snapGridCanvas" IsHitTestVisible="False" Opacity="0.6" />
 
@@ -310,7 +315,7 @@
 
         <Canvas x:Name="screenOverlayCanvas" IsHitTestVisible="False" SnapsToDevicePixels="True">
             <!-- 缩放比例徽标：跟随光标短暂显示，淡入淡出 -->
-            <Border x:Name="zoomBadgeBorder"
+            <Border x:Name="zoomBadgeBorder" x:FieldModifier="internal"
                     Padding="10,5"
                     Background="{StaticResource ViewerSurfaceBrush}"
                     BorderBrush="{StaticResource ViewerAccentBorderBrush}"
@@ -321,7 +326,7 @@
                 <Border.Effect>
                     <effects:DropShadowEffect BlurRadius="14" ShadowDepth="3" Opacity="0.35" Color="#000000" />
                 </Border.Effect>
-                <TextBlock x:Name="zoomBadgeTextBlock"
+                <TextBlock x:Name="zoomBadgeTextBlock" x:FieldModifier="internal"
                            Foreground="{StaticResource ViewerTextPrimaryBrush}"
                            FontSize="12"
                            FontWeight="SemiBold" />
@@ -339,7 +344,7 @@
             Panel.ZIndex="120"
             Visibility="{Binding HasDiagnosticError, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}">
             <DockPanel LastChildFill="True">
-                <Button x:Name="diagnosticErrorDismissButton"
+                <Button x:Name="diagnosticErrorDismissButton" x:FieldModifier="internal"
                     DockPanel.Dock="Right"
                     Margin="12,0,0,0"
                     Padding="6,0"
@@ -350,7 +355,7 @@
                     Foreground="{StaticResource ViewerErrorBrush}"
                     Background="Transparent"
                     BorderThickness="0" />
-                 <TextBlock x:Name="diagnosticErrorTextBlock"
+                 <TextBlock x:Name="diagnosticErrorTextBlock" x:FieldModifier="internal"
                      Text="{Binding DiagnosticErrorText, RelativeSource={RelativeSource AncestorType=UserControl}}"
                    Foreground="{StaticResource ViewerTextPrimaryBrush}"
                    FontWeight="SemiBold"
@@ -404,6 +409,27 @@
             <TextBlock x:Name="scaleBarText" Text="{localization:UiText ScaleBarDefault}" Foreground="{StaticResource ViewerTextPrimaryBrush}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" Canvas.Left="30" Canvas.Top="-5"/>
         </Canvas>
 
+        <!-- 常驻状态栏：图像尺寸与文件路径（底部居中常驻显示） -->
+        <Border x:Name="statusBarBorder" x:FieldModifier="internal"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Bottom"
+                Margin="10,0,10,10"
+                MaxWidth="420"
+                Padding="10,6"
+                Background="#C0141D29"
+                BorderBrush="#334A63"
+                BorderThickness="1"
+                CornerRadius="12"
+                IsHitTestVisible="False"
+                Panel.ZIndex="5">
+            <TextBlock x:Name="statusBarTextBlock" x:FieldModifier="internal"
+                       Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                       FontWeight="SemiBold"
+                       FontSize="12"
+                       TextTrimming="CharacterEllipsis"
+                       automation:AutomationProperties.LiveSetting="Polite" />
+        </Border>
+
         <!-- 信息面板 -->
         <Border x:Name="infoPanel" 
                 Margin="10" 
@@ -432,10 +458,11 @@
                 </Grid.RowDefinitions>
                 <TextBlock Text="{localization:UiText RoiListTitle}" Foreground="{StaticResource ViewerTextPrimaryBrush}" FontWeight="Bold" Margin="0,0,0,6" />
                 <ListBox Grid.Row="1"
-                         x:Name="roiListBox"
+                         x:Name="roiListBox" x:FieldModifier="internal"
                          Background="Transparent"
                          BorderThickness="0"
                          Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                         automation:AutomationProperties.Name="{localization:UiText RoiListAccessibleName}"
                          ItemsSource="{Binding ViewerState.AllRois, RelativeSource={RelativeSource AncestorType=UserControl}}"
                          SelectedItem="{Binding ViewerState.SelectedRoi, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}">
                     <ListBox.ItemTemplate>
@@ -606,11 +633,12 @@
             </StackPanel>
         </Border>
 
-        <Border x:Name="toolbarPanel"
+        <Border x:Name="toolbarPanel" x:FieldModifier="internal"
                 HorizontalAlignment="Left"
                 VerticalAlignment="Top"
                 Margin="16"
                 Panel.ZIndex="100"
+                Visibility="Collapsed"
                 Style="{StaticResource ViewerFloatingPanelStyle}">
             <StackPanel Width="Auto">
                 <TextBlock Text="{localization:UiText MenuFileAndProjects}" Style="{StaticResource ViewerSectionTitleStyle}" />
@@ -618,6 +646,8 @@
                     <Button Content="{localization:UiText MenuOpenImageFile}"
                             Click="OnToolbarFileCommandClick"
                             Tag="{x:Static controls:ImageViewerFileMenuTags.OpenImage}"
+                            ToolTip="{localization:UiText ToolbarOpenImageTooltip}"
+                            automation:AutomationProperties.HelpText="{localization:UiText ToolbarOpenImageTooltip}"
                             Style="{StaticResource ViewerToolbarPrimaryButtonStyle}" />
                 </WrapPanel>
 
@@ -626,32 +656,40 @@
                     <Button Content="{localization:UiText MenuZoomOut}"
                         Click="OnToolbarViewCommandClick"
                         Tag="{x:Static controls:ImageViewerViewMenuTags.ZoomOut}"
-                        ToolTip="{localization:UiText MenuZoomOut}"
+                        ToolTip="{localization:UiText ToolbarZoomOutTooltip}"
+                        automation:AutomationProperties.HelpText="{localization:UiText ToolbarZoomOutTooltip}"
                         Style="{StaticResource ViewerToolbarButtonStyle}" />
                     <Button Content="{localization:UiText MenuZoomIn}"
                         Click="OnToolbarViewCommandClick"
                         Tag="{x:Static controls:ImageViewerViewMenuTags.ZoomIn}"
-                        ToolTip="{localization:UiText MenuZoomIn}"
+                        ToolTip="{localization:UiText ToolbarZoomInTooltip}"
+                        automation:AutomationProperties.HelpText="{localization:UiText ToolbarZoomInTooltip}"
                         Style="{StaticResource ViewerToolbarButtonStyle}" />
                     <Border Margin="0,0,8,8" Padding="10,7" Background="{StaticResource ViewerSurfaceAltBrush}" BorderBrush="{StaticResource ViewerChipBorderBrush}" BorderThickness="1" CornerRadius="10">
                     <TextBlock Text="{Binding Scale, RelativeSource={RelativeSource AncestorType=UserControl}, StringFormat={}{0:P0}}"
                            Foreground="{StaticResource ViewerTextPrimaryBrush}"
                            FontWeight="SemiBold"
                            VerticalAlignment="Center"
-                           ToolTip="{localization:UiText MenuZoomLevel}" />
+                           automation:AutomationProperties.Name="{localization:UiText ZoomLevelDisplayAccessibleName}"
+                           ToolTip="{localization:UiText ToolbarZoomLevelTooltip}" />
                     </Border>
                     <Button Content="{localization:UiText MenuFitToView}"
                             Click="OnToolbarViewCommandClick"
                             Tag="{x:Static controls:ImageViewerViewMenuTags.FitToView}"
-                            ToolTip="Ctrl+F"
+                            ToolTip="{localization:UiText ToolbarFitToViewTooltip}"
+                            automation:AutomationProperties.HelpText="{localization:UiText ToolbarFitToViewTooltip}"
                             Style="{StaticResource ViewerToolbarButtonStyle}" />
                     <Button Content="{localization:UiText MenuActualSize}"
                             Click="OnToolbarViewCommandClick"
                             Tag="{x:Static controls:ImageViewerViewMenuTags.ActualSize}"
+                            ToolTip="{localization:UiText ToolbarActualSizeTooltip}"
+                            automation:AutomationProperties.HelpText="{localization:UiText ToolbarActualSizeTooltip}"
                             Style="{StaticResource ViewerToolbarButtonStyle}" />
                     <Button Content="{localization:UiText MenuResetView}"
                             Click="OnToolbarViewCommandClick"
                             Tag="{x:Static controls:ImageViewerViewMenuTags.ResetView}"
+                            ToolTip="{localization:UiText ToolbarResetViewTooltip}"
+                            automation:AutomationProperties.HelpText="{localization:UiText ToolbarResetViewTooltip}"
                             Style="{StaticResource ViewerToolbarButtonStyle}" />
                 </WrapPanel>
 
@@ -661,33 +699,43 @@
                                   IsChecked="{Binding ShowInfoPanel, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
                                   Checked="OnToolbarPanelToggleChanged"
                                   Unchecked="OnToolbarPanelToggleChanged"
+                                  ToolTip="{localization:UiText ToolbarToggleInfoPanelTooltip}"
+                                  automation:AutomationProperties.HelpText="{localization:UiText ToolbarToggleInfoPanelTooltip}"
                                   Style="{StaticResource ViewerToolbarToggleButtonStyle}" />
                     <ToggleButton Content="{localization:UiText MenuShowHistogram}"
                                   IsChecked="{Binding ShowHistogram, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
                                   Checked="OnToolbarPanelToggleChanged"
                                   Unchecked="OnToolbarPanelToggleChanged"
+                                  ToolTip="{localization:UiText ToolbarToggleHistogramTooltip}"
+                                  automation:AutomationProperties.HelpText="{localization:UiText ToolbarToggleHistogramTooltip}"
                                   Style="{StaticResource ViewerToolbarToggleButtonStyle}" />
                     <ToggleButton Content="{localization:UiText MenuShowProfile}"
                                   IsChecked="{Binding ShowProfile, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
                                   Checked="OnToolbarPanelToggleChanged"
                                   Unchecked="OnToolbarPanelToggleChanged"
+                                  ToolTip="{localization:UiText ToolbarToggleProfileTooltip}"
+                                  automation:AutomationProperties.HelpText="{localization:UiText ToolbarToggleProfileTooltip}"
                                   Style="{StaticResource ViewerToolbarToggleButtonStyle}" />
                     <ToggleButton Content="{localization:UiText MenuShowScaleBar}"
                                   IsChecked="{Binding ShowScaleBar, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
                                   Checked="OnToolbarPanelToggleChanged"
                                   Unchecked="OnToolbarPanelToggleChanged"
+                                  ToolTip="{localization:UiText ToolbarToggleScaleBarTooltip}"
+                                  automation:AutomationProperties.HelpText="{localization:UiText ToolbarToggleScaleBarTooltip}"
                                   Style="{StaticResource ViewerToolbarToggleButtonStyle}" />
                     <ToggleButton Content="{localization:UiText MenuShowRoiList}"
                                   IsChecked="{Binding ShowRoiList, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
                                   Checked="OnToolbarPanelToggleChanged"
                                   Unchecked="OnToolbarPanelToggleChanged"
+                                  ToolTip="{localization:UiText ToolbarToggleRoiListTooltip}"
+                                  automation:AutomationProperties.HelpText="{localization:UiText ToolbarToggleRoiListTooltip}"
                                   Style="{StaticResource ViewerToolbarToggleButtonStyle}" />
                 </WrapPanel>
             </StackPanel>
         </Border>
 
         <!-- 状态提示横幅（顶部居中，约 3 秒自动消失） -->
-        <Border x:Name="statusHintBorder"
+        <Border x:Name="statusHintBorder" x:FieldModifier="internal"
                 MaxWidth="520"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Top"
@@ -703,7 +751,7 @@
             <Border.Effect>
                 <effects:DropShadowEffect BlurRadius="16" ShadowDepth="4" Opacity="0.35" Color="#000000" />
             </Border.Effect>
-            <TextBlock x:Name="statusHintTextBlock"
+            <TextBlock x:Name="statusHintTextBlock" x:FieldModifier="internal"
                        Foreground="{StaticResource ViewerTextPrimaryBrush}"
                        FontSize="12.5"
                        FontWeight="SemiBold"
@@ -768,7 +816,7 @@
                 </Grid>
 
                 <StackPanel Grid.Column="1" Margin="14,0,0,0">
-                    <TextBlock x:Name="imageLoadStatusTextBlock"
+                    <TextBlock x:Name="imageLoadStatusTextBlock" x:FieldModifier="internal"
                                Text="{Binding ImageLoadStatusText, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                Foreground="{StaticResource ViewerTextPrimaryBrush}"
                                FontWeight="SemiBold"

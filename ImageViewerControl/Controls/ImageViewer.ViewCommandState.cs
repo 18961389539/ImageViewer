@@ -11,6 +11,7 @@ namespace ImageViewer.Controls
         bool ShowProfile,
         bool ShowScaleBar,
         bool ShowRoiList,
+        bool ShowToolbar,
         bool ShowSnapGrid,
         bool EnableSnapToGrid);
 
@@ -27,6 +28,7 @@ namespace ImageViewer.Controls
         bool ShowProfileChecked,
         bool ShowScaleBarChecked,
         bool ShowRoiListChecked,
+        bool ShowToolbarChecked,
         bool ShowSnapGridChecked,
         bool EnableSnapToGridChecked);
 
@@ -47,6 +49,7 @@ namespace ImageViewer.Controls
                 ShowProfileChecked: input.ShowProfile,
                 ShowScaleBarChecked: input.ShowScaleBar,
                 ShowRoiListChecked: input.ShowRoiList,
+                ShowToolbarChecked: input.ShowToolbar,
                 ShowSnapGridChecked: input.ShowSnapGrid,
                 EnableSnapToGridChecked: input.EnableSnapToGrid);
         }

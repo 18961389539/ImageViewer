@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows;
 using System.Windows.Media.Media3D;
 using ImageViewer.Controls;
+using ImageViewer.Localization;
 using ImageViewer.Models;
 using Xunit;
 
@@ -39,12 +40,12 @@ namespace ImageViewerControl.Tests
             WpfTestRunner.Run(() =>
             {
                 using var viewer = new Volume3DViewer();
-                ContextMenu menu = WpfTestRunner.GetPrivateField<ContextMenu>(viewer, "threeDContextMenu");
+                ContextMenu menu = viewer.threeDContextMenu;
 
-                Assert.Contains(menu.Items.OfType<MenuItem>(), item => (string)item.Header == "Reset camera");
-                Assert.Contains(menu.Items.OfType<MenuItem>(), item => (string)item.Header == "Fit volume");
-                Assert.Contains(menu.Items.OfType<MenuItem>(), item => (string)item.Header == "Show coordinate system");
-                Assert.Contains(menu.Items.OfType<MenuItem>(), item => (string)item.Header == "Switch to axial slice");
+                Assert.Contains(menu.Items.OfType<MenuItem>(), item => (string)item.Header == UiText.Get("Menu3DResetCamera"));
+                Assert.Contains(menu.Items.OfType<MenuItem>(), item => (string)item.Header == UiText.Get("Menu3DFitVolume"));
+                Assert.Contains(menu.Items.OfType<MenuItem>(), item => (string)item.Header == UiText.Get("Menu3DShowCoordinateSystem"));
+                Assert.Contains(menu.Items.OfType<MenuItem>(), item => (string)item.Header == UiText.Get("Menu3DSwitchToAxialSlice"));
             });
         }
 
@@ -57,8 +58,8 @@ namespace ImageViewerControl.Tests
                 {
                     Volume = new VolumeData([CreateBitmap(7), CreateBitmap(14)])
                 };
-                ContextMenu menu = WpfTestRunner.GetPrivateField<ContextMenu>(viewer.Volume3DViewer, "threeDContextMenu");
-                var switchMenuItem = menu.Items.OfType<MenuItem>().Single(item => (string)item.Header == "Switch to axial slice");
+                ContextMenu menu = viewer.Volume3DViewer.threeDContextMenu;
+                var switchMenuItem = menu.Items.OfType<MenuItem>().Single(item => (string)item.Header == UiText.Get("Menu3DSwitchToAxialSlice"));
                 switchMenuItem.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
 
                 Assert.IsType<VolumeViewer>(viewer.ActiveView);

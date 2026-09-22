@@ -96,7 +96,7 @@ namespace ImageViewer.Controls
         private readonly IImageViewerAnalysisHost _host;
         private readonly IImageViewerAnalysisUiFacade _uiFacade;
         private readonly IImageViewerProfileTargetResolver _profileTargetResolver;
-        private readonly IImageViewerAnalysisErrorSink _errorSink;
+        internal readonly IImageViewerAnalysisErrorSink _errorSink;
         private ImageViewerBackgroundOperationObserver? _backgroundOperationObserver;
 
         public ImageViewerAnalysisCoordinator(

@@ -19,6 +19,7 @@ namespace ImageViewer.Plugins
 {
     public sealed partial class RoiPluginRegistry
     {
+        private readonly object _gate = new();
         private readonly List<IRoiPlugin> _plugins = new();
         private readonly Dictionary<Type, IRoiPlugin> _pluginsByType = new();
         private readonly Dictionary<string, IRoiPlugin> _pluginsByTypeKey = new(StringComparer.OrdinalIgnoreCase);
@@ -26,9 +27,27 @@ namespace ImageViewer.Plugins
         [Obsolete("Prefer passing an explicit registry instance.")]
         public static RoiPluginRegistry Default { get; } = CreateBuiltIn();
 
-        public IReadOnlyList<IRoiPlugin> Plugins => _plugins;
+        public IReadOnlyList<IRoiPlugin> Plugins
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return [.. _plugins];
+                }
+            }
+        }
 
-        public IReadOnlyCollection<string> RegisteredTypeKeys => _pluginsByTypeKey.Keys;
+        public IReadOnlyCollection<string> RegisteredTypeKeys
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return [.. _pluginsByTypeKey.Keys];
+                }
+            }
+        }
 
         public void Register(IRoiPlugin plugin)
         {
@@ -36,19 +55,22 @@ namespace ImageViewer.Plugins
 
             plugin = FilterDrawingTools(plugin);
 
-            if (_pluginsByType.ContainsKey(plugin.RoiType))
+            lock (_gate)
             {
-                throw new InvalidOperationException($"ROI plugin for type '{plugin.RoiType.FullName}' is already registered.");
-            }
+                if (_pluginsByType.ContainsKey(plugin.RoiType))
+                {
+                    throw new InvalidOperationException($"ROI plugin for type '{plugin.RoiType.FullName}' is already registered.");
+                }
 
-            if (_pluginsByTypeKey.ContainsKey(plugin.TypeKey))
-            {
-                throw new InvalidOperationException($"ROI plugin with key '{plugin.TypeKey}' is already registered.");
-            }
+                if (_pluginsByTypeKey.ContainsKey(plugin.TypeKey))
+                {
+                    throw new InvalidOperationException($"ROI plugin with key '{plugin.TypeKey}' is already registered.");
+                }
 
-            _plugins.Add(plugin);
-            _pluginsByType.Add(plugin.RoiType, plugin);
-            _pluginsByTypeKey.Add(plugin.TypeKey, plugin);
+                _plugins.Add(plugin);
+                _pluginsByType.Add(plugin.RoiType, plugin);
+                _pluginsByTypeKey.Add(plugin.TypeKey, plugin);
+            }
         }
 
         public IRoiPlugin? FindByRoi(RoiBase roi)
@@ -60,38 +82,61 @@ namespace ImageViewer.Plugins
         public IRoiPlugin? FindByType(Type roiType)
         {
             ArgumentNullException.ThrowIfNull(roiType);
-            return _pluginsByType.TryGetValue(roiType, out var plugin) ? plugin : null;
+
+            lock (_gate)
+            {
+                return _pluginsByType.TryGetValue(roiType, out var plugin) ? plugin : null;
+            }
         }
 
         public IRoiPlugin? FindByTypeKey(string typeKey)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(typeKey);
-            return _pluginsByTypeKey.TryGetValue(typeKey, out var plugin) ? plugin : null;
+
+            lock (_gate)
+            {
+                return _pluginsByTypeKey.TryGetValue(typeKey, out var plugin) ? plugin : null;
+            }
         }
 
         public bool Unregister(string typeKey)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(typeKey);
 
-            if (!_pluginsByTypeKey.TryGetValue(typeKey, out var plugin))
+            lock (_gate)
             {
-                return false;
-            }
+                if (!_pluginsByTypeKey.TryGetValue(typeKey, out var plugin))
+                {
+                    return false;
+                }
 
-            _plugins.Remove(plugin);
-            _pluginsByType.Remove(plugin.RoiType);
-            _pluginsByTypeKey.Remove(typeKey);
-            return true;
+                _plugins.Remove(plugin);
+                _pluginsByType.Remove(plugin.RoiType);
+                _pluginsByTypeKey.Remove(typeKey);
+                return true;
+            }
         }
 
         public IEnumerable<IRoiPlugin> GetPluginsInHitTestOrder()
         {
-            return _plugins.OrderByDescending(plugin => plugin.HitTestOrder);
+            IRoiPlugin[] snapshot;
+            lock (_gate)
+            {
+                snapshot = [.. _plugins];
+            }
+
+            return snapshot.OrderByDescending(plugin => plugin.HitTestOrder);
         }
 
         public IEnumerable<RoiToolDescriptor> GetDrawingTools()
         {
-            return RoiToolCatalog.OrderVisibleTools(_plugins);
+            IRoiPlugin[] snapshot;
+            lock (_gate)
+            {
+                snapshot = [.. _plugins];
+            }
+
+            return RoiToolCatalog.OrderVisibleTools(snapshot);
         }
 
         private static IRoiPlugin FilterDrawingTools(IRoiPlugin plugin)

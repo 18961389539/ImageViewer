@@ -34,6 +34,8 @@ namespace ImageViewerControl.Tests
                     SetShowScaleBar = value => viewer.ShowScaleBar = value,
                     GetShowRoiList = () => viewer.ShowRoiList,
                     SetShowRoiList = value => viewer.ShowRoiList = value,
+                    GetShowToolbar = () => viewer.ShowToolbar,
+                    SetShowToolbar = value => viewer.ShowToolbar = value,
                     GetShowSnapGrid = () => viewer.ShowSnapGrid,
                     SetShowSnapGrid = value => viewer.ShowSnapGrid = value,
                     GetEnableSnapToGrid = () => viewer.EnableSnapToGrid,
@@ -65,7 +67,7 @@ namespace ImageViewerControl.Tests
             {
                 using var viewer = new ImageViewer.Controls.ImageViewer();
                 ImageViewerControlComposition composition = GetComposition(viewer);
-                ImageViewerAnalysisState analysisState = WpfTestRunner.GetPrivateField<ImageViewerAnalysisState>(viewer, "_analysisState");
+                ImageViewerAnalysisState analysisState = viewer._analysisState;
                 int updateRenderedImageCount = 0;
                 int smartDisplaySuggestionCount = 0;
                 var controller = new ImageViewerAnalysisCommandController(
@@ -200,7 +202,7 @@ namespace ImageViewerControl.Tests
 
         private static ImageViewerControlComposition GetComposition(ImageViewer.Controls.ImageViewer viewer)
         {
-            return WpfTestRunner.GetPrivateField<ImageViewerControlComposition>(viewer, "_controlComposition");
+            return viewer._controlComposition;
         }
     }
 }

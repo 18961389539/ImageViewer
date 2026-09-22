@@ -181,7 +181,11 @@ namespace ImageViewer.Controls
                 ArgumentNullException.ThrowIfNull(viewportController);
                 ArgumentNullException.ThrowIfNull(sessionController);
 
-                return new DroppedContentController(viewportController, sessionController, () => _owner._roiSelectionStateController.RefreshPropertyPanel());
+                return new DroppedContentController(
+                    viewportController,
+                    sessionController,
+                    () => _owner._roiSelectionStateController.RefreshPropertyPanel(),
+                    () => _owner.ViewerState.UndoRedo.Clear());
             }
 
             public ExternalImageSourceBindingController CreateExternalImageSourceBindingController()

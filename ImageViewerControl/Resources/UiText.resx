@@ -79,6 +79,10 @@
 
 这些建议不会自动修改当前图像显示。</value></data>
   <data name="MenuDisplaySettings" xml:space="preserve"><value>显示选项</value></data>
+  <data name="MenuShowToolbar" xml:space="preserve"><value>显示工具栏</value></data>
+  <data name="MenuShowToolbarTooltip" xml:space="preserve"><value>显示/隐藏左侧浮动工具栏
+工具栏提供打开图像、缩放、视图操作和面板开关。
+为保留更多图像可视区域，默认隐藏，可随时在此开启。</value></data>
   <data name="MenuSearchNoResults" xml:space="preserve"><value>未找到匹配的命令</value></data>
   <data name="MenuSearchMatchCount" xml:space="preserve"><value>找到 {0} 个匹配命令</value></data>
   <data name="MenuShowPixelGrid" xml:space="preserve"><value>显示像素网格</value></data>
@@ -110,9 +114,13 @@
   <data name="MenuFlipVertical" xml:space="preserve"><value>垂直翻转</value></data>
   <data name="RoiListTitle" xml:space="preserve"><value>ROI 列表</value></data>
   <data name="RoiListToggleVisible" xml:space="preserve"><value>显示</value></data>
-  <data name="RoiListToggleVisibleTooltip" xml:space="preserve"><value>切换 ROI 显示状态</value></data>
+  <data name="RoiListToggleVisibleTooltip" xml:space="preserve"><value>切换标注显示状态
+勾上就显示，不勾就隐藏。
+隐藏只是看不见，测量和分析照常进行，结果不受影响。</value></data>
   <data name="RoiListToggleLocked" xml:space="preserve"><value>锁定</value></data>
-  <data name="RoiListToggleLockedTooltip" xml:space="preserve"><value>切换 ROI 锁定状态</value></data>
+  <data name="RoiListToggleLockedTooltip" xml:space="preserve"><value>切换 ROI 锁定状态
+勾选后锁定该 ROI，无法拖动、缩放或编辑，防止误操作。
+锁定后仍可单独调整显示状态。</value></data>
   <data name="PropertyPanelTitle" xml:space="preserve"><value>对象属性</value></data>
   <data name="HistogramPanelTitle" xml:space="preserve"><value>直方图</value></data>
   <data name="ProfilePanelTitle" xml:space="preserve"><value>剖面图</value></data>
@@ -415,4 +423,178 @@ Center Distance: {6:F2}</value></data>
   <data name="StatusRoiDeleted" xml:space="preserve"><value>已删除所选 ROI</value></data>
   <data name="StatusRoisCleared" xml:space="preserve"><value>已清空所有 ROI</value></data>
   <data name="StatusDrawCancelled" xml:space="preserve"><value>已取消绘制</value></data>
+  <data name="Menu3DResetCamera" xml:space="preserve"><value>重置相机</value></data>
+  <data name="Menu3DFitVolume" xml:space="preserve"><value>适配体数据</value></data>
+  <data name="Menu3DFrontView" xml:space="preserve"><value>正面视图</value></data>
+  <data name="Menu3DBackView" xml:space="preserve"><value>背面视图</value></data>
+  <data name="Menu3DTopView" xml:space="preserve"><value>顶面视图</value></data>
+  <data name="Menu3DBottomView" xml:space="preserve"><value>底面视图</value></data>
+  <data name="Menu3DSideView" xml:space="preserve"><value>侧面视图</value></data>
+  <data name="Menu3DOppositeSideView" xml:space="preserve"><value>对侧视图</value></data>
+  <data name="Menu3DIsometricView" xml:space="preserve"><value>等轴测视图</value></data>
+  <data name="Menu3DShowCoordinateSystem" xml:space="preserve"><value>显示坐标系</value></data>
+  <data name="Menu3DShowBoundingBox" xml:space="preserve"><value>显示包围盒</value></data>
+  <data name="Menu3DShowAxialPlane" xml:space="preserve"><value>显示轴位切面</value></data>
+  <data name="Menu3DShowCoronalPlane" xml:space="preserve"><value>显示冠状切面</value></data>
+  <data name="Menu3DShowSagittalPlane" xml:space="preserve"><value>显示矢状切面</value></data>
+  <data name="Menu3DIncreaseTransparency" xml:space="preserve"><value>增加透明度</value></data>
+  <data name="Menu3DDecreaseTransparency" xml:space="preserve"><value>降低透明度</value></data>
+  <data name="Menu3DSwitchToAxialSlice" xml:space="preserve"><value>切换到轴位切片</value></data>
+  <data name="Menu3DResetCameraTooltip" xml:space="preserve"><value>重置相机
+将视角恢复到默认位置与方向，便于重新定位观察体数据。</value></data>
+  <data name="Menu3DFitVolumeTooltip" xml:space="preserve"><value>适配体数据
+自动调整相机距离，让整个体数据完整显示在视口内。</value></data>
+  <data name="Menu3DFrontViewTooltip" xml:space="preserve"><value>正面视图
+从 Z 轴正方向正视体数据，用于查看正面结构。</value></data>
+  <data name="Menu3DBackViewTooltip" xml:space="preserve"><value>背面视图
+从 Z 轴负方向观察体数据，用于查看背面结构。</value></data>
+  <data name="Menu3DTopViewTooltip" xml:space="preserve"><value>顶面视图
+从 Y 轴正方向俯视体数据，用于查看顶部布局。</value></data>
+  <data name="Menu3DBottomViewTooltip" xml:space="preserve"><value>底面视图
+从 Y 轴负方向仰视体数据，用于查看底部布局。</value></data>
+  <data name="Menu3DSideViewTooltip" xml:space="preserve"><value>侧面视图
+从 X 轴正方向侧视体数据，用于查看侧面结构。</value></data>
+  <data name="Menu3DOppositeSideViewTooltip" xml:space="preserve"><value>对侧视图
+从 X 轴负方向观察体数据的另一侧。</value></data>
+  <data name="Menu3DIsometricViewTooltip" xml:space="preserve"><value>等轴测视图
+从斜向 45° 视角观察体数据，立体感最强，适合整体概览。</value></data>
+  <data name="Menu3DShowCoordinateSystemTooltip" xml:space="preserve"><value>显示坐标系
+开启后显示 X/Y/Z 轴向指示，便于判断体数据的空间方向。</value></data>
+  <data name="Menu3DShowBoundingBoxTooltip" xml:space="preserve"><value>显示包围盒
+开启后显示体数据的边界框线框，辅助判断数据范围。</value></data>
+  <data name="Menu3DShowAxialPlaneTooltip" xml:space="preserve"><value>显示轴位切面
+开启后在 3D 中显示当前轴位切片的位置指示面。</value></data>
+  <data name="Menu3DShowCoronalPlaneTooltip" xml:space="preserve"><value>显示冠状切面
+开启后在 3D 中显示当前冠状切片的位置指示面。</value></data>
+  <data name="Menu3DShowSagittalPlaneTooltip" xml:space="preserve"><value>显示矢状切面
+开启后在 3D 中显示当前矢状切片的位置指示面。</value></data>
+  <data name="Menu3DIncreaseTransparencyTooltip" xml:space="preserve"><value>增加透明度
+让体数据更透明，便于观察内部结构与切面。</value></data>
+  <data name="Menu3DDecreaseTransparencyTooltip" xml:space="preserve"><value>降低透明度
+让体数据更不透明，便于观察表面细节。</value></data>
+  <data name="Menu3DSwitchToAxialSliceTooltip" xml:space="preserve"><value>切换到轴位切片
+切换到 2D 轴位切片视图浏览，并在 3D 中同步当前切片位置。</value></data>
+  <data name="AdaptiveAuto" xml:space="preserve"><value>自动</value></data>
+  <data name="AdaptiveAutoTooltip" xml:space="preserve"><value>自动选择视图
+根据加载的数据类型自动切换：图像显示 2D，体数据显示 3D。
+适合无需手动干预的快速浏览。</value></data>
+  <data name="Adaptive2D" xml:space="preserve"><value>2D</value></data>
+  <data name="Adaptive2DTooltip" xml:space="preserve"><value>2D 图像视图
+切换到平面图像浏览，支持滚轮缩放与 Ctrl+F 适应窗口。
+适合查看切片或单张图像细节。</value></data>
+  <data name="Adaptive3D" xml:space="preserve"><value>3D</value></data>
+  <data name="Adaptive3DTooltip" xml:space="preserve"><value>3D 体数据视图
+切换到三维体渲染视图，可用鼠标拖拽旋转并观察切面。
+适合整体把握体数据的空间结构。</value></data>
+  <data name="AdaptiveAxial" xml:space="preserve"><value>轴位</value></data>
+  <data name="AdaptiveAxialTooltip" xml:space="preserve"><value>轴位视图（1）
+按轴位方向逐层显示体数据切片，拖动滑块或滚轮切换层。
+默认显示当前体数据的轴位截面。</value></data>
+  <data name="AdaptiveCoronal" xml:space="preserve"><value>冠状</value></data>
+  <data name="AdaptiveCoronalTooltip" xml:space="preserve"><value>冠状视图（2）
+按冠状方向显示体数据切片；按 ↑/↓ 键切换切片。
+与 3D 视图的冠状切面位置保持同步。</value></data>
+  <data name="AdaptiveSagittal" xml:space="preserve"><value>矢状</value></data>
+  <data name="AdaptiveSagittalTooltip" xml:space="preserve"><value>矢状视图（3）
+按矢状方向显示体数据切片；按 ↑/↓ 键切换切片。
+与 3D 视图的矢状切面位置保持同步。</value></data>
+  <data name="AdaptiveQuality" xml:space="preserve"><value>质量分析</value></data>
+  <data name="AdaptiveQualityTooltip" xml:space="preserve"><value>质量分析
+自动检查体数据的曝光与对比度，列出异常切片供点击定位。
+结果仅作提示，不会修改任何 ROI 或图像数据。</value></data>
+  <data name="AdaptiveSegment" xml:space="preserve"><value>分割候选</value></data>
+  <data name="AdaptiveSegmentTooltip" xml:space="preserve"><value>分割候选
+基于当前轴位切片生成候选区域，接受后仅在界面记录，不写回 ROI。
+便于人工复核后再决定是否保留。</value></data>
+  <data name="AdaptiveCancel" xml:space="preserve"><value>取消</value></data>
+  <data name="AdaptiveCancelTooltip" xml:space="preserve"><value>取消当前操作（Esc）
+中断正在进行的质量分析等耗时任务；无任务进行时无效果。</value></data>
+  <data name="AdaptiveDataQualityTitle" xml:space="preserve"><value>数据质量</value></data>
+  <data name="AdaptiveAccept" xml:space="preserve"><value>接受</value></data>
+  <data name="AdaptiveReject" xml:space="preserve"><value>拒绝</value></data>
+  <data name="AdaptiveRetry" xml:space="preserve"><value>重试质量分析</value></data>
+  <data name="StatusNoVolume" xml:space="preserve"><value>未加载体数据</value></data>
+  <data name="StatusNoDataLoaded" xml:space="preserve"><value>未加载数据</value></data>
+  <data name="StatusSingleImage" xml:space="preserve"><value>单张图像</value></data>
+  <data name="StatusVolumeSummary" xml:space="preserve"><value>体数据 {0} x {1} x {2}，间距 {3} x {4} x {5} mm</value></data>
+  <data name="StatusAxialSlice" xml:space="preserve"><value>轴位切片 {0}/{1}</value></data>
+  <data name="StatusCoronalSlice" xml:space="preserve"><value>冠状切片 {0}/{1}</value></data>
+  <data name="StatusSagittalSlice" xml:space="preserve"><value>矢状切片 {0}/{1}</value></data>
+  <data name="Status3DVolumeSummary" xml:space="preserve"><value>3D 体数据 | {0} x {1} x {2} | 间距 {3} x {4} x {5} mm | 轴 X/Y/Z</value></data>
+  <data name="StatusModeFormat" xml:space="preserve"><value>模式：{0}  |  {1}</value></data>
+  <data name="ModeAuto" xml:space="preserve"><value>自动</value></data>
+  <data name="Mode2D" xml:space="preserve"><value>2D 图像</value></data>
+  <data name="Mode3D" xml:space="preserve"><value>3D 体数据</value></data>
+  <data name="ModeAxialSlice" xml:space="preserve"><value>轴位切片</value></data>
+  <data name="ModeCoronal" xml:space="preserve"><value>冠状视图</value></data>
+  <data name="ModeSagittal" xml:space="preserve"><value>矢状视图</value></data>
+  <data name="StatusLoadVolumeFirstQuality" xml:space="preserve"><value>请先加载体数据再进行质量分析。</value></data>
+  <data name="StatusAnalyzingQuality" xml:space="preserve"><value>正在分析体数据质量...</value></data>
+  <data name="StatusQualityFound" xml:space="preserve"><value>质量分析发现 {0} 个问题。</value></data>
+  <data name="StatusQualityPassed" xml:space="preserve"><value>质量分析通过。</value></data>
+  <data name="StatusQualityCancelled" xml:space="preserve"><value>质量分析已取消。</value></data>
+  <data name="StatusQualityFailed" xml:space="preserve"><value>质量分析失败：{0}</value></data>
+  <data name="StatusAnomalyItem" xml:space="preserve"><value>切片 {0}：{1}</value></data>
+  <data name="StatusLoadVolumeFirstSegmentation" xml:space="preserve"><value>请先加载体数据再进行分割。</value></data>
+  <data name="StatusSegmentationCandidates" xml:space="preserve"><value>分割完成，发现 {0} 个候选区域，请确认后再决定接受。</value></data>
+  <data name="StatusSegmentationComplete" xml:space="preserve"><value>分割完成，未改动 ROI。</value></data>
+  <data name="StatusSegmentationFailed" xml:space="preserve"><value>分割失败：{0}</value></data>
+  <data name="StatusLoadVolumeFirstMpr" xml:space="preserve"><value>请先加载体数据再选择 MPR 方向。</value></data>
+  <data name="StatusUnableCreateView" xml:space="preserve"><value>无法创建 {0} 视图：{1}</value></data>
+  <data name="StatusAnomalyLocated" xml:space="preserve"><value>已在切片 {0} 定位异常。</value></data>
+  <data name="StatusNoSegmentationCandidate" xml:space="preserve"><value>当前没有可接受的分割候选。</value></data>
+  <data name="StatusCandidateAccepted" xml:space="preserve"><value>候选区域已记录，待复核；ROI 数据未改动。</value></data>
+  <data name="StatusCandidateRejected" xml:space="preserve"><value>已拒绝分割候选。</value></data>
+  <data name="StatusNoRoiChanged" xml:space="preserve"><value>未改动任何 ROI。</value></data>
+  <data name="StatusVolumeFitted" xml:space="preserve"><value>3D 体数据已适配到视图。</value></data>
+  <data name="StatusCameraReset" xml:space="preserve"><value>3D 相机已重置。</value></data>
+  <data name="Status2DViewReset" xml:space="preserve"><value>2D 视图已重置。</value></data>
+  <data name="Status2DViewResetFirstSlice" xml:space="preserve"><value>2D 视图已重置到第一张切片。</value></data>
+  <data name="StatusCancelRequested" xml:space="preserve"><value>已请求取消操作。</value></data>
+  <data name="StatusAutoSaveFailed" xml:space="preserve"><value>自动保存失败，请检查磁盘空间或写入权限。</value></data>
+  <data name="ErrorUiOperationFailedTitle" xml:space="preserve"><value>操作失败</value></data>
+  <data name="ErrorUiOperationFailedMessage" xml:space="preserve"><value>操作“{0}”失败，请查看诊断信息。</value></data>
+  <data name="StatusBarImageSizeAndPath" xml:space="preserve"><value>{0} × {1} · {2}</value></data>
+  <data name="StatusBarImageSizeOnly" xml:space="preserve"><value>{0} × {1}</value></data>
+  <data name="ViewerAccessibleName" xml:space="preserve"><value>图像查看器</value></data>
+  <data name="ImageDisplayAreaName" xml:space="preserve"><value>图像显示区域</value></data>
+  <data name="ImageDisplayAreaHelpText" xml:space="preserve"><value>支持缩放、平移、标注绘制与测量操作；可拖入图像文件打开。</value></data>
+  <data name="RoiListAccessibleName" xml:space="preserve"><value>标注列表</value></data>
+  <data name="ZoomLevelDisplayAccessibleName" xml:space="preserve"><value>当前缩放比例</value></data>
+  <data name="ToolbarOpenImageTooltip" xml:space="preserve"><value>打开图像文件
+显示文件选择窗口，选择 PNG、JPG、BMP、TIF 等格式的图像。
+打开后按 Ctrl+F 可快速适应窗口。</value></data>
+  <data name="ToolbarZoomInTooltip" xml:space="preserve"><value>放大图像
+以视口中心为基准放大 25%，便于查看细节。
+滚轮向上滚动或按 Ctrl++ 也可以放大。</value></data>
+  <data name="ToolbarZoomOutTooltip" xml:space="preserve"><value>缩小图像
+以视口中心为基准缩小 20%，便于查看整体布局。
+滚轮向下滚动或按 Ctrl+- 也可以缩小。</value></data>
+  <data name="ToolbarZoomLevelTooltip" xml:space="preserve"><value>当前缩放比例
+显示图像相对原始像素的缩放百分比。
+数字越大图像越放大；100% 表示按原始像素显示。</value></data>
+  <data name="ToolbarFitToViewTooltip" xml:space="preserve"><value>适应窗口
+自动调整缩放和平移，让整幅图像完整显示在窗口内。
+按 Ctrl+F 可快速执行。</value></data>
+  <data name="ToolbarActualSizeTooltip" xml:space="preserve"><value>实际大小
+按 100% 原始像素尺寸显示图像。
+适合需要逐像素核对的场景。</value></data>
+  <data name="ToolbarResetViewTooltip" xml:space="preserve"><value>重置视图
+恢复默认缩放、位置与方向（无旋转、无翻转）。
+按 Ctrl+0 可快速执行。</value></data>
+  <data name="ToolbarToggleInfoPanelTooltip" xml:space="preserve"><value>显示信息面板
+在右上角显示当前图像的像素统计与 ROI 摘要信息。
+再次点击可隐藏。</value></data>
+  <data name="ToolbarToggleHistogramTooltip" xml:space="preserve"><value>显示直方图
+在右下角显示图像灰度分布直方图，辅助判断亮度与对比度。
+再次点击可隐藏。</value></data>
+  <data name="ToolbarToggleProfileTooltip" xml:space="preserve"><value>显示灰度剖面图
+在左下角显示当前选中线段或 ROI 的灰度变化曲线。
+再次点击可隐藏。</value></data>
+  <data name="ToolbarToggleScaleBarTooltip" xml:space="preserve"><value>显示比例尺
+在图像左下角显示物理比例尺，需先完成像素校准才能准确表示物理长度。
+再次点击可隐藏。</value></data>
+  <data name="ToolbarToggleRoiListTooltip" xml:space="preserve"><value>显示 ROI 列表
+在左上角列出当前所有标注，可快速选中、切换显隐或锁定。
+再次点击可隐藏。</value></data>
 </root>

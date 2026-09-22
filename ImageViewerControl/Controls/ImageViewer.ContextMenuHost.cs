@@ -45,6 +45,7 @@ namespace ImageViewer.Controls
         public bool ShowProfile => _owner.ShowProfile;
         public bool ShowScaleBar => _owner.ShowScaleBar;
         public bool ShowRoiList => _owner.ShowRoiList;
+        public bool ShowToolbar => _owner.ShowToolbar;
         public bool ShowSnapGrid => _owner.ShowSnapGrid;
         public bool EnableSnapToGrid => _owner.EnableSnapToGrid;
         public bool HasAnalysisBitmap => _hasAnalysisBitmap();

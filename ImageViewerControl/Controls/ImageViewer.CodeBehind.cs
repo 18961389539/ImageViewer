@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 using ImageViewer.Localization;
 
@@ -47,6 +48,7 @@ namespace ImageViewer.Controls
 
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
+            UpdateStatusBar();
             _controlComposition.SessionController.StartAutoSave();
             _externalImageSourceBindingController.Refresh();
             _imageSourceController.HandleLoaded();
@@ -174,7 +176,14 @@ namespace ImageViewer.Controls
                 return;
             }
 
-            _interactionController.HandleKeyDown(e);
+            try
+            {
+                _interactionController.HandleKeyDown(e);
+            }
+            catch (Exception ex)
+            {
+                ReportUiOperationFailure("键盘快捷键处理", ex);
+            }
         }
 
         private void OnMouseRightButtonDown(object sender, MouseButtonEventArgs e) => _interactionController.HandleMouseRightButtonDown(e);
@@ -335,6 +344,41 @@ namespace ImageViewer.Controls
         }
 
         private void UpdateContextMenuState() => _contextMenuController.UpdateState();
+
+        /// <summary>
+        /// 更新常驻状态栏：显示当前图像像素尺寸与文件路径；无图像时显示"未加载数据"。
+        /// Chinese: 每次图像源变化时刷新状态栏上的图像信息，无图像时给出占位提示。
+        /// English: Refreshes the persistent status bar with the current image size and file path.
+        /// </summary>
+        private void UpdateStatusBar()
+        {
+            if (statusBarTextBlock is null || statusBarBorder is null)
+            {
+                return;
+            }
+
+            string text;
+            if (ImageSource is null || !ImageViewerImageSourceUtilities.TryGetSourceImageSize(ImageSource, out Size imageSize))
+            {
+                text = UiText.Get("StatusNoDataLoaded");
+                statusBarTextBlock.ToolTip = null;
+            }
+            else
+            {
+                string? filePath = _controlComposition?.ViewportController.TryGetCurrentImagePath();
+                text = string.IsNullOrEmpty(filePath)
+                    ? UiText.Format("StatusBarImageSizeOnly", (int)imageSize.Width, (int)imageSize.Height)
+                    : UiText.Format("StatusBarImageSizeAndPath", (int)imageSize.Width, (int)imageSize.Height, filePath);
+                statusBarTextBlock.ToolTip = text;
+            }
+
+            if (!string.Equals(statusBarTextBlock.Text, text, StringComparison.Ordinal))
+            {
+                statusBarTextBlock.Text = text;
+            }
+
+            statusBarBorder.Visibility = Visibility.Visible;
+        }
 
         private async void OnViewCommandMenuClick(object sender, RoutedEventArgs e)
         {

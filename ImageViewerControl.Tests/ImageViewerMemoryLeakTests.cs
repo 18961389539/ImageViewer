@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Windows;
 using ImageViewer.Controls;
 using ImageViewer.Models;
@@ -64,6 +65,101 @@ namespace ImageViewerControl.Tests
                 Assert.False(manager.CanUndo);
                 Assert.False(manager.CanRedo);
             });
+        }
+
+        [Fact]
+        public void UndoRedoManager_ExceedingMaxDepth_EvictsOldestCommand()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                var manager = new UndoRedoManager(maxDepth: 3);
+                var viewModel = new ImageViewerViewModel(RoiPluginRegistry.CreateBuiltIn());
+                var commands = new List<RoiBase>();
+
+                for (int index = 0; index < 5; index++)
+                {
+                    var roi = new LineMeasureRoi();
+                    commands.Add(roi);
+                    manager.Execute(new AddRoiCommand(roi, viewModel));
+                }
+
+                // 最旧的两个命令应被淘汰，仅保留最近 3 个
+                manager.Undo();
+                Assert.DoesNotContain(commands[4], viewModel.AllRois);
+                manager.Redo();
+
+                for (int index = 0; index < 3; index++)
+                {
+                    manager.Undo();
+                }
+
+                Assert.False(manager.CanUndo);
+                Assert.DoesNotContain(commands[2], viewModel.AllRois);
+            });
+        }
+
+        /// <summary>
+        /// 撤销命令执行抛异常时，命令不应从两个栈中同时丢失；应保留在重做栈以便恢复。
+        /// </summary>
+        [Fact]
+        public void UndoRedoManager_WhenUndoThrows_CommandRemainsInRedoStack()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                var manager = new UndoRedoManager();
+                var command = new ThrowingUndoCommand();
+                manager.Execute(command);
+
+                Assert.Throws<InvalidOperationException>(() => manager.Undo());
+
+                Assert.True(manager.CanRedo, "撤销抛异常后命令应仍保留在重做栈。");
+            });
+        }
+
+        /// <summary>
+        /// 重做命令执行抛异常时，命令不应从两个栈中同时丢失；应保留在撤销栈以便再次尝试。
+        /// </summary>
+        [Fact]
+        public void UndoRedoManager_WhenRedoThrows_CommandRemainsInUndoStack()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                var manager = new UndoRedoManager();
+                var command = new ThrowOnSecondExecuteCommand();
+                manager.Execute(command);
+                manager.Undo();
+
+                Assert.Throws<InvalidOperationException>(() => manager.Redo());
+
+                Assert.True(manager.CanUndo, "重做抛异常后命令应仍保留在撤销栈。");
+            });
+        }
+
+        private sealed class ThrowingUndoCommand : IUndoRedoCommand
+        {
+            public void Execute()
+            {
+            }
+
+            public void Undo() => throw new InvalidOperationException("模拟撤销失败。");
+        }
+
+        private sealed class ThrowOnSecondExecuteCommand : IUndoRedoCommand
+        {
+            private int _executeCount;
+
+            public void Execute()
+            {
+                _executeCount++;
+                if (_executeCount == 2)
+                {
+                    throw new InvalidOperationException("模拟重做失败。");
+                }
+            }
+
+            public void Undo()
+            {
+            }
         }
 
         private static WeakReference CreateDisposedViewerWeakReference()

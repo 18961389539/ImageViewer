@@ -25,7 +25,7 @@ namespace ImageViewerControl.Tests
             WpfTestRunner.Run(() =>
             {
                 using var viewer = new ImageViewer.Controls.ImageViewer();
-                var contextMenu = WpfTestRunner.GetPrivateField<ContextMenu>(viewer, "mainContextMenu");
+                var contextMenu = viewer.mainContextMenu;
 
                 MenuItem analysisMenu = contextMenu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, UiText.Get("MenuAnalysisAndExport")));
                 MenuItem performanceMenu = contextMenu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, UiText.Get("MenuLargeImageAndPerformance")));
@@ -43,7 +43,7 @@ namespace ImageViewerControl.Tests
             WpfTestRunner.Run(() =>
             {
                 using var viewer = new ImageViewer.Controls.ImageViewer();
-                var contextMenu = WpfTestRunner.GetPrivateField<ContextMenu>(viewer, "mainContextMenu");
+                var contextMenu = viewer.mainContextMenu;
 
                 MenuItem roiMenu = contextMenu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, UiText.Get("MenuRoiOperations")));
                 MenuItem measureMenu = roiMenu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, UiText.Get("MenuMeasure")));

@@ -82,6 +82,8 @@ namespace ImageViewer.Controls
                     SetShowScaleBar = value => _owner.ShowScaleBar = value,
                     GetShowRoiList = () => _owner.ShowRoiList,
                     SetShowRoiList = value => _owner.ShowRoiList = value,
+                    GetShowToolbar = () => _owner.ShowToolbar,
+                    SetShowToolbar = value => _owner.ShowToolbar = value,
                     GetShowSnapGrid = () => _owner.ShowSnapGrid,
                     SetShowSnapGrid = value => _owner.ShowSnapGrid = value,
                     GetEnableSnapToGrid = () => _owner.EnableSnapToGrid,

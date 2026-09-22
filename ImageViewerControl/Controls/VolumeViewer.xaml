@@ -9,14 +9,14 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <ContentControl x:Name="sliceViewerHost" />
-        <Border Grid.Row="1" Padding="8,6" Background="#E6111822">
+        <Border Grid.Row="1" Padding="8,6" Background="#E618212E">
             <DockPanel LastChildFill="True">
                 <TextBlock x:Name="sliceStatusText"
                            DockPanel.Dock="Left"
                            Margin="0,0,12,0"
                            VerticalAlignment="Center"
-                           Foreground="White" />
-                <Slider x:Name="sliceSlider"
+                           Foreground="#F5F8FC" />
+                <Slider x:Name="sliceSlider" x:FieldModifier="internal"
                         Minimum="0"
                         Maximum="0"
                         IsSnapToTickEnabled="True"

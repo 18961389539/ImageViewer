@@ -1,4 +1,5 @@
 using System;
+using System.Windows.Media;
 
 namespace ImageViewer.Controls
 {
@@ -16,7 +17,7 @@ namespace ImageViewer.Controls
 
         void SetSelectedLabel();
 
-        void SetSelectedColor(string colorName);
+        void SetSelectedColor(Color color);
 
         void CalibrateSelectedRoi();
 
@@ -57,19 +58,19 @@ namespace ImageViewer.Controls
                     _host.SetSelectedLabel();
                     break;
                 case ImageViewerRoiMenuCommand.SetColorCyan:
-                    _host.SetSelectedColor("Cyan");
+                    _host.SetSelectedColor(Colors.Cyan);
                     break;
                 case ImageViewerRoiMenuCommand.SetColorRed:
-                    _host.SetSelectedColor("Red");
+                    _host.SetSelectedColor(Colors.Red);
                     break;
                 case ImageViewerRoiMenuCommand.SetColorGreen:
-                    _host.SetSelectedColor("Green");
+                    _host.SetSelectedColor(Colors.Green);
                     break;
                 case ImageViewerRoiMenuCommand.SetColorYellow:
-                    _host.SetSelectedColor("Yellow");
+                    _host.SetSelectedColor(Colors.Yellow);
                     break;
                 case ImageViewerRoiMenuCommand.SetColorMagenta:
-                    _host.SetSelectedColor("Magenta");
+                    _host.SetSelectedColor(Colors.Magenta);
                     break;
                 case ImageViewerRoiMenuCommand.CalibratePixels:
                     _host.CalibrateSelectedRoi();

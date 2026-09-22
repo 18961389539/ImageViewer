@@ -8,6 +8,7 @@ using HelixToolkit.Geometry;
 using HelixToolkit.Maths;
 using HelixToolkit.SharpDX;
 using HelixToolkit.Wpf.SharpDX;
+using ImageViewer.Localization;
 using ImageViewer.Models;
 using ImageViewer.Services;
 
@@ -44,7 +45,7 @@ namespace ImageViewer.Controls
             };
             viewport.EffectsManager = new DefaultEffectsManager();
             viewport.Items.Add(new DirectionalLight3D { Direction = new Vector3D(-1, -1, -1) });
-            volumeStatusText.Text = "No volume";
+            volumeStatusText.Text = UiText.Get("StatusNoVolume");
         }
 
         public VolumeData? Volume
@@ -254,7 +255,7 @@ namespace ImageViewer.Controls
             CropBounds = null;
             if (_volume == null)
             {
-                volumeStatusText.Text = "No volume";
+                volumeStatusText.Text = UiText.Get("StatusNoVolume");
                 return;
             }
 
@@ -295,7 +296,7 @@ namespace ImageViewer.Controls
                 UpDirection = new Vector3D(0, 1, 0),
                 FieldOfView = 45
             };
-            volumeStatusText.Text = $"3D volume | {_volume.Width} x {_volume.Height} x {_volume.Depth} | spacing {_volume.SpacingX:0.###} x {_volume.SpacingY:0.###} x {_volume.SpacingZ:0.###} mm | axes X/Y/Z";
+            volumeStatusText.Text = UiText.Format("Status3DVolumeSummary", _volume.Width, _volume.Height, _volume.Depth, _volume.SpacingX, _volume.SpacingY, _volume.SpacingZ);
         }
 
         private void OnResetCameraClick(object sender, RoutedEventArgs e) => ResetCamera();

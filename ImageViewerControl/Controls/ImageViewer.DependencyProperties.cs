@@ -70,6 +70,10 @@ namespace ImageViewer.Controls
             DependencyProperty.Register(nameof(ShowRoiList), typeof(bool), typeof(ImageViewer),
                 new PropertyMetadata(false, OnShowRoiListChanged));
 
+        public static readonly DependencyProperty ShowToolbarProperty =
+            DependencyProperty.Register(nameof(ShowToolbar), typeof(bool), typeof(ImageViewer),
+                new PropertyMetadata(false, OnShowToolbarChanged));
+
         public static readonly DependencyProperty ShowSnapGridProperty =
             DependencyProperty.Register(nameof(ShowSnapGrid), typeof(bool), typeof(ImageViewer),
                 new PropertyMetadata(false, OnShowSnapGridChanged));
@@ -202,6 +206,12 @@ namespace ImageViewer.Controls
             set => SetValue(ShowRoiListProperty, value);
         }
 
+        public bool ShowToolbar
+        {
+            get => (bool)GetValue(ShowToolbarProperty);
+            set => SetValue(ShowToolbarProperty, value);
+        }
+
         public bool ShowSnapGrid
         {
             get => (bool)GetValue(ShowSnapGridProperty);
@@ -277,9 +287,22 @@ namespace ImageViewer.Controls
             WithViewer<bool>(d, e, (viewer, value) => viewer._imageViewStateController.HandleShowRoiListChanged(value));
         }
 
+        private static void OnShowToolbarChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            WithViewer<bool>(d, e, (viewer, isVisible) =>
+            {
+                viewer.toolbarPanel.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
+                viewer.UpdateContextMenuState();
+            });
+        }
+
         private static void OnImageSourceChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            WithViewer(d, viewer => viewer._imageSourceController.HandleImageSourceChanged(e.NewValue as ImageSource));
+            WithViewer(d, viewer =>
+            {
+                viewer._imageSourceController.HandleImageSourceChanged(e.NewValue as ImageSource);
+                viewer.UpdateStatusBar();
+            });
         }
 
         private static void OnCalibrationChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)

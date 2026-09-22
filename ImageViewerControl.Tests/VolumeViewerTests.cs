@@ -20,7 +20,7 @@ namespace ImageViewerControl.Tests
                 BitmapSource second = CreateBitmap(20);
                 var volume = new VolumeData([first, second]);
                 using var viewer = new VolumeViewer { Volume = volume };
-                Slider slider = WpfTestRunner.GetPrivateField<Slider>(viewer, "sliceSlider");
+                Slider slider = viewer.sliceSlider;
 
                 Assert.Equal(0, viewer.CurrentSliceIndex);
                 Assert.Equal(10, ReadFirstPixel(viewer.SliceViewer.ImageSource));

@@ -9,7 +9,7 @@
     Title="{localization:DemoText WindowTitle}"
     Width="1100"
     Height="720"
-    Background="#0F172A"
+    Background="#0A0F16"
     mc:Ignorable="d">
     <Grid Margin="12">
         <Grid.RowDefinitions>
@@ -19,8 +19,8 @@
 
         <Border
             Padding="12"
-            Background="#111827"
-            BorderBrush="#334155"
+            Background="#18212E"
+            BorderBrush="#314158"
             BorderThickness="1"
             CornerRadius="8">
             <Grid>
@@ -31,7 +31,7 @@
 
                 <TextBlock
                     VerticalAlignment="Center"
-                    Foreground="#E2E8F0"
+                    Foreground="#F5F8FC"
                     FontSize="14"
                     Text="{localization:DemoText ToolbarHint}" />
 
@@ -39,24 +39,24 @@
                     Grid.Column="1"
                     Padding="12,6"
                     Click="OnOpenImageClick"
-                    Background="#0EA5E9"
+                    Background="#69AFFF"
                     BorderThickness="0"
                     Content="{localization:DemoText OpenImageButton}"
-                    Foreground="White" />
+                    Foreground="#11151C" />
             </Grid>
         </Border>
 
         <Border
             Grid.Row="1"
             Margin="0,12,0,0"
-            Background="#020617"
-            BorderBrush="#334155"
+            Background="#080B11"
+            BorderBrush="#314158"
             BorderThickness="1"
             CornerRadius="8">
             <imageViewer:AdaptiveImageViewer
                 x:Name="Viewer"
                 Margin="1"
-                Background="#020617" />
+                Background="#0A0F16" />
         </Border>
     </Grid>
 </Window>

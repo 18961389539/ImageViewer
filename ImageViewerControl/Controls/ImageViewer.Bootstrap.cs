@@ -35,6 +35,7 @@ namespace ImageViewer.Controls
         private void CompleteBootstrap()
         {
             _lifetime.Attach();
+            UpdateStatusBar();
             UpdateRenderedImage();
             RefreshRoiDrawingMenuItems();
             ApplyMenuItemContentAlignment(mainContextMenu);

@@ -20,6 +20,7 @@ namespace ImageViewerControl.Tests
                     ShowProfile: false,
                     ShowScaleBar: true,
                     ShowRoiList: false,
+                    ShowToolbar: true,
                     ShowSnapGrid: true,
                     EnableSnapToGrid: false));
 
@@ -37,6 +38,7 @@ namespace ImageViewerControl.Tests
                     ShowProfileChecked: false,
                     ShowScaleBarChecked: true,
                     ShowRoiListChecked: false,
+                    ShowToolbarChecked: true,
                     ShowSnapGridChecked: true,
                     EnableSnapToGridChecked: false),
                 state);
@@ -57,6 +59,7 @@ namespace ImageViewerControl.Tests
                     ShowProfile: false,
                     ShowScaleBar: false,
                     ShowRoiList: false,
+                    ShowToolbar: false,
                     ShowSnapGrid: false,
                     EnableSnapToGrid: false));
 
@@ -81,6 +84,7 @@ namespace ImageViewerControl.Tests
                     ShowProfile: false,
                     ShowScaleBar: false,
                     ShowRoiList: false,
+                    ShowToolbar: false,
                     ShowSnapGrid: false,
                     EnableSnapToGrid: false));
 

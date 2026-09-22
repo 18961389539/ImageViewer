@@ -18,8 +18,8 @@ namespace ImageViewer.Controls
         private readonly ImageViewerHost? _ownedHost;
         private const double MinScale = 0.1;
         private const double MaxScale = 100;
-        private readonly ImageViewerControlComposition _controlComposition;
-        private readonly ImageViewerAnalysisState _analysisState = new();
+        internal readonly ImageViewerControlComposition _controlComposition;
+        internal readonly ImageViewerAnalysisState _analysisState = new();
         private readonly IImageViewerLatestTaskScheduler _infoPanelStatisticsScheduler;
         private readonly ImageViewerLifetime _lifetime;
         private int _imageRotation;

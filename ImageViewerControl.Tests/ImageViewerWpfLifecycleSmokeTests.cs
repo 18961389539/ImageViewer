@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -13,6 +14,7 @@ using ImageViewer.Dialogs;
 using ImageViewer.Models;
 using ImageViewer.Plugins;
 using ImageViewer.Services;
+using ImageViewer.ViewModels;
 using Xunit;
 
 namespace ImageViewerControl.Tests
@@ -57,7 +59,7 @@ namespace ImageViewerControl.Tests
             WpfTestRunner.Run(() =>
             {
                 using var viewer = new ImageViewer.Controls.ImageViewer();
-                Canvas imageContainer = WpfTestRunner.GetPrivateField<Canvas>(viewer, "imageContainer");
+                Canvas imageContainer = viewer.imageContainer;
                 BitmapSource bitmap = CreateBitmap(pixelWidth: 12, pixelHeight: 8);
                 var window = new Window
                 {
@@ -104,7 +106,7 @@ namespace ImageViewerControl.Tests
                     window.Show();
                     WpfTestRunner.DrainDispatcher();
 
-                    ImageViewerControlComposition composition = WpfTestRunner.GetPrivateField<ImageViewerControlComposition>(viewer, "_controlComposition");
+                    ImageViewerControlComposition composition = viewer._controlComposition;
                     viewer.SetImage(CreateBitmap(pixelWidth: 12, pixelHeight: 8));
                     WpfTestRunner.DrainDispatcher();
 
@@ -252,10 +254,9 @@ namespace ImageViewerControl.Tests
                         diagnostics));
 
                 using var viewer = host.CreateViewer();
-                ImageViewerControlComposition composition = WpfTestRunner.GetPrivateField<ImageViewerControlComposition>(viewer, "_controlComposition");
+                ImageViewerControlComposition composition = viewer._controlComposition;
                 ImageViewerAnalysisCoordinator analysisController = composition.AnalysisController;
-                object errorSinkObject = WpfTestRunner.GetPrivateField<object>(analysisController, "_errorSink");
-                var errorSink = Assert.IsAssignableFrom<IImageViewerAnalysisErrorSink>(errorSinkObject);
+                IImageViewerAnalysisErrorSink errorSink = analysisController._errorSink;
                 var exception = new InvalidOperationException("boom");
 
                 errorSink.LogNonCriticalError("analysis failed", exception);
@@ -353,6 +354,71 @@ namespace ImageViewerControl.Tests
                 Assert.Collection(scheduler.DelayRequests, delay => Assert.Equal(35, delay));
                 Assert.Equal(1, scheduler.CancelCallCount);
             });
+        }
+
+        [Fact]
+        public void DroppingImageFile_ClearsUndoHistory()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                using var viewer = new ImageViewer.Controls.ImageViewer();
+                DroppedContentController droppedContentController = GetDroppedContentController(viewer);
+                PopulateUndoHistory(viewer);
+                Assert.True(viewer.ViewerState.UndoRedo.CanUndo);
+
+                string imagePath = CreateTempPngPath();
+                try
+                {
+                    var data = new DataObject();
+                    data.SetData(DataFormats.FileDrop, new[] { imagePath });
+                    DragEventArgs args = CreateDropArgs(data, target: viewer);
+
+                    droppedContentController.HandleDropAsync(args).GetAwaiter().GetResult();
+                    WpfTestRunner.DrainDispatcher();
+
+                    Assert.False(viewer.ViewerState.UndoRedo.CanUndo, "拖放打开新图像后撤销历史应被清空。");
+                }
+                finally
+                {
+                    File.Delete(imagePath);
+                }
+            });
+        }
+
+        private static DroppedContentController GetDroppedContentController(ImageViewer.Controls.ImageViewer viewer)
+        {
+            var composition = viewer._controlComposition;
+            return composition.DroppedContentController;
+        }
+
+        /// <summary>
+        /// DragEventArgs 的公开构造函数在 .NET Core WPF 中为 internal，测试通过反射调用内部构造函数构造拖放事件。
+        /// </summary>
+        private static DragEventArgs CreateDropArgs(IDataObject data, DependencyObject target)
+        {
+            System.Reflection.ConstructorInfo constructor = typeof(DragEventArgs).GetConstructor(
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+                null,
+                [typeof(IDataObject), typeof(DragDropKeyStates), typeof(DragDropEffects), typeof(DependencyObject), typeof(Point)],
+                null)
+                ?? throw new InvalidOperationException("DragEventArgs internal constructor was not found.");
+
+            return (DragEventArgs)constructor.Invoke([data, DragDropKeyStates.None, DragDropEffects.Copy, target, new Point(0, 0)]);
+        }
+
+        private static void PopulateUndoHistory(ImageViewer.Controls.ImageViewer viewer)
+        {
+            viewer.ViewerState.UndoRedo.Execute(new AddRoiCommand(new LineMeasureRoi(), viewer.ViewerState));
+        }
+
+        private static string CreateTempPngPath()
+        {
+            string path = Path.Combine(Path.GetTempPath(), $"iv-drop-{Guid.NewGuid():N}.png");
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(CreateBitmap(pixelWidth: 8, pixelHeight: 8)));
+            using var stream = File.Create(path);
+            encoder.Save(stream);
+            return path;
         }
 
         private static BitmapSource CreateBitmap(int pixelWidth, int pixelHeight)

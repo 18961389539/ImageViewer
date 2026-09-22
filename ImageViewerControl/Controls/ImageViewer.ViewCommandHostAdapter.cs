@@ -59,6 +59,12 @@ namespace ImageViewer.Controls
             set => _dependencies.SetShowRoiList(value);
         }
 
+        public bool ShowToolbar
+        {
+            get => _dependencies.GetShowToolbar();
+            set => _dependencies.SetShowToolbar(value);
+        }
+
         public bool ShowSnapGrid
         {
             get => _dependencies.GetShowSnapGrid();

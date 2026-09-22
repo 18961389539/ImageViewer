@@ -3,6 +3,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Threading;
+using ImageViewer.Localization;
 
 namespace ImageViewer.Controls
 {
@@ -14,6 +15,7 @@ namespace ImageViewer.Controls
         private readonly SemaphoreSlim _saveGate = new(1, 1);
         private CancellationTokenSource _lifecycleCancellationTokenSource = new();
         private string? _currentProjectPath;
+        private bool _lastAutoSaveFailed;
 
         public ImageViewerAutoSaveController(
             ImageViewerAutoSaveWorkflow workflow,
@@ -67,6 +69,11 @@ namespace ImageViewer.Controls
         public void Toggle()
         {
             IsEnabled = !IsEnabled;
+            // 重新开启时重置失败标记，避免上次失败长时间抑制新失败提示
+            if (IsEnabled)
+            {
+                _lastAutoSaveFailed = false;
+            }
         }
 
         public void Dispose()
@@ -107,6 +114,7 @@ namespace ImageViewer.Controls
                     viewportState.TranslateY,
                     _workflow.GetPluginRegistry(),
                     cancellationToken);
+                _lastAutoSaveFailed = false;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -114,6 +122,13 @@ namespace ImageViewer.Controls
             catch (Exception ex)
             {
                 _workflow.LogNonCriticalError("Auto save failed", ex);
+                if (_lastAutoSaveFailed)
+                {
+                    return;
+                }
+
+                _lastAutoSaveFailed = true;
+                _workflow.ShowStatusHint(UiText.Get("StatusAutoSaveFailed"));
             }
             finally
             {
@@ -123,6 +138,11 @@ namespace ImageViewer.Controls
 
         private string GetAutoSaveFileName()
         {
+            if (string.IsNullOrWhiteSpace(_currentProjectPath))
+            {
+                return "autosave";
+            }
+
             string baseName = Path.GetFileNameWithoutExtension(_currentProjectPath) ?? "autosave";
             foreach (char invalidChar in Path.GetInvalidFileNameChars())
             {

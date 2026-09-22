@@ -2,6 +2,7 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using ImageViewer.Localization;
 using ImageViewer.Models;
 using ImageViewer.Services;
 
@@ -109,13 +110,13 @@ namespace ImageViewer.Controls
             if (_volume == null)
             {
                 sliceViewer.ImageSource = null;
-                sliceStatusText.Text = "No volume";
+                sliceStatusText.Text = UiText.Get("StatusNoVolume");
                 return;
             }
 
             int sliceIndex = CurrentSliceIndex;
             sliceViewer.SetImage(VolumeSliceService.GetSlice(_volume, VolumeSliceOrientation.Axial, sliceIndex));
-            sliceStatusText.Text = $"Axial slice {sliceIndex + 1}/{_volume.Depth}";
+            sliceStatusText.Text = UiText.Format("StatusAxialSlice", sliceIndex + 1, _volume.Depth);
         }
     }
 }

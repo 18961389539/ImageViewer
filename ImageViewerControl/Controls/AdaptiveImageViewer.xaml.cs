@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Input;
+using ImageViewer.Localization;
 using ImageViewer.Models;
 using ImageViewer.Services;
 
@@ -169,7 +170,7 @@ namespace ImageViewer.Controls
             _volume3DViewer.SetCurrentSlice(_volumeViewer.CurrentSliceIndex);
             if (_volume != null)
             {
-                statusText.Text = $"Axial slice {_volumeViewer.CurrentSliceIndex + 1}/{_volume.Depth}";
+                statusText.Text = UiText.Format("StatusAxialSlice", _volumeViewer.CurrentSliceIndex + 1, _volume.Depth);
             }
         }
 
@@ -189,11 +190,11 @@ namespace ImageViewer.Controls
         {
             if (_volume == null)
             {
-                statusText.Text = "Load a volume before quality analysis.";
+                statusText.Text = UiText.Get("StatusLoadVolumeFirstQuality");
                 return;
             }
 
-            BeginOperation("Analyzing volume quality...");
+            BeginOperation(UiText.Get("StatusAnalyzingQuality"));
             try
             {
                 VolumeQualityReport report = await Task.Run(() => VolumeQualityAnalyzer.Analyze(_volume), _operationCancellation!.Token);
@@ -201,19 +202,19 @@ namespace ImageViewer.Controls
                 anomalyList.Items.Clear();
                 foreach (VolumeAnomaly anomaly in report.Anomalies)
                 {
-                    anomalyList.Items.Add($"Slice {anomaly.SliceIndex + 1}: {anomaly.Message}");
+                    anomalyList.Items.Add(UiText.Format("StatusAnomalyItem", anomaly.SliceIndex + 1, anomaly.Message));
                 }
 
-                statusText.Text = report.HasAnomalies ? $"Quality analysis found {report.Anomalies.Count} issue(s)." : "Quality analysis passed.";
+                statusText.Text = report.HasAnomalies ? UiText.Format("StatusQualityFound", report.Anomalies.Count) : UiText.Get("StatusQualityPassed");
                 retryButton.Visibility = Visibility.Collapsed;
             }
             catch (OperationCanceledException)
             {
-                statusText.Text = "Quality analysis cancelled.";
+                statusText.Text = UiText.Get("StatusQualityCancelled");
             }
             catch (Exception exception)
             {
-                statusText.Text = $"Quality analysis failed: {exception.Message}";
+                statusText.Text = UiText.Format("StatusQualityFailed", exception.Message);
                 retryButton.Visibility = Visibility.Visible;
             }
             finally
@@ -226,7 +227,7 @@ namespace ImageViewer.Controls
         {
             if (_volume == null)
             {
-                statusText.Text = "Load a volume before segmentation.";
+                statusText.Text = UiText.Get("StatusLoadVolumeFirstSegmentation");
                 return;
             }
 
@@ -234,13 +235,13 @@ namespace ImageViewer.Controls
             {
                 BitmapSource slice = _volume.GetAxialSlice(Math.Max(0, _volumeViewer.CurrentSliceIndex));
                 _pendingSegmentation = SegmentationPipelineService.Segment(slice, new Rect(0, 0, slice.PixelWidth, slice.PixelHeight));
-                segmentationText.Text = $"Segmentation: {_pendingSegmentation.Blobs.Count} candidate region(s). Review before accepting.";
-                statusText.Text = "Segmentation complete; no ROI was changed.";
+                segmentationText.Text = UiText.Format("StatusSegmentationCandidates", _pendingSegmentation.Blobs.Count);
+                statusText.Text = UiText.Get("StatusSegmentationComplete");
             }
             catch (Exception exception)
             {
                 _pendingSegmentation = null;
-                statusText.Text = $"Segmentation failed: {exception.Message}";
+                statusText.Text = UiText.Format("StatusSegmentationFailed", exception.Message);
             }
             UpdateButtonStates();
         }
@@ -249,7 +250,7 @@ namespace ImageViewer.Controls
         {
             if (_volume == null)
             {
-                statusText.Text = "Load a volume before selecting an MPR direction.";
+                statusText.Text = UiText.Get("StatusLoadVolumeFirstMpr");
                 return;
             }
 
@@ -261,7 +262,7 @@ namespace ImageViewer.Controls
             }
             catch (Exception exception)
             {
-                statusText.Text = $"Unable to create {mode} view: {exception.Message}";
+                statusText.Text = UiText.Format("StatusUnableCreateView", LocalizeMode(mode), exception.Message);
                 retryButton.Visibility = Visibility.Visible;
             }
         }
@@ -276,17 +277,17 @@ namespace ImageViewer.Controls
             VolumeAnomaly anomaly = _qualityReport.Anomalies[anomalyList.SelectedIndex];
             _volumeViewer.SelectSlice(anomaly.SliceIndex);
             DisplayMode = AdaptiveDisplayMode.AxialSlice;
-            statusText.Text = $"Located anomaly on slice {anomaly.SliceIndex + 1}.";
+            statusText.Text = UiText.Format("StatusAnomalyLocated", anomaly.SliceIndex + 1);
         }
 
         private void OnAcceptSegmentationClick(object sender, RoutedEventArgs e) =>
-            statusText.Text = _pendingSegmentation == null ? "No segmentation candidate to accept." : "Candidate accepted for review; ROI data remains unchanged.";
+            statusText.Text = _pendingSegmentation == null ? UiText.Get("StatusNoSegmentationCandidate") : UiText.Get("StatusCandidateAccepted");
 
         private void OnRejectSegmentationClick(object sender, RoutedEventArgs e)
         {
             _pendingSegmentation = null;
-            segmentationText.Text = "Segmentation candidate rejected.";
-            statusText.Text = "No ROI was changed.";
+            segmentationText.Text = UiText.Get("StatusCandidateRejected");
+            statusText.Text = UiText.Get("StatusNoRoiChanged");
             UpdateButtonStates();
         }
 
@@ -303,7 +304,7 @@ namespace ImageViewer.Controls
                     if (_volume != null)
                     {
                         _volume3DViewer.FitVolume();
-                        statusText.Text = "3D volume fitted to view.";
+                        statusText.Text = UiText.Get("StatusVolumeFitted");
                     }
                     break;
                 case Key.Up: StepMprSlice(1); break;
@@ -345,13 +346,13 @@ namespace ImageViewer.Controls
             {
                 _coronalSliceIndex = sliceIndex;
                 _volume3DViewer.SetCoronalSlice(sliceIndex);
-                statusText.Text = $"Coronal slice {sliceIndex + 1}/{_volume.Height}";
+                statusText.Text = UiText.Format("StatusCoronalSlice", sliceIndex + 1, _volume.Height);
             }
             else
             {
                 _sagittalSliceIndex = sliceIndex;
                 _volume3DViewer.SetSagittalSlice(sliceIndex);
-                statusText.Text = $"Sagittal slice {sliceIndex + 1}/{_volume.Width}";
+                statusText.Text = UiText.Format("StatusSagittalSlice", sliceIndex + 1, _volume.Width);
             }
         }
 
@@ -360,16 +361,16 @@ namespace ImageViewer.Controls
             if (ResolveMode() == AdaptiveDisplayMode.ThreeDimensional)
             {
                 _volume3DViewer.ResetCamera();
-                statusText.Text = "3D camera reset.";
+                statusText.Text = UiText.Get("StatusCameraReset");
             }
             else if (_volume == null)
             {
-                statusText.Text = "2D view reset.";
+                statusText.Text = UiText.Get("Status2DViewReset");
             }
             else
             {
                 _volumeViewer.SelectSlice(0);
-                statusText.Text = "2D view reset to the first slice.";
+                statusText.Text = UiText.Get("Status2DViewResetFirstSlice");
             }
         }
 
@@ -378,7 +379,7 @@ namespace ImageViewer.Controls
         private void OnCancelClick(object sender, RoutedEventArgs e)
         {
             _operationCancellation?.Cancel();
-            statusText.Text = "Operation cancellation requested.";
+            statusText.Text = UiText.Get("StatusCancelRequested");
             operationProgress.Visibility = Visibility.Collapsed;
             UpdateButtonStates();
         }
@@ -403,9 +404,24 @@ namespace ImageViewer.Controls
 
         private void UpdateStatus()
         {
-            string data = _volume == null ? (_imageSource == null ? "No data loaded" : "Single image") : $"Volume {_volume.Width} x {_volume.Height} x {_volume.Depth}, spacing {_volume.SpacingX:0.###} x {_volume.SpacingY:0.###} x {_volume.SpacingZ:0.###} mm";
+            string data = _volume == null
+                ? (_imageSource == null ? UiText.Get("StatusNoDataLoaded") : UiText.Get("StatusSingleImage"))
+                : UiText.Format("StatusVolumeSummary", _volume.Width, _volume.Height, _volume.Depth, _volume.SpacingX, _volume.SpacingY, _volume.SpacingZ);
             statusText.Text = data;
-            stateBarText.Text = $"Mode: {ResolveMode()}  |  {data}";
+            stateBarText.Text = UiText.Format("StatusModeFormat", LocalizeMode(ResolveMode()), data);
+        }
+
+        private static string LocalizeMode(AdaptiveDisplayMode mode)
+        {
+            return mode switch
+            {
+                AdaptiveDisplayMode.TwoDimensional => UiText.Get("Mode2D"),
+                AdaptiveDisplayMode.ThreeDimensional => UiText.Get("Mode3D"),
+                AdaptiveDisplayMode.AxialSlice => UiText.Get("ModeAxialSlice"),
+                AdaptiveDisplayMode.Coronal => UiText.Get("ModeCoronal"),
+                AdaptiveDisplayMode.Sagittal => UiText.Get("ModeSagittal"),
+                _ => UiText.Get("ModeAuto")
+            };
         }
 
         private void UpdateButtonStates()

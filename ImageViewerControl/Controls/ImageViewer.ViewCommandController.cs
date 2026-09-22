@@ -21,6 +21,7 @@ namespace ImageViewer.Controls
                 [ImageViewerViewCommand.ToggleProfile] = () => _host.ShowProfile = !_host.ShowProfile,
                 [ImageViewerViewCommand.ToggleScaleBar] = () => _host.ShowScaleBar = !_host.ShowScaleBar,
                 [ImageViewerViewCommand.ToggleRoiList] = () => _host.ShowRoiList = !_host.ShowRoiList,
+                [ImageViewerViewCommand.ToggleToolbar] = () => _host.ShowToolbar = !_host.ShowToolbar,
                 [ImageViewerViewCommand.ToggleSnapGrid] = () => _host.ShowSnapGrid = !_host.ShowSnapGrid,
                 [ImageViewerViewCommand.ToggleSnapToGrid] = () => _host.EnableSnapToGrid = !_host.EnableSnapToGrid,
                 [ImageViewerViewCommand.FitToView] = _host.FitToView,
