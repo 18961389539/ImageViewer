@@ -12,27 +12,27 @@ namespace ImageViewer.Services
 {
     public sealed class ImageViewerSessionService : IImageViewerSessionService
     {
-        public void SaveToFile(string filePath, string? imagePath, IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, double scale, double translateX, double translateY, RoiPluginRegistry? pluginRegistry = null)
+        public void SaveToFile(string filePath, string? imagePath, IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, double scale, double translateX, double translateY, RoiPluginRegistry? pluginRegistry = null, CameraCalibration? calibration = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
             ArgumentNullException.ThrowIfNull(rois);
             ArgumentNullException.ThrowIfNull(pluginRegistry);
 
             EnsureDirectory(filePath);
-            File.WriteAllText(filePath, SerializeSession(Path.GetFileNameWithoutExtension(filePath), imagePath, rois, pixelSize, physicalUnit, scale, translateX, translateY, pluginRegistry));
+            File.WriteAllText(filePath, SerializeSession(Path.GetFileNameWithoutExtension(filePath), imagePath, rois, pixelSize, physicalUnit, scale, translateX, translateY, pluginRegistry, calibration));
         }
 
-        public Task SaveToFileAsync(string filePath, string? imagePath, IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, double scale, double translateX, double translateY, RoiPluginRegistry? pluginRegistry = null, CancellationToken cancellationToken = default)
+        public Task SaveToFileAsync(string filePath, string? imagePath, IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, double scale, double translateX, double translateY, RoiPluginRegistry? pluginRegistry = null, CameraCalibration? calibration = null, CancellationToken cancellationToken = default)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
             ArgumentNullException.ThrowIfNull(rois);
             ArgumentNullException.ThrowIfNull(pluginRegistry);
 
             EnsureDirectory(filePath);
-            return File.WriteAllTextAsync(filePath, SerializeSession(Path.GetFileNameWithoutExtension(filePath), imagePath, rois, pixelSize, physicalUnit, scale, translateX, translateY, pluginRegistry), cancellationToken);
+            return File.WriteAllTextAsync(filePath, SerializeSession(Path.GetFileNameWithoutExtension(filePath), imagePath, rois, pixelSize, physicalUnit, scale, translateX, translateY, pluginRegistry, calibration), cancellationToken);
         }
 
-        public string SerializeSession(string? sessionName, string? imagePath, IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, double scale, double translateX, double translateY, RoiPluginRegistry? pluginRegistry = null)
+        public string SerializeSession(string? sessionName, string? imagePath, IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, double scale, double translateX, double translateY, RoiPluginRegistry? pluginRegistry = null, CameraCalibration? calibration = null)
         {
             ArgumentNullException.ThrowIfNull(rois);
             ArgumentNullException.ThrowIfNull(pluginRegistry);
@@ -45,7 +45,8 @@ namespace ImageViewer.Services
                 RoiDocumentJson = RoiPersistenceService.Serialize(rois, pixelSize, physicalUnit, pluginRegistry),
                 Scale = scale,
                 TranslateX = translateX,
-                TranslateY = translateY
+                TranslateY = translateY,
+                Calibration = calibration
             };
 
             return JsonSerializer.Serialize(session, ImageViewerJsonSerializationContext.Default.ImageViewerSessionDocument);
@@ -73,7 +74,7 @@ namespace ImageViewer.Services
             var session = JsonSerializer.Deserialize(sessionJson, ImageViewerJsonSerializationContext.Default.ImageViewerSessionDocument)
                 ?? new ImageViewerSessionDocument();
             var roiData = RoiPersistenceService.Deserialize(session.RoiDocumentJson ?? string.Empty, pluginRegistry);
-            return new ImageViewerSessionData(session.SessionName, session.SavedAtUtc, ResolveImagePath(session.ImagePath, sessionBaseDirectory), roiData.Rois, roiData.PixelSize, roiData.PhysicalUnit, session.Scale, session.TranslateX, session.TranslateY);
+            return new ImageViewerSessionData(session.SessionName, session.SavedAtUtc, ResolveImagePath(session.ImagePath, sessionBaseDirectory), roiData.Rois, roiData.PixelSize, roiData.PhysicalUnit, session.Scale, session.TranslateX, session.TranslateY, session.Calibration);
         }
 
         private static string? ResolveImagePath(string? imagePath, string? sessionBaseDirectory)
@@ -106,5 +107,6 @@ namespace ImageViewer.Services
         string PhysicalUnit,
         double Scale,
         double TranslateX,
-        double TranslateY);
+        double TranslateY,
+        CameraCalibration? Calibration);
 }

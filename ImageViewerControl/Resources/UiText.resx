@@ -12,26 +12,29 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="MenuUndo" xml:space="preserve"><value>撤销 (Ctrl+Z)</value></data>
-  <data name="MenuRedo" xml:space="preserve"><value>重做 (Ctrl+Y)</value></data>
+  <data name="MenuUndo" xml:space="preserve"><value>撤销</value></data>
+  <data name="MenuRedo" xml:space="preserve"><value>重做</value></data>
   <data name="MenuDraw" xml:space="preserve"><value>绘制</value></data>
   <data name="MenuMeasure" xml:space="preserve"><value>测量</value></data>
-  <data name="MenuRoiOperations" xml:space="preserve"><value>标注与测量</value></data>
+  <data name="MenuRoiOperations" xml:space="preserve"><value>ROI 操作</value></data>
   <data name="MenuDeleteSelectedRoi" xml:space="preserve"><value>删除所选 ROI</value></data>
   <data name="MenuClearAllRois" xml:space="preserve"><value>清空所有 ROI</value></data>
-  <data name="RoiDestructiveActionUndoHint" xml:space="preserve"><value>可使用 Ctrl+Z 撤销</value></data>
+  <data name="RoiDestructiveActionUndoHint" xml:space="preserve"><value>按 Delete 删除，可使用 Ctrl+Z 撤销</value></data>
+  <data name="RoiClearAllUndoHint" xml:space="preserve"><value>清空所有标注，可使用 Ctrl+Z 撤销</value></data>
+  <data name="MenuDrawTooltip" xml:space="preserve"><value>选择要绘制的区域或测量工具
+左键绘制，右键完成，Esc 取消。</value></data>
   <data name="MenuEditProperties" xml:space="preserve"><value>编辑属性...</value></data>
   <data name="MenuSetLabel" xml:space="preserve"><value>设置标签...</value></data>
   <data name="MenuSetColor" xml:space="preserve"><value>设置颜色</value></data>
-  <data name="MenuColorCyanDefault" xml:space="preserve"><value>青色 (默认)</value></data>
+  <data name="MenuColorCyanDefault" xml:space="preserve"><value>青色（默认）</value></data>
   <data name="MenuColorRed" xml:space="preserve"><value>红色</value></data>
   <data name="MenuColorGreen" xml:space="preserve"><value>绿色</value></data>
   <data name="MenuColorYellow" xml:space="preserve"><value>黄色</value></data>
-  <data name="MenuColorMagenta" xml:space="preserve"><value>紫色</value></data>
-  <data name="MenuCalibratePixels" xml:space="preserve"><value>像素物理校准...</value></data>
+  <data name="MenuColorMagenta" xml:space="preserve"><value>品红</value></data>
+  <data name="MenuCalibratePixels" xml:space="preserve"><value>像素/物理尺寸校准...</value></data>
   <data name="MenuEditCaliperSettings" xml:space="preserve"><value>卡尺参数...</value></data>
   <data name="MenuGradientAlignCaliper" xml:space="preserve"><value>梯度检测对齐（卡尺）</value></data>
-  <data name="MenuFileAndProjects" xml:space="preserve"><value>文件与项目</value></data>
+  <data name="MenuFileAndProjects" xml:space="preserve"><value>文件</value></data>
   <data name="MenuOpenImageFile" xml:space="preserve"><value>打开图像文件...</value></data>
   <data name="MenuSaveRois" xml:space="preserve"><value>保存 ROI...</value></data>
   <data name="MenuLoadRois" xml:space="preserve"><value>加载 ROI...</value></data>
@@ -49,7 +52,7 @@
   <data name="MenuPauseRealtimeHistogram" xml:space="preserve"><value>暂停实时直方图</value></data>
   <data name="MenuPauseRealtimeProfile" xml:space="preserve"><value>暂停实时剖面图</value></data>
   <data name="MenuRefreshAnalysis" xml:space="preserve"><value>立即刷新分析</value></data>
-  <data name="MenuLargeImageAndPerformance" xml:space="preserve"><value>大图处理与性能</value></data>
+  <data name="MenuLargeImageAndPerformance" xml:space="preserve"><value>性能与渲染</value></data>
   <data name="MenuEnableImagePyramid" xml:space="preserve"><value>启用分级金字塔</value></data>
   <data name="MenuAutoSelectPyramidLevel" xml:space="preserve"><value>自动切换分辨率</value></data>
   <data name="MenuAdvancedPerformance" xml:space="preserve"><value>高级渲染性能</value></data>
@@ -58,27 +61,26 @@
   <data name="MenuEnableGpuViewportCache" xml:space="preserve"><value>启用 GPU 视口缓存</value></data>
   <data name="MenuClearPyramidCache" xml:space="preserve"><value>清空多分辨率缓存</value></data>
   <data name="MenuClearAnalysisCache" xml:space="preserve"><value>清空分析缓存</value></data>
-  <data name="MenuRenderAndPseudoColor" xml:space="preserve"><value>渲染与伪彩色</value></data>
   <data name="MenuSmartDisplaySuggestion" xml:space="preserve"><value>智能显示建议...</value></data>
   <data name="MenuPseudoColorStrategy" xml:space="preserve"><value>伪彩色策略</value></data>
-  <data name="MenuPreferShaderPseudoColor" xml:space="preserve"><value>优先使用 ShaderEffect 伪彩</value></data>
+  <data name="MenuPreferShaderPseudoColor" xml:space="preserve"><value>优先使用 ShaderEffect 伪彩色</value></data>
   <data name="MenuAllowCpuFallback" xml:space="preserve"><value>ShaderEffect 失败时回退到 CPU</value></data>
-  <data name="MenuPseudoColor" xml:space="preserve"><value>伪彩</value></data>
+  <data name="MenuPseudoColor" xml:space="preserve"><value>伪彩色</value></data>
   <data name="MenuPseudoColorOriginal" xml:space="preserve"><value>原始</value></data>
   <data name="MenuPseudoColorHot" xml:space="preserve"><value>Hot</value></data>
   <data name="MenuPseudoColorJet" xml:space="preserve"><value>Jet</value></data>
   <data name="MenuPseudoColorViridis" xml:space="preserve"><value>Viridis</value></data>
   <data name="MenuShowRenderStatus" xml:space="preserve"><value>显示渲染状态...</value></data>
   <data name="DialogSmartDisplaySuggestionTitle" xml:space="preserve"><value>智能显示建议</value></data>
-  <data name="SmartDisplaySuggestionPseudoColorRecommended" xml:space="preserve"><value>建议启用 Viridis 伪彩</value></data>
+  <data name="SmartDisplaySuggestionPseudoColorRecommended" xml:space="preserve"><value>建议启用 Viridis 伪彩色</value></data>
   <data name="SmartDisplaySuggestionPseudoColorNotNeeded" xml:space="preserve"><value>无需伪彩色</value></data>
   <data name="SmartDisplaySuggestionSummary" xml:space="preserve"><value>建议对比度系数：{0:F2}
 建议亮度偏移：{1:F2}
-伪彩建议：{2}
+伪彩色建议：{2}
 依据：{3}
 
 这些建议不会自动修改当前图像显示。</value></data>
-  <data name="MenuDisplaySettings" xml:space="preserve"><value>显示选项</value></data>
+  <data name="MenuDisplaySettings" xml:space="preserve"><value>显示</value></data>
   <data name="MenuShowToolbar" xml:space="preserve"><value>显示工具栏</value></data>
   <data name="MenuShowToolbarTooltip" xml:space="preserve"><value>显示/隐藏左侧浮动工具栏
 工具栏提供打开图像、缩放、视图操作和面板开关。
@@ -89,13 +91,13 @@
   <data name="MenuShowSnapGrid" xml:space="preserve"><value>显示吸附网格</value></data>
   <data name="MenuEnableSnapToGrid" xml:space="preserve"><value>启用网格吸附</value></data>
   <data name="MenuShowCrosshair" xml:space="preserve"><value>显示十字准星</value></data>
-  <data name="MenuShowCaliperScores" xml:space="preserve"><value>显示卡尺分数</value></data>
+  <data name="MenuShowCaliperScores" xml:space="preserve"><value>显示卡尺得分</value></data>
   <data name="MenuShowInfoPanel" xml:space="preserve"><value>显示信息面板</value></data>
   <data name="MenuShowHistogram" xml:space="preserve"><value>显示直方图</value></data>
   <data name="MenuShowProfile" xml:space="preserve"><value>显示灰度剖面图</value></data>
   <data name="MenuShowScaleBar" xml:space="preserve"><value>显示比例尺</value></data>
   <data name="MenuShowRoiList" xml:space="preserve"><value>显示 ROI 列表</value></data>
-  <data name="MenuViewControl" xml:space="preserve"><value>视图操作</value></data>
+  <data name="MenuViewControl" xml:space="preserve"><value>视图</value></data>
   <data name="MenuSearch" xml:space="preserve"><value>搜索菜单... 支持命令名与快捷键（如 Ctrl+Z）</value></data>
   <data name="MenuZoomOut" xml:space="preserve"><value>缩小</value></data>
   <data name="MenuZoomIn" xml:space="preserve"><value>放大</value></data>
@@ -105,7 +107,7 @@
   <data name="EmptyStateBackgroundRetry" xml:space="preserve"><value>后台重试</value></data>
   <data name="EmptyStateTiledRendering" xml:space="preserve"><value>大图分块</value></data>
   <data name="MenuFitToView" xml:space="preserve"><value>适应窗口</value></data>
-  <data name="MenuActualSize" xml:space="preserve"><value>实际大小 (100%)</value></data>
+  <data name="MenuActualSize" xml:space="preserve"><value>实际大小（100%）</value></data>
   <data name="MenuZoomToSelectedRoi" xml:space="preserve"><value>缩放到所选 ROI</value></data>
   <data name="MenuResetView" xml:space="preserve"><value>重置视图</value></data>
   <data name="MenuRotateLeft" xml:space="preserve"><value>向左旋转 90°</value></data>
@@ -148,13 +150,19 @@
   <data name="EmptyStateTitle" xml:space="preserve"><value>尚未加载图像</value></data>
   <data name="EmptyStateDescription" xml:space="preserve"><value>拖放图像到窗口，使用上方的打开按钮，或按 Ctrl+O 导入。</value></data>
   <data name="EmptyStateHint" xml:space="preserve"><value>支持大图分块、后台加载和失败重试。</value></data>
-  <data name="CalibrationDialogTitle" xml:space="preserve"><value>像素物理校准</value></data>
+  <data name="CalibrationDialogTitle" xml:space="preserve"><value>像素/物理尺寸校准</value></data>
   <data name="CalibrationDialogPrompt" xml:space="preserve"><value>请输入选中线段对应的实际长度:</value></data>
+  <data name="CalibrationDialogHint" xml:space="preserve"><value>下方畸变系数为可选；不填（0）则不应用镜头畸变校正。</value></data>
   <data name="CalibrationDialogActualLengthLabel" xml:space="preserve"><value>实际长度</value></data>
   <data name="CalibrationDialogUnitLabel" xml:space="preserve"><value>单位</value></data>
   <data name="CalibrationDialogWarningTitle" xml:space="preserve"><value>校准</value></data>
   <data name="CalibrationDialogInvalidLengthMessage" xml:space="preserve"><value>请输入有效的实际长度。</value></data>
   <data name="CalibrationDefaultUnit" xml:space="preserve"><value>mm</value></data>
+  <data name="CalibrationDialogDistortionHeader" xml:space="preserve"><value>镜头径向畸变（可选）</value></data>
+  <data name="CalibrationDialogDistortionHint" xml:space="preserve"><value>K1/K2 为归一化径向畸变系数（填 0 表示不校正）。主点按图像中心、归一化半径按图像短边一半自动计算。</value></data>
+  <data name="CalibrationDialogK1Label" xml:space="preserve"><value>一阶畸变系数 K1</value></data>
+  <data name="CalibrationDialogK2Label" xml:space="preserve"><value>二阶畸变系数 K2</value></data>
+  <data name="InfoLineCalibrationDistortion" xml:space="preserve"><value>畸变校正: K1={0:F3}, K2={1:F3}</value></data>
   <data name="CaliperFieldCount" xml:space="preserve"><value>卡尺数量</value></data>
   <data name="CaliperFieldSearchRange" xml:space="preserve"><value>搜索范围 (px)</value></data>
   <data name="CaliperFieldSamplingHalfWidth" xml:space="preserve"><value>半宽采样 (px)</value></data>
@@ -163,20 +171,24 @@
   <data name="CaliperFieldMinimumValid" xml:space="preserve"><value>最少有效卡尺</value></data>
   <data name="CaliperFieldOutlierThreshold" xml:space="preserve"><value>离群阈值 (px, 0=自动)</value></data>
   <data name="CaliperFieldPolarity" xml:space="preserve"><value>边缘极性</value></data>
+  <data name="CaliperFieldEdgeSelection" xml:space="preserve"><value>边缘序号 (1=最强)</value></data>
+  <data name="CaliperFieldMinimumEdgeGap" xml:space="preserve"><value>最小边缘间距 (px, 0=关闭)</value></data>
+  <data name="CaliperFieldNominalEdgeGap" xml:space="preserve"><value>标称边缘间距 (px, 0=关闭先验)</value></data>
+  <data name="CaliperFieldNominalEdgeGapTolerance" xml:space="preserve"><value>标称间距容差 (px, 0=不允许偏差)</value></data>
   <data name="LineMeasureCaliperDialogTitle" xml:space="preserve"><value>卡尺参数</value></data>
   <data name="LineMeasureCaliperDialogHeading" xml:space="preserve"><value>设置卡尺检测参数</value></data>
   <data name="LineMeasureCaliperDialogDescription" xml:space="preserve"><value>说明: 极性控制两侧边缘的梯度方向；离群阈值为 0 时会自动估计。</value></data>
   <data name="LineMeasureCaliperDialogInvalidMessage" xml:space="preserve"><value>请输入有效的卡尺参数。</value></data>
-  <data name="LineCaliperDialogTitle" xml:space="preserve"><value>直线查找卡尺参数</value></data>
-  <data name="LineCaliperDialogHeading" xml:space="preserve"><value>设置直线查找卡尺参数</value></data>
+  <data name="LineCaliperDialogTitle" xml:space="preserve"><value>拟合直线参数</value></data>
+  <data name="LineCaliperDialogHeading" xml:space="preserve"><value>设置拟合直线参数</value></data>
   <data name="LineCaliperDialogDescription" xml:space="preserve"><value>说明: 先绘制一条近似直线，系统会沿线方向布置卡尺，在附近搜索真实直线。</value></data>
-  <data name="LineCaliperDialogInvalidMessage" xml:space="preserve"><value>请输入有效的直线查找卡尺参数。</value></data>
-  <data name="CircularCaliperDialogTitle" xml:space="preserve"><value>圆形卡尺参数</value></data>
-  <data name="CircularCaliperDialogHeading" xml:space="preserve"><value>设置圆形卡尺检测参数</value></data>
-  <data name="CircularCaliperDialogDescription" xml:space="preserve"><value>说明: 圆形卡尺沿圆周均匀取样；极性控制半径方向上的梯度方向；离群阈值为 0 时会自动估计。</value></data>
-  <data name="CircularCaliperDialogInvalidMessage" xml:space="preserve"><value>请输入有效的圆形卡尺参数。</value></data>
+  <data name="LineCaliperDialogInvalidMessage" xml:space="preserve"><value>请输入有效的拟合直线参数。</value></data>
+  <data name="CircularCaliperDialogTitle" xml:space="preserve"><value>拟合圆参数</value></data>
+  <data name="CircularCaliperDialogHeading" xml:space="preserve"><value>设置拟合圆检测参数</value></data>
+  <data name="CircularCaliperDialogDescription" xml:space="preserve"><value>说明: 拟合圆沿圆周均匀取样；极性控制半径方向上的梯度方向；离群阈值为 0 时会自动估计。</value></data>
+  <data name="CircularCaliperDialogInvalidMessage" xml:space="preserve"><value>请输入有效的拟合圆参数。</value></data>
   <data name="FileDialogOpenImageTitle" xml:space="preserve"><value>选择图像文件</value></data>
-  <data name="FileDialogOpenImageFilter" xml:space="preserve"><value>图像文件|*.png;*.jpg;*.jpeg;*.bmp;*.tif;*.tiff|所有文件|*.*</value></data>
+  <data name="FileDialogOpenImageFilter" xml:space="preserve"><value>图像文件|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.tif;*.tiff|所有文件|*.*</value></data>
   <data name="FileDialogSaveRoiTitle" xml:space="preserve"><value>保存 ROI</value></data>
   <data name="FileDialogOpenRoiTitle" xml:space="preserve"><value>加载 ROI</value></data>
   <data name="FileDialogRoiFilter" xml:space="preserve"><value>ROI 文件|*.json|所有文件|*.*</value></data>
@@ -202,11 +214,11 @@
   <data name="ToolArrowAnnotation" xml:space="preserve"><value>箭头标注</value></data>
   <data name="ToolPointAnnotation" xml:space="preserve"><value>点标注</value></data>
   <data name="ToolTextAnnotation" xml:space="preserve"><value>文本标注</value></data>
-  <data name="ToolCircularCaliper" xml:space="preserve"><value>圆形卡尺</value></data>
-  <data name="ToolArcCaliper" xml:space="preserve"><value>弧形卡尺</value></data>
+  <data name="ToolCircularCaliper" xml:space="preserve"><value>拟合圆</value></data>
+  <data name="ToolArcCaliper" xml:space="preserve"><value>拟合弧</value></data>
   <data name="ToolLineMeasure" xml:space="preserve"><value>距离测量</value></data>
-  <data name="ToolCaliperMeasure" xml:space="preserve"><value>卡尺测量</value></data>
-  <data name="ToolLineCaliper" xml:space="preserve"><value>直线查找卡尺</value></data>
+  <data name="ToolCaliperMeasure" xml:space="preserve"><value>宽度测量</value></data>
+  <data name="ToolLineCaliper" xml:space="preserve"><value>拟合直线</value></data>
   <data name="ToolAngleMeasure" xml:space="preserve"><value>角度测量</value></data>
   <data name="ToolArcMeasure" xml:space="preserve"><value>圆弧测量</value></data>
   <data name="ToolPointToLineDistance" xml:space="preserve"><value>点到线距离</value></data>
@@ -233,13 +245,13 @@
   <data name="RoiDisplayParallelismMeasure" xml:space="preserve"><value>平行度测量</value></data>
   <data name="RoiDisplayPerpendicularityMeasure" xml:space="preserve"><value>垂直度测量</value></data>
   <data name="RoiDisplayConcentricityMeasure" xml:space="preserve"><value>同心度测量</value></data>
-  <data name="RoiDisplayCaliperMeasure" xml:space="preserve"><value>卡尺测量</value></data>
-  <data name="RoiDisplayLineCaliperMeasure" xml:space="preserve"><value>直线查找卡尺</value></data>
-  <data name="RoiDisplayCircularCaliperMeasure" xml:space="preserve"><value>圆形卡尺</value></data>
-  <data name="RoiDisplayArcCaliperMeasure" xml:space="preserve"><value>弧形卡尺</value></data>
-  <data name="InfoTitleLineCaliper" xml:space="preserve"><value>直线卡尺</value></data>
-  <data name="InfoTitleArcCaliper" xml:space="preserve"><value>弧形卡尺</value></data>
-  <data name="InfoTitleCircularCaliper" xml:space="preserve"><value>圆形卡尺</value></data>
+  <data name="RoiDisplayCaliperMeasure" xml:space="preserve"><value>宽度测量</value></data>
+  <data name="RoiDisplayLineCaliperMeasure" xml:space="preserve"><value>拟合直线</value></data>
+  <data name="RoiDisplayCircularCaliperMeasure" xml:space="preserve"><value>拟合圆</value></data>
+  <data name="RoiDisplayArcCaliperMeasure" xml:space="preserve"><value>拟合弧</value></data>
+  <data name="InfoTitleLineCaliper" xml:space="preserve"><value>拟合直线</value></data>
+  <data name="InfoTitleArcCaliper" xml:space="preserve"><value>拟合弧</value></data>
+  <data name="InfoTitleCircularCaliper" xml:space="preserve"><value>拟合圆</value></data>
   <data name="InfoLineRectDimensions" xml:space="preserve"><value>矩形 ROI  W:{0} H:{1}</value></data>
   <data name="InfoLineArea" xml:space="preserve"><value>面积:{0}</value></data>
   <data name="InfoLineFittedEllipse" xml:space="preserve"><value>拟合椭圆  RX:{0} RY:{1}</value></data>
@@ -270,7 +282,7 @@
   <data name="InfoLineConcentricityDetail" xml:space="preserve"><value>半径1:{0} 半径2:{1}</value></data>
   <data name="InfoLinePointAnnotation" xml:space="preserve"><value>点标注  X:{0:F1} Y:{1:F1}</value></data>
   <data name="InfoLineTextAnnotation" xml:space="preserve"><value>文本标注  X:{0:F1} Y:{1:F1}</value></data>
-  <data name="InfoLineBlobAnalysis" xml:space="preserve"><value>斑点分析  W:{0} H:{1} Angle:{2:F1}°</value></data>
+  <data name="InfoLineBlobAnalysis" xml:space="preserve"><value>斑点分析  宽:{0} 高:{1} 角度:{2:F1}°</value></data>
   <data name="InfoLineBlobThresholdOtsu" xml:space="preserve"><value>阈值: Otsu  极性:{0} 最小面积:{1}</value></data>
   <data name="InfoLineBlobThresholdManual" xml:space="preserve"><value>阈值: {0}  极性:{1} 最小面积:{2}</value></data>
   <data name="InfoPolarityDark" xml:space="preserve"><value>暗目标</value></data>
@@ -279,8 +291,8 @@
   <data name="InfoLineBlobSummary" xml:space="preserve"><value>斑点数:{0} 总面积:{1}</value></data>
   <data name="InfoLineBlobItem" xml:space="preserve"><value>斑点#{0}  面积:{1} 宽:{2} 高:{3} 中心:({4:F1}, {5:F1})</value></data>
   <data name="InfoLineBlobBox" xml:space="preserve"><value>边界框: X:{0:F1} Y:{1:F1} 宽:{2} 高:{3}</value></data>
-  <data name="InfoLineBlobRemaining" xml:space="preserve"><value>... 其余 {0} 个 Blob 未展开显示</value></data>
-  <data name="InfoLineCaliperMeasure" xml:space="preserve"><value>卡尺测量  距离:{0}</value></data>
+  <data name="InfoLineBlobRemaining" xml:space="preserve"><value>... 其余 {0} 个斑点未展开显示</value></data>
+  <data name="InfoLineCaliperMeasure" xml:space="preserve"><value>宽度测量  距离:{0}</value></data>
   <data name="InfoLineRegionSearch" xml:space="preserve"><value>区域:{0} 搜索:{1}</value></data>
   <data name="InfoLineSingleSearch" xml:space="preserve"><value>搜索:{0}</value></data>
   <data name="InfoLineCaliperParameters" xml:space="preserve"><value>卡尺数:{0} 采样宽度:{1}px 极性:{2}</value></data>
@@ -293,9 +305,9 @@
   <data name="InfoLineStatisticsStdDev" xml:space="preserve"><value>标准差:{0:F2} 数量:{1}</value></data>
   <data name="InfoLineCalibration" xml:space="preserve"><value>校准: 1 px = {0:F4} {1}</value></data>
   <data name="InfoUnitPixels" xml:space="preserve"><value>px</value></data>
-  <data name="InfoLineArcCaliperGeometry" xml:space="preserve"><value>Radius:{0} Arc:{1:F1}°</value></data>
-  <data name="InfoLineArcCaliperDetail" xml:space="preserve"><value>Center:({0:F1}, {1:F1}) Start:{2:F1}°</value></data>
-  <data name="InfoLineCircularCaliperDetail" xml:space="preserve"><value>Center:({0:F1}, {1:F1})</value></data>
+  <data name="InfoLineArcCaliperGeometry" xml:space="preserve"><value>半径:{0} 弧:{1:F1}°</value></data>
+  <data name="InfoLineArcCaliperDetail" xml:space="preserve"><value>圆心:({0:F1}, {1:F1}) 起点:{2:F1}°</value></data>
+  <data name="InfoLineCircularCaliperDetail" xml:space="preserve"><value>圆心:({0:F1}, {1:F1})</value></data>
   <data name="RenderStatusNotAvailable" xml:space="preserve"><value>n/a</value></data>
   <data name="RenderStatusModeShaderEffect" xml:space="preserve"><value>ShaderEffect</value></data>
   <data name="RenderStatusModeOriginal" xml:space="preserve"><value>Original</value></data>
@@ -323,6 +335,12 @@
   <data name="PixelInfoGray" xml:space="preserve"><value> Gray:{0}</value></data>
   <data name="PixelInfoValues" xml:space="preserve"><value> V:{0},{1},{2}</value></data>
   <data name="EditorDetailsLabel" xml:space="preserve"><value>详情</value></data>
+  <data name="EditorToleranceGroup" xml:space="preserve"><value>公差判定</value></data>
+  <data name="EditorToleranceNominal" xml:space="preserve"><value>标称值</value></data>
+  <data name="EditorTolerancePlus" xml:space="preserve"><value>上公差</value></data>
+  <data name="EditorToleranceMinus" xml:space="preserve"><value>下公差</value></data>
+  <data name="InfoTolerancePass" xml:space="preserve"><value>判定: 合格  实测 {0:G4}，标称 {1:G4}</value></data>
+  <data name="InfoToleranceFail" xml:space="preserve"><value>判定: 超差  实测 {0:G4}，标称 {1:G4}</value></data>
   <data name="EditorLabel" xml:space="preserve"><value>标签</value></data>
   <data name="EditorStrokeThickness" xml:space="preserve"><value>线宽</value></data>
   <data name="EditorVisible" xml:space="preserve"><value>可见</value></data>
@@ -351,44 +369,44 @@
   <data name="EditorRadiusX" xml:space="preserve"><value>X 半径</value></data>
   <data name="EditorRadiusY" xml:space="preserve"><value>Y 半径</value></data>
   <data name="EditorVertices" xml:space="preserve"><value>顶点数: {0}</value></data>
-  <data name="EditorPoints" xml:space="preserve"><value>点数: {0}
-自由曲线: {1}</value></data>
-  <data name="EditorLineMeasureDetails" xml:space="preserve"><value>P1: {0:F1}, {1:F1}
-P2: {2:F1}, {3:F1}</value></data>
-  <data name="EditorAngleDetails" xml:space="preserve"><value>P1: {0:F1}, {1:F1}
-Vertex: {2:F1}, {3:F1}
-P2: {4:F1}, {5:F1}</value></data>
-  <data name="EditorArcDetailsBase" xml:space="preserve"><value>Start: {0:F1}, {1:F1}
-End: {2:F1}, {3:F1}
-Arc: {4:F1}, {5:F1}</value></data>
+  <data name="EditorPoints" xml:space="preserve"><value>顶点数: {0}
+自由曲线点数: {1}</value></data>
+  <data name="EditorLineMeasureDetails" xml:space="preserve"><value>起点: ({0:F1}, {1:F1})
+终点: ({2:F1}, {3:F1})</value></data>
+  <data name="EditorAngleDetails" xml:space="preserve"><value>起点: ({0:F1}, {1:F1})
+顶点: ({2:F1}, {3:F1})
+终点: ({4:F1}, {5:F1})</value></data>
+  <data name="EditorArcDetailsBase" xml:space="preserve"><value>起点: ({0:F1}, {1:F1})
+终点: ({2:F1}, {3:F1})
+弧点: ({4:F1}, {5:F1})</value></data>
   <data name="EditorArcDetailsRadius" xml:space="preserve"><value>
-Radius: {0:F2}</value></data>
+半径: {0:F2}</value></data>
   <data name="EditorArcDetailsLength" xml:space="preserve"><value>
-Arc Length: {0:F2}</value></data>
+弧长: {0:F2}</value></data>
   <data name="EditorArcDetailsCentralAngle" xml:space="preserve"><value>
-Central Angle: {0:F1}°</value></data>
-  <data name="EditorPointToLineDetails" xml:space="preserve"><value>Point: {0:F1}, {1:F1}
-Line P1: {2:F1}, {3:F1}
-Line P2: {4:F1}, {5:F1}
-Distance: {6:F2}</value></data>
-  <data name="EditorPointToCircleDetails" xml:space="preserve"><value>Point: {0:F1}, {1:F1}
-Center: {2:F1}, {3:F1}
-Radius: {4:F2}
-To Circle: {5:F2}
-To Center: {6:F2}</value></data>
-  <data name="EditorParallelismDetails" xml:space="preserve"><value>Line1: ({0:F1},{1:F1})-({2:F1},{3:F1})
-Line2: ({4:F1},{5:F1})-({6:F1},{7:F1})
-Angle Diff: {8:F2}°
-Avg Distance: {9:F2}</value></data>
-  <data name="EditorPerpendicularityDetails" xml:space="preserve"><value>Line1: ({0:F1},{1:F1})-({2:F1},{3:F1})
-Line2: ({4:F1},{5:F1})-({6:F1},{7:F1})
-Angle: {8:F1}°
-Error: {9:F2}°</value></data>
-  <data name="EditorConcentricityDetails" xml:space="preserve"><value>Center1: {0:F1}, {1:F1}
-Radius1: {2:F2}
-Center2: {3:F1}, {4:F1}
-Radius2: {5:F2}
-Center Distance: {6:F2}</value></data>
+圆心角: {0:F1}°</value></data>
+  <data name="EditorPointToLineDetails" xml:space="preserve"><value>点: ({0:F1}, {1:F1})
+线起点: ({2:F1}, {3:F1})
+线终点: ({4:F1}, {5:F1})
+距离: {6:F2}</value></data>
+  <data name="EditorPointToCircleDetails" xml:space="preserve"><value>点: ({0:F1}, {1:F1})
+圆心: ({2:F1}, {3:F1})
+半径: {4:F2}
+到圆距离: {5:F2}
+到圆心距离: {6:F2}</value></data>
+  <data name="EditorParallelismDetails" xml:space="preserve"><value>线1: ({0:F1},{1:F1})-({2:F1},{3:F1})
+线2: ({4:F1},{5:F1})-({6:F1},{7:F1})
+角度差: {8:F2}°
+平均距离: {9:F2}</value></data>
+  <data name="EditorPerpendicularityDetails" xml:space="preserve"><value>线1: ({0:F1},{1:F1})-({2:F1},{3:F1})
+线2: ({4:F1},{5:F1})-({6:F1},{7:F1})
+角度: {8:F1}°
+误差: {9:F2}°</value></data>
+  <data name="EditorConcentricityDetails" xml:space="preserve"><value>圆心1: {0:F1}, {1:F1}
+半径1: {2:F2}
+圆心2: {3:F1}, {4:F1}
+半径2: {5:F2}
+中心距: {6:F2}</value></data>
   <data name="ErrorOpenImageTitle" xml:space="preserve"><value>打开图像失败</value></data>
   <data name="ErrorOpenImageMessage" xml:space="preserve"><value>无法加载图像文件。</value></data>
   <data name="ErrorExportPngTitle" xml:space="preserve"><value>导出 PNG 失败</value></data>
@@ -397,17 +415,17 @@ Center Distance: {6:F2}</value></data>
   <data name="ErrorExportAnalysisMessage" xml:space="preserve"><value>无法导出 ROI 分析 CSV。</value></data>
   <data name="ErrorSaveSessionTitle" xml:space="preserve"><value>保存会话失败</value></data>
   <data name="ErrorSaveSessionMessage" xml:space="preserve"><value>无法保存图像查看会话。</value></data>
-  <data name="ErrorExportProjectPackageTitle" xml:space="preserve"><value>导出工程包失败</value></data>
-  <data name="ErrorExportProjectPackageMessage" xml:space="preserve"><value>无法导出当前工程包。</value></data>
+  <data name="ErrorExportProjectPackageTitle" xml:space="preserve"><value>导出项目包失败</value></data>
+  <data name="ErrorExportProjectPackageMessage" xml:space="preserve"><value>无法导出当前项目包。</value></data>
   <data name="WarningFileMissingTitle" xml:space="preserve"><value>文件不存在</value></data>
   <data name="WarningRecentProjectRemoved" xml:space="preserve"><value>最近项目文件已不存在，已从列表中移除。</value></data>
-  <data name="ErrorLoadProjectTitle" xml:space="preserve"><value>加载工程失败</value></data>
-  <data name="ErrorLoadProjectMessage" xml:space="preserve"><value>无法加载所选工程文件。</value></data>
+  <data name="ErrorLoadProjectTitle" xml:space="preserve"><value>加载项目失败</value></data>
+  <data name="ErrorLoadProjectMessage" xml:space="preserve"><value>无法加载所选项目文件。</value></data>
   <data name="ErrorSaveRoiTitle" xml:space="preserve"><value>保存 ROI 失败</value></data>
   <data name="ErrorSaveRoiMessage" xml:space="preserve"><value>无法保存 ROI 文件，请检查路径和写入权限。</value></data>
   <data name="ErrorLoadRoiTitle" xml:space="preserve"><value>加载 ROI 失败</value></data>
   <data name="ErrorLoadRoiMessage" xml:space="preserve"><value>无法加载 ROI 文件，请检查文件格式是否有效。</value></data>
-  <data name="RecentProjectsEmpty" xml:space="preserve"><value>(无最近项目)</value></data>
+  <data name="RecentProjectsEmpty" xml:space="preserve"><value>（无最近项目）</value></data>
   <data name="RecentProjectHeader" xml:space="preserve"><value>{0} ({1})</value></data>
   <data name="StatusSaveRoiSuccess" xml:space="preserve"><value>已保存 ROI 文件</value></data>
   <data name="StatusLoadRoiSuccess" xml:space="preserve"><value>已加载 {0} 个 ROI</value></data>
@@ -420,9 +438,13 @@ Center Distance: {6:F2}</value></data>
   <data name="StatusZoomLevel" xml:space="preserve"><value>缩放：{0:P0}</value></data>
   <data name="StatusUndone" xml:space="preserve"><value>已撤销</value></data>
   <data name="StatusRedone" xml:space="preserve"><value>已重做</value></data>
-  <data name="StatusRoiDeleted" xml:space="preserve"><value>已删除所选 ROI</value></data>
-  <data name="StatusRoisCleared" xml:space="preserve"><value>已清空所有 ROI</value></data>
+  <data name="StatusRoiDeleted" xml:space="preserve"><value>已删除所选 ROI，可按 Ctrl+Z 撤销</value></data>
+  <data name="StatusRoisCleared" xml:space="preserve"><value>已清空所有 ROI，可按 Ctrl+Z 撤销</value></data>
   <data name="StatusDrawCancelled" xml:space="preserve"><value>已取消绘制</value></data>
+  <data name="StatusHintIconSuccess" xml:space="preserve"><value>✓</value></data>
+  <data name="StatusHintIconError" xml:space="preserve"><value>⚠</value></data>
+  <data name="StatusDropUnsupported" xml:space="preserve"><value>不支持的文件类型，请拖入图像、.ivsession 或 .ivpkg 文件。</value></data>
+  <data name="DropOverlayHint" xml:space="preserve"><value>松开以打开</value></data>
   <data name="Menu3DResetCamera" xml:space="preserve"><value>重置相机</value></data>
   <data name="Menu3DFitVolume" xml:space="preserve"><value>适配体数据</value></data>
   <data name="Menu3DFrontView" xml:space="preserve"><value>正面视图</value></data>
@@ -533,14 +555,14 @@ Center Distance: {6:F2}</value></data>
   <data name="StatusQualityFound" xml:space="preserve"><value>质量分析发现 {0} 个问题。</value></data>
   <data name="StatusQualityPassed" xml:space="preserve"><value>质量分析通过。</value></data>
   <data name="StatusQualityCancelled" xml:space="preserve"><value>质量分析已取消。</value></data>
-  <data name="StatusQualityFailed" xml:space="preserve"><value>质量分析失败：{0}</value></data>
+  <data name="StatusQualityFailed" xml:space="preserve"><value>质量分析失败，请重试。</value></data>
   <data name="StatusAnomalyItem" xml:space="preserve"><value>切片 {0}：{1}</value></data>
   <data name="StatusLoadVolumeFirstSegmentation" xml:space="preserve"><value>请先加载体数据再进行分割。</value></data>
   <data name="StatusSegmentationCandidates" xml:space="preserve"><value>分割完成，发现 {0} 个候选区域，请确认后再决定接受。</value></data>
   <data name="StatusSegmentationComplete" xml:space="preserve"><value>分割完成，未改动 ROI。</value></data>
-  <data name="StatusSegmentationFailed" xml:space="preserve"><value>分割失败：{0}</value></data>
+  <data name="StatusSegmentationFailed" xml:space="preserve"><value>分割失败，请重试。</value></data>
   <data name="StatusLoadVolumeFirstMpr" xml:space="preserve"><value>请先加载体数据再选择 MPR 方向。</value></data>
-  <data name="StatusUnableCreateView" xml:space="preserve"><value>无法创建 {0} 视图：{1}</value></data>
+  <data name="StatusUnableCreateView" xml:space="preserve"><value>无法创建 {0} 视图，请重试。</value></data>
   <data name="StatusAnomalyLocated" xml:space="preserve"><value>已在切片 {0} 定位异常。</value></data>
   <data name="StatusNoSegmentationCandidate" xml:space="preserve"><value>当前没有可接受的分割候选。</value></data>
   <data name="StatusCandidateAccepted" xml:space="preserve"><value>候选区域已记录，待复核；ROI 数据未改动。</value></data>
@@ -597,4 +619,21 @@ Center Distance: {6:F2}</value></data>
   <data name="ToolbarToggleRoiListTooltip" xml:space="preserve"><value>显示 ROI 列表
 在左上角列出当前所有标注，可快速选中、切换显隐或锁定。
 再次点击可隐藏。</value></data>
+  <data name="StatusSessionImageMissing" xml:space="preserve"><value>会话中的图像文件不存在：{0}。已加载标注和视口状态，但缺少底图。</value></data>
+  <data name="StatusRotatedLeft" xml:space="preserve"><value>已逆时针旋转 90°</value></data>
+  <data name="StatusRotatedRight" xml:space="preserve"><value>已顺时针旋转 90°</value></data>
+  <data name="StatusFlippedHorizontal" xml:space="preserve"><value>已水平翻转</value></data>
+  <data name="StatusFlippedVertical" xml:space="preserve"><value>已垂直翻转</value></data>
+  <data name="StatusFitToView" xml:space="preserve"><value>已适应窗口</value></data>
+  <data name="StatusActualSize" xml:space="preserve"><value>已按实际大小显示</value></data>
+  <data name="StatusResetViewDone" xml:space="preserve"><value>已重置视图</value></data>
+  <data name="StatusShowFullImage" xml:space="preserve"><value>已显示全图</value></data>
+  <data name="StatusHistogramFailed" xml:space="preserve"><value>直方图计算失败</value></data>
+  <data name="StatusProfileFailed" xml:space="preserve"><value>剖面图计算失败</value></data>
+  <data name="AdaptiveViewerName" xml:space="preserve"><value>自适应图像查看器</value></data>
+  <data name="VolumeViewerName" xml:space="preserve"><value>体积切片查看器</value></data>
+  <data name="Volume3DViewerName" xml:space="preserve"><value>三维体积查看器</value></data>
+  <data name="AdaptiveViewerStatusName" xml:space="preserve"><value>自适应查看器状态</value></data>
+  <data name="VolumeSliceStatusName" xml:space="preserve"><value>切片状态</value></data>
+  <data name="Volume3DStatusName" xml:space="preserve"><value>三维体积状态</value></data>
 </root>

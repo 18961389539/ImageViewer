@@ -125,7 +125,7 @@ namespace ImageViewer.Controls
 
         private string BuildRoiInfo(RoiBase roi, bool includeImageStatistics = true)
         {
-            return RoiInfoService.BuildInfo(roi, includeImageStatistics ? GetAnalysisBitmapSource() : null, PixelSize, PhysicalUnit, PluginRegistry, includeImageStatistics);
+            return RoiInfoService.BuildInfo(roi, includeImageStatistics ? GetAnalysisBitmapSource() : null, PixelSize, PhysicalUnit, PluginRegistry, includeImageStatistics, Calibration);
         }
 
         private void UpdateHistogram(bool force = false)

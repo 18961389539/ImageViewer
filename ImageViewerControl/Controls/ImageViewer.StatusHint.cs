@@ -1,9 +1,11 @@
 using System;
 using System.Windows;
+using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using ImageViewer.Localization;
 
 namespace ImageViewer.Controls
 {
@@ -41,6 +43,7 @@ namespace ImageViewer.Controls
             ApplyStatusHintStyle(kind);
             statusHintTextBlock.Text = message;
             statusHintBorder.Visibility = Visibility.Visible;
+            RaiseLiveRegionChanged(statusHintTextBlock);
 
             // 轻快淡入，与淡出对称
             statusHintBorder.BeginAnimation(OpacityProperty, new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(120)));
@@ -89,16 +92,53 @@ namespace ImageViewer.Controls
                 case StatusHintKind.Success:
                     statusHintBorder.BorderBrush = GetBrushResource("ViewerAccentBorderBrush");
                     statusHintTextBlock.Foreground = GetBrushResource("ViewerTextPrimaryBrush");
+                    ApplyStatusHintIcon("StatusHintIconSuccess", GetBrushResource("ViewerAccentBrush"));
                     break;
                 case StatusHintKind.Error:
                     statusHintBorder.BorderBrush = GetBrushResource("ViewerErrorBorderBrush");
                     statusHintTextBlock.Foreground = GetBrushResource("ViewerErrorBrush");
+                    ApplyStatusHintIcon("StatusHintIconError", GetBrushResource("ViewerErrorBrush"));
                     break;
                 default:
                     statusHintBorder.BorderBrush = GetBrushResource("ViewerPanelBorderBrush");
                     statusHintTextBlock.Foreground = GetBrushResource("ViewerTextPrimaryBrush");
+                    ApplyStatusHintIcon(null, null);
                     break;
             }
+        }
+
+        /// <summary>
+        /// 用图标前缀区分成功/错误提示，避免仅靠边框颜色传达结果（对色觉障碍用户更友好）。
+        /// Chinese: 信息类提示不显示图标；成功与错误提示显示对应符号并着色。
+        /// English: Shows a symbolic icon for success/error hints so status is not conveyed by color alone.
+        /// </summary>
+        private void ApplyStatusHintIcon(string? iconResourceKey, Brush? foreground)
+        {
+            if (statusHintIconTextBlock is null)
+            {
+                return;
+            }
+
+            if (string.IsNullOrEmpty(iconResourceKey))
+            {
+                statusHintIconTextBlock.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            statusHintIconTextBlock.Text = UiText.Get(iconResourceKey);
+            statusHintIconTextBlock.Foreground = foreground;
+            statusHintIconTextBlock.Visibility = Visibility.Visible;
+        }
+
+        /// <summary>
+        /// 显式抛出 LiveRegionChanged，使已声明的 AutomationProperties.LiveSetting 真正通知屏幕阅读器。
+        /// Chinese: WPF 中 LiveSetting 仅是元数据，必须在文本变化时主动抛出事件才会被朗读。
+        /// English: Raises LiveRegionChanged so assistive technology actually announces the updated text.
+        /// </summary>
+        private static void RaiseLiveRegionChanged(UIElement element)
+        {
+            AutomationPeer? peer = UIElementAutomationPeer.FromElement(element) ?? UIElementAutomationPeer.CreatePeerForElement(element);
+            peer?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
         }
 
         private Brush GetBrushResource(string key)

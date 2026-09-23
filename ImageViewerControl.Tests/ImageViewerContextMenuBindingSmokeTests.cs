@@ -182,7 +182,7 @@ namespace ImageViewerControl.Tests
                 var clearAllMenuItem = viewer.clearAllMenuItem;
 
                 Assert.Equal(UiText.Get("RoiDestructiveActionUndoHint"), deleteMenuItem.ToolTip);
-                Assert.Equal(UiText.Get("RoiDestructiveActionUndoHint"), clearAllMenuItem.ToolTip);
+                Assert.Equal(UiText.Get("RoiClearAllUndoHint"), clearAllMenuItem.ToolTip);
             });
         }
 

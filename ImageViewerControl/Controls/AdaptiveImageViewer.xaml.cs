@@ -212,9 +212,9 @@ namespace ImageViewer.Controls
             {
                 statusText.Text = UiText.Get("StatusQualityCancelled");
             }
-            catch (Exception exception)
+            catch (Exception)
             {
-                statusText.Text = UiText.Format("StatusQualityFailed", exception.Message);
+                statusText.Text = UiText.Get("StatusQualityFailed");
                 retryButton.Visibility = Visibility.Visible;
             }
             finally
@@ -238,10 +238,10 @@ namespace ImageViewer.Controls
                 segmentationText.Text = UiText.Format("StatusSegmentationCandidates", _pendingSegmentation.Blobs.Count);
                 statusText.Text = UiText.Get("StatusSegmentationComplete");
             }
-            catch (Exception exception)
+            catch (Exception)
             {
                 _pendingSegmentation = null;
-                statusText.Text = UiText.Format("StatusSegmentationFailed", exception.Message);
+                statusText.Text = UiText.Get("StatusSegmentationFailed");
             }
             UpdateButtonStates();
         }
@@ -260,9 +260,9 @@ namespace ImageViewer.Controls
                 UpdateMprSlice(mode, orientation, GetMprSliceIndex(mode));
                 DisplayMode = mode;
             }
-            catch (Exception exception)
+            catch (Exception)
             {
-                statusText.Text = UiText.Format("StatusUnableCreateView", LocalizeMode(mode), exception.Message);
+                statusText.Text = UiText.Format("StatusUnableCreateView", LocalizeMode(mode));
                 retryButton.Visibility = Visibility.Visible;
             }
         }

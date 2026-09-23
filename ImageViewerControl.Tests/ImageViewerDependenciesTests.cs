@@ -213,7 +213,7 @@ namespace ImageViewerControl.Tests
 
             public string? ShowSaveAnalysisCsvDialog() => throw new NotSupportedException();
 
-            public (double Length, string Unit)? ShowCalibrationDialog(string currentUnit) => throw new NotSupportedException();
+            public CalibrationDialogResult? ShowCalibrationDialog(string currentUnit) => throw new NotSupportedException();
 
             public CaliperMeasureRoi? ShowLineMeasureCaliperSettingsDialog(CaliperMeasureRoi roi, Action<CaliperMeasureRoi>? previewAction = null) => throw new NotSupportedException();
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using ImageViewer.Abstractions;
 
 namespace ImageViewer.Controls
@@ -14,6 +15,8 @@ namespace ImageViewer.Controls
         void ApplyPseudoColorMenuState(ImageViewerPseudoColorMenuState state);
         void PresentHistogram(ImageViewerHistogramOutput? output);
         void PresentProfile(ImageViewerProfileOutput? output);
+        void PresentHistogramError(string message);
+        void PresentProfileError(string message);
     }
 
     internal sealed class ImageViewerAnalysisUiFacade : IImageViewerAnalysisUiFacade
@@ -81,6 +84,33 @@ namespace ImageViewer.Controls
             {
                 ImageViewerAnalysisGraphRenderer.DrawProfile(_profileCanvas, output.ProfileData);
             }
+        }
+
+        public void PresentHistogramError(string message)
+        {
+            _histogramCanvas.Children.Clear();
+            _histogramCanvas.Children.Add(CreateErrorTextBlock(message, _histogramCanvas));
+        }
+
+        public void PresentProfileError(string message)
+        {
+            _profileCanvas.Children.Clear();
+            _profileCanvas.Children.Add(CreateErrorTextBlock(message, _profileCanvas));
+        }
+
+        private static TextBlock CreateErrorTextBlock(string message, Canvas canvas)
+        {
+            return new TextBlock
+            {
+                Text = message,
+                Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x6B, 0x6B)),
+                FontSize = 12,
+                TextWrapping = TextWrapping.Wrap,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Width = canvas.ActualWidth > 0 ? canvas.ActualWidth : 200,
+                TextAlignment = TextAlignment.Center
+            };
         }
     }
 }

@@ -12,4 +12,8 @@
     <ProjectReference Include="..\ImageViewerControl\ImageViewerControl.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="Resources\TestImage.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

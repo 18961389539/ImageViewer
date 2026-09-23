@@ -113,6 +113,7 @@ namespace ImageViewer.Controls
                     viewportState.TranslateX,
                     viewportState.TranslateY,
                     _workflow.GetPluginRegistry(),
+                    _workflow.GetCalibration(),
                     cancellationToken);
                 _lastAutoSaveFailed = false;
             }
@@ -128,7 +129,7 @@ namespace ImageViewer.Controls
                 }
 
                 _lastAutoSaveFailed = true;
-                _workflow.ShowStatusHint(UiText.Get("StatusAutoSaveFailed"));
+                _workflow.ShowStatusHint(UiText.Get("StatusAutoSaveFailed"), StatusHintKind.Error);
             }
             finally
             {

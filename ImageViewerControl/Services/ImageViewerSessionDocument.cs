@@ -1,4 +1,5 @@
 using System;
+using ImageViewer.Models;
 
 namespace ImageViewer.Services
 {
@@ -11,5 +12,6 @@ namespace ImageViewer.Services
         public double Scale { get; set; } = 1.0;
         public double TranslateX { get; set; }
         public double TranslateY { get; set; }
+        public CameraCalibration? Calibration { get; set; }
     }
 }

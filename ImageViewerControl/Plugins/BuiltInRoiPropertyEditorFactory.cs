@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -20,6 +21,9 @@ namespace ImageViewer.Plugins
                 BlobAnalysisRoi typed => CreateEditor(typed),
                 RotatedRect typed => CreateEditor(typed),
                 ArcCaliperMeasureRoi typed => CreateEditor(typed),
+                CaliperMeasureRoi typed => CreateEditor(typed),
+                LineCaliperMeasureRoi typed => CreateEditor(typed),
+                CircularCaliperMeasureRoi typed => CreateEditor(typed),
                 EllipseRoi typed => CreateEditor(typed),
                 CircleRoi typed => CreateEditor(typed),
                 RingRoi typed => CreateEditor(typed),
@@ -89,7 +93,33 @@ namespace ImageViewer.Plugins
 
         public static FrameworkElement CreateEditor(TextAnnotationRoi roi) => CreatePanel(roi, readOnlyPointPath: nameof(TextAnnotationRoi.Position), includeLabel: true);
 
-        public static FrameworkElement CreateEditor(LineMeasureRoi roi) => CreatePanel(roi, readOnlyText: UiText.FormatInvariant("EditorLineMeasureDetails", roi.P1.X, roi.P1.Y, roi.P2.X, roi.P2.Y));
+        public static FrameworkElement CreateEditor(LineMeasureRoi roi)
+        {
+            StackPanel panel = CreatePanel(roi, readOnlyText: UiText.FormatInvariant("EditorLineMeasureDetails", roi.P1.X, roi.P1.Y, roi.P2.X, roi.P2.Y));
+            AppendToleranceEditor(panel, roi);
+            return panel;
+        }
+
+        public static FrameworkElement CreateEditor(CaliperMeasureRoi roi)
+        {
+            var panel = CreateBasePanel(roi);
+            AppendToleranceEditor(panel, roi);
+            return panel;
+        }
+
+        public static FrameworkElement CreateEditor(LineCaliperMeasureRoi roi)
+        {
+            var panel = CreateBasePanel(roi);
+            AppendToleranceEditor(panel, roi);
+            return panel;
+        }
+
+        public static FrameworkElement CreateEditor(CircularCaliperMeasureRoi roi)
+        {
+            var panel = CreateBasePanel(roi);
+            AppendToleranceEditor(panel, roi);
+            return panel;
+        }
 
         public static FrameworkElement CreateEditor(AngleMeasureRoi roi) => CreatePanel(roi, readOnlyText: UiText.FormatInvariant("EditorAngleDetails", roi.P1.X, roi.P1.Y, roi.Vertex.X, roi.Vertex.Y, roi.P2.X, roi.P2.Y));
 
@@ -102,7 +132,10 @@ namespace ImageViewer.Plugins
                 text += UiText.FormatInvariant("EditorArcDetailsLength", roi.ArcLength);
                 text += UiText.FormatInvariant("EditorArcDetailsCentralAngle", roi.CentralAngle);
             }
-            return CreatePanel(roi, readOnlyText: text);
+
+            StackPanel panel = CreatePanel(roi, readOnlyText: text);
+            AppendToleranceEditor(panel, roi);
+            return panel;
         }
 
         public static FrameworkElement CreateEditor(PointToLineDistanceRoi roi)
@@ -278,10 +311,57 @@ namespace ImageViewer.Plugins
             panel.Children.Add(textBlock);
         }
 
+        /// <summary>
+        /// 追加公差判定编辑组（标称值 + 上/下公差）。
+        /// Chinese: 公差值可为空（清空输入即视为未设置）；判定结果在信息面板实时显示。
+        /// English: Appends the tolerance judgement editor section (nominal + plus/minus).
+        /// </summary>
+        private static void AppendToleranceEditor(StackPanel panel, RoiBase roi)
+        {
+            roi.Tolerance ??= new ImageViewer.Models.MeasurementTolerance();
+            panel.Children.Add(CreateLabel(UiText.Get("EditorToleranceGroup")));
+            AddNullableTextEditor(panel, UiText.Get("EditorToleranceNominal"), "Tolerance.Nominal");
+            AddNullableTextEditor(panel, UiText.Get("EditorTolerancePlus"), "Tolerance.TolerancePlus");
+            AddNullableTextEditor(panel, UiText.Get("EditorToleranceMinus"), "Tolerance.ToleranceMinus");
+        }
+
+        private static void AddNullableTextEditor(StackPanel panel, string header, string propertyPath)
+        {
+            panel.Children.Add(CreateLabel(header));
+            var textBox = new TextBox();
+            textBox.SetBinding(TextBox.TextProperty, new Binding(propertyPath)
+            {
+                Mode = BindingMode.TwoWay,
+                UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged,
+                Converter = new NullableDoubleToStringConverter()
+            });
+            panel.Children.Add(textBox);
+        }
+
         private static Binding CreateTwoWayBinding(string propertyPath) => new(propertyPath)
         {
             Mode = BindingMode.TwoWay,
             UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged
         };
+
+        /// <summary>
+        /// double? ↔ 文本 双向转换器（公差输入复用）。
+        /// Chinese: 空文本解析为 null（未设置），数值按不变区域性格式化，避免本地化小数点干扰。
+        /// English: Converts between double? and text for tolerance inputs using the invariant culture.
+        /// </summary>
+        private sealed class NullableDoubleToStringConverter : IValueConverter
+        {
+            public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+            {
+                return value is double number ? number.ToString("G", CultureInfo.InvariantCulture) : string.Empty;
+            }
+
+            public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+            {
+                return value is string text && double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double number)
+                    ? number
+                    : null;
+            }
+        }
     }
 }

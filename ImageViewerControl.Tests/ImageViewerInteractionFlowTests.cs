@@ -309,7 +309,7 @@ namespace ImageViewerControl.Tests
                 LastMoveDy = dy;
             }
 
-            public void ShowStatusHint(string message)
+            public void ShowStatusHint(string message, StatusHintKind kind)
             {
                 StatusHints.Add(message);
             }
@@ -357,7 +357,7 @@ namespace ImageViewerControl.Tests
                 bool handled = flow.HandleKeyInput(Key.Delete, isCtrlPressed: false, isShiftPressed: false);
 
                 Assert.True(handled);
-                Assert.Contains("已删除所选 ROI", host.StatusHints);
+                Assert.Contains("已删除所选 ROI，可按 Ctrl+Z 撤销", host.StatusHints);
             });
         }
     }

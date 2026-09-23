@@ -27,7 +27,7 @@ namespace ImageViewer.Controls
                 if (_host.RemoveSelectedRoi())
                 {
                     _host.DrawRois();
-                    _host.ShowStatusHint(UiText.Get("StatusRoiDeleted"));
+                    _host.ShowStatusHint(UiText.Get("StatusRoiDeleted"), StatusHintKind.Info);
                     return true;
                 }
 
@@ -41,7 +41,7 @@ namespace ImageViewer.Controls
                     viewModel.UndoRedo.Undo();
                     _host.TryRefreshCaliperDetection(viewModel.SelectedRoi);
                     _host.DrawRois();
-                    _host.ShowStatusHint(UiText.Get("StatusUndone"));
+                    _host.ShowStatusHint(UiText.Get("StatusUndone"), StatusHintKind.Info);
                 }
 
                 return true;
@@ -54,7 +54,7 @@ namespace ImageViewer.Controls
                     viewModel.UndoRedo.Redo();
                     _host.TryRefreshCaliperDetection(viewModel.SelectedRoi);
                     _host.DrawRois();
-                    _host.ShowStatusHint(UiText.Get("StatusRedone"));
+                    _host.ShowStatusHint(UiText.Get("StatusRedone"), StatusHintKind.Info);
                 }
 
                 return true;
@@ -93,7 +93,7 @@ namespace ImageViewer.Controls
             {
                 if (_host.IsToolInteractionActive)
                 {
-                    _host.ShowStatusHint(UiText.Get("StatusDrawCancelled"));
+                    _host.ShowStatusHint(UiText.Get("StatusDrawCancelled"), StatusHintKind.Info);
                 }
 
                 _host.ExitCurrentMode();

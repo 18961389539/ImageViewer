@@ -429,6 +429,16 @@ namespace ImageViewerControl.Tests
             {
                 LastProfileOutput = output;
             }
+
+            public void PresentHistogramError(string message)
+            {
+                LastHistogramOutput = null;
+            }
+
+            public void PresentProfileError(string message)
+            {
+                LastProfileOutput = null;
+            }
         }
 
         private sealed class FakeProfileTargetResolver : IImageViewerProfileTargetResolver

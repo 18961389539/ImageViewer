@@ -269,6 +269,59 @@ namespace ImageViewerControl.Tests
             });
         }
 
+        [Fact]
+        public void ShowStatusHint_Success_ShowsSuccessIcon()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                using var viewer = new ImageViewer.Controls.ImageViewer();
+                var icon = viewer.statusHintIconTextBlock;
+
+                viewer.ShowStatusHint("成功", StatusHintKind.Success, durationMs: 500);
+                WpfTestRunner.DrainDispatcher();
+
+                Assert.Equal(Visibility.Visible, icon.Visibility);
+                Assert.Equal("✓", icon.Text);
+
+                viewer.DismissStatusHint();
+            });
+        }
+
+        [Fact]
+        public void ShowStatusHint_Error_ShowsErrorIcon()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                using var viewer = new ImageViewer.Controls.ImageViewer();
+                var icon = viewer.statusHintIconTextBlock;
+                var text = viewer.statusHintTextBlock;
+
+                viewer.ShowStatusHint("失败", StatusHintKind.Error, durationMs: 500);
+                WpfTestRunner.DrainDispatcher();
+
+                Assert.Equal(Visibility.Visible, icon.Visibility);
+                Assert.Equal("⚠", icon.Text);
+                Assert.Equal("失败", text.Text);
+
+                viewer.DismissStatusHint();
+            });
+        }
+
+        [Fact]
+        public void MenuSearch_CountsLeafCommandsNotGroups()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                using var viewer = new ImageViewer.Controls.ImageViewer();
+                viewer.menuSearchBox.Text = "Ctrl+Z";
+                WpfTestRunner.DrainDispatcher();
+
+                Assert.Equal(Visibility.Visible, viewer.undoMenuItem.Visibility);
+                // 撤销、删除、清空三项的 ToolTip/InputGestureText 均提及 Ctrl+Z，应按叶子命令计数为 3
+                Assert.StartsWith("找到 3", viewer.menuSearchMatchCountText.Text);
+            });
+        }
+
         private static ImageSource CreateBitmap(byte value)
         {
             return BitmapSource.Create(

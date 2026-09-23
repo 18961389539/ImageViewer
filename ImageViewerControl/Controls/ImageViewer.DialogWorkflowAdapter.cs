@@ -25,7 +25,7 @@ namespace ImageViewer.Controls
 
         string? ShowSaveAnalysisCsvDialog();
 
-        (double Length, string Unit)? ShowCalibrationDialog(string currentUnit);
+        CalibrationDialogResult? ShowCalibrationDialog(string currentUnit);
 
         CaliperMeasureRoi? ShowLineMeasureCaliperSettingsDialog(CaliperMeasureRoi roi, Action<CaliperMeasureRoi>? previewAction = null);
 
@@ -74,7 +74,7 @@ namespace ImageViewer.Controls
 
         public string? ShowSaveAnalysisCsvDialog() => _fileDialogService.ShowSaveAnalysisCsvDialog(_ownerWindowProvider());
 
-        public (double Length, string Unit)? ShowCalibrationDialog(string currentUnit) => _dialogService.ShowCalibrationDialog(_ownerWindowProvider(), currentUnit);
+        public CalibrationDialogResult? ShowCalibrationDialog(string currentUnit) => _dialogService.ShowCalibrationDialog(_ownerWindowProvider(), currentUnit);
 
         public CaliperMeasureRoi? ShowLineMeasureCaliperSettingsDialog(CaliperMeasureRoi roi, Action<CaliperMeasureRoi>? previewAction = null)
             => _dialogService.ShowLineMeasureCaliperSettingsDialog(_ownerWindowProvider(), roi, previewAction);

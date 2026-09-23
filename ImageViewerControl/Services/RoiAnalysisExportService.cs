@@ -14,7 +14,7 @@ namespace ImageViewer.Services
 {
     public static class RoiAnalysisExportService
     {
-        public static string BuildSummary(IEnumerable<RoiBase> rois, BitmapSource? bitmap, double pixelSize, string? physicalUnit)
+        public static string BuildSummary(IEnumerable<RoiBase> rois, BitmapSource? bitmap, double pixelSize, string? physicalUnit, CameraCalibration? calibration = null)
         {
             ArgumentNullException.ThrowIfNull(rois);
 
@@ -29,12 +29,12 @@ namespace ImageViewer.Services
                 lines.Add($"- {group.Key}: {group.Count()}");
             }
 
-            double totalLineLength = roiList.OfType<LineMeasureRoi>().Sum(line => GeometryUtils.Distance(line.P1, line.P2) * pixelSize);
-            double totalPolylineLength = roiList.OfType<PolylineRoi>().Sum(GetPolylineLength) * pixelSize;
-            double totalPolygonArea = roiList.OfType<PolygonRoi>().Sum(poly => GeometryUtils.PolygonArea(poly.Points)) * pixelSize * pixelSize;
-            double totalRectArea = roiList.OfType<RotatedRect>().Sum(rect => rect.Width * rect.Height) * pixelSize * pixelSize;
-            double totalEllipseArea = roiList.OfType<EllipseRoi>().Sum(ellipse => Math.PI * ellipse.RadiusX * ellipse.RadiusY) * pixelSize * pixelSize;
-            double totalCircleArea = roiList.OfType<CircleRoi>().Sum(circle => Math.PI * circle.Radius * circle.Radius) * pixelSize * pixelSize;
+            double totalLineLength = roiList.OfType<LineMeasureRoi>().Sum(line => GeometryUtils.Distance(line.P1, line.P2) * RoiCalibrationHelper.GetLengthCorrection(line, calibration) * pixelSize);
+            double totalPolylineLength = roiList.OfType<PolylineRoi>().Sum(poly => GetPolylineLength(poly) * RoiCalibrationHelper.GetLengthCorrection(poly, calibration)) * pixelSize;
+            double totalPolygonArea = roiList.OfType<PolygonRoi>().Sum(poly => GeometryUtils.PolygonArea(poly.Points) * RoiCalibrationHelper.GetAreaCorrection(poly, calibration)) * pixelSize * pixelSize;
+            double totalRectArea = roiList.OfType<RotatedRect>().Sum(rect => rect.Width * rect.Height * RoiCalibrationHelper.GetAreaCorrection(rect, calibration)) * pixelSize * pixelSize;
+            double totalEllipseArea = roiList.OfType<EllipseRoi>().Sum(ellipse => Math.PI * ellipse.RadiusX * ellipse.RadiusY * RoiCalibrationHelper.GetAreaCorrection(ellipse, calibration)) * pixelSize * pixelSize;
+            double totalCircleArea = roiList.OfType<CircleRoi>().Sum(circle => Math.PI * circle.Radius * circle.Radius * RoiCalibrationHelper.GetAreaCorrection(circle, calibration)) * pixelSize * pixelSize;
             string unit = string.IsNullOrWhiteSpace(physicalUnit) ? "px" : physicalUnit;
 
             lines.Add(string.Empty);
@@ -55,21 +55,21 @@ namespace ImageViewer.Services
             return string.Join(Environment.NewLine, lines);
         }
 
-        public static void SaveCsv(string filePath, IEnumerable<RoiBase> rois, BitmapSource? bitmap, double pixelSize, string? physicalUnit)
+        public static void SaveCsv(string filePath, IEnumerable<RoiBase> rois, BitmapSource? bitmap, double pixelSize, string? physicalUnit, CameraCalibration? calibration = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
             ArgumentNullException.ThrowIfNull(rois);
-            File.WriteAllText(filePath, BuildCsv(rois, bitmap, pixelSize, physicalUnit), Encoding.UTF8);
+            File.WriteAllText(filePath, BuildCsv(rois, bitmap, pixelSize, physicalUnit, calibration), Encoding.UTF8);
         }
 
-        public static Task SaveCsvAsync(string filePath, IEnumerable<RoiBase> rois, BitmapSource? bitmap, double pixelSize, string? physicalUnit, CancellationToken cancellationToken = default)
+        public static Task SaveCsvAsync(string filePath, IEnumerable<RoiBase> rois, BitmapSource? bitmap, double pixelSize, string? physicalUnit, CameraCalibration? calibration = null, CancellationToken cancellationToken = default)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
             ArgumentNullException.ThrowIfNull(rois);
-            return File.WriteAllTextAsync(filePath, BuildCsv(rois, bitmap, pixelSize, physicalUnit), Encoding.UTF8, cancellationToken);
+            return File.WriteAllTextAsync(filePath, BuildCsv(rois, bitmap, pixelSize, physicalUnit, calibration), Encoding.UTF8, cancellationToken);
         }
 
-        public static string BuildCsv(IEnumerable<RoiBase> rois, BitmapSource? bitmap, double pixelSize, string? physicalUnit)
+        public static string BuildCsv(IEnumerable<RoiBase> rois, BitmapSource? bitmap, double pixelSize, string? physicalUnit, CameraCalibration? calibration = null)
         {
             ArgumentNullException.ThrowIfNull(rois);
 
@@ -79,7 +79,7 @@ namespace ImageViewer.Services
 
             foreach (var roi in rois)
             {
-                var metrics = GetMetrics(roi, pixelSize, unit);
+                var metrics = GetMetrics(roi, pixelSize, unit, calibration);
                 string mean = string.Empty;
                 string min = string.Empty;
                 string max = string.Empty;
@@ -111,19 +111,21 @@ namespace ImageViewer.Services
             return builder.ToString();
         }
 
-        private static (string Metric1, string Metric2, string Metric3) GetMetrics(RoiBase roi, double pixelSize, string unit)
+        private static (string Metric1, string Metric2, string Metric3) GetMetrics(RoiBase roi, double pixelSize, string unit, CameraCalibration? calibration)
         {
+            double correction = RoiCalibrationHelper.GetLengthCorrection(roi, calibration);
+            double areaCorrection = correction * correction;
             return roi switch
             {
-                RotatedRect rect => ($"Width={rect.Width * pixelSize:F2} {unit}", $"Height={rect.Height * pixelSize:F2} {unit}", $"Angle={rect.Angle:F1}°"),
-                EllipseRoi ellipse => ($"RadiusX={ellipse.RadiusX * pixelSize:F2} {unit}", $"RadiusY={ellipse.RadiusY * pixelSize:F2} {unit}", $"Angle={ellipse.Angle:F1}°"),
-                CircleRoi circle => ($"Radius={circle.Radius * pixelSize:F2} {unit}", string.Empty, string.Empty),
-                PolygonRoi polygon => ($"Area={GeometryUtils.PolygonArea(polygon.Points) * pixelSize * pixelSize:F2} {unit}²", $"Perimeter={GeometryUtils.PolygonPerimeter(polygon.Points) * pixelSize:F2} {unit}", $"Vertices={polygon.Points.Count}"),
-                PolylineRoi polyline => ($"Length={GetPolylineLength(polyline) * pixelSize:F2} {unit}", $"Points={polyline.Points.Count}", $"Freehand={polyline.IsFreehand}"),
+                RotatedRect rect => ($"Width={rect.Width * correction * pixelSize:F2} {unit}", $"Height={rect.Height * correction * pixelSize:F2} {unit}", $"Angle={rect.Angle:F1}°"),
+                EllipseRoi ellipse => ($"RadiusX={ellipse.RadiusX * correction * pixelSize:F2} {unit}", $"RadiusY={ellipse.RadiusY * correction * pixelSize:F2} {unit}", $"Angle={ellipse.Angle:F1}°"),
+                CircleRoi circle => ($"Radius={circle.Radius * correction * pixelSize:F2} {unit}", string.Empty, string.Empty),
+                PolygonRoi polygon => ($"Area={GeometryUtils.PolygonArea(polygon.Points) * areaCorrection * pixelSize * pixelSize:F2} {unit}²", $"Perimeter={GeometryUtils.PolygonPerimeter(polygon.Points) * correction * pixelSize:F2} {unit}", $"Vertices={polygon.Points.Count}"),
+                PolylineRoi polyline => ($"Length={GetPolylineLength(polyline) * correction * pixelSize:F2} {unit}", $"Points={polyline.Points.Count}", $"Freehand={polyline.IsFreehand}"),
                 PointAnnotationRoi point => ($"X={point.Position.X:F1}", $"Y={point.Position.Y:F1}", string.Empty),
                 TextAnnotationRoi text => ($"X={text.Position.X:F1}", $"Y={text.Position.Y:F1}", string.Empty),
-                LineMeasureRoi line => ($"Length={GeometryUtils.Distance(line.P1, line.P2) * pixelSize:F2} {unit}", $"dX={(line.P2.X - line.P1.X) * pixelSize:F2} {unit}", $"dY={(line.P2.Y - line.P1.Y) * pixelSize:F2} {unit}"),
-                AngleMeasureRoi angle => ($"Angle={GeometryUtils.SmallestAngle(angle.P1, angle.Vertex, angle.P2):F1}°", $"Leg1={GeometryUtils.Distance(angle.P1, angle.Vertex) * pixelSize:F2} {unit}", $"Leg2={GeometryUtils.Distance(angle.Vertex, angle.P2) * pixelSize:F2} {unit}"),
+                LineMeasureRoi line => ($"Length={GeometryUtils.Distance(line.P1, line.P2) * correction * pixelSize:F2} {unit}", $"dX={(line.P2.X - line.P1.X) * correction * pixelSize:F2} {unit}", $"dY={(line.P2.Y - line.P1.Y) * correction * pixelSize:F2} {unit}"),
+                AngleMeasureRoi angle => ($"Angle={GeometryUtils.SmallestAngle(angle.P1, angle.Vertex, angle.P2):F1}°", $"Leg1={GeometryUtils.Distance(angle.P1, angle.Vertex) * correction * pixelSize:F2} {unit}", $"Leg2={GeometryUtils.Distance(angle.Vertex, angle.P2) * correction * pixelSize:F2} {unit}"),
                 _ => (string.Empty, string.Empty, string.Empty)
             };
         }

@@ -44,6 +44,7 @@ namespace ImageViewer.Controls
         {
             _propertyEditorHost.Content = editor;
             _propertyPanel.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
+            _owner.infoPanel.Visibility = isVisible ? Visibility.Collapsed : (_owner.ShowInfoPanel ? Visibility.Visible : Visibility.Collapsed);
         }
 
         public void ApplyCaliperDetection(CaliperMeasureRoi roi)

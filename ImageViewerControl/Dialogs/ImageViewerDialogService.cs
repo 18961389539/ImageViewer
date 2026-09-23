@@ -18,7 +18,7 @@ namespace ImageViewer.Dialogs
             return dialog.ShowDialog() == true ? dialog.Input : null;
         }
 
-        public (double Length, string Unit)? ShowCalibrationDialog(Window? owner, string currentUnit)
+        public CalibrationDialogResult? ShowCalibrationDialog(Window? owner, string currentUnit)
         {
             var dialog = new CalibrationDialog(currentUnit)
             {
@@ -26,7 +26,7 @@ namespace ImageViewer.Dialogs
             };
 
             return dialog.ShowDialog() == true
-                ? (dialog.Length, dialog.Unit)
+                ? new CalibrationDialogResult(dialog.Length, dialog.Unit, dialog.K1, dialog.K2)
                 : null;
         }
 

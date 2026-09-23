@@ -60,7 +60,7 @@ namespace ImageViewer.Controls
 
         public void ShowNonCriticalError(string title, string message, Exception ex) => _showNonCriticalError(title, message, ex);
 
-        public void ShowStatusHint(string message) => _owner.ShowStatusHint(message);
+        public void ShowStatusHint(string message, StatusHintKind kind) => _owner.ShowStatusHint(message, kind);
 
         public void ClearUndoHistory() => _owner.ViewerState.UndoRedo.Clear();
     }

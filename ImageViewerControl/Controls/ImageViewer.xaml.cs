@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using System.Windows.Controls;
 using System.Windows.Media;
+using ImageViewer.Localization;
 using ImageViewer.Services;
 
 namespace ImageViewer.Controls
@@ -52,20 +53,30 @@ namespace ImageViewer.Controls
 
         private void ResetView() => _viewCommandController.Execute(ImageViewerViewCommand.ResetView);
 
-        private void RotateImageLeft() => SetImageRotation(_imageRotation - 90);
+        private void RotateImageLeft()
+        {
+            SetImageRotation(_imageRotation - 90);
+            ShowStatusHint(UiText.Get("StatusRotatedLeft"), StatusHintKind.Success);
+        }
 
-        private void RotateImageRight() => SetImageRotation(_imageRotation + 90);
+        private void RotateImageRight()
+        {
+            SetImageRotation(_imageRotation + 90);
+            ShowStatusHint(UiText.Get("StatusRotatedRight"), StatusHintKind.Success);
+        }
 
         private void FlipImageHorizontal()
         {
             _flipImageHorizontally = !_flipImageHorizontally;
             ApplyImageOrientation();
+            ShowStatusHint(UiText.Get("StatusFlippedHorizontal"), StatusHintKind.Success);
         }
 
         private void FlipImageVertical()
         {
             _flipImageVertically = !_flipImageVertically;
             ApplyImageOrientation();
+            ShowStatusHint(UiText.Get("StatusFlippedVertical"), StatusHintKind.Success);
         }
 
         private void SetImageRotation(int angle)

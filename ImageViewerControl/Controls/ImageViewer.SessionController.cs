@@ -43,6 +43,10 @@ namespace ImageViewer.Controls
 
         public required Action<string> SetPhysicalUnit { get; init; }
 
+        public required Func<CameraCalibration?> GetCalibration { get; init; }
+
+        public required Action<CameraCalibration?> SetCalibration { get; init; }
+
         public required Func<ImageViewerViewportState> GetCurrentViewportState { get; init; }
 
         public required Func<string?> TryGetCurrentImagePath { get; init; }
@@ -59,7 +63,7 @@ namespace ImageViewer.Controls
 
         public required Action<string, string> ShowWarning { get; init; }
 
-        public required Action<string> ShowStatusHint { get; init; }
+        public required Action<string, StatusHintKind> ShowStatusHint { get; init; }
 
         public required Action ClearUndoHistory { get; init; }
 
@@ -82,13 +86,15 @@ namespace ImageViewer.Controls
 
         public required Func<string> GetPhysicalUnit { get; init; }
 
+        public required Func<CameraCalibration?> GetCalibration { get; init; }
+
         public required IImageViewerSessionService SessionService { get; init; }
 
         public required Func<RoiPluginRegistry> GetPluginRegistry { get; init; }
 
         public required Action<string, Exception> LogNonCriticalError { get; init; }
 
-        public required Action<string> ShowStatusHint { get; init; }
+        public required Action<string, StatusHintKind> ShowStatusHint { get; init; }
     }
 
     internal sealed class ImageViewerSessionController : IDisposable
@@ -136,9 +142,10 @@ namespace ImageViewer.Controls
                     viewportState.Scale,
                     viewportState.TranslateX,
                     viewportState.TranslateY,
-                    _persistence.GetPluginRegistry());
+                    _persistence.GetPluginRegistry(),
+                    _persistence.GetCalibration());
                 SetCurrentProject(filePath, SessionProjectKind);
-                _persistence.ShowStatusHint(UiText.Get("StatusSaveSessionSuccess"));
+                _persistence.ShowStatusHint(UiText.Get("StatusSaveSessionSuccess"), StatusHintKind.Success);
             }
             catch (Exception ex)
             {
@@ -179,7 +186,7 @@ namespace ImageViewer.Controls
                     viewportState.TranslateY,
                     _persistence.GetPluginRegistry());
                 SetCurrentProject(filePath, PackageProjectKind);
-                _persistence.ShowStatusHint(UiText.Get("StatusExportPackageSuccess"));
+                _persistence.ShowStatusHint(UiText.Get("StatusExportPackageSuccess"), StatusHintKind.Success);
             }
             catch (Exception ex)
             {
@@ -241,7 +248,7 @@ namespace ImageViewer.Controls
                 ApplySession(session);
                 SetCurrentProject(filePath, string.Equals(Path.GetExtension(filePath), ".ivpkg", StringComparison.OrdinalIgnoreCase) ? PackageProjectKind : SessionProjectKind);
                 _persistence.ClearUndoHistory();
-                _persistence.ShowStatusHint(UiText.Get("StatusLoadSessionSuccess"));
+                _persistence.ShowStatusHint(UiText.Get("StatusLoadSessionSuccess"), StatusHintKind.Success);
             }
             catch (Exception ex)
             {
@@ -251,14 +258,22 @@ namespace ImageViewer.Controls
 
         private void ApplySession(ImageViewerSessionData session)
         {
-            if (!string.IsNullOrWhiteSpace(session.ImagePath) && File.Exists(session.ImagePath))
+            if (!string.IsNullOrWhiteSpace(session.ImagePath))
             {
-                _persistence.LoadImageFromFile(session.ImagePath, false);
+                if (File.Exists(session.ImagePath))
+                {
+                    _persistence.LoadImageFromFile(session.ImagePath, false);
+                }
+                else
+                {
+                    _persistence.ShowStatusHint(UiText.Format("StatusSessionImageMissing", session.ImagePath), StatusHintKind.Error);
+                }
             }
 
             _persistence.ReplaceAllRois(session.Rois);
             _persistence.SetPixelSize(session.PixelSize);
             _persistence.SetPhysicalUnit(session.PhysicalUnit);
+            _persistence.SetCalibration(session.Calibration);
             _persistence.ApplyViewportState(new ImageViewerViewportState(session.Scale, session.TranslateX, session.TranslateY));
             _persistence.DrawRois();
             _persistence.UpdateContextMenuState();

@@ -113,7 +113,10 @@ namespace ImageViewer.Controls
         {
             ArgumentNullException.ThrowIfNull(context);
 
-            return CreateComposition(BuildParts(context), context.Commands);
+            ImageViewerControlCompositionParts parts = BuildParts(context);
+            ImageViewerControlComposition composition = CreateComposition(parts, context.Commands);
+            ValidateWiring(parts, composition);
+            return composition;
         }
 
         private static ImageViewerControlCompositionParts BuildParts(ImageViewerControlCompositionContext context)
@@ -179,6 +182,31 @@ namespace ImageViewer.Controls
                 parts.AnalysisComposition.AnalysisController,
                 parts.AnalysisComposition.AnalysisCommandController,
                 parts.ExternalImageSourceBindingController);
+        }
+
+        /// <summary>
+        /// 装配自检：验证扁平组合与各子组合引用的控制器为同一实例，
+        /// 防止后续扩展时新增部件却接入不同实例导致状态不同步。
+        /// Chinese: 在组合根装配完成后做引用一致性校验，接线错误时快速失败。
+        /// English: Verifies referential consistency between the flattened composition and its sub-compositions after assembly.
+        /// </summary>
+        private static void ValidateWiring(ImageViewerControlCompositionParts parts, ImageViewerControlComposition composition)
+        {
+            RequireSameInstance(nameof(composition.SessionController), composition.SessionController, parts.SessionComposition.SessionController);
+            RequireSameInstance(nameof(composition.RoiPersistenceController), composition.RoiPersistenceController, parts.SessionComposition.RoiPersistenceController);
+            RequireSameInstance(nameof(composition.FileMenuCommandController), composition.FileMenuCommandController, parts.SessionComposition.FileMenuCommandController);
+            RequireSameInstance(nameof(composition.AnalysisController), composition.AnalysisController, parts.AnalysisComposition.AnalysisController);
+            RequireSameInstance(nameof(composition.AnalysisCommandController), composition.AnalysisCommandController, parts.AnalysisComposition.AnalysisCommandController);
+            RequireSameInstance(nameof(composition.InteractionController), composition.InteractionController, parts.InteractionComposition.InteractionController);
+            RequireSameInstance(nameof(composition.ContextMenuController), composition.ContextMenuController, parts.InteractionComposition.ContextMenuController);
+        }
+
+        private static void RequireSameInstance(string partName, object? composed, object? source)
+        {
+            if (!ReferenceEquals(composed, source))
+            {
+                throw new InvalidOperationException($"Composition wiring mismatch for '{partName}': the composition holds a different instance than the part it was built from.");
+            }
         }
     }
 

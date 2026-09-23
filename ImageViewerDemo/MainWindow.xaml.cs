@@ -1,5 +1,6 @@
 using Microsoft.Win32;
 using System;
+using System.IO;
 using System.Windows;
 using System.Windows.Media.Imaging;
 using ImageViewerDemo.Localization;
@@ -11,6 +12,30 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        LoadStartupImage();
+    }
+
+    /// <summary>
+    /// 启动时自动加载随程序分发的单通道灰度测试图。
+    /// Chinese: 便于直接演示测量与标注功能；文件缺失或加载失败时静默跳过，不阻塞主窗口。
+    /// English: Loads the bundled single-channel gray test image on startup for immediate measurement demos.
+    /// </summary>
+    private void LoadStartupImage()
+    {
+        string path = Path.Combine(AppContext.BaseDirectory, "Resources", "TestImage.png");
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        try
+        {
+            Viewer.ImageSource = LoadBitmap(path);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, DemoText.Get("OpenImageErrorTitle"), MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
 

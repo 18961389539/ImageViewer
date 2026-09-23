@@ -47,6 +47,8 @@ namespace ImageViewer.Controls
         {
             _state.LastMousePosition = rootPosition;
             _state.IsCanvasDragging = true;
+            // 进入平移时切换为抓取光标，明确反馈"正在拖动画布"
+            _host.SetCursor(Cursors.Hand);
             _host.CaptureRootMouse();
         }
 
@@ -87,6 +89,8 @@ namespace ImageViewer.Controls
         public void ResetPanState()
         {
             _state.IsCanvasDragging = false;
+            // 平移结束后恢复默认光标，悬停在 ROI 上时会在下次移动时重新评估
+            _host.SetCursor(Cursors.Arrow);
             if (_host.IsRootMouseCaptured && !_state.HasActiveRoiManipulation)
             {
                 _host.ReleaseRootMouse();

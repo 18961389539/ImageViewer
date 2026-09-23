@@ -58,6 +58,9 @@
                 <Trigger Property="IsPressed" Value="True">
                     <Setter TargetName="Chrome" Property="Background" Value="{StaticResource ViewerButtonPressedBrush}" />
                 </Trigger>
+                <Trigger Property="IsKeyboardFocused" Value="True">
+                    <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource ViewerAccentBrush}" />
+                </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
                     <Setter Property="Opacity" Value="0.45" />
                 </Trigger>
@@ -140,28 +143,129 @@
         <Grid.ContextMenu>
             <ContextMenu x:Name="mainContextMenu" x:FieldModifier="internal" Opened="OnContextMenuOpened">
                 <ContextMenu.Resources>
+                    <Style TargetType="ContextMenu">
+                        <Setter Property="Background" Value="#18212E" />
+                        <Setter Property="Foreground" Value="#F5F8FC" />
+                        <Setter Property="BorderBrush" Value="#314158" />
+                        <Setter Property="BorderThickness" Value="1" />
+                        <Setter Property="Padding" Value="2" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ContextMenu">
+                                    <Border Background="#18212E" BorderBrush="#314158" BorderThickness="1" CornerRadius="6" Padding="2" SnapsToDevicePixels="True">
+                                        <DockPanel LastChildFill="True">
+                                            <!-- 搜索区固定挂在菜单模板顶部，而不是作为一个菜单项：
+                                                 作为菜单项时会被自动生成的容器按内容宽度左对齐（HorizontalContentAlignment=Left），
+                                                 导致搜索框塌成一个小方块、无法横贯菜单宽度。 -->
+                                            <StackPanel DockPanel.Dock="Top">
+                                                <TextBox x:Name="PART_MenuSearchBox"
+                                                         Margin="4"
+                                                         Padding="8,5"
+                                                         HorizontalAlignment="Stretch"
+                                                         Background="#111824"
+                                                         Foreground="#F5F8FC"
+                                                         BorderBrush="#314158"
+                                                         CaretBrush="#F5F8FC"
+                                                         SelectionBrush="#69AFFF"
+                                                         ToolTip="{localization:UiText MenuSearch}"
+                                                         TextChanged="OnMenuSearchTextChanged"
+                                                         PreviewKeyDown="OnMenuSearchPreviewKeyDown" />
+                                                <TextBlock x:Name="PART_MenuSearchMatchCount"
+                                                           Margin="12,4,12,2"
+                                                           Foreground="{StaticResource ViewerAccentBrush}"
+                                                           Text="{localization:UiText MenuSearchMatchCount}"
+                                                           Visibility="Collapsed" />
+                                                <TextBlock x:Name="PART_MenuSearchNoResults"
+                                                           Margin="12,4,12,8"
+                                                           Foreground="{StaticResource ViewerTextSecondaryBrush}"
+                                                           Text="{localization:UiText MenuSearchNoResults}"
+                                                           Visibility="Collapsed" />
+                                                <Separator />
+                                            </StackPanel>
+                                            <ItemsPresenter SnapsToDevicePixels="True" />
+                                        </DockPanel>
+                                    </Border>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
                     <Style TargetType="MenuItem">
                         <Setter Property="HorizontalContentAlignment" Value="Left" />
                         <Setter Property="VerticalContentAlignment" Value="Center" />
+                        <Setter Property="Foreground" Value="#F5F8FC" />
+                        <Setter Property="Padding" Value="10,5" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="MenuItem">
+                                    <Grid>
+                                        <Border x:Name="menuItemBorder" Background="Transparent" SnapsToDevicePixels="True">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <Path Grid.Column="0" x:Name="checkGlyph" Visibility="Collapsed"
+                                                      Data="M 0,4 L 3.5,7.5 L 8,1" Stroke="#69AFFF" StrokeThickness="1.5"
+                                                      Margin="10,0,4,0" VerticalAlignment="Center" Width="8" Height="9" />
+                                                <ContentPresenter Grid.Column="1" ContentSource="Header"
+                                                                  Margin="{TemplateBinding Padding}"
+                                                                  RecognizesAccessKey="True" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="2" x:Name="shortcutText"
+                                                           Text="{TemplateBinding InputGestureText}"
+                                                           Foreground="#AAB5C3" Margin="24,0,10,0"
+                                                           VerticalAlignment="Center" FontSize="11" />
+                                                <Path Grid.Column="3" x:Name="submenuArrow" Visibility="Collapsed"
+                                                      Data="M 0,0 L 4,4 L 0,8" Stroke="#AAB5C3" StrokeThickness="1.5"
+                                                      Margin="0,0,10,0" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Border>
+                                        <Popup x:Name="SubMenuPopup" AllowsTransparency="True"
+                                               IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                                               Placement="Right" VerticalOffset="-2" HorizontalOffset="-2"
+                                               PopupAnimation="Slide" Focusable="False">
+                                            <Border Background="#18212E" BorderBrush="#314158" BorderThickness="1" CornerRadius="4" Padding="2" SnapsToDevicePixels="True">
+                                                <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle" />
+                                            </Border>
+                                        </Popup>
+                                    </Grid>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="menuItemBorder" Property="Background" Value="#243245" />
+                                        </Trigger>
+                                        <Trigger Property="IsEnabled" Value="False">
+                                            <Setter Property="Foreground" Value="#5A6B7D" />
+                                        </Trigger>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="checkGlyph" Property="Visibility" Value="Visible" />
+                                        </Trigger>
+                                        <Trigger Property="HasItems" Value="True">
+                                            <Setter TargetName="submenuArrow" Property="Visibility" Value="Visible" />
+                                            <Setter TargetName="shortcutText" Property="Visibility" Value="Collapsed" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                    <Style TargetType="Separator">
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Separator">
+                                    <Border Height="1" Background="#314158" Margin="8,3" SnapsToDevicePixels="True" />
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                    <Style TargetType="TextBox">
+                        <Setter Property="Background" Value="#111824" />
+                        <Setter Property="Foreground" Value="#F5F8FC" />
+                        <Setter Property="BorderBrush" Value="#314158" />
+                        <Setter Property="CaretBrush" Value="#F5F8FC" />
+                        <Setter Property="SelectionBrush" Value="#69AFFF" />
                     </Style>
                 </ContextMenu.Resources>
-                <TextBox x:Name="menuSearchBox" x:FieldModifier="internal"
-                         Margin="4"
-                         Padding="8,5"
-                         ToolTip="{localization:UiText MenuSearch}"
-                         TextChanged="OnMenuSearchTextChanged"
-                         PreviewKeyDown="OnMenuSearchPreviewKeyDown" />
-                <TextBlock x:Name="menuSearchMatchCountText" x:FieldModifier="internal"
-                           Margin="12,4,12,2"
-                           Foreground="{StaticResource ViewerAccentBrush}"
-                           Text="{localization:UiText MenuSearchMatchCount}"
-                           Visibility="Collapsed" />
-                <TextBlock x:Name="menuSearchNoResultsText" x:FieldModifier="internal"
-                           Margin="12,4,12,8"
-                           Foreground="{StaticResource ViewerTextSecondaryBrush}"
-                           Text="{localization:UiText MenuSearchNoResults}"
-                           Visibility="Collapsed" />
-                <Separator />
                 <MenuItem Header="{Binding PlacementTarget.ImageLoadStatusText, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                           IsEnabled="False"
                           Foreground="{StaticResource ViewerErrorBrush}"
@@ -170,15 +274,16 @@
                           Click="OnRetryImageLoadClick"
                           Visibility="{Binding PlacementTarget.CanRetryImageLoad, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 <Separator Visibility="{Binding PlacementTarget.ImageLoadHasError, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <MenuItem x:Name="drawRoiMenuItem" x:FieldModifier="internal" Header="{localization:UiText MenuDraw}" ToolTip="{localization:UiText MenuDrawTooltip}" IsEnabled="{Binding MenuState.Context.DrawRoiEnabled}" />
+                <MenuItem x:Name="measureMenuItem" Header="{localization:UiText MenuMeasure}">
+                    <MenuItem x:Name="gradientDetectMenuItem" Click="OnFeatureMenuCommandClick" Tag="{x:Static controls:ImageViewerFeatureMenuTags.GradientDetect}" Header="{localization:UiText MenuGradientAlignCaliper}" IsEnabled="{Binding MenuState.Context.GradientDetectEnabled}" />
+                </MenuItem>
                 <MenuItem x:Name="roiOperationsMenuItem" Header="{localization:UiText MenuRoiOperations}">
-                    <MenuItem x:Name="undoMenuItem" x:FieldModifier="internal" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.Undo}" Header="{localization:UiText MenuUndo}" IsEnabled="{Binding MenuState.Context.UndoEnabled}" />
-                    <MenuItem x:Name="redoMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.Redo}" Header="{localization:UiText MenuRedo}" IsEnabled="{Binding MenuState.Context.RedoEnabled}" />
-                    <Separator />
-                    <MenuItem x:Name="drawRoiMenuItem" x:FieldModifier="internal" Header="{localization:UiText MenuDraw}" IsEnabled="{Binding MenuState.Context.DrawRoiEnabled}" />
-                    <MenuItem x:Name="measureMenuItem" Header="{localization:UiText MenuMeasure}" />
+                    <MenuItem x:Name="undoMenuItem" x:FieldModifier="internal" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.Undo}" Header="{localization:UiText MenuUndo}" InputGestureText="Ctrl+Z" IsEnabled="{Binding MenuState.Context.UndoEnabled}" />
+                    <MenuItem x:Name="redoMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.Redo}" Header="{localization:UiText MenuRedo}" InputGestureText="Ctrl+Y" IsEnabled="{Binding MenuState.Context.RedoEnabled}" />
                     <Separator />
                     <MenuItem x:Name="deleteRoiMenuItem" x:FieldModifier="internal" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.DeleteSelected}" Header="{localization:UiText MenuDeleteSelectedRoi}" ToolTip="{localization:UiText RoiDestructiveActionUndoHint}" IsEnabled="{Binding MenuState.Context.DeleteSelectedEnabled}" />
-                    <MenuItem x:Name="clearAllMenuItem" x:FieldModifier="internal" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.ClearAll}" Header="{localization:UiText MenuClearAllRois}" ToolTip="{localization:UiText RoiDestructiveActionUndoHint}" IsEnabled="{Binding MenuState.Context.ClearAllEnabled}" />
+                    <MenuItem x:Name="clearAllMenuItem" x:FieldModifier="internal" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.ClearAll}" Header="{localization:UiText MenuClearAllRois}" ToolTip="{localization:UiText RoiClearAllUndoHint}" IsEnabled="{Binding MenuState.Context.ClearAllEnabled}" />
                     <Separator />
                     <MenuItem x:Name="editPropertiesMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.EditProperties}" Header="{localization:UiText MenuEditProperties}" IsEnabled="{Binding MenuState.Context.EditPropertiesEnabled}" />
                     <MenuItem x:Name="setLabelMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.SetLabel}" Header="{localization:UiText MenuSetLabel}" IsEnabled="{Binding MenuState.Context.SetLabelEnabled}" />
@@ -189,17 +294,15 @@
                         <MenuItem Click="OnRoiMenuCommandClick" Header="{localization:UiText MenuColorYellow}" Tag="{x:Static controls:ImageViewerRoiMenuTags.SetColorYellow}" />
                         <MenuItem Click="OnRoiMenuCommandClick" Header="{localization:UiText MenuColorMagenta}" Tag="{x:Static controls:ImageViewerRoiMenuTags.SetColorMagenta}" />
                     </MenuItem>
+                    <Separator />
                     <MenuItem x:Name="calibratePixelsMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.CalibratePixels}" Header="{localization:UiText MenuCalibratePixels}" IsEnabled="{Binding MenuState.Context.CalibratePixelsEnabled}" />
                     <MenuItem x:Name="editCaliperSettingsMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.EditCaliperSettings}" Header="{localization:UiText MenuEditCaliperSettings}" IsEnabled="{Binding MenuState.Context.EditCaliperSettingsEnabled}" />
-                    <MenuItem x:Name="gradientDetectMenuItem" Click="OnFeatureMenuCommandClick" Tag="{x:Static controls:ImageViewerFeatureMenuTags.GradientDetect}" Header="{localization:UiText MenuGradientAlignCaliper}" IsEnabled="{Binding MenuState.Context.GradientDetectEnabled}" />
                     <Separator />
                     <MenuItem x:Name="showRoiListMenuItem" Header="{localization:UiText MenuShowRoiList}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleRoiList}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowRoiListChecked}" />
                     <MenuItem x:Name="zoomToSelectionMenuItem" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ZoomToSelection}" Header="{localization:UiText MenuZoomToSelectedRoi}" IsEnabled="{Binding MenuState.View.ZoomToSelectionEnabled}" />
                 </MenuItem>
                 <MenuItem Header="{localization:UiText MenuFileAndProjects}">
                     <MenuItem x:Name="openImageMenuItem" x:FieldModifier="internal" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.OpenImage}" Header="{localization:UiText MenuOpenImageFile}" InputGestureText="Ctrl+O" />
-                    <MenuItem x:Name="saveRoisMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.SaveRois}" Header="{localization:UiText MenuSaveRois}" IsEnabled="{Binding MenuState.File.SaveRoisEnabled}" />
-                    <MenuItem x:Name="loadRoisMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.LoadRois}" Header="{localization:UiText MenuLoadRois}" />
                     <Separator />
                     <MenuItem x:Name="saveSessionMenuItem" x:FieldModifier="internal" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.SaveSession}" Header="{localization:UiText MenuSaveSession}" IsEnabled="{Binding MenuState.File.SaveSessionEnabled}" />
                     <MenuItem x:Name="loadSessionMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.LoadSession}" Header="{localization:UiText MenuOpenProjectOrSession}" />
@@ -214,8 +317,36 @@
                             </Style>
                         </MenuItem.ItemContainerStyle>
                     </MenuItem>
+                    <Separator />
+                    <MenuItem x:Name="saveRoisMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.SaveRois}" Header="{localization:UiText MenuSaveRois}" IsEnabled="{Binding MenuState.File.SaveRoisEnabled}" />
+                    <MenuItem x:Name="loadRoisMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.LoadRois}" Header="{localization:UiText MenuLoadRois}" />
+                    <Separator />
                     <MenuItem x:Name="exportProjectPackageMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.ExportProjectPackage}" Header="{localization:UiText MenuExportProjectPackage}" IsEnabled="{Binding MenuState.File.ExportProjectPackageEnabled}" />
                     <MenuItem x:Name="autoSaveMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.ToggleAutoSave}" Header="{localization:UiText MenuAutoSave}" IsCheckable="True" IsChecked="{Binding MenuState.File.AutoSaveChecked}" />
+                </MenuItem>
+                <MenuItem Header="{localization:UiText MenuViewControl}">
+                    <MenuItem x:Name="fitToViewMenuItem" x:FieldModifier="internal" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.FitToView}" Header="{localization:UiText MenuFitToView}" InputGestureText="Ctrl+F" IsEnabled="{Binding MenuState.View.FitToViewEnabled}" />
+                    <MenuItem x:Name="actualSizeMenuItem" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ActualSize}" Header="{localization:UiText MenuActualSize}" IsEnabled="{Binding MenuState.View.ActualSizeEnabled}" />
+                    <MenuItem x:Name="resetViewMenuItem" x:FieldModifier="internal" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ResetView}" Header="{localization:UiText MenuResetView}" InputGestureText="Ctrl+0" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
+                    <Separator />
+                    <MenuItem Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.RotateLeft}" Header="{localization:UiText MenuRotateLeft}" InputGestureText="Ctrl+Shift+R" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
+                    <MenuItem Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.RotateRight}" Header="{localization:UiText MenuRotateRight}" InputGestureText="Ctrl+R" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
+                    <MenuItem Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.FlipHorizontal}" Header="{localization:UiText MenuFlipHorizontal}" InputGestureText="Ctrl+H" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
+                    <MenuItem Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.FlipVertical}" Header="{localization:UiText MenuFlipVertical}" InputGestureText="Ctrl+Shift+H" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
+                </MenuItem>
+                <MenuItem Header="{localization:UiText MenuDisplaySettings}">
+                    <MenuItem x:Name="showToolbarMenuItem" x:FieldModifier="internal" Header="{localization:UiText MenuShowToolbar}" ToolTip="{localization:UiText MenuShowToolbarTooltip}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleToolbar}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowToolbarChecked}" />
+                    <MenuItem x:Name="showPixelGridMenuItem" Header="{localization:UiText MenuShowPixelGrid}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.TogglePixelGrid}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowPixelGridChecked}" />
+                    <MenuItem x:Name="showSnapGridMenuItem" Header="{localization:UiText MenuShowSnapGrid}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleSnapGrid}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowSnapGridChecked}" />
+                    <MenuItem x:Name="enableSnapToGridMenuItem" Header="{localization:UiText MenuEnableSnapToGrid}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleSnapToGrid}" IsCheckable="True" IsChecked="{Binding MenuState.View.EnableSnapToGridChecked}" />
+                    <Separator />
+                    <MenuItem x:Name="showCrosshairMenuItem" Header="{localization:UiText MenuShowCrosshair}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleCrosshair}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowCrosshairChecked}" />
+                    <MenuItem x:Name="showCaliperScoresMenuItem" Header="{localization:UiText MenuShowCaliperScores}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleCaliperScores}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowCaliperScoresChecked}" />
+                    <Separator />
+                    <MenuItem x:Name="showInfoPanelMenuItem" x:FieldModifier="internal" Header="{localization:UiText MenuShowInfoPanel}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleInfoPanel}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowInfoPanelChecked}" />
+                    <MenuItem x:Name="showHistogramMenuItem" Header="{localization:UiText MenuShowHistogram}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleHistogram}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowHistogramChecked}" />
+                    <MenuItem x:Name="showProfileMenuItem" Header="{localization:UiText MenuShowProfile}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleProfile}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowProfileChecked}" />
+                    <MenuItem x:Name="showScaleBarMenuItem" Header="{localization:UiText MenuShowScaleBar}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleScaleBar}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowScaleBarChecked}" />
                 </MenuItem>
                 <MenuItem Header="{localization:UiText MenuAnalysisAndExport}">
                     <MenuItem x:Name="exportSnapshotMenuItem" x:FieldModifier="internal" Click="OnFeatureMenuCommandClick" Tag="{x:Static controls:ImageViewerFeatureMenuTags.ExportSnapshot}" Header="{localization:UiText MenuExportCurrentViewPng}" IsEnabled="{Binding MenuState.Context.ExportSnapshotEnabled}" />
@@ -230,6 +361,8 @@
                     </MenuItem>
                 </MenuItem>
                 <MenuItem Header="{localization:UiText MenuLargeImageAndPerformance}">
+                    <MenuItem x:Name="smartDisplaySuggestionMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ShowSmartDisplaySuggestion}" Header="{localization:UiText MenuSmartDisplaySuggestion}" IsEnabled="{Binding MenuState.Analysis.EnableRefreshAnalysis}" />
+                    <Separator />
                     <MenuItem x:Name="enableImagePyramidMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ToggleImagePyramid}" Header="{localization:UiText MenuEnableImagePyramid}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.EnableImagePyramidChecked}" />
                     <MenuItem x:Name="autoSelectPyramidLevelMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ToggleAutoSelectPyramidLevel}" Header="{localization:UiText MenuAutoSelectPyramidLevel}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.AutoSelectPyramidLevelChecked}" IsEnabled="{Binding MenuState.Analysis.AutoSelectPyramidLevelEnabled}" />
                     <MenuItem Header="{localization:UiText MenuAdvancedPerformance}">
@@ -240,9 +373,6 @@
                         <MenuItem x:Name="clearPyramidCacheMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ClearPyramidCache}" Header="{localization:UiText MenuClearPyramidCache}" IsEnabled="{Binding MenuState.Analysis.EnableClearPyramidCache}" />
                         <MenuItem x:Name="clearAnalysisCacheMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ClearAnalysisCache}" Header="{localization:UiText MenuClearAnalysisCache}" IsEnabled="{Binding MenuState.Analysis.EnableClearAnalysisCache}" />
                     </MenuItem>
-                </MenuItem>
-                <MenuItem Header="{localization:UiText MenuRenderAndPseudoColor}">
-                    <MenuItem x:Name="smartDisplaySuggestionMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ShowSmartDisplaySuggestion}" Header="{localization:UiText MenuSmartDisplaySuggestion}" IsEnabled="{Binding MenuState.Analysis.EnableRefreshAnalysis}" />
                     <Separator />
                     <MenuItem Header="{localization:UiText MenuPseudoColorStrategy}">
                         <MenuItem x:Name="preferShaderPseudoColorMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.TogglePreferShaderPseudoColor}" Header="{localization:UiText MenuPreferShaderPseudoColor}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PreferShaderPseudoColorChecked}" />
@@ -255,29 +385,6 @@
                         <MenuItem Header="{localization:UiText MenuPseudoColorViridis}" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.SetPseudoColorPaletteViridis}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PseudoColorViridisChecked}" />
                     </MenuItem>
                     <MenuItem x:Name="showRenderStatusMenuItem" x:FieldModifier="internal" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ShowRenderStatus}" Header="{localization:UiText MenuShowRenderStatus}" IsEnabled="{Binding MenuState.Analysis.EnableShowRenderStatus}" />
-                </MenuItem>
-                <MenuItem Header="{localization:UiText MenuDisplaySettings}">
-                    <MenuItem x:Name="showToolbarMenuItem" x:FieldModifier="internal" Header="{localization:UiText MenuShowToolbar}" ToolTip="{localization:UiText MenuShowToolbarTooltip}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleToolbar}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowToolbarChecked}" />
-                    <MenuItem x:Name="showPixelGridMenuItem" Header="{localization:UiText MenuShowPixelGrid}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.TogglePixelGrid}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowPixelGridChecked}" />
-                    <MenuItem x:Name="showSnapGridMenuItem" Header="{localization:UiText MenuShowSnapGrid}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleSnapGrid}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowSnapGridChecked}" />
-                    <MenuItem x:Name="enableSnapToGridMenuItem" Header="{localization:UiText MenuEnableSnapToGrid}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleSnapToGrid}" IsCheckable="True" IsChecked="{Binding MenuState.View.EnableSnapToGridChecked}" />
-                    <MenuItem x:Name="showCrosshairMenuItem" Header="{localization:UiText MenuShowCrosshair}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleCrosshair}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowCrosshairChecked}" />
-                    <MenuItem x:Name="showCaliperScoresMenuItem" Header="{localization:UiText MenuShowCaliperScores}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleCaliperScores}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowCaliperScoresChecked}" />
-                    <MenuItem x:Name="showInfoPanelMenuItem" x:FieldModifier="internal" Header="{localization:UiText MenuShowInfoPanel}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleInfoPanel}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowInfoPanelChecked}" />
-                    <MenuItem x:Name="showHistogramMenuItem" Header="{localization:UiText MenuShowHistogram}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleHistogram}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowHistogramChecked}" />
-                    <MenuItem x:Name="showProfileMenuItem" Header="{localization:UiText MenuShowProfile}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleProfile}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowProfileChecked}" />
-                    <MenuItem x:Name="showScaleBarMenuItem" Header="{localization:UiText MenuShowScaleBar}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleScaleBar}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowScaleBarChecked}" />
-                </MenuItem>
-                <Separator />
-                <MenuItem Header="{localization:UiText MenuViewControl}">
-                    <MenuItem x:Name="fitToViewMenuItem" x:FieldModifier="internal" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.FitToView}" Header="{localization:UiText MenuFitToView}" InputGestureText="Ctrl+F" IsEnabled="{Binding MenuState.View.FitToViewEnabled}" />
-                    <MenuItem x:Name="actualSizeMenuItem" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ActualSize}" Header="{localization:UiText MenuActualSize}" IsEnabled="{Binding MenuState.View.ActualSizeEnabled}" />
-                    <MenuItem x:Name="resetViewMenuItem" x:FieldModifier="internal" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ResetView}" Header="{localization:UiText MenuResetView}" InputGestureText="Ctrl+0" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
-                    <Separator />
-                    <MenuItem Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.RotateLeft}" Header="{localization:UiText MenuRotateLeft}" InputGestureText="Ctrl+Shift+R" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
-                    <MenuItem Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.RotateRight}" Header="{localization:UiText MenuRotateRight}" InputGestureText="Ctrl+R" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
-                    <MenuItem Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.FlipHorizontal}" Header="{localization:UiText MenuFlipHorizontal}" InputGestureText="Ctrl+H" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
-                    <MenuItem Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.FlipVertical}" Header="{localization:UiText MenuFlipVertical}" InputGestureText="Ctrl+Shift+H" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
                 </MenuItem>
             </ContextMenu>
         </Grid.ContextMenu>
@@ -439,7 +546,7 @@
                 Style="{StaticResource ViewerFloatingPanelStyle}"
                 IsHitTestVisible="False"
                 Visibility="Collapsed">
-            <TextBlock x:Name="infoTextBlock" Foreground="{StaticResource ViewerTextPrimaryBrush}" />
+            <TextBlock x:Name="infoTextBlock" Foreground="{StaticResource ViewerTextPrimaryBrush}" TextWrapping="Wrap" MaxWidth="320" />
         </Border>
 
         <Border x:Name="roiListPanel"
@@ -751,13 +858,21 @@
             <Border.Effect>
                 <effects:DropShadowEffect BlurRadius="16" ShadowDepth="4" Opacity="0.35" Color="#000000" />
             </Border.Effect>
-            <TextBlock x:Name="statusHintTextBlock" x:FieldModifier="internal"
-                       Foreground="{StaticResource ViewerTextPrimaryBrush}"
-                       FontSize="12.5"
-                       FontWeight="SemiBold"
-                       TextAlignment="Center"
-                       TextWrapping="Wrap"
-                       automation:AutomationProperties.LiveSetting="Polite" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <TextBlock x:Name="statusHintIconTextBlock" x:FieldModifier="internal"
+                           Margin="0,0,6,0"
+                           VerticalAlignment="Center"
+                           FontSize="13"
+                           FontWeight="Bold"
+                           Visibility="Collapsed" />
+                <TextBlock x:Name="statusHintTextBlock" x:FieldModifier="internal"
+                           Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                           FontSize="12.5"
+                           FontWeight="SemiBold"
+                           TextAlignment="Center"
+                           TextWrapping="Wrap"
+                           automation:AutomationProperties.LiveSetting="Polite" />
+            </StackPanel>
         </Border>
 
         <Border x:Name="imageLoadPanel"
@@ -765,9 +880,7 @@
                 Padding="18"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
-                Background="{StaticResource ViewerSurfaceBrush}"
-                BorderBrush="{StaticResource ViewerPanelBorderBrush}"
-                BorderThickness="1"
+
                 CornerRadius="18"
                 Panel.ZIndex="110"
                 Width="420"
@@ -842,6 +955,24 @@
                             Style="{StaticResource ViewerToolbarPrimaryButtonStyle}" />
                 </StackPanel>
             </Grid>
+        </Border>
+
+        <!-- 拖放视觉反馈：拖入可打开文件时显示，提示松开即可打开 -->
+        <Border x:Name="dropHintOverlay" x:FieldModifier="internal"
+                Margin="24"
+                Background="#66102133"
+                BorderBrush="{StaticResource ViewerAccentBorderBrush}"
+                BorderThickness="2"
+                CornerRadius="16"
+                IsHitTestVisible="False"
+                Panel.ZIndex="140"
+                Visibility="Collapsed">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock Text="{localization:UiText DropOverlayHint}"
+                           Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                           FontSize="18"
+                           FontWeight="SemiBold" />
+            </StackPanel>
         </Border>
     </Grid>
 </UserControl>

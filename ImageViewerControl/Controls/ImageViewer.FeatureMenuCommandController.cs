@@ -22,8 +22,9 @@ namespace ImageViewer.Controls
         public required Func<IReadOnlyList<RoiBase>> GetAllRois { get; init; }
         public required Func<double> GetPixelSize { get; init; }
         public required Func<string> GetPhysicalUnit { get; init; }
+        public required Func<CameraCalibration?> GetCalibration { get; init; }
         public required Action<string, string, Exception> ShowNonCriticalError { get; init; }
-        public required Action<string> ShowStatusHint { get; init; }
+        public required Action<string, StatusHintKind> ShowStatusHint { get; init; }
         public required Action UpdateContextMenuState { get; init; }
     }
 
@@ -40,13 +41,11 @@ namespace ImageViewer.Controls
         void UpdateContextMenuState();
     }
 
-    internal sealed class ImageViewerFeatureMenuCommandController
+    internal sealed class ImageViewerFeatureMenuCommandController : ImageViewerMenuCommandControllerBase<IImageViewerFeatureMenuCommandHost>
     {
-        private readonly IImageViewerFeatureMenuCommandHost _host;
-
         public ImageViewerFeatureMenuCommandController(IImageViewerFeatureMenuCommandHost host)
+            : base(host, host.UpdateContextMenuState)
         {
-            _host = host ?? throw new ArgumentNullException(nameof(host));
         }
 
         public async Task ExecuteAsync(ImageViewerFeatureMenuCommand command)
@@ -54,22 +53,22 @@ namespace ImageViewer.Controls
             switch (command)
             {
                 case ImageViewerFeatureMenuCommand.GradientDetect:
-                    _host.RunGradientDetection();
+                    Host.RunGradientDetection();
                     break;
                 case ImageViewerFeatureMenuCommand.ExportSnapshot:
-                    await _host.ExportSnapshotAsync();
+                    await Host.ExportSnapshotAsync();
                     break;
                 case ImageViewerFeatureMenuCommand.ExportAnalysisCsv:
-                    await _host.ExportAnalysisCsvAsync();
+                    await Host.ExportAnalysisCsvAsync();
                     break;
                 case ImageViewerFeatureMenuCommand.ShowAnalysisSummary:
-                    _host.ShowAnalysisSummary();
+                    Host.ShowAnalysisSummary();
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(command), command, null);
             }
 
-            _host.UpdateContextMenuState();
+            RefreshMenuState();
         }
     }
 }

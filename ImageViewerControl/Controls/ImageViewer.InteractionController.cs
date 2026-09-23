@@ -87,7 +87,7 @@ namespace ImageViewer.Controls
         void ResizeRoi(RoiBase roi, ResizeHandle handle, double dx, double dy, Point currentPos);
         IUndoRedoCommand? CreateStateCommand(RoiBase roi, RoiBase oldState, RoiBase newState);
         void MoveRoi(RoiBase roi, double dx, double dy);
-        void ShowStatusHint(string message);
+        void ShowStatusHint(string message, StatusHintKind kind);
     }
 
     internal interface IImageViewerPointerInteractionFlow

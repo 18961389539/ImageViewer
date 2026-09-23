@@ -72,6 +72,19 @@ namespace ImageViewer.Models
             set => SetVisualStateValue(VisualState.IsLocked, value, static (state, next) => state.IsLocked = next);
         }
 
+        private MeasurementTolerance? _tolerance;
+
+        /// <summary>
+        /// 测量公差判定参数（标称值 + 上下公差）；非测量 ROI 不使用。
+        /// Chinese: 仅在信息面板展示合格/超差判定，不影响绘制与检测。
+        /// English: Optional pass-fail tolerance applied to the primary measurement of this ROI.
+        /// </summary>
+        public MeasurementTolerance? Tolerance
+        {
+            get => _tolerance;
+            set => SetProperty(ref _tolerance, value);
+        }
+
         private void SetVisualStateValue<T>(T currentValue, T newValue, Action<RoiVisualState, T> assign, [CallerMemberName] string? propertyName = null)
         {
             if (EqualityComparer<T>.Default.Equals(currentValue, newValue))

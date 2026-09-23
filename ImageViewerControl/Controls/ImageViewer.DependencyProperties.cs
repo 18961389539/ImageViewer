@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Media;
+using ImageViewer.Models;
 using ImageViewer.Services;
 
 namespace ImageViewer.Controls
@@ -105,6 +106,10 @@ namespace ImageViewer.Controls
         public static readonly DependencyProperty PhysicalUnitProperty =
             DependencyProperty.Register(nameof(PhysicalUnit), typeof(string), typeof(ImageViewer),
                 new PropertyMetadata("px", OnCalibrationChanged));
+
+        public static readonly DependencyProperty CalibrationProperty =
+            DependencyProperty.Register(nameof(Calibration), typeof(CameraCalibration), typeof(ImageViewer),
+                new PropertyMetadata(null, OnCalibrationChanged));
 
         public static readonly DependencyProperty MenuStateProperty =
             DependencyProperty.Register(nameof(MenuState), typeof(object), typeof(ImageViewer),
@@ -258,6 +263,12 @@ namespace ImageViewer.Controls
         {
             get => (string)GetValue(PhysicalUnitProperty);
             set => SetValue(PhysicalUnitProperty, value);
+        }
+
+        public CameraCalibration? Calibration
+        {
+            get => (CameraCalibration?)GetValue(CalibrationProperty);
+            set => SetValue(CalibrationProperty, value);
         }
 
         public object MenuState

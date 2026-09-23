@@ -4,13 +4,11 @@ using ImageViewer.Services;
 
 namespace ImageViewer.Controls
 {
-    internal sealed class ImageViewerAnalysisCommandController
+    internal sealed class ImageViewerAnalysisCommandController : ImageViewerCommandControllerBase<IImageViewerAnalysisCommandHost>
     {
-        private readonly IImageViewerAnalysisCommandHost _host;
-
         public ImageViewerAnalysisCommandController(IImageViewerAnalysisCommandHost host)
+            : base(host)
         {
-            _host = host;
         }
 
         public void Execute(ImageViewerAnalysisCommand command)
@@ -18,63 +16,63 @@ namespace ImageViewer.Controls
             switch (command)
             {
                 case ImageViewerAnalysisCommand.ToggleAsyncAnalysis:
-                    _host.EnableAsyncAnalysis = !_host.EnableAsyncAnalysis;
+                    Host.EnableAsyncAnalysis = !Host.EnableAsyncAnalysis;
                     break;
                 case ImageViewerAnalysisCommand.TogglePauseRealtimeHistogram:
-                    _host.PauseRealtimeHistogram = !_host.PauseRealtimeHistogram;
+                    Host.PauseRealtimeHistogram = !Host.PauseRealtimeHistogram;
                     break;
                 case ImageViewerAnalysisCommand.TogglePauseRealtimeProfile:
-                    _host.PauseRealtimeProfile = !_host.PauseRealtimeProfile;
+                    Host.PauseRealtimeProfile = !Host.PauseRealtimeProfile;
                     break;
                 case ImageViewerAnalysisCommand.RefreshAnalysis:
-                    _host.RefreshAnalysis();
+                    Host.RefreshAnalysis();
                     break;
                 case ImageViewerAnalysisCommand.ToggleImagePyramid:
-                    _host.EnableImagePyramid = !_host.EnableImagePyramid;
+                    Host.EnableImagePyramid = !Host.EnableImagePyramid;
                     break;
                 case ImageViewerAnalysisCommand.ToggleAutoSelectPyramidLevel:
-                    _host.AutoSelectPyramidLevel = !_host.AutoSelectPyramidLevel;
+                    Host.AutoSelectPyramidLevel = !Host.AutoSelectPyramidLevel;
                     break;
                 case ImageViewerAnalysisCommand.ToggleTiledRendering:
-                    _host.EnableTiledRendering = !_host.EnableTiledRendering;
+                    Host.EnableTiledRendering = !Host.EnableTiledRendering;
                     break;
                 case ImageViewerAnalysisCommand.TogglePrefetchAdjacentTiles:
-                    _host.PrefetchAdjacentTiles = !_host.PrefetchAdjacentTiles;
+                    Host.PrefetchAdjacentTiles = !Host.PrefetchAdjacentTiles;
                     break;
                 case ImageViewerAnalysisCommand.ToggleGpuRendering:
-                    _host.EnableGpuRendering = !_host.EnableGpuRendering;
-                    _host.UpdateRenderedImage();
+                    Host.EnableGpuRendering = !Host.EnableGpuRendering;
+                    Host.UpdateRenderedImage();
                     break;
                 case ImageViewerAnalysisCommand.ClearPyramidCache:
-                    _host.ResetPyramidToBaseLevel();
-                    _host.RebuildPyramidIfNeeded();
+                    Host.ResetPyramidToBaseLevel();
+                    Host.RebuildPyramidIfNeeded();
                     break;
                 case ImageViewerAnalysisCommand.ClearAnalysisCache:
-                    _host.ClearAnalysisCache();
+                    Host.ClearAnalysisCache();
                     break;
                 case ImageViewerAnalysisCommand.TogglePreferShaderPseudoColor:
-                    _host.PreferShaderPseudoColor = !_host.PreferShaderPseudoColor;
+                    Host.PreferShaderPseudoColor = !Host.PreferShaderPseudoColor;
                     break;
                 case ImageViewerAnalysisCommand.ToggleAllowCpuPseudoColorFallback:
-                    _host.AllowCpuPseudoColorFallback = !_host.AllowCpuPseudoColorFallback;
+                    Host.AllowCpuPseudoColorFallback = !Host.AllowCpuPseudoColorFallback;
                     break;
                 case ImageViewerAnalysisCommand.SetPseudoColorPaletteNone:
-                    _host.SetPseudoColorPalette(PseudoColorPalette.None);
+                    Host.SetPseudoColorPalette(PseudoColorPalette.None);
                     break;
                 case ImageViewerAnalysisCommand.SetPseudoColorPaletteHot:
-                    _host.SetPseudoColorPalette(PseudoColorPalette.Hot);
+                    Host.SetPseudoColorPalette(PseudoColorPalette.Hot);
                     break;
                 case ImageViewerAnalysisCommand.SetPseudoColorPaletteJet:
-                    _host.SetPseudoColorPalette(PseudoColorPalette.Jet);
+                    Host.SetPseudoColorPalette(PseudoColorPalette.Jet);
                     break;
                 case ImageViewerAnalysisCommand.SetPseudoColorPaletteViridis:
-                    _host.SetPseudoColorPalette(PseudoColorPalette.Viridis);
+                    Host.SetPseudoColorPalette(PseudoColorPalette.Viridis);
                     break;
                 case ImageViewerAnalysisCommand.ShowSmartDisplaySuggestion:
-                    _host.ShowSmartDisplaySuggestion();
+                    Host.ShowSmartDisplaySuggestion();
                     break;
                 case ImageViewerAnalysisCommand.ShowRenderStatus:
-                    _host.ShowRenderStatus();
+                    Host.ShowRenderStatus();
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(command), command, null);

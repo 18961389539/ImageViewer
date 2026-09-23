@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using System.Windows;
+using ImageViewer.Localization;
 using ImageViewer.Utils;
 
 namespace ImageViewer.Controls
@@ -11,17 +12,20 @@ namespace ImageViewer.Controls
         private readonly ImageViewerSessionController _sessionController;
         private readonly Action _refreshSelectedRoiPropertyPanel;
         private readonly Action _clearUndoHistory;
+        private readonly Action<string, StatusHintKind> _showStatusHint;
 
         public DroppedContentController(
             ViewportController viewportController,
             ImageViewerSessionController sessionController,
             Action refreshSelectedRoiPropertyPanel,
-            Action clearUndoHistory)
+            Action clearUndoHistory,
+            Action<string, StatusHintKind> showStatusHint)
         {
             _viewportController = viewportController ?? throw new ArgumentNullException(nameof(viewportController));
             _sessionController = sessionController ?? throw new ArgumentNullException(nameof(sessionController));
             _refreshSelectedRoiPropertyPanel = refreshSelectedRoiPropertyPanel ?? throw new ArgumentNullException(nameof(refreshSelectedRoiPropertyPanel));
             _clearUndoHistory = clearUndoHistory ?? throw new ArgumentNullException(nameof(clearUndoHistory));
+            _showStatusHint = showStatusHint ?? throw new ArgumentNullException(nameof(showStatusHint));
         }
 
         public static void HandleDragOver(DragEventArgs e)
@@ -39,10 +43,19 @@ namespace ImageViewer.Controls
 
         public async Task HandleDropAsync(DragEventArgs e)
         {
-            if (e.Data.GetDataPresent(DataFormats.FileDrop) && e.Data.GetData(DataFormats.FileDrop) is string[] paths && DroppedFileHelper.TryGetOpenablePath(paths, out string path, out DroppedFileKind kind))
+            if (!e.Data.GetDataPresent(DataFormats.FileDrop) || e.Data.GetData(DataFormats.FileDrop) is not string[] paths)
+            {
+                return;
+            }
+
+            if (DroppedFileHelper.TryGetOpenablePath(paths, out string path, out DroppedFileKind kind))
             {
                 await OpenDroppedPathAsync(path, kind);
+                return;
             }
+
+            // 拖入的文件没有可打开类型时给出明确提示，避免用户面对"无反应"的困惑
+            _showStatusHint(UiText.Get("StatusDropUnsupported"), StatusHintKind.Error);
         }
 
         private async Task OpenDroppedPathAsync(string path, DroppedFileKind kind)

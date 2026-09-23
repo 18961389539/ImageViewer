@@ -143,6 +143,45 @@ namespace ImageViewer.Models
             set => SetProperty(ref _caliperSearchRange, Math.Max(1, value));
         }
 
+        private double _minimumEdgeGap;
+
+        /// <summary>
+        /// 双边缘最小间距（px）；0 表示不约束。
+        /// Chinese: 用于排除相邻纹理伪边导致的错误配对；两边缘间距低于该值时自动改选更远的候选对。
+        /// English: Minimum required distance between the two detected edges, in pixels; 0 disables the constraint.
+        /// </summary>
+        public double MinimumEdgeGap
+        {
+            get => _minimumEdgeGap;
+            set => SetProperty(ref _minimumEdgeGap, Math.Max(0, value));
+        }
+
+        private double _nominalEdgeGap;
+
+        /// <summary>
+        /// 标称边缘间距先验（px，像素单位）；0 表示不启用宽度先验。
+        /// Chinese: 双边缘配对时，偏离标称间距的组合会被扣分，优先选择宽度接近标称的边缘对。
+        /// English: Nominal edge gap prior used when selecting the best edge pair; 0 disables the prior.
+        /// </summary>
+        public double NominalEdgeGap
+        {
+            get => _nominalEdgeGap;
+            set => SetProperty(ref _nominalEdgeGap, Math.Max(0, value));
+        }
+
+        private double _nominalEdgeGapTolerance;
+
+        /// <summary>
+        /// 标称间距容差（px）：间距落在标称 ± 容差内不扣分，超出部分按像素线性扣分。
+        /// Chinese: 与 NominalEdgeGap 配合使用；0 表示不允许偏差。
+        /// English: Tolerance band around the nominal edge gap before scoring penalty applies.
+        /// </summary>
+        public double NominalEdgeGapTolerance
+        {
+            get => _nominalEdgeGapTolerance;
+            set => SetProperty(ref _nominalEdgeGapTolerance, Math.Max(0, value));
+        }
+
         public int CaliperSamplingHalfWidth
         {
             get => _caliperSamplingHalfWidth;

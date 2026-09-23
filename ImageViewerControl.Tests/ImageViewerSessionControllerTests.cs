@@ -303,7 +303,8 @@ namespace ImageViewerControl.Tests
                             "um",
                             2.5,
                             30,
-                            40)
+                            40,
+                            null)
                     };
                     var recentProjectService = new RecordingRecentProjectService();
                     var host = new RecordingSessionHost(sessionService, recentProjectService, new RecordingProjectPackageService());
@@ -432,6 +433,8 @@ namespace ImageViewerControl.Tests
                     SetPixelSize = value => host.PixelSize = value,
                     GetPhysicalUnit = () => host.PhysicalUnit,
                     SetPhysicalUnit = value => host.PhysicalUnit = value,
+                    GetCalibration = () => host.Calibration,
+                    SetCalibration = value => host.Calibration = value,
                     GetCurrentViewportState = () => host.CurrentViewportState,
                     TryGetCurrentImagePath = () => host.CurrentImagePath,
                     LoadImageFromFile = host.LoadImageFromFile,
@@ -440,7 +443,7 @@ namespace ImageViewerControl.Tests
                     DrawRois = host.DrawRois,
                     ShowNonCriticalError = host.ShowNonCriticalError,
                     ShowWarning = host.ShowWarning,
-                    ShowStatusHint = message => host.StatusHints.Add(message),
+                    ShowStatusHint = (message, _) => host.StatusHints.Add(message),
                     ClearUndoHistory = () => host.ClearUndoHistoryCount++,
                     UpdateContextMenuState = host.UpdateContextMenuState
                 },
@@ -453,10 +456,11 @@ namespace ImageViewerControl.Tests
                     GetAllRois = () => host.AllRois,
                     GetPixelSize = () => host.PixelSize,
                     GetPhysicalUnit = () => host.PhysicalUnit,
+                    GetCalibration = () => host.Calibration,
                     SessionService = host.SessionService,
                     GetPluginRegistry = () => host.PluginRegistry,
                     LogNonCriticalError = host.LogNonCriticalError,
-                    ShowStatusHint = message => host.StatusHints.Add(message)
+                    ShowStatusHint = (message, _) => host.StatusHints.Add(message)
                 }
             };
         }
@@ -494,6 +498,8 @@ namespace ImageViewerControl.Tests
             public double PixelSize { get; set; }
 
             public string PhysicalUnit { get; set; } = "px";
+
+            public CameraCalibration? Calibration { get; set; }
 
             public ImageViewerViewportState CurrentViewportState { get; set; } = new(1, 0, 0);
 
@@ -594,14 +600,15 @@ namespace ImageViewerControl.Tests
                 "px",
                 1,
                 0,
-                0);
+                0,
+                null);
 
-            public void SaveToFile(string filePath, string? imagePath, IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, double scale, double translateX, double translateY, RoiPluginRegistry? pluginRegistry = null)
+            public void SaveToFile(string filePath, string? imagePath, IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, double scale, double translateX, double translateY, RoiPluginRegistry? pluginRegistry = null, CameraCalibration? calibration = null)
             {
                 throw new NotSupportedException();
             }
 
-            public Task SaveToFileAsync(string filePath, string? imagePath, IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, double scale, double translateX, double translateY, RoiPluginRegistry? pluginRegistry = null, CancellationToken cancellationToken = default)
+            public Task SaveToFileAsync(string filePath, string? imagePath, IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, double scale, double translateX, double translateY, RoiPluginRegistry? pluginRegistry = null, CameraCalibration? calibration = null, CancellationToken cancellationToken = default)
             {
                 if (ThrowOnSave)
                 {
@@ -615,7 +622,7 @@ namespace ImageViewerControl.Tests
                 return Task.CompletedTask;
             }
 
-            public string SerializeSession(string? sessionName, string? imagePath, IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, double scale, double translateX, double translateY, RoiPluginRegistry? pluginRegistry = null)
+            public string SerializeSession(string? sessionName, string? imagePath, IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, double scale, double translateX, double translateY, RoiPluginRegistry? pluginRegistry = null, CameraCalibration? calibration = null)
             {
                 throw new NotSupportedException();
             }
@@ -657,7 +664,8 @@ namespace ImageViewerControl.Tests
                 "px",
                 1,
                 0,
-                0);
+                0,
+                null);
 
             public Task ExportAsync(string packagePath, string? imagePath, IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, double scale, double translateX, double translateY, RoiPluginRegistry? pluginRegistry = null, CancellationToken cancellationToken = default)
             {

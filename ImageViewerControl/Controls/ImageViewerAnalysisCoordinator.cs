@@ -8,6 +8,7 @@ using System.Windows.Media;
 using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
 using ImageViewer.Abstractions;
+using ImageViewer.Localization;
 using ImageViewer.Models;
 using ImageViewer.Services;
 
@@ -314,6 +315,7 @@ namespace ImageViewer.Controls
                 catch (Exception ex)
                 {
                     _errorSink.LogNonCriticalError("Failed to update histogram", ex);
+                    _uiFacade.PresentHistogramError(UiText.Get("StatusHistogramFailed"));
                 }
 
                 return;
@@ -341,6 +343,7 @@ namespace ImageViewer.Controls
             catch (Exception ex)
             {
                 _errorSink.LogNonCriticalError("Failed to update histogram", ex);
+                _uiFacade.PresentHistogramError(UiText.Get("StatusHistogramFailed"));
             }
         }
 
@@ -381,6 +384,7 @@ namespace ImageViewer.Controls
                 catch (Exception ex)
                 {
                     _errorSink.LogNonCriticalError("Failed to update profile", ex);
+                    _uiFacade.PresentProfileError(UiText.Get("StatusProfileFailed"));
                 }
 
                 return;
@@ -410,6 +414,7 @@ namespace ImageViewer.Controls
             catch (Exception ex)
             {
                 _errorSink.LogNonCriticalError("Failed to update profile", ex);
+                _uiFacade.PresentProfileError(UiText.Get("StatusProfileFailed"));
             }
         }
 

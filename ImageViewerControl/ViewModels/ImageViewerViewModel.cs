@@ -36,7 +36,7 @@ namespace ImageViewer.ViewModels
         private bool _isSynchronizingAllRois;
 
         /// <summary>
-        /// 尝试对当前选中的直线查找卡尺 ROI 执行边缘检测。
+        /// 尝试对当前选中的拟合直线 ROI 执行边缘检测。
         /// Chinese: Attempts to detect the true line for the currently selected line-caliper ROI.
         /// </summary>
         /// <param name="result">如果检测成功，返回检测结果。</param>

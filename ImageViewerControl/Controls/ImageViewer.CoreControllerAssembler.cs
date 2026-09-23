@@ -1,5 +1,6 @@
 using System;
 using System.Windows;
+using ImageViewer.Models;
 
 namespace ImageViewer.Controls
 {
@@ -127,10 +128,13 @@ namespace ImageViewer.Controls
                         Calibration = new ImageViewerDialogCalibrationWorkflow
                         {
                             GetPhysicalUnit = () => _owner.PhysicalUnit,
-                            ApplyCalibration = (pixelSize, unit) =>
+                            ApplyCalibration = (pixelSize, unit, k1, k2) =>
                             {
                                 _owner.PixelSize = pixelSize;
                                 _owner.PhysicalUnit = unit;
+                                _owner.Calibration = Math.Abs(k1) < 1e-9 && Math.Abs(k2) < 1e-9
+                                    ? null
+                                    : CameraCalibration.CreateForImage(k1, k2, _owner.ImageSource?.Width ?? 0, _owner.ImageSource?.Height ?? 0);
                             }
                         }
                     },
@@ -165,7 +169,7 @@ namespace ImageViewer.Controls
                     roi => _owner.TryRefreshCaliperDetection(roi),
                     () => _owner.DrawRois(),
                     _owner.LogNonCriticalError,
-                    message => _owner.ShowStatusHint(message));
+                    (message, kind) => _owner.ShowStatusHint(message, kind));
             }
 
             public CalibrationController CreateCalibrationController(ImageViewerDialogWorkflowService dialogWorkflowService)
@@ -185,7 +189,8 @@ namespace ImageViewer.Controls
                     viewportController,
                     sessionController,
                     () => _owner._roiSelectionStateController.RefreshPropertyPanel(),
-                    () => _owner.ViewerState.UndoRedo.Clear());
+                    () => _owner.ViewerState.UndoRedo.Clear(),
+                    (message, kind) => _owner.ShowStatusHint(message, kind));
             }
 
             public ExternalImageSourceBindingController CreateExternalImageSourceBindingController()

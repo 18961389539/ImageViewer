@@ -29,11 +29,10 @@ namespace ImageViewerControl.Tests
 
                 MenuItem analysisMenu = contextMenu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, UiText.Get("MenuAnalysisAndExport")));
                 MenuItem performanceMenu = contextMenu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, UiText.Get("MenuLargeImageAndPerformance")));
-                MenuItem renderMenu = contextMenu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, UiText.Get("MenuRenderAndPseudoColor")));
 
                 Assert.Contains(analysisMenu.Items.OfType<MenuItem>(), item => Equals(item.Header, UiText.Get("MenuAnalysisRun")));
                 Assert.Contains(performanceMenu.Items.OfType<MenuItem>(), item => Equals(item.Header, UiText.Get("MenuAdvancedPerformance")));
-                Assert.Contains(renderMenu.Items.OfType<MenuItem>(), item => Equals(item.Header, UiText.Get("MenuPseudoColorStrategy")));
+                Assert.Contains(performanceMenu.Items.OfType<MenuItem>(), item => Equals(item.Header, UiText.Get("MenuPseudoColorStrategy")));
             });
         }
 
@@ -45,15 +44,17 @@ namespace ImageViewerControl.Tests
                 using var viewer = new ImageViewer.Controls.ImageViewer();
                 var contextMenu = viewer.mainContextMenu;
 
+                MenuItem drawMenu = contextMenu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, UiText.Get("MenuDraw")));
+                MenuItem measureMenu = contextMenu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, UiText.Get("MenuMeasure")));
                 MenuItem roiMenu = contextMenu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, UiText.Get("MenuRoiOperations")));
-                MenuItem measureMenu = roiMenu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, UiText.Get("MenuMeasure")));
 
-                Assert.Contains(roiMenu.Items.OfType<MenuItem>(), item => Equals(item.Header, UiText.Get("MenuDraw")));
+                Assert.Contains(drawMenu.Items.OfType<MenuItem>(), item => Equals(item.Header, UiText.Get("ToolRotatedRect")));
                 Assert.Contains(roiMenu.Items.OfType<MenuItem>(), item => Equals(item.Header, UiText.Get("MenuShowRoiList")));
                 Assert.Contains(roiMenu.Items.OfType<MenuItem>(), item => Equals(item.Header, UiText.Get("MenuZoomToSelectedRoi")));
                 Assert.Contains(measureMenu.Items.OfType<MenuItem>(), item => Equals(item.Header, UiText.Get("MenuGradientAlignCaliper")));
                 Assert.Contains(measureMenu.Items.OfType<MenuItem>(), item => Equals(item.Header, UiText.Get("ToolFittedEllipse")));
                 Assert.DoesNotContain(roiMenu.Items.OfType<MenuItem>(), item => Equals(item.Header, UiText.Get("MenuGradientAlignCaliper")));
+                Assert.DoesNotContain(roiMenu.Items.OfType<MenuItem>(), item => Equals(item.Header, UiText.Get("MenuDraw")));
             });
         }
 

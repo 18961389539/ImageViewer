@@ -26,13 +26,11 @@ namespace ImageViewer.Controls
         void UpdateContextMenuState();
     }
 
-    internal sealed class ImageViewerRoiMenuCommandController
+    internal sealed class ImageViewerRoiMenuCommandController : ImageViewerMenuCommandControllerBase<IImageViewerRoiMenuCommandHost>
     {
-        private readonly IImageViewerRoiMenuCommandHost _host;
-
         public ImageViewerRoiMenuCommandController(IImageViewerRoiMenuCommandHost host)
+            : base(host, host.UpdateContextMenuState)
         {
-            _host = host;
         }
 
         public void Execute(ImageViewerRoiMenuCommand command)
@@ -40,49 +38,49 @@ namespace ImageViewer.Controls
             switch (command)
             {
                 case ImageViewerRoiMenuCommand.Undo:
-                    _host.Undo();
+                    Host.Undo();
                     break;
                 case ImageViewerRoiMenuCommand.Redo:
-                    _host.Redo();
+                    Host.Redo();
                     break;
                 case ImageViewerRoiMenuCommand.DeleteSelected:
-                    _host.DeleteSelected();
+                    Host.DeleteSelected();
                     break;
                 case ImageViewerRoiMenuCommand.ClearAll:
-                    _host.ClearAll();
+                    Host.ClearAll();
                     break;
                 case ImageViewerRoiMenuCommand.EditProperties:
-                    _host.EditSelectedProperties();
+                    Host.EditSelectedProperties();
                     break;
                 case ImageViewerRoiMenuCommand.SetLabel:
-                    _host.SetSelectedLabel();
+                    Host.SetSelectedLabel();
                     break;
                 case ImageViewerRoiMenuCommand.SetColorCyan:
-                    _host.SetSelectedColor(Colors.Cyan);
+                    Host.SetSelectedColor(Colors.Cyan);
                     break;
                 case ImageViewerRoiMenuCommand.SetColorRed:
-                    _host.SetSelectedColor(Colors.Red);
+                    Host.SetSelectedColor(Colors.Red);
                     break;
                 case ImageViewerRoiMenuCommand.SetColorGreen:
-                    _host.SetSelectedColor(Colors.Green);
+                    Host.SetSelectedColor(Colors.Green);
                     break;
                 case ImageViewerRoiMenuCommand.SetColorYellow:
-                    _host.SetSelectedColor(Colors.Yellow);
+                    Host.SetSelectedColor(Colors.Yellow);
                     break;
                 case ImageViewerRoiMenuCommand.SetColorMagenta:
-                    _host.SetSelectedColor(Colors.Magenta);
+                    Host.SetSelectedColor(Colors.Magenta);
                     break;
                 case ImageViewerRoiMenuCommand.CalibratePixels:
-                    _host.CalibrateSelectedRoi();
+                    Host.CalibrateSelectedRoi();
                     break;
                 case ImageViewerRoiMenuCommand.EditCaliperSettings:
-                    _host.EditSelectedCaliperSettings();
+                    Host.EditSelectedCaliperSettings();
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(command), command, null);
             }
 
-            _host.UpdateContextMenuState();
+            RefreshMenuState();
         }
     }
 }

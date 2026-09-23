@@ -72,7 +72,7 @@ namespace ImageViewer.Controls
                 encoder.Frames.Add(BitmapFrame.Create(bitmap));
                 await using var stream = File.Create(filePath);
                 await Task.Run(() => encoder.Save(stream));
-                _dependencies.ShowStatusHint(UiText.Get("StatusExportPngSuccess"));
+                _dependencies.ShowStatusHint(UiText.Get("StatusExportPngSuccess"), StatusHintKind.Success);
             }
             catch (Exception ex)
             {
@@ -90,8 +90,8 @@ namespace ImageViewer.Controls
 
             try
             {
-                await RoiAnalysisExportService.SaveCsvAsync(filePath, _dependencies.GetAllRois(), _dependencies.GetAnalysisBitmapSource(), _dependencies.GetPixelSize(), _dependencies.GetPhysicalUnit());
-                _dependencies.ShowStatusHint(UiText.Get("StatusExportCsvSuccess"));
+                await RoiAnalysisExportService.SaveCsvAsync(filePath, _dependencies.GetAllRois(), _dependencies.GetAnalysisBitmapSource(), _dependencies.GetPixelSize(), _dependencies.GetPhysicalUnit(), _dependencies.GetCalibration());
+                _dependencies.ShowStatusHint(UiText.Get("StatusExportCsvSuccess"), StatusHintKind.Success);
             }
             catch (Exception ex)
             {
@@ -101,7 +101,7 @@ namespace ImageViewer.Controls
 
         public void ShowAnalysisSummary()
         {
-            string summary = RoiAnalysisExportService.BuildSummary(_dependencies.GetAllRois(), _dependencies.GetAnalysisBitmapSource(), _dependencies.GetPixelSize(), _dependencies.GetPhysicalUnit());
+            string summary = RoiAnalysisExportService.BuildSummary(_dependencies.GetAllRois(), _dependencies.GetAnalysisBitmapSource(), _dependencies.GetPixelSize(), _dependencies.GetPhysicalUnit(), _dependencies.GetCalibration());
             _dependencies.ShowReadOnlyText(UiText.Get("DialogAnalysisSummaryTitle"), summary);
         }
 

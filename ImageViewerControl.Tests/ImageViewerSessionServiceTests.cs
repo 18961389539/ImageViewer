@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using ImageViewer.Models;
 using ImageViewer.Plugins;
 using ImageViewer.Services;
 using Xunit;
@@ -41,6 +42,35 @@ namespace ImageViewerControl.Tests
             Assert.Equal(1.0, result.Scale);
             Assert.Equal(1.0, result.PixelSize);
             Assert.Equal("px", result.PhysicalUnit);
+        }
+
+        [Fact]
+        public void SerializeSession_WithCalibration_RoundTripsDistortionParameters()
+        {
+            var registry = RoiPluginRegistry.CreateBuiltIn();
+            var service = new ImageViewerSessionService();
+            var calibration = new CameraCalibration { K1 = 0.05, K2 = -0.003, PrincipalX = 200, PrincipalY = 150, NormalizationRadius = 100 };
+
+            string sessionJson = service.SerializeSession("sample", null, [], 0.02, "mm", 1.0, 0, 0, registry, calibration);
+            ImageViewerSessionData result = service.LoadFromJson(sessionJson, null, registry);
+
+            Assert.NotNull(result.Calibration);
+            Assert.Equal(0.05, result.Calibration!.K1, 6);
+            Assert.Equal(-0.003, result.Calibration.K2, 6);
+            Assert.Equal(200, result.Calibration.PrincipalX, 6);
+            Assert.Equal(150, result.Calibration.PrincipalY, 6);
+            Assert.Equal(100, result.Calibration.NormalizationRadius, 6);
+        }
+
+        [Fact]
+        public void LoadFromJson_WithoutCalibration_ReturnsNullCalibration()
+        {
+            var service = new ImageViewerSessionService();
+            const string sessionJson = "{\"SessionName\":\"sample\",\"RoiDocumentJson\":\"{}\"}";
+
+            ImageViewerSessionData result = service.LoadFromJson(sessionJson, null, RoiPluginRegistry.CreateBuiltIn());
+
+            Assert.Null(result.Calibration);
         }
     }
 }

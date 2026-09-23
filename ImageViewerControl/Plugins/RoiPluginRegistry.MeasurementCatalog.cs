@@ -31,19 +31,24 @@ namespace ImageViewer.Plugins
                             MinimumValidCalipers = data.Measurement.MinimumValidCalipers > 0 ? data.Measurement.MinimumValidCalipers : 8,
                             CaliperMinimumGradient = data.Measurement.CaliperMinimumGradient > 0 ? data.Measurement.CaliperMinimumGradient : 8,
                             CaliperOutlierThreshold = data.Measurement.CaliperOutlierThreshold > 0 ? data.Measurement.CaliperOutlierThreshold : 2.5,
-                            CaliperEdgePolarity = ParseCaliperEdgePolarity(data.Measurement.CaliperEdgePolarity)
+                            CaliperEdgePolarity = ParseCaliperEdgePolarity(data.Measurement.CaliperEdgePolarity),
+                            EdgeSelection = Math.Max(1, data.Measurement.EdgeSelection)
                         },
                         static roi => roi.Center,
                         static roi => roi.Radius,
-                        static (roi, data) => PopulateCaliperPersistenceData(
-                            data,
-                            roi.CaliperCount,
-                            roi.CaliperSearchRange,
-                            roi.CaliperSamplingHalfWidth,
-                            roi.MinimumValidCalipers,
-                            roi.CaliperMinimumGradient,
-                            roi.CaliperOutlierThreshold,
-                                roi.CaliperEdgePolarity))),
+                        static (roi, data) =>
+                        {
+                            PopulateCaliperPersistenceData(
+                                data,
+                                roi.CaliperCount,
+                                roi.CaliperSearchRange,
+                                roi.CaliperSamplingHalfWidth,
+                                roi.MinimumValidCalipers,
+                                roi.CaliperMinimumGradient,
+                                roi.CaliperOutlierThreshold,
+                                roi.CaliperEdgePolarity);
+                            data.Measurement.EdgeSelection = roi.EdgeSelection;
+                        })),
 
                             CreateRegistration<ArcCaliperMeasureRoi>(
                     typeKey: "arc-caliper-measure",
@@ -65,7 +70,8 @@ namespace ImageViewer.Plugins
                             MinimumValidCalipers = data.Measurement.MinimumValidCalipers > 0 ? data.Measurement.MinimumValidCalipers : 8,
                             CaliperMinimumGradient = data.Measurement.CaliperMinimumGradient > 0 ? data.Measurement.CaliperMinimumGradient : 8,
                             CaliperOutlierThreshold = data.Measurement.CaliperOutlierThreshold > 0 ? data.Measurement.CaliperOutlierThreshold : 2.5,
-                            CaliperEdgePolarity = ParseCaliperEdgePolarity(data.Measurement.CaliperEdgePolarity)
+                            CaliperEdgePolarity = ParseCaliperEdgePolarity(data.Measurement.CaliperEdgePolarity),
+                            EdgeSelection = Math.Max(1, data.Measurement.EdgeSelection)
                         },
                         static roi => roi.Center,
                         static roi => roi.Radius,
@@ -82,6 +88,7 @@ namespace ImageViewer.Plugins
                                 roi.CaliperMinimumGradient,
                                 roi.CaliperOutlierThreshold,
                                 roi.CaliperEdgePolarity);
+                            data.Measurement.EdgeSelection = roi.EdgeSelection;
                         })),
 
                     CreateRegistration<LineMeasureRoi>(
@@ -116,7 +123,10 @@ namespace ImageViewer.Plugins
                             CaliperRegionLength = data.Geometry.Width,
                             CaliperSearchRange = data.Geometry.Height > 0 ? (int)Math.Round(data.Geometry.Height / 2) : 24,
                             CaliperAngleDegrees = data.Geometry.Angle,
-                            HasExplicitCaliperRegion = data.Geometry.Center != null
+                            HasExplicitCaliperRegion = data.Geometry.Center != null,
+                            MinimumEdgeGap = data.Measurement.MinimumEdgeGap,
+                            NominalEdgeGap = data.Measurement.NominalEdgeGap,
+                            NominalEdgeGapTolerance = data.Measurement.NominalEdgeGapTolerance
                         },
                         static roi => roi.P1,
                         static roi => roi.P2,
@@ -126,8 +136,10 @@ namespace ImageViewer.Plugins
                             data.Geometry.Width = roi.GetResolvedCaliperRegionLength();
                             data.Geometry.Height = roi.CaliperSearchRange * 2;
                             data.Geometry.Angle = roi.CaliperAngleDegrees;
-                        }),
-                    createPropertyEditor: static _ => null),
+                            data.Measurement.MinimumEdgeGap = roi.MinimumEdgeGap;
+                            data.Measurement.NominalEdgeGap = roi.NominalEdgeGap;
+                            data.Measurement.NominalEdgeGapTolerance = roi.NominalEdgeGapTolerance;
+                        })),
 
                     CreateRegistration<LineCaliperMeasureRoi>(
                     typeKey: "line-caliper-measure",
@@ -147,20 +159,24 @@ namespace ImageViewer.Plugins
                             MinimumValidCalipers = data.Measurement.MinimumValidCalipers > 0 ? data.Measurement.MinimumValidCalipers : 8,
                             CaliperMinimumGradient = data.Measurement.CaliperMinimumGradient > 0 ? data.Measurement.CaliperMinimumGradient : 8,
                             CaliperOutlierThreshold = data.Measurement.CaliperOutlierThreshold > 0 ? data.Measurement.CaliperOutlierThreshold : 2.5,
-                            CaliperEdgePolarity = ParseCaliperEdgePolarity(data.Measurement.CaliperEdgePolarity)
+                            CaliperEdgePolarity = ParseCaliperEdgePolarity(data.Measurement.CaliperEdgePolarity),
+                            EdgeSelection = Math.Max(1, data.Measurement.EdgeSelection)
                         },
                         static roi => roi.P1,
                         static roi => roi.P2,
-                        static (roi, data) => PopulateCaliperPersistenceData(
-                            data,
-                            roi.CaliperCount,
-                            roi.CaliperSearchRange,
-                            roi.CaliperSamplingHalfWidth,
-                            roi.MinimumValidCalipers,
-                            roi.CaliperMinimumGradient,
-                            roi.CaliperOutlierThreshold,
-                            roi.CaliperEdgePolarity)),
-                    createPropertyEditor: static _ => null),
+                        static (roi, data) =>
+                        {
+                            PopulateCaliperPersistenceData(
+                                data,
+                                roi.CaliperCount,
+                                roi.CaliperSearchRange,
+                                roi.CaliperSamplingHalfWidth,
+                                roi.MinimumValidCalipers,
+                                roi.CaliperMinimumGradient,
+                                roi.CaliperOutlierThreshold,
+                                roi.CaliperEdgePolarity);
+                            data.Measurement.EdgeSelection = roi.EdgeSelection;
+                        })),
 
                     CreateRegistration<AngleMeasureRoi>(
                     typeKey: "angle-measure",

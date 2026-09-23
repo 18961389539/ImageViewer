@@ -1,4 +1,5 @@
 using System;
+using ImageViewer.Localization;
 
 namespace ImageViewer.Controls
 {
@@ -33,8 +34,9 @@ namespace ImageViewer.Controls
                             GetAllRois = () => _owner.ViewerState.AllRois,
                             GetPixelSize = () => _owner.PixelSize,
                             GetPhysicalUnit = () => _owner.PhysicalUnit,
+                            GetCalibration = () => _owner.Calibration,
                             ShowNonCriticalError = _owner.ShowNonCriticalError,
-                            ShowStatusHint = message => _owner.ShowStatusHint(message),
+                            ShowStatusHint = (message, kind) => _owner.ShowStatusHint(message, kind),
                             UpdateContextMenuState = _owner.UpdateContextMenuState
                         }));
             }
@@ -88,14 +90,27 @@ namespace ImageViewer.Controls
                     SetShowSnapGrid = value => _owner.ShowSnapGrid = value,
                     GetEnableSnapToGrid = () => _owner.EnableSnapToGrid,
                     SetEnableSnapToGrid = value => _owner.EnableSnapToGrid = value,
-                    FitToView = viewportController.FitToView,
+                    FitToView = () =>
+                    {
+                        viewportController.FitToView();
+                        _owner.ShowStatusHint(UiText.Get("StatusFitToView"), StatusHintKind.Success);
+                    },
                     ResetView = () =>
                     {
                         viewportController.ResetView();
                         _owner.ResetImageOrientation();
+                        _owner.ShowStatusHint(UiText.Get("StatusResetViewDone"), StatusHintKind.Success);
                     },
-                    ShowFullImage = viewportController.ShowFullImage,
-                    SetActualSize = viewportController.SetActualSize,
+                    ShowFullImage = () =>
+                    {
+                        viewportController.ShowFullImage();
+                        _owner.ShowStatusHint(UiText.Get("StatusShowFullImage"), StatusHintKind.Success);
+                    },
+                    SetActualSize = () =>
+                    {
+                        viewportController.SetActualSize();
+                        _owner.ShowStatusHint(UiText.Get("StatusActualSize"), StatusHintKind.Success);
+                    },
                     ZoomIn = () => _owner.ZoomAtViewportCenter(1.25),
                     ZoomOut = () => _owner.ZoomAtViewportCenter(0.8),
                     ZoomToSelection = viewportController.ZoomToSelection,

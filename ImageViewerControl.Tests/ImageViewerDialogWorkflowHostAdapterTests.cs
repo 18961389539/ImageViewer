@@ -103,7 +103,7 @@ namespace ImageViewerControl.Tests
                 Calibration = new ImageViewerDialogCalibrationWorkflow
                 {
                     GetPhysicalUnit = () => "px",
-                    ApplyCalibration = (_, _) => { }
+                    ApplyCalibration = (_, _, _, _) => { }
                 }
             };
         }
@@ -151,7 +151,7 @@ namespace ImageViewerControl.Tests
 
             public string? ShowSaveAnalysisCsvDialog() => null;
 
-            public (double Length, string Unit)? ShowCalibrationDialog(string currentUnit) => null;
+            public CalibrationDialogResult? ShowCalibrationDialog(string currentUnit) => null;
 
             public CaliperMeasureRoi? ShowLineMeasureCaliperSettingsDialog(CaliperMeasureRoi roi, Action<CaliperMeasureRoi>? previewAction = null) => LineMeasureCaliperResult;
 

@@ -3,12 +3,102 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:helix="http://helix-toolkit.org/wpf/SharpDX"
-    xmlns:localization="clr-namespace:ImageViewer.Localization">
+    xmlns:localization="clr-namespace:ImageViewer.Localization"
+    xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
+    automation:AutomationProperties.Name="{localization:UiText Volume3DViewerName}">
     <Grid Background="#0A0F16">
         <Grid.ContextMenu>
             <ContextMenu x:Name="threeDContextMenu" x:FieldModifier="internal">
+                <ContextMenu.Resources>
+                    <Style TargetType="ContextMenu">
+                        <Setter Property="Background" Value="#18212E" />
+                        <Setter Property="Foreground" Value="#F5F8FC" />
+                        <Setter Property="BorderBrush" Value="#314158" />
+                        <Setter Property="BorderThickness" Value="1" />
+                        <Setter Property="Padding" Value="2" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ContextMenu">
+                                    <Border Background="#18212E" BorderBrush="#314158" BorderThickness="1" CornerRadius="6" Padding="2" SnapsToDevicePixels="True">
+                                        <ItemsPresenter SnapsToDevicePixels="True" />
+                                    </Border>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                    <Style TargetType="MenuItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Left" />
+                        <Setter Property="VerticalContentAlignment" Value="Center" />
+                        <Setter Property="Foreground" Value="#F5F8FC" />
+                        <Setter Property="Padding" Value="10,5" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="MenuItem">
+                                    <Grid>
+                                        <Border x:Name="menuItemBorder" Background="Transparent" SnapsToDevicePixels="True">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <Path Grid.Column="0" x:Name="checkGlyph" Visibility="Collapsed"
+                                                      Data="M 0,4 L 3.5,7.5 L 8,1" Stroke="#69AFFF" StrokeThickness="1.5"
+                                                      Margin="10,0,4,0" VerticalAlignment="Center" Width="8" Height="9" />
+                                                <ContentPresenter Grid.Column="1" ContentSource="Header"
+                                                                  Margin="{TemplateBinding Padding}"
+                                                                  RecognizesAccessKey="True" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="2" x:Name="shortcutText"
+                                                           Text="{TemplateBinding InputGestureText}"
+                                                           Foreground="#AAB5C3" Margin="24,0,10,0"
+                                                           VerticalAlignment="Center" FontSize="11" />
+                                                <Path Grid.Column="3" x:Name="submenuArrow" Visibility="Collapsed"
+                                                      Data="M 0,0 L 4,4 L 0,8" Stroke="#AAB5C3" StrokeThickness="1.5"
+                                                      Margin="0,0,10,0" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Border>
+                                        <Popup x:Name="SubMenuPopup" AllowsTransparency="True"
+                                               IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                                               Placement="Right" VerticalOffset="-2" HorizontalOffset="-2"
+                                               PopupAnimation="Slide" Focusable="False">
+                                            <Border Background="#18212E" BorderBrush="#314158" BorderThickness="1" CornerRadius="4" Padding="2" SnapsToDevicePixels="True">
+                                                <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle" />
+                                            </Border>
+                                        </Popup>
+                                    </Grid>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="menuItemBorder" Property="Background" Value="#243245" />
+                                        </Trigger>
+                                        <Trigger Property="IsEnabled" Value="False">
+                                            <Setter Property="Foreground" Value="#5A6B7D" />
+                                        </Trigger>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="checkGlyph" Property="Visibility" Value="Visible" />
+                                        </Trigger>
+                                        <Trigger Property="HasItems" Value="True">
+                                            <Setter TargetName="submenuArrow" Property="Visibility" Value="Visible" />
+                                            <Setter TargetName="shortcutText" Property="Visibility" Value="Collapsed" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                    <Style TargetType="Separator">
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Separator">
+                                    <Border Height="1" Background="#314158" Margin="8,3" SnapsToDevicePixels="True" />
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ContextMenu.Resources>
                 <MenuItem Header="{localization:UiText Menu3DResetCamera}" ToolTip="{localization:UiText Menu3DResetCameraTooltip}" Click="OnResetCameraClick" />
                 <MenuItem Header="{localization:UiText Menu3DFitVolume}" ToolTip="{localization:UiText Menu3DFitVolumeTooltip}" Click="OnFitVolumeClick" />
+                <Separator />
                 <MenuItem Header="{localization:UiText Menu3DFrontView}" ToolTip="{localization:UiText Menu3DFrontViewTooltip}" Click="OnFrontViewClick" />
                 <MenuItem Header="{localization:UiText Menu3DBackView}" ToolTip="{localization:UiText Menu3DBackViewTooltip}" Click="OnBackViewClick" />
                 <MenuItem Header="{localization:UiText Menu3DTopView}" ToolTip="{localization:UiText Menu3DTopViewTooltip}" Click="OnTopViewClick" />
@@ -16,11 +106,13 @@
                 <MenuItem Header="{localization:UiText Menu3DSideView}" ToolTip="{localization:UiText Menu3DSideViewTooltip}" Click="OnSideViewClick" />
                 <MenuItem Header="{localization:UiText Menu3DOppositeSideView}" ToolTip="{localization:UiText Menu3DOppositeSideViewTooltip}" Click="OnOppositeSideViewClick" />
                 <MenuItem Header="{localization:UiText Menu3DIsometricView}" ToolTip="{localization:UiText Menu3DIsometricViewTooltip}" Click="OnIsometricViewClick" />
+                <Separator />
                 <MenuItem Header="{localization:UiText Menu3DShowCoordinateSystem}" ToolTip="{localization:UiText Menu3DShowCoordinateSystemTooltip}" IsCheckable="True" IsChecked="True" Click="OnCoordinateSystemClick" />
                 <MenuItem Header="{localization:UiText Menu3DShowBoundingBox}" ToolTip="{localization:UiText Menu3DShowBoundingBoxTooltip}" IsCheckable="True" IsChecked="True" Click="OnBoundingBoxClick" />
                 <MenuItem Header="{localization:UiText Menu3DShowAxialPlane}" ToolTip="{localization:UiText Menu3DShowAxialPlaneTooltip}" IsCheckable="True" IsChecked="True" Click="OnAxialPlaneClick" />
                 <MenuItem Header="{localization:UiText Menu3DShowCoronalPlane}" ToolTip="{localization:UiText Menu3DShowCoronalPlaneTooltip}" IsCheckable="True" Click="OnCoronalPlaneClick" />
                 <MenuItem Header="{localization:UiText Menu3DShowSagittalPlane}" ToolTip="{localization:UiText Menu3DShowSagittalPlaneTooltip}" IsCheckable="True" Click="OnSagittalPlaneClick" />
+                <Separator />
                 <MenuItem Header="{localization:UiText Menu3DIncreaseTransparency}" ToolTip="{localization:UiText Menu3DIncreaseTransparencyTooltip}" Click="OnIncreaseTransparencyClick" />
                 <MenuItem Header="{localization:UiText Menu3DDecreaseTransparency}" ToolTip="{localization:UiText Menu3DDecreaseTransparencyTooltip}" Click="OnDecreaseTransparencyClick" />
                 <Separator />
@@ -41,7 +133,7 @@
             Padding="8,5"
             Background="#C018212E"
             CornerRadius="8">
-            <TextBlock x:Name="volumeStatusText" Foreground="#F5F8FC" />
+            <TextBlock x:Name="volumeStatusText" Foreground="#F5F8FC" automation:AutomationProperties.Name="{localization:UiText Volume3DStatusName}" automation:AutomationProperties.LiveSetting="Polite" />
         </Border>
     </Grid>
 </UserControl>

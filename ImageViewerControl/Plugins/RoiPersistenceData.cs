@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using ImageViewer.Models;
 
 namespace ImageViewer.Plugins
 {
@@ -175,6 +176,30 @@ namespace ImageViewer.Plugins
             set => Measurement.CaliperEdgePolarity = value;
         }
 
+        public double MinimumEdgeGap
+        {
+            get => Measurement.MinimumEdgeGap;
+            set => Measurement.MinimumEdgeGap = value;
+        }
+
+        public double NominalEdgeGap
+        {
+            get => Measurement.NominalEdgeGap;
+            set => Measurement.NominalEdgeGap = value;
+        }
+
+        public double NominalEdgeGapTolerance
+        {
+            get => Measurement.NominalEdgeGapTolerance;
+            set => Measurement.NominalEdgeGapTolerance = value;
+        }
+
+        public int EdgeSelection
+        {
+            get => Measurement.EdgeSelection;
+            set => Measurement.EdgeSelection = value;
+        }
+
         public bool IsClosed
         {
             get => Options.IsClosed;
@@ -219,6 +244,7 @@ namespace ImageViewer.Plugins
         public double StrokeThickness { get; set; } = 2.0;
         public bool IsVisible { get; set; } = true;
         public bool IsLocked { get; set; }
+        public MeasurementTolerance? Tolerance { get; set; }
     }
 
     public sealed class RoiPersistenceGeometryData
@@ -248,6 +274,10 @@ namespace ImageViewer.Plugins
         public double CaliperMinimumGradient { get; set; }
         public double CaliperOutlierThreshold { get; set; }
         public string? CaliperEdgePolarity { get; set; }
+        public double MinimumEdgeGap { get; set; }
+        public double NominalEdgeGap { get; set; }
+        public double NominalEdgeGapTolerance { get; set; }
+        public int EdgeSelection { get; set; } = 1;
     }
 
     public sealed class RoiPersistenceOptionsData

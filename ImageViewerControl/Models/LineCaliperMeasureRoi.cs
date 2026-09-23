@@ -79,6 +79,19 @@ namespace ImageViewer.Models
             set => SetProperty(ref _caliperSearchRange, Math.Max(1, value));
         }
 
+        private int _edgeSelection = 1;
+
+        /// <summary>
+        /// 单边缘选择序号：1=最强梯度边缘，2=次强，依此类推。
+        /// Chinese: 用于标签边缘旁存在更强干扰边（刻痕/反光）时，按序号锁定要测量的目标边缘。
+        /// English: Selects the N-th strongest edge along the search profile; 1 is the strongest.
+        /// </summary>
+        public int EdgeSelection
+        {
+            get => _edgeSelection;
+            set => SetProperty(ref _edgeSelection, Math.Clamp(value, 1, 8));
+        }
+
         public int CaliperSamplingHalfWidth
         {
             get => _caliperSamplingHalfWidth;

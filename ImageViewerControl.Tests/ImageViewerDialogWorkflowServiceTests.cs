@@ -40,12 +40,14 @@ namespace ImageViewerControl.Tests
                 P1 = new Point(0, 0),
                 P2 = new Point(10, 0)
             };
-            adapter.CalibrationResult = (25d, "mm");
+            adapter.CalibrationResult = new CalibrationDialogResult(25d, "mm", 0.01, -0.002);
 
             service.CalibrateSelectedRoi(roi);
 
             Assert.Equal(2.5d, state.PixelSize, 5);
             Assert.Equal("mm", state.PhysicalUnit);
+            Assert.Equal(0.01, state.K1, 6);
+            Assert.Equal(-0.002, state.K2, 6);
         }
 
         [Fact]
@@ -112,10 +114,12 @@ namespace ImageViewerControl.Tests
                 Calibration = new ImageViewerDialogCalibrationWorkflow
                 {
                     GetPhysicalUnit = () => state.PhysicalUnit,
-                    ApplyCalibration = (pixelSize, unit) =>
+                    ApplyCalibration = (pixelSize, unit, k1, k2) =>
                     {
                         state.PixelSize = pixelSize;
                         state.PhysicalUnit = unit;
+                        state.K1 = k1;
+                        state.K2 = k2;
                     }
                 }
             };
@@ -128,6 +132,10 @@ namespace ImageViewerControl.Tests
             public double PixelSize { get; set; } = 1.0;
 
             public string PhysicalUnit { get; set; } = "px";
+
+            public double K1 { get; set; }
+
+            public double K2 { get; set; }
 
             public int ImageLoadRetryCount { get; set; } = 2;
 
@@ -166,7 +174,7 @@ namespace ImageViewerControl.Tests
 
             public string? LastDefaultValue { get; private set; }
 
-            public (double Length, string Unit)? CalibrationResult { get; set; }
+            public CalibrationDialogResult? CalibrationResult { get; set; }
 
             public string? ShowOpenImageDialog() => OpenImageResult;
 
@@ -192,7 +200,7 @@ namespace ImageViewerControl.Tests
 
             public string? ShowSaveAnalysisCsvDialog() => null;
 
-            public (double Length, string Unit)? ShowCalibrationDialog(string currentUnit) => CalibrationResult;
+            public CalibrationDialogResult? ShowCalibrationDialog(string currentUnit) => CalibrationResult;
 
             public CaliperMeasureRoi? ShowLineMeasureCaliperSettingsDialog(CaliperMeasureRoi roi, Action<CaliperMeasureRoi>? previewAction = null) => null;
 

@@ -13,7 +13,7 @@ namespace ImageViewer.Controls
         private readonly Action<RoiBase?> _tryRefreshCaliperDetection;
         private readonly Action _drawRois;
         private readonly Action<string, Exception> _logNonCriticalError;
-        private readonly Action<string> _showStatusHint;
+        private readonly Action<string, StatusHintKind> _showStatusHint;
 
         public RoiEditController(
             ImageViewerViewModel viewModel,
@@ -21,7 +21,7 @@ namespace ImageViewer.Controls
             Action<RoiBase?> tryRefreshCaliperDetection,
             Action drawRois,
             Action<string, Exception> logNonCriticalError,
-            Action<string> showStatusHint)
+            Action<string, StatusHintKind> showStatusHint)
         {
             _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
             _dialogWorkflowService = dialogWorkflowService ?? throw new ArgumentNullException(nameof(dialogWorkflowService));
@@ -52,7 +52,7 @@ namespace ImageViewer.Controls
             _viewModel.UndoRedo.Undo();
             _tryRefreshCaliperDetection(_viewModel.SelectedRoi);
             _drawRois();
-            _showStatusHint(UiText.Get("StatusUndone"));
+            _showStatusHint(UiText.Get("StatusUndone"), StatusHintKind.Info);
         }
 
         public void Redo()
@@ -65,7 +65,7 @@ namespace ImageViewer.Controls
             _viewModel.UndoRedo.Redo();
             _tryRefreshCaliperDetection(_viewModel.SelectedRoi);
             _drawRois();
-            _showStatusHint(UiText.Get("StatusRedone"));
+            _showStatusHint(UiText.Get("StatusRedone"), StatusHintKind.Info);
         }
 
         public void DeleteSelected()
@@ -73,7 +73,7 @@ namespace ImageViewer.Controls
             if (RemoveSelectedRoi())
             {
                 _drawRois();
-                _showStatusHint(UiText.Get("StatusRoiDeleted"));
+                _showStatusHint(UiText.Get("StatusRoiDeleted"), StatusHintKind.Info);
             }
         }
 
@@ -86,7 +86,7 @@ namespace ImageViewer.Controls
 
             _viewModel.UndoRedo.Execute(new ClearAllRoisCommand(_viewModel));
             _drawRois();
-            _showStatusHint(UiText.Get("StatusRoisCleared"));
+            _showStatusHint(UiText.Get("StatusRoisCleared"), StatusHintKind.Info);
         }
 
         public void SetSelectedLabel()

@@ -67,7 +67,7 @@ namespace ImageViewer.Controls
                 }
             }
 
-            public void ShowStatusHint(string message) => _owner.ShowStatusHint(message);
+            public void ShowStatusHint(string message, StatusHintKind kind) => _owner.ShowStatusHint(message, kind);
         }
     }
 }

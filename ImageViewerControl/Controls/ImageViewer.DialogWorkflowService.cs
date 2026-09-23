@@ -64,7 +64,7 @@ namespace ImageViewer.Controls
     {
         public required Func<string> GetPhysicalUnit { get; init; }
 
-        public required Action<double, string> ApplyCalibration { get; init; }
+        public required Action<double, string, double, double> ApplyCalibration { get; init; }
     }
 
     internal sealed class ImageViewerDialogWorkflowService
@@ -268,7 +268,11 @@ namespace ImageViewer.Controls
             var calibration = _adapter.ShowCalibrationDialog(_dependencies.Calibration.GetPhysicalUnit());
             if (calibration != null)
             {
-                _dependencies.Calibration.ApplyCalibration(calibration.Value.Length / pixelDistance, calibration.Value.Unit);
+                _dependencies.Calibration.ApplyCalibration(
+                    calibration.Value.Length / pixelDistance,
+                    calibration.Value.Unit,
+                    calibration.Value.K1,
+                    calibration.Value.K2);
             }
         }
 

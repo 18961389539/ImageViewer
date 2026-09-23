@@ -17,6 +17,7 @@ namespace ImageViewer.Dialogs
         private readonly TextBox _minimumGradientTextBox;
         private readonly TextBox _minimumValidCalipersTextBox;
         private readonly TextBox _outlierThresholdTextBox;
+        private readonly TextBox _edgeSelectionTextBox;
         private readonly ComboBox _polarityComboBox;
         private readonly CheckBox _livePreviewCheckBox;
 
@@ -48,6 +49,7 @@ namespace ImageViewer.Dialogs
             _minimumGradientTextBox = AddField(advancedPanel, UiText.Get("CaliperFieldMinimumGradient"), _model.CaliperMinimumGradient.ToString(CultureInfo.InvariantCulture));
             _minimumValidCalipersTextBox = AddField(advancedPanel, UiText.Get("CaliperFieldMinimumValid"), _model.MinimumValidCalipers.ToString(CultureInfo.InvariantCulture));
             _outlierThresholdTextBox = AddField(advancedPanel, UiText.Get("CaliperFieldOutlierThreshold"), _model.CaliperOutlierThreshold.ToString(CultureInfo.InvariantCulture));
+            _edgeSelectionTextBox = AddField(advancedPanel, UiText.Get("CaliperFieldEdgeSelection"), _model.EdgeSelection.ToString(CultureInfo.InvariantCulture));
 
             advancedPanel.Children.Add(new TextBlock { Text = UiText.Get("CaliperFieldPolarity"), Margin = new Thickness(0, 8, 0, 2) });
             _polarityComboBox = new ComboBox
@@ -71,6 +73,7 @@ namespace ImageViewer.Dialogs
             AttachPreviewHandler(_minimumGradientTextBox);
             AttachPreviewHandler(_minimumValidCalipersTextBox);
             AttachPreviewHandler(_outlierThresholdTextBox);
+            AttachPreviewHandler(_edgeSelectionTextBox);
             _polarityComboBox.SelectionChanged += (_, _) =>
             {
                 if (_livePreviewCheckBox?.IsChecked == true)
@@ -154,6 +157,7 @@ namespace ImageViewer.Dialogs
                 !TryParseNonNegativeDouble(_minimumGradientTextBox.Text, out double minimumGradient) ||
                 !TryParsePositiveInt(_minimumValidCalipersTextBox.Text, out int minimumValidCalipers, minValue: 3) ||
                 !TryParseNonNegativeDouble(_outlierThresholdTextBox.Text, out double outlierThreshold) ||
+                !TryParsePositiveInt(_edgeSelectionTextBox.Text, out int edgeSelection, minValue: 1) ||
                 _polarityComboBox.SelectedItem is not CaliperEdgePolarity polarity)
             {
                 return false;
@@ -165,6 +169,7 @@ namespace ImageViewer.Dialogs
             _model.CaliperMinimumGradient = minimumGradient;
             _model.MinimumValidCalipers = minimumValidCalipers;
             _model.CaliperOutlierThreshold = outlierThreshold;
+            _model.EdgeSelection = Math.Clamp(edgeSelection, 1, 8);
             _model.CaliperEdgePolarity = polarity;
             return true;
         }

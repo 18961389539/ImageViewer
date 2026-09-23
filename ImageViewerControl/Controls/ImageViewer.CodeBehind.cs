@@ -22,6 +22,7 @@ namespace ImageViewer.Controls
             rootGrid.MouseRightButtonDown += OnMouseRightButtonDown;
             rootGrid.LostMouseCapture += OnLostMouseCapture;
             rootGrid.DragOver += OnDragOver;
+            rootGrid.DragLeave += OnDragLeave;
             rootGrid.Drop += OnDrop;
             KeyDown += OnKeyDown;
             rootGrid.SizeChanged += OnRootGridSizeChanged;
@@ -36,6 +37,7 @@ namespace ImageViewer.Controls
             rootGrid.MouseRightButtonDown -= OnMouseRightButtonDown;
             rootGrid.LostMouseCapture -= OnLostMouseCapture;
             rootGrid.DragOver -= OnDragOver;
+            rootGrid.DragLeave -= OnDragLeave;
             rootGrid.Drop -= OnDrop;
             rootGrid.SizeChanged -= OnRootGridSizeChanged;
             KeyDown -= OnKeyDown;
@@ -188,6 +190,58 @@ namespace ImageViewer.Controls
 
         private void OnMouseRightButtonDown(object sender, MouseButtonEventArgs e) => _interactionController.HandleMouseRightButtonDown(e);
 
+        /// <summary>
+        /// 菜单搜索区的模板部件缓存。搜索框位于 <see cref="ContextMenu"/> 的 ControlTemplate 顶部，
+        /// 因此需通过模板查找获取（不再是 XAML 生成的字段），以保证它横贯菜单宽度而不被项容器左对齐压扁。
+        /// </summary>
+        private TextBox? _menuSearchBox;
+        private TextBlock? _menuSearchMatchCountText;
+        private TextBlock? _menuSearchNoResultsText;
+
+        private void EnsureMenuSearchTemplateParts()
+        {
+            if (_menuSearchBox is not null)
+            {
+                return;
+            }
+
+            mainContextMenu.ApplyTemplate();
+
+            _menuSearchBox = mainContextMenu.Template?.FindName("PART_MenuSearchBox", mainContextMenu) as TextBox
+                ?? throw new InvalidOperationException("菜单搜索区模板部件 'PART_MenuSearchBox' 缺失。");
+            _menuSearchMatchCountText = mainContextMenu.Template?.FindName("PART_MenuSearchMatchCount", mainContextMenu) as TextBlock
+                ?? throw new InvalidOperationException("菜单搜索区模板部件 'PART_MenuSearchMatchCount' 缺失。");
+            _menuSearchNoResultsText = mainContextMenu.Template?.FindName("PART_MenuSearchNoResults", mainContextMenu) as TextBlock
+                ?? throw new InvalidOperationException("菜单搜索区模板部件 'PART_MenuSearchNoResults' 缺失。");
+        }
+
+        internal TextBox menuSearchBox
+        {
+            get
+            {
+                EnsureMenuSearchTemplateParts();
+                return _menuSearchBox!;
+            }
+        }
+
+        internal TextBlock menuSearchMatchCountText
+        {
+            get
+            {
+                EnsureMenuSearchTemplateParts();
+                return _menuSearchMatchCountText!;
+            }
+        }
+
+        internal TextBlock menuSearchNoResultsText
+        {
+            get
+            {
+                EnsureMenuSearchTemplateParts();
+                return _menuSearchNoResultsText!;
+            }
+        }
+
         private void OnContextMenuOpened(object sender, RoutedEventArgs e)
         {
             menuSearchBox.Text = string.Empty;
@@ -211,7 +265,8 @@ namespace ImageViewer.Controls
                     hasMatch |= itemMatch;
                     if (itemMatch)
                     {
-                        matchCount++;
+                        // 统计命中的叶子命令数，而非顶级分组数，使"找到 N 个匹配命令"贴合用户感知
+                        matchCount += CountMatchingLeafMenuItems(menuItem, words);
                     }
                 }
                 else if (item is Separator separator)
@@ -277,13 +332,38 @@ namespace ImageViewer.Controls
                 }
             }
 
-            bool ownMatch = words.Length == 0
-                || MatchesAllWords(menuItem.Header?.ToString(), words)
-                || MatchesAllWords(menuItem.InputGestureText, words)
-                || MatchesAllWords(menuItem.ToolTip?.ToString(), words);
+            bool ownMatch = MatchesOwnSearchTerms(menuItem, words);
             bool visible = ownMatch || childMatch;
             menuItem.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
             return visible;
+        }
+
+        /// <summary>递归统计命中的叶子命令数（无子菜单的可执行项），用于搜索结果计数。</summary>
+        private static int CountMatchingLeafMenuItems(MenuItem menuItem, string[] words)
+        {
+            int count = 0;
+            foreach (object child in menuItem.Items)
+            {
+                if (child is MenuItem childMenuItem)
+                {
+                    count += CountMatchingLeafMenuItems(childMenuItem, words);
+                }
+            }
+
+            if (menuItem.Items.Count == 0 && MatchesOwnSearchTerms(menuItem, words))
+            {
+                count++;
+            }
+
+            return count;
+        }
+
+        private static bool MatchesOwnSearchTerms(MenuItem menuItem, string[] words)
+        {
+            return words.Length == 0
+                || MatchesAllWords(menuItem.Header?.ToString(), words)
+                || MatchesAllWords(menuItem.InputGestureText, words)
+                || MatchesAllWords(menuItem.ToolTip?.ToString(), words);
         }
 
         /// <summary>多个空格分隔的关键词都必须命中（AND 语义）。</summary>
@@ -375,6 +455,8 @@ namespace ImageViewer.Controls
             if (!string.Equals(statusBarTextBlock.Text, text, StringComparison.Ordinal))
             {
                 statusBarTextBlock.Text = text;
+                // 状态栏已声明 LiveSetting=Polite，文本变化时主动通知屏幕阅读器
+                RaiseLiveRegionChanged(statusBarTextBlock);
             }
 
             statusBarBorder.Visibility = Visibility.Visible;
@@ -460,10 +542,18 @@ namespace ImageViewer.Controls
             }
         }
 
-        private void OnDragOver(object sender, DragEventArgs e) => DroppedContentController.HandleDragOver(e);
+        private void OnDragOver(object sender, DragEventArgs e)
+        {
+            DroppedContentController.HandleDragOver(e);
+            // 拖入可打开文件时显示遮罩提示"松开以打开"，否则隐藏
+            dropHintOverlay.Visibility = e.Effects == DragDropEffects.Copy ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void OnDragLeave(object sender, DragEventArgs e) => dropHintOverlay.Visibility = Visibility.Collapsed;
 
         private async void OnDrop(object sender, DragEventArgs e)
         {
+            dropHintOverlay.Visibility = Visibility.Collapsed;
             await RunUiOperationAsync("拖放打开图像", () => _droppedContentController.HandleDropAsync(e));
         }
 

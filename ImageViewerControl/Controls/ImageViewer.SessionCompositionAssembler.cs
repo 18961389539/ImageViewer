@@ -37,6 +37,8 @@ namespace ImageViewer.Controls
                             SetPixelSize = value => _owner.PixelSize = value,
                             GetPhysicalUnit = () => _owner.PhysicalUnit,
                             SetPhysicalUnit = value => _owner.PhysicalUnit = value,
+                            GetCalibration = () => _owner.Calibration,
+                            SetCalibration = value => _owner.Calibration = value,
                             GetCurrentViewportState = () => viewportController.CurrentState,
                             TryGetCurrentImagePath = viewportController.TryGetCurrentImagePath,
                             LoadImageFromFile = viewportController.LoadImageFromFile,
@@ -45,7 +47,7 @@ namespace ImageViewer.Controls
                             DrawRois = () => _owner.DrawRois(),
                             ShowNonCriticalError = _owner.ShowNonCriticalError,
                             ShowWarning = dialogWorkflowService.ShowWarning,
-                            ShowStatusHint = message => _owner.ShowStatusHint(message),
+                            ShowStatusHint = (message, kind) => _owner.ShowStatusHint(message, kind),
                             ClearUndoHistory = () => _owner.ViewerState.UndoRedo.Clear(),
                             UpdateContextMenuState = _owner.UpdateContextMenuState
                         },
@@ -58,10 +60,11 @@ namespace ImageViewer.Controls
                             GetAllRois = () => _owner.ViewerState.AllRois,
                             GetPixelSize = () => _owner.PixelSize,
                             GetPhysicalUnit = () => _owner.PhysicalUnit,
+                            GetCalibration = () => _owner.Calibration,
                             SessionService = _owner.RuntimeServices.SessionService,
                             GetPluginRegistry = () => _owner.PluginRegistry,
                             LogNonCriticalError = _owner.LogNonCriticalError,
-                            ShowStatusHint = message => _owner.ShowStatusHint(message)
+                            ShowStatusHint = (message, kind) => _owner.ShowStatusHint(message, kind)
                         }
                     },
                     _owner.HostServices.PeriodicTaskSchedulerFactory,

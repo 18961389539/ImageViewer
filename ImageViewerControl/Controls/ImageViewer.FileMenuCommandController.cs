@@ -24,13 +24,11 @@ namespace ImageViewer.Controls
         void UpdateContextMenuState();
     }
 
-    internal sealed class ImageViewerFileMenuCommandController
+    internal sealed class ImageViewerFileMenuCommandController : ImageViewerMenuCommandControllerBase<IImageViewerFileMenuCommandHost>
     {
-        private readonly IImageViewerFileMenuCommandHost _host;
-
         public ImageViewerFileMenuCommandController(IImageViewerFileMenuCommandHost host)
+            : base(host, host.UpdateContextMenuState)
         {
-            _host = host;
         }
 
         public async Task ExecuteAsync(ImageViewerFileMenuCommand command)
@@ -38,31 +36,31 @@ namespace ImageViewer.Controls
             switch (command)
             {
                 case ImageViewerFileMenuCommand.OpenImage:
-                    await _host.ShowOpenImageDialogAsync();
+                    await Host.ShowOpenImageDialogAsync();
                     break;
                 case ImageViewerFileMenuCommand.SaveRois:
-                    await _host.SaveRoisAsync();
+                    await Host.SaveRoisAsync();
                     break;
                 case ImageViewerFileMenuCommand.LoadRois:
-                    await _host.LoadRoisAsync();
+                    await Host.LoadRoisAsync();
                     break;
                 case ImageViewerFileMenuCommand.SaveSession:
-                    await _host.SaveSessionAsync();
+                    await Host.SaveSessionAsync();
                     break;
                 case ImageViewerFileMenuCommand.LoadSession:
-                    await _host.LoadSessionAsync();
+                    await Host.LoadSessionAsync();
                     break;
                 case ImageViewerFileMenuCommand.ExportProjectPackage:
-                    await _host.ExportProjectPackageAsync();
+                    await Host.ExportProjectPackageAsync();
                     break;
                 case ImageViewerFileMenuCommand.ToggleAutoSave:
-                    _host.ToggleAutoSave();
+                    Host.ToggleAutoSave();
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(command), command, null);
             }
 
-            _host.UpdateContextMenuState();
+            RefreshMenuState();
         }
 
         public async Task OpenRecentProjectAsync(string filePath)
@@ -72,8 +70,8 @@ namespace ImageViewer.Controls
                 return;
             }
 
-            await _host.OpenRecentProjectAsync(filePath);
-            _host.UpdateContextMenuState();
+            await Host.OpenRecentProjectAsync(filePath);
+            RefreshMenuState();
         }
     }
 }

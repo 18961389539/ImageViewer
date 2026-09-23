@@ -762,6 +762,14 @@ namespace ImageViewer.Plugins
             roi.StrokeThickness = data.Common.StrokeThickness;
             roi.IsVisible = data.Common.IsVisible;
             roi.IsLocked = data.Common.IsLocked;
+            roi.Tolerance = data.Common.Tolerance is { } tolerance
+                ? new MeasurementTolerance
+                {
+                    Nominal = tolerance.Nominal,
+                    TolerancePlus = tolerance.TolerancePlus,
+                    ToleranceMinus = tolerance.ToleranceMinus
+                }
+                : null;
 
             if (!string.IsNullOrWhiteSpace(data.Common.StrokeColor))
             {
@@ -777,6 +785,14 @@ namespace ImageViewer.Plugins
             data.Common.StrokeThickness = roi.StrokeThickness;
             data.Common.IsVisible = roi.IsVisible;
             data.Common.IsLocked = roi.IsLocked;
+            data.Common.Tolerance = roi.Tolerance is { } tolerance
+                ? new MeasurementTolerance
+                {
+                    Nominal = tolerance.Nominal,
+                    TolerancePlus = tolerance.TolerancePlus,
+                    ToleranceMinus = tolerance.ToleranceMinus
+                }
+                : null;
         }
     }
 }

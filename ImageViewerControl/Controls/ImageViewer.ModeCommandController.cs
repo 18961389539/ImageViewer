@@ -2,13 +2,11 @@ using System;
 
 namespace ImageViewer.Controls
 {
-    internal sealed class ImageViewerModeCommandController
+    internal sealed class ImageViewerModeCommandController : ImageViewerCommandControllerBase<IImageViewerModeCommandHost>
     {
-        private readonly IImageViewerModeCommandHost _host;
-
         public ImageViewerModeCommandController(IImageViewerModeCommandHost host)
+            : base(host)
         {
-            _host = host;
         }
 
         public void Execute(ImageViewerModeCommand command)
@@ -16,34 +14,34 @@ namespace ImageViewer.Controls
             switch (command)
             {
                 case ImageViewerModeCommand.Rectangle:
-                    _host.StartRectangleMode();
+                    Host.StartRectangleMode();
                     break;
                 case ImageViewerModeCommand.Ellipse:
-                    _host.StartEllipseMode();
+                    Host.StartEllipseMode();
                     break;
                 case ImageViewerModeCommand.Circle:
-                    _host.StartCircleMode();
+                    Host.StartCircleMode();
                     break;
                 case ImageViewerModeCommand.Polygon:
-                    _host.StartPolygonMode();
+                    Host.StartPolygonMode();
                     break;
                 case ImageViewerModeCommand.Polyline:
-                    _host.StartPolylineMode();
+                    Host.StartPolylineMode();
                     break;
                 case ImageViewerModeCommand.Freehand:
-                    _host.StartFreehandMode();
+                    Host.StartFreehandMode();
                     break;
                 case ImageViewerModeCommand.PointAnnotation:
-                    _host.StartPointAnnotationMode();
+                    Host.StartPointAnnotationMode();
                     break;
                 case ImageViewerModeCommand.TextAnnotation:
-                    _host.StartTextAnnotationMode();
+                    Host.StartTextAnnotationMode();
                     break;
                 case ImageViewerModeCommand.LineMeasure:
-                    _host.StartLineMeasureMode();
+                    Host.StartLineMeasureMode();
                     break;
                 case ImageViewerModeCommand.AngleMeasure:
-                    _host.StartAngleMeasureMode();
+                    Host.StartAngleMeasureMode();
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(command), command, null);

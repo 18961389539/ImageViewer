@@ -32,7 +32,7 @@ namespace ImageViewer.Controls
 
         void ShowNonCriticalError(string title, string message, Exception ex);
 
-        void ShowStatusHint(string message);
+        void ShowStatusHint(string message, StatusHintKind kind);
 
         void ClearUndoHistory();
     }
@@ -57,7 +57,7 @@ namespace ImageViewer.Controls
             try
             {
                 await RoiPersistenceService.SaveToFileAsync(filePath, _host.AllRois, _host.PixelSize, _host.PhysicalUnit, _host.PluginRegistry);
-                _host.ShowStatusHint(UiText.Get("StatusSaveRoiSuccess"));
+                _host.ShowStatusHint(UiText.Get("StatusSaveRoiSuccess"), StatusHintKind.Success);
             }
             catch (Exception ex)
             {
@@ -83,7 +83,7 @@ namespace ImageViewer.Controls
                 _host.DrawRois();
                 _host.RefreshSelectedRoiPropertyPanel();
                 _host.ClearUndoHistory();
-                _host.ShowStatusHint(UiText.Format("StatusLoadRoiSuccess", result.Rois.Count));
+                _host.ShowStatusHint(UiText.Format("StatusLoadRoiSuccess", result.Rois.Count), StatusHintKind.Success);
             }
             catch (Exception ex)
             {
