@@ -44,7 +44,7 @@ namespace ImageViewerControl.Tests
                 "blob-analysis",
                 new BlobAnalysisRoi
                 {
-                    Center = new Point(10, 20),
+                    Center = new PointD(10, 20),
                     Width = 30,
                     Height = 40,
                     Angle = 15,
@@ -70,7 +70,7 @@ namespace ImageViewerControl.Tests
                 roi =>
                 {
                     var roundTripped = Assert.IsType<BlobAnalysisRoi>(roi);
-                    Assert.Equal(new Point(10, 20), roundTripped.Center);
+                    Assert.Equal(new PointD(10, 20), roundTripped.Center);
                     Assert.Equal(30, roundTripped.Width);
                     Assert.Equal(40, roundTripped.Height);
                     Assert.Equal(15, roundTripped.Angle);
@@ -83,7 +83,7 @@ namespace ImageViewerControl.Tests
                 "ellipse",
                 new EllipseRoi
                 {
-                    Center = new Point(5, 6),
+                    Center = new PointD(5, 6),
                     RadiusX = 12,
                     RadiusY = 8,
                     Angle = 22
@@ -100,7 +100,7 @@ namespace ImageViewerControl.Tests
                 roi =>
                 {
                     var roundTripped = Assert.IsType<EllipseRoi>(roi);
-                    Assert.Equal(new Point(5, 6), roundTripped.Center);
+                    Assert.Equal(new PointD(5, 6), roundTripped.Center);
                     Assert.Equal(12, roundTripped.RadiusX);
                     Assert.Equal(8, roundTripped.RadiusY);
                     Assert.Equal(22, roundTripped.Angle);
@@ -109,7 +109,7 @@ namespace ImageViewerControl.Tests
                 "point-annotation",
                 new PointAnnotationRoi
                 {
-                    Position = new Point(3, 4)
+                    Position = new PointD(3, 4)
                 },
                 data =>
                 {
@@ -120,7 +120,7 @@ namespace ImageViewerControl.Tests
                 roi =>
                 {
                     var roundTripped = Assert.IsType<PointAnnotationRoi>(roi);
-                    Assert.Equal(new Point(3, 4), roundTripped.Position);
+                    Assert.Equal(new PointD(3, 4), roundTripped.Position);
                 }),
             new(
                 "polygon",
@@ -128,9 +128,9 @@ namespace ImageViewerControl.Tests
                 {
                     Points =
                     [
-                        new Point(0, 0),
-                        new Point(5, 0),
-                        new Point(5, 5)
+                        new PointD(0, 0),
+                        new PointD(5, 0),
+                        new PointD(5, 5)
                     ],
                     IsClosed = true
                 },
@@ -152,9 +152,9 @@ namespace ImageViewerControl.Tests
                 "caliper-measure",
                 new CaliperMeasureRoi
                 {
-                    P1 = new Point(1, 1),
-                    P2 = new Point(9, 1),
-                    CaliperCenter = new Point(5, 2),
+                    P1 = new PointD(1, 1),
+                    P2 = new PointD(9, 1),
+                    CaliperCenter = new PointD(5, 2),
                     CaliperRegionLength = 14,
                     CaliperSearchRange = 6,
                     CaliperAngleDegrees = 12,
@@ -175,9 +175,9 @@ namespace ImageViewerControl.Tests
                 roi =>
                 {
                     var roundTripped = Assert.IsType<CaliperMeasureRoi>(roi);
-                    Assert.Equal(new Point(1, 1), roundTripped.P1);
-                    Assert.Equal(new Point(9, 1), roundTripped.P2);
-                    Assert.Equal(new Point(5, 2), roundTripped.CaliperCenter);
+                    Assert.Equal(new PointD(1, 1), roundTripped.P1);
+                    Assert.Equal(new PointD(9, 1), roundTripped.P2);
+                    Assert.Equal(new PointD(5, 2), roundTripped.CaliperCenter);
                     Assert.Equal(14, roundTripped.GetResolvedCaliperRegionLength());
                     Assert.Equal(6, roundTripped.CaliperSearchRange);
                     Assert.Equal(12, roundTripped.CaliperAngleDegrees);
@@ -186,7 +186,7 @@ namespace ImageViewerControl.Tests
                 "circular-caliper-measure",
                 new CircularCaliperMeasureRoi
                 {
-                    Center = new Point(20, 30),
+                    Center = new PointD(20, 30),
                     Radius = 18,
                     CaliperCount = 24,
                     CaliperSearchRange = 12,
@@ -213,7 +213,7 @@ namespace ImageViewerControl.Tests
                 roi =>
                 {
                     var roundTripped = Assert.IsType<CircularCaliperMeasureRoi>(roi);
-                    Assert.Equal(new Point(20, 30), roundTripped.Center);
+                    Assert.Equal(new PointD(20, 30), roundTripped.Center);
                     Assert.Equal(18, roundTripped.Radius);
                     Assert.Equal(24, roundTripped.CaliperCount);
                     Assert.Equal(12, roundTripped.CaliperSearchRange);
@@ -227,10 +227,10 @@ namespace ImageViewerControl.Tests
                 "parallelism-measure",
                 new ParallelismMeasureRoi
                 {
-                    Line1P1 = new Point(1, 2),
-                    Line1P2 = new Point(3, 4),
-                    Line2P1 = new Point(5, 6),
-                    Line2P2 = new Point(7, 8)
+                    Line1P1 = new PointD(1, 2),
+                    Line1P2 = new PointD(3, 4),
+                    Line2P1 = new PointD(5, 6),
+                    Line2P2 = new PointD(7, 8)
                 },
                 data =>
                 {
@@ -246,18 +246,18 @@ namespace ImageViewerControl.Tests
                 roi =>
                 {
                     var roundTripped = Assert.IsType<ParallelismMeasureRoi>(roi);
-                    Assert.Equal(new Point(1, 2), roundTripped.Line1P1);
-                    Assert.Equal(new Point(3, 4), roundTripped.Line1P2);
-                    Assert.Equal(new Point(5, 6), roundTripped.Line2P1);
-                    Assert.Equal(new Point(7, 8), roundTripped.Line2P2);
+                    Assert.Equal(new PointD(1, 2), roundTripped.Line1P1);
+                    Assert.Equal(new PointD(3, 4), roundTripped.Line1P2);
+                    Assert.Equal(new PointD(5, 6), roundTripped.Line2P1);
+                    Assert.Equal(new PointD(7, 8), roundTripped.Line2P2);
                 }),
             new(
                 "concentricity-measure",
                 new ConcentricityMeasureRoi
                 {
-                    Center1 = new Point(10, 10),
+                    Center1 = new PointD(10, 10),
                     Radius1 = 4,
-                    Center2 = new Point(12, 13),
+                    Center2 = new PointD(12, 13),
                     Radius2 = 7
                 },
                 data =>
@@ -272,9 +272,9 @@ namespace ImageViewerControl.Tests
                 roi =>
                 {
                     var roundTripped = Assert.IsType<ConcentricityMeasureRoi>(roi);
-                    Assert.Equal(new Point(10, 10), roundTripped.Center1);
+                    Assert.Equal(new PointD(10, 10), roundTripped.Center1);
                     Assert.Equal(4, roundTripped.Radius1);
-                    Assert.Equal(new Point(12, 13), roundTripped.Center2);
+                    Assert.Equal(new PointD(12, 13), roundTripped.Center2);
                     Assert.Equal(7, roundTripped.Radius2);
                 })
         ];

@@ -11,6 +11,7 @@ using ImageViewer.Abstractions;
 using ImageViewer.Localization;
 using ImageViewer.Models;
 using ImageViewer.Services;
+using ImageViewer.Utils;
 
 namespace ImageViewer.Controls
 {
@@ -377,7 +378,7 @@ namespace ImageViewer.Controls
                 try
                 {
                     var stopwatch = Stopwatch.StartNew();
-                    byte[] profileData = ImageAnalysisService.CreateProfile(bitmap, targetLine.P1, targetLine.P2);
+                    byte[] profileData = ImageAnalysisService.CreateProfile(bitmap, targetLine.P1.ToWpfPoint(), targetLine.P2.ToWpfPoint());
                     _host.AnalysisState.LastProfileDuration = stopwatch.Elapsed;
                     _uiFacade.PresentProfile(new ImageViewerProfileOutput(profileData));
                 }
@@ -399,7 +400,7 @@ namespace ImageViewer.Controls
             {
                 await Task.Delay(120, cancellationTokenSource.Token);
                 var stopwatch = Stopwatch.StartNew();
-                byte[]? profileData = await _host.RenderService.CreateProfileAsync(new ImageViewerAnalysisRequest(bitmap, targetLine.P1, targetLine.P2), cancellationTokenSource.Token);
+                byte[]? profileData = await _host.RenderService.CreateProfileAsync(new ImageViewerAnalysisRequest(bitmap, targetLine.P1.ToWpfPoint(), targetLine.P2.ToWpfPoint()), cancellationTokenSource.Token);
                 if (cancellationTokenSource.IsCancellationRequested || profileData == null)
                 {
                     return;

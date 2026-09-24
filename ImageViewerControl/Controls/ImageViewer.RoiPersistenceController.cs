@@ -84,11 +84,36 @@ namespace ImageViewer.Controls
                 _host.RefreshSelectedRoiPropertyPanel();
                 _host.ClearUndoHistory();
                 _host.ShowStatusHint(UiText.Format("StatusLoadRoiSuccess", result.Rois.Count), StatusHintKind.Success);
+                ReportUnresolvedRois(result.UnresolvedItems);
             }
             catch (Exception ex)
             {
                 _host.ShowNonCriticalError(UiText.Get("ErrorLoadRoiTitle"), UiText.Get("ErrorLoadRoiMessage"), ex);
             }
+        }
+
+        /// <summary>
+        /// 提示无法识别的标注类型。
+        /// Chinese: 缺少对应插件时这些标注不会被静默丢弃，状态栏按类型给出数量（源文件保持不变）。
+        /// English: Reports payloads no plugin could resolve instead of dropping them silently.
+        /// </summary>
+        private void ReportUnresolvedRois(IReadOnlyList<RoiPersistenceData> unresolvedItems)
+        {
+            if (unresolvedItems.Count == 0)
+            {
+                return;
+            }
+
+            string typeNames = string.Join(
+                ", ",
+                unresolvedItems
+                    .Select(item => item.Type)
+                    .Where(type => !string.IsNullOrWhiteSpace(type))
+                    .Distinct(StringComparer.OrdinalIgnoreCase));
+
+            _host.ShowStatusHint(
+                UiText.Format("StatusLoadRoiUnresolved", unresolvedItems.Count, typeNames),
+                StatusHintKind.Error);
         }
     }
 }

@@ -1,17 +1,16 @@
 using System;
-using System.Windows;
 
 namespace ImageViewer.Models
 {
     public class RingRoi : RoiBase
     {
-        private Point _center;
+        private PointD _center;
         private double _innerRadius;
         private double _outerRadius;
 
         public override string RoiTypeName => nameof(RingRoi);
 
-        public Point Center
+        public PointD Center
         {
             get => _center;
             set => SetProperty(ref _center, value);
@@ -42,7 +41,8 @@ namespace ImageViewer.Models
                 StrokeColor = StrokeColor,
                 StrokeThickness = StrokeThickness,
                 IsVisible = IsVisible,
-                IsLocked = IsLocked
+                IsLocked = IsLocked,
+                Tolerance = Tolerance?.Clone()
             };
         }
 

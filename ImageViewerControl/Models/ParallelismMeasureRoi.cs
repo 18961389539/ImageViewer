@@ -1,42 +1,41 @@
 using System;
-using System.Windows;
 using ImageViewer.Common;
 
 namespace ImageViewer.Models
 {
     public class ParallelismMeasureRoi : RoiBase
     {
-        private Point _line1P1;
-        private Point _line1P2;
-        private Point _line2P1;
-        private Point _line2P2;
+        private PointD _line1P1;
+        private PointD _line1P2;
+        private PointD _line2P1;
+        private PointD _line2P2;
 
         public ParallelismMeasureRoi()
         {
-            StrokeColor = System.Windows.Media.Colors.Gold;
+            StrokeColor = RoiColors.Gold;
         }
 
         public override string RoiTypeName => "Parallelism";
 
-        public Point Line1P1
+        public PointD Line1P1
         {
             get => _line1P1;
             set => SetProperty(ref _line1P1, value);
         }
 
-        public Point Line1P2
+        public PointD Line1P2
         {
             get => _line1P2;
             set => SetProperty(ref _line1P2, value);
         }
 
-        public Point Line2P1
+        public PointD Line2P1
         {
             get => _line2P1;
             set => SetProperty(ref _line2P1, value);
         }
 
-        public Point Line2P2
+        public PointD Line2P2
         {
             get => _line2P2;
             set => SetProperty(ref _line2P2, value);
@@ -107,7 +106,7 @@ namespace ImageViewer.Models
             }
         }
 
-        private static double PointToLineDistance(Point point, Point lineP1, Point lineP2)
+        private static double PointToLineDistance(PointD point, PointD lineP1, PointD lineP2)
         {
             double dx = lineP2.X - lineP1.X;
             double dy = lineP2.Y - lineP1.Y;
@@ -139,7 +138,8 @@ namespace ImageViewer.Models
                 StrokeColor = StrokeColor,
                 StrokeThickness = StrokeThickness,
                 IsVisible = IsVisible,
-                IsLocked = IsLocked
+                IsLocked = IsLocked,
+                Tolerance = Tolerance?.Clone()
             };
         }
 

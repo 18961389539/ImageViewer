@@ -42,26 +42,26 @@ namespace ImageViewer.Services
                 CaliperMeasureRoi caliper => GeometryUtils.GetBoundingBox(BuildCaliperCorners(caliper)),
                 RotatedRect rect => GeometryUtils.GetBoundingBox(new[]
                 {
-                    GeometryUtils.RotatePoint(new Point(rect.Center.X - rect.Width / 2, rect.Center.Y - rect.Height / 2), rect.Center, rect.Angle),
-                    GeometryUtils.RotatePoint(new Point(rect.Center.X + rect.Width / 2, rect.Center.Y - rect.Height / 2), rect.Center, rect.Angle),
-                    GeometryUtils.RotatePoint(new Point(rect.Center.X + rect.Width / 2, rect.Center.Y + rect.Height / 2), rect.Center, rect.Angle),
-                    GeometryUtils.RotatePoint(new Point(rect.Center.X - rect.Width / 2, rect.Center.Y + rect.Height / 2), rect.Center, rect.Angle)
+                    GeometryUtils.RotatePoint(new Point(rect.Center.X - rect.Width / 2, rect.Center.Y - rect.Height / 2), rect.Center.ToWpfPoint(), rect.Angle),
+                    GeometryUtils.RotatePoint(new Point(rect.Center.X + rect.Width / 2, rect.Center.Y - rect.Height / 2), rect.Center.ToWpfPoint(), rect.Angle),
+                    GeometryUtils.RotatePoint(new Point(rect.Center.X + rect.Width / 2, rect.Center.Y + rect.Height / 2), rect.Center.ToWpfPoint(), rect.Angle),
+                    GeometryUtils.RotatePoint(new Point(rect.Center.X - rect.Width / 2, rect.Center.Y + rect.Height / 2), rect.Center.ToWpfPoint(), rect.Angle)
                 }),
                 EllipseRoi ellipse => GeometryUtils.GetBoundingBox(new[]
                 {
-                    GeometryUtils.RotatePoint(new Point(ellipse.Center.X - ellipse.RadiusX, ellipse.Center.Y - ellipse.RadiusY), ellipse.Center, ellipse.Angle),
-                    GeometryUtils.RotatePoint(new Point(ellipse.Center.X + ellipse.RadiusX, ellipse.Center.Y - ellipse.RadiusY), ellipse.Center, ellipse.Angle),
-                    GeometryUtils.RotatePoint(new Point(ellipse.Center.X + ellipse.RadiusX, ellipse.Center.Y + ellipse.RadiusY), ellipse.Center, ellipse.Angle),
-                    GeometryUtils.RotatePoint(new Point(ellipse.Center.X - ellipse.RadiusX, ellipse.Center.Y + ellipse.RadiusY), ellipse.Center, ellipse.Angle)
+                    GeometryUtils.RotatePoint(new Point(ellipse.Center.X - ellipse.RadiusX, ellipse.Center.Y - ellipse.RadiusY), ellipse.Center.ToWpfPoint(), ellipse.Angle),
+                    GeometryUtils.RotatePoint(new Point(ellipse.Center.X + ellipse.RadiusX, ellipse.Center.Y - ellipse.RadiusY), ellipse.Center.ToWpfPoint(), ellipse.Angle),
+                    GeometryUtils.RotatePoint(new Point(ellipse.Center.X + ellipse.RadiusX, ellipse.Center.Y + ellipse.RadiusY), ellipse.Center.ToWpfPoint(), ellipse.Angle),
+                    GeometryUtils.RotatePoint(new Point(ellipse.Center.X - ellipse.RadiusX, ellipse.Center.Y + ellipse.RadiusY), ellipse.Center.ToWpfPoint(), ellipse.Angle)
                 }),
                 CircleRoi circle => new Rect(circle.Center.X - circle.Radius, circle.Center.Y - circle.Radius, circle.Radius * 2, circle.Radius * 2),
-                PolygonRoi polygon when polygon.Points.Count > 0 => GeometryUtils.GetBoundingBox(polygon.Points),
-                PolylineRoi polyline when polyline.Points.Count > 0 => GeometryUtils.GetBoundingBox(polyline.Points),
+                PolygonRoi polygon when polygon.Points.Count > 0 => GeometryUtils.GetBoundingBox(polygon.Points.ToWpfPoints()),
+                PolylineRoi polyline when polyline.Points.Count > 0 => GeometryUtils.GetBoundingBox(polyline.Points.ToWpfPoints()),
                 PointAnnotationRoi point => new Rect(point.Position.X, point.Position.Y, 1, 1),
                 TextAnnotationRoi text => new Rect(text.Position.X, text.Position.Y, 1, 1),
-                LineMeasureRoi line => GeometryUtils.GetBoundingBox(new[] { line.P1, line.P2 }),
-                AngleMeasureRoi angle => GeometryUtils.GetBoundingBox(new[] { angle.P1, angle.Vertex, angle.P2 }),
-                ArcMeasureRoi arc => GeometryUtils.GetBoundingBox(new[] { arc.StartPoint, arc.EndPoint, arc.ArcPoint }),
+                LineMeasureRoi line => GeometryUtils.GetBoundingBox(new[] { line.P1.ToWpfPoint(), line.P2.ToWpfPoint() }),
+                AngleMeasureRoi angle => GeometryUtils.GetBoundingBox(new[] { angle.P1.ToWpfPoint(), angle.Vertex.ToWpfPoint(), angle.P2.ToWpfPoint() }),
+                ArcMeasureRoi arc => GeometryUtils.GetBoundingBox(new[] { arc.StartPoint.ToWpfPoint(), arc.EndPoint.ToWpfPoint(), arc.ArcPoint.ToWpfPoint() }),
                 _ => Rect.Empty
             };
         }
@@ -73,16 +73,16 @@ namespace ImageViewer.Services
             return roi switch
             {
                 CaliperMeasureRoi caliper => BuildCaliperCorners(caliper),
-                RotatedRect rect => new[] { rect.Center },
-                EllipseRoi ellipse => new[] { ellipse.Center },
-                CircleRoi circle => new[] { circle.Center },
-                PolygonRoi polygon => polygon.Points,
-                PolylineRoi polyline => polyline.Points,
-                PointAnnotationRoi point => new[] { point.Position },
-                TextAnnotationRoi text => new[] { text.Position },
-                LineMeasureRoi line => new[] { line.P1, line.P2 },
-                AngleMeasureRoi angle => new[] { angle.P1, angle.Vertex, angle.P2 },
-                ArcMeasureRoi arc => new[] { arc.StartPoint, arc.EndPoint, arc.ArcPoint },
+                RotatedRect rect => new[] { rect.Center.ToWpfPoint() },
+                EllipseRoi ellipse => new[] { ellipse.Center.ToWpfPoint() },
+                CircleRoi circle => new[] { circle.Center.ToWpfPoint() },
+                PolygonRoi polygon => polygon.Points.ToWpfPoints(),
+                PolylineRoi polyline => polyline.Points.ToWpfPoints(),
+                PointAnnotationRoi point => new[] { point.Position.ToWpfPoint() },
+                TextAnnotationRoi text => new[] { text.Position.ToWpfPoint() },
+                LineMeasureRoi line => new[] { line.P1.ToWpfPoint(), line.P2.ToWpfPoint() },
+                AngleMeasureRoi angle => new[] { angle.P1.ToWpfPoint(), angle.Vertex.ToWpfPoint(), angle.P2.ToWpfPoint() },
+                ArcMeasureRoi arc => new[] { arc.StartPoint.ToWpfPoint(), arc.EndPoint.ToWpfPoint(), arc.ArcPoint.ToWpfPoint() },
                 _ => Array.Empty<Point>()
             };
         }
@@ -90,9 +90,9 @@ namespace ImageViewer.Services
         private static Point[] BuildCaliperCorners(CaliperMeasureRoi caliper)
         {
             caliper.EnsureCaliperRegion();
-            Vector measurementDirection = caliper.GetCaliperMeasurementDirection();
+            Vector measurementDirection = caliper.GetCaliperMeasurementDirection().ToWpfVector();
             Vector caliperDirection = new(-measurementDirection.Y, measurementDirection.X);
-            Point center = caliper.CaliperCenter;
+            Point center = caliper.CaliperCenter.ToWpfPoint();
             double halfSearchRange = caliper.CaliperSearchRange;
             double regionHalfLength = caliper.GetResolvedCaliperRegionLength() / 2;
             return

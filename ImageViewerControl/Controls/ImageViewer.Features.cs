@@ -20,58 +20,6 @@ namespace ImageViewer.Controls
         [Obsolete("Use ShowRoiProperties(RoiBase) instead.", false)]
         public void ShowRoiPropertiesDialog(RoiBase roi) => ShowRoiProperties(roi);
 
-        private TResultRoi? CreateRoiFromSelectionCore<TResultRoi>(Point position, Func<RoiBase, TResultRoi?> createFromSource)
-            where TResultRoi : RoiBase
-        {
-            RoiBase? source = HitTest(position);
-            return source == null ? null : createFromSource(source);
-        }
-
-        private static FittedEllipseRoi? CreateFittedEllipseFromSource(RoiBase source)
-        {
-            if (!TryGetEllipseFitSourcePoints(source, out IReadOnlyList<Point>? points) || points == null)
-            {
-                return null;
-            }
-
-            if (!GeometryUtils.TryFitEllipse(points, out Point center, out double radiusX, out double radiusY, out double angleDegrees))
-            {
-                return null;
-            }
-
-            return new FittedEllipseRoi
-            {
-                Center = center,
-                RadiusX = radiusX,
-                RadiusY = radiusY,
-                Angle = angleDegrees,
-                SourcePointCount = points.Count,
-                Label = string.IsNullOrWhiteSpace(source.Label) ? "Fit" : $"Fit {source.Label}"
-            };
-        }
-
-        private static bool TryGetEllipseFitSourcePoints(RoiBase source, out IReadOnlyList<Point>? points)
-        {
-            points = source switch
-            {
-                PolygonRoi polygon when polygon.Points.Count >= 3 => polygon.Points,
-                PolylineRoi polyline when polyline.Points.Count >= 3 => polyline.Points,
-                _ => null
-            };
-
-            return points != null;
-        }
-
-        private static ArcMeasureRoi CreateArcMeasureFromPoints(Point startPoint, Point endPoint, Point arcPoint)
-        {
-            return new ArcMeasureRoi
-            {
-                StartPoint = startPoint,
-                EndPoint = endPoint,
-                ArcPoint = arcPoint
-            };
-        }
-
         private bool TryApplyCaliperDetection(CaliperMeasureRoi line)
         {
             return TryApplyBitmapAnalysisCore<CaliperMeasureRoi, LineMeasureGradientDetectionResult>(
@@ -179,10 +127,10 @@ namespace ImageViewer.Controls
 
             return Utils.GeometryUtils.GetBoundingBox(new[]
             {
-                Utils.GeometryUtils.RotatePoint(new Point(rect.Left, rect.Top), blobRoi.Center, blobRoi.Angle),
-                Utils.GeometryUtils.RotatePoint(new Point(rect.Right, rect.Top), blobRoi.Center, blobRoi.Angle),
-                Utils.GeometryUtils.RotatePoint(new Point(rect.Right, rect.Bottom), blobRoi.Center, blobRoi.Angle),
-                Utils.GeometryUtils.RotatePoint(new Point(rect.Left, rect.Bottom), blobRoi.Center, blobRoi.Angle)
+                Utils.GeometryUtils.RotatePoint(new Point(rect.Left, rect.Top), blobRoi.Center.ToWpfPoint(), blobRoi.Angle),
+                Utils.GeometryUtils.RotatePoint(new Point(rect.Right, rect.Top), blobRoi.Center.ToWpfPoint(), blobRoi.Angle),
+                Utils.GeometryUtils.RotatePoint(new Point(rect.Right, rect.Bottom), blobRoi.Center.ToWpfPoint(), blobRoi.Angle),
+                Utils.GeometryUtils.RotatePoint(new Point(rect.Left, rect.Bottom), blobRoi.Center.ToWpfPoint(), blobRoi.Angle)
             });
         }
 

@@ -111,84 +111,14 @@ namespace ImageViewer.Controls
         {
             activeOverlayCanvas.Children.Clear();
             var context = CreateRoiRenderContext(activeOverlayCanvas);
-            RoiRenderer.RenderActive(EnumerateActiveRois(), context);
 
-            if (_currentPolygon != null && _currentPolygon.Points.Count > 0 && !_currentPolygon.IsClosed)
+            if (ActiveDrawRoi is RoiBase activeRoi)
             {
-                string info = $"Points: {_currentPolygon.Points.Count}";
-                Point lastPoint = _currentPolygon.Points.Last();
-                context.DrawInfoText(info, new Point(lastPoint.X, lastPoint.Y - InfoTextOffset / Scale), Brushes.Orange);
-
-                if (_polygonPreviewPoint is Point currentPos)
-                {
-                    if (_currentPolygon.Points.Count > 0)
-                    {
-                        Point polygonLastPoint = _currentPolygon.Points.Last();
-                        var previewLine = new Line
-                        {
-                            X1 = polygonLastPoint.X,
-                            Y1 = polygonLastPoint.Y,
-                            X2 = currentPos.X,
-                            Y2 = currentPos.Y,
-                            Stroke = Brushes.Orange,
-                            StrokeThickness = 2 / Scale,
-                            StrokeDashArray = new DoubleCollection { 2, 2 },
-                            IsHitTestVisible = false
-                        };
-                        activeOverlayCanvas.Children.Add(previewLine);
-                    }
-
-                    Point firstPoint = _currentPolygon.Points.First();
-                    var closingLine = new Line
-                    {
-                        X1 = currentPos.X,
-                        Y1 = currentPos.Y,
-                        X2 = firstPoint.X,
-                        Y2 = firstPoint.Y,
-                        Stroke = _isPolygonCloseCandidate ? Brushes.Yellow : Brushes.Orange,
-                        StrokeThickness = 1 / Scale,
-                        StrokeDashArray = new DoubleCollection { 4, 4 },
-                        IsHitTestVisible = false
-                    };
-                    activeOverlayCanvas.Children.Add(closingLine);
-
-                    if (_isPolygonCloseCandidate)
-                    {
-                        double highlightSize = (HandleSize + PolygonCloseHighlightPadding) / Scale;
-                        var closeHandle = new Ellipse
-                        {
-                            Width = highlightSize,
-                            Height = highlightSize,
-                            Fill = new SolidColorBrush(Color.FromArgb(160, 255, 215, 0)),
-                            Stroke = Brushes.Yellow,
-                            StrokeThickness = 2 / Scale,
-                            IsHitTestVisible = false
-                        };
-
-                        Canvas.SetLeft(closeHandle, firstPoint.X - highlightSize / 2);
-                        Canvas.SetTop(closeHandle, firstPoint.Y - highlightSize / 2);
-                        activeOverlayCanvas.Children.Add(closeHandle);
-                    }
-                }
+                RoiRenderer.RenderActive([activeRoi], context);
             }
 
-            if (_currentPolyline != null && _currentPolyline.Points.Count > 0 && !_isFreehandPolylineMode && _polylinePreviewPoint is Point polylinePreviewPoint)
-            {
-                Point lastPoint = _currentPolyline.Points.Last();
-                var previewLine = new Line
-                {
-                    X1 = lastPoint.X,
-                    Y1 = lastPoint.Y,
-                    X2 = polylinePreviewPoint.X,
-                    Y2 = polylinePreviewPoint.Y,
-                    Stroke = Brushes.Orange,
-                    StrokeThickness = 2 / Scale,
-                    StrokeDashArray = new DoubleCollection { 2, 2 },
-                    IsHitTestVisible = false
-                };
-                activeOverlayCanvas.Children.Add(previewLine);
-            }
+            // 插件化绘制会话自行绘制"画到一半"的预览（橡皮筋、闭合虚线、实时数值文本）。
+            _activeDrawSession?.DrawOverlay(DrawHost, context);
         }
-
     }
 }

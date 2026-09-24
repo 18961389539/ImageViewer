@@ -1,14 +1,13 @@
-using System.Windows;
 
 namespace ImageViewer.Models
 {
     internal sealed class DualEdgeCaliperDetectionDisplayState
     {
         public bool HasDetection { get; set; }
-        public Point Edge1Start { get; set; }
-        public Point Edge1End { get; set; }
-        public Point Edge2Start { get; set; }
-        public Point Edge2End { get; set; }
+        public PointD Edge1Start { get; set; }
+        public PointD Edge1End { get; set; }
+        public PointD Edge2Start { get; set; }
+        public PointD Edge2End { get; set; }
         public LineSegmentOverlay[] RegionSegments { get; set; } = [];
         public LineSegmentOverlay[] CaliperBars { get; set; } = [];
         public LineSegmentOverlay[] InvalidCaliperMarkers { get; set; } = [];
@@ -17,8 +16,8 @@ namespace ImageViewer.Models
         public LineSegmentOverlay[] RejectedEdge1Markers { get; set; } = [];
         public LineSegmentOverlay[] RejectedEdge2Markers { get; set; } = [];
         public CaliperScoreOverlay[] ScoreOverlays { get; set; } = [];
-        public Point[] Edge1Points { get; set; } = [];
-        public Point[] Edge2Points { get; set; } = [];
+        public PointD[] Edge1Points { get; set; } = [];
+        public PointD[] Edge2Points { get; set; } = [];
         public double Edge1AverageScore { get; set; }
         public double Edge2AverageScore { get; set; }
         public double Edge1ResidualRms { get; set; }

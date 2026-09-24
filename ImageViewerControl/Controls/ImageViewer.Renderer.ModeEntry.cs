@@ -2,34 +2,14 @@ using System;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Input;
+using ImageViewer.Drawing;
 using ImageViewer.Models;
+using ImageViewer.Plugins;
 
 namespace ImageViewer.Controls
 {
     public partial class ImageViewer
     {
-        private void StartInteractionMode(InteractionMode mode, Cursor cursor, Action? resetState = null)
-        {
-            ExitCurrentMode();
-            resetState?.Invoke();
-            EnterInteractionMode(mode, cursor);
-        }
-
-        public void ExitCurrentMode()
-        {
-            ReleaseRootGridMouseIfCaptured();
-
-            if (_currentPolygon != null)
-            {
-                EndPolygonDrawing();
-            }
-
-            ResetTransientInteractionState();
-
-            LeaveInteractionMode();
-            DrawRois();
-        }
-
         [EditorBrowsable(EditorBrowsableState.Never)]
         [Obsolete("Use StartLineMeasureMode() or StartCaliperMeasureMode() for explicit measure-mode entry.", false)]
         public void StartMeasureMode()
@@ -39,141 +19,130 @@ namespace ImageViewer.Controls
 
         public void StartRoiMode()
         {
-            StartInteractionMode(InteractionMode.DrawRectangle, Cursors.Cross);
+            StartDraw(BuiltInDrawControllers.RotatedRect);
         }
 
         public void StartBlobAnalysisMode()
         {
-            StartInteractionMode(InteractionMode.DrawBlobAnalysis, Cursors.Cross);
+            StartDraw(BuiltInDrawControllers.BlobAnalysis);
         }
 
         public void StartCircleRoiMode()
         {
-            StartInteractionMode(InteractionMode.DrawCircle, Cursors.Cross, () => _isArcCaliperMode = false);
+            StartDraw(BuiltInDrawControllers.Circle);
         }
 
         public void StartRingRoiMode()
         {
-            StartInteractionMode(InteractionMode.DrawRing, Cursors.Cross, () => _ringDrawStep = 0);
+            StartDraw(BuiltInDrawControllers.Ring);
         }
 
         public void StartCircularCaliperMeasureMode()
         {
-            StartInteractionMode(InteractionMode.DrawCircularCaliper, Cursors.Cross, () => _isArcCaliperMode = false);
+            StartDraw(BuiltInDrawControllers.CircularCaliper);
         }
 
         public void StartArcCaliperMeasureMode()
         {
-            StartInteractionMode(InteractionMode.DrawCircularCaliper, Cursors.Cross, () => _isArcCaliperMode = true);
+            StartDraw(BuiltInDrawControllers.ArcCaliper);
         }
 
         public void StartLineCaliperMeasureMode()
         {
-            StartInteractionMode(InteractionMode.MeasureLineCaliper, Cursors.Pen);
+            StartDraw(BuiltInDrawControllers.LineCaliper);
         }
 
         public void StartPointAnnotationMode()
         {
-            StartInteractionMode(InteractionMode.DrawPointAnnotation, Cursors.Cross);
+            StartDraw(BuiltInDrawControllers.PointAnnotation);
         }
 
         public void StartArrowAnnotationMode()
         {
-            StartInteractionMode(InteractionMode.MeasureLine, Cursors.Pen, () => _isArrowAnnotationMode = true);
+            StartDraw(BuiltInDrawControllers.ArrowAnnotation);
         }
 
         public void StartTextAnnotationMode()
         {
-            StartInteractionMode(InteractionMode.DrawTextAnnotation, Cursors.IBeam);
+            StartDraw(BuiltInDrawControllers.TextAnnotation);
         }
 
         public void StartPolylineRoiMode(bool freehand)
         {
-            StartInteractionMode(
-                freehand ? InteractionMode.DrawFreehandPolyline : InteractionMode.DrawPolyline,
-                Cursors.Pen,
-                () =>
-                {
-                    _currentPolyline = new PolylineRoi { IsFreehand = freehand };
-                    _isFreehandPolylineMode = freehand;
-                });
+            StartDraw(freehand ? BuiltInDrawControllers.FreehandPolyline : BuiltInDrawControllers.Polyline);
         }
 
+        public void StartPolygonRoiMode()
+        {
+            StartDraw(BuiltInDrawControllers.Polygon);
+        }
+
+        /// <summary>
+        /// 进入外部落点模式：每次点击由调用方提供的工厂创建 ROI。
+        /// Chinese: 落点使用未吸附的原始坐标，与既有行为一致。
+        /// English: Enters external placement mode: each click creates an ROI from the caller-supplied
+        /// factory. The placement uses the raw (unsnapped) coordinate, matching the existing behavior.
+        /// </summary>
         public void StartPlacementMode(Func<Point, RoiBase?> createRoi, Cursor? cursor = null)
         {
             ArgumentNullException.ThrowIfNull(createRoi);
 
-            StartInteractionMode(InteractionMode.PlaceExternalRoi, cursor ?? Cursors.Cross, () => _externalPlacementFactory = createRoi);
+            StartDraw(new RoiDrawController(
+                cursor ?? Cursors.Cross,
+                () => new ClickPlaceDrawSession<RoiBase>(
+                    (_, position) => createRoi(position),
+                    useSnappedPosition: false,
+                    handlesEvent: true)));
         }
 
         public void StartFitEllipseMode()
         {
-            StartPlacementMode(CreateFittedEllipseAt, Cursors.UpArrow);
+            StartDraw(BuiltInDrawControllers.FittedEllipse);
         }
 
         public void StartLineMeasureMode()
         {
-            StartInteractionMode(InteractionMode.MeasureLine, Cursors.Pen, () => _isArrowAnnotationMode = false);
+            StartDraw(BuiltInDrawControllers.LineMeasure);
         }
 
         public void StartCaliperMeasureMode()
         {
-            StartInteractionMode(InteractionMode.MeasureCaliper, Cursors.Pen);
+            StartDraw(BuiltInDrawControllers.CaliperMeasure);
         }
 
         public void StartAngleMeasureMode()
         {
-            StartInteractionMode(InteractionMode.MeasureAngle, Cursors.Pen, () => _angleMeasureStep = 0);
+            StartDraw(BuiltInDrawControllers.AngleMeasure);
         }
 
         public void StartArcMeasureMode()
         {
-            StartInteractionMode(InteractionMode.MeasureArc, Cursors.Pen, () => _arcMeasureStep = 0);
+            StartDraw(BuiltInDrawControllers.ArcMeasure);
         }
 
         public void StartPointToLineMeasureMode()
         {
-            StartInteractionMode(InteractionMode.MeasurePointToLine, Cursors.Pen, () =>
-            {
-                _currentPointToLineMeasure = null;
-                _pointToLineMeasureStep = 0;
-            });
+            StartDraw(BuiltInDrawControllers.PointToLineDistance);
         }
 
         public void StartPointToCircleMeasureMode()
         {
-            StartInteractionMode(InteractionMode.MeasurePointToCircle, Cursors.Pen, () =>
-            {
-                _currentPointToCircleMeasure = null;
-                _pointToCircleMeasureStep = 0;
-            });
+            StartDraw(BuiltInDrawControllers.PointToCircleDistance);
         }
 
         public void StartParallelismMeasureMode()
         {
-            StartInteractionMode(InteractionMode.MeasureParallelism, Cursors.Pen, () =>
-            {
-                _currentParallelismMeasure = null;
-                _parallelismMeasureStep = 0;
-            });
+            StartDraw(BuiltInDrawControllers.Parallelism);
         }
 
         public void StartPerpendicularityMeasureMode()
         {
-            StartInteractionMode(InteractionMode.MeasurePerpendicularity, Cursors.Pen, () =>
-            {
-                _currentPerpendicularityMeasure = null;
-                _perpendicularityMeasureStep = 0;
-            });
+            StartDraw(BuiltInDrawControllers.Perpendicularity);
         }
 
         public void StartConcentricityMeasureMode()
         {
-            StartInteractionMode(InteractionMode.MeasureConcentricity, Cursors.Pen, () =>
-            {
-                _currentConcentricityMeasure = null;
-                _concentricityMeasureStep = 0;
-            });
+            StartDraw(BuiltInDrawControllers.Concentricity);
         }
 
     }

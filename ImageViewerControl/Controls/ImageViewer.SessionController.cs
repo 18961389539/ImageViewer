@@ -68,6 +68,35 @@ namespace ImageViewer.Controls
         public required Action ClearUndoHistory { get; init; }
 
         public required Action UpdateContextMenuState { get; init; }
+
+        /// <summary>
+        /// 加载时未能识别的 ROI 载荷。
+        /// Chinese: 打开工程时由会话控制器写入，保存（含自动保存）时原样回写，避免缺插件导致标注被抹掉。
+        /// English: ROI payloads carried over from the last load so saves write them back verbatim.
+        /// </summary>
+        public IReadOnlyList<RoiPersistenceData> UnresolvedRois { get; set; } = [];
+
+        /// <summary>
+        /// 采集当前需要落盘的一整份状态。
+        /// Chinese: 供保存会话 / 导出项目包复用，避免在每个调用点重复逐参数拼装。
+        /// English: Captures the full state to persist so every call site stops reassembling the same parameter list.
+        /// </summary>
+        public ImageViewerPersistenceSnapshot CaptureSnapshot()
+        {
+            ImageViewerViewportState viewportState = GetCurrentViewportState();
+            return new ImageViewerPersistenceSnapshot(
+                TryGetCurrentImagePath(),
+                GetAllRois(),
+                GetPixelSize(),
+                GetPhysicalUnit(),
+                viewportState.Scale,
+                viewportState.TranslateX,
+                viewportState.TranslateY,
+                GetCalibration())
+            {
+                UnresolvedRois = UnresolvedRois
+            };
+        }
     }
 
     internal sealed class ImageViewerAutoSaveWorkflow
@@ -95,6 +124,33 @@ namespace ImageViewer.Controls
         public required Action<string, Exception> LogNonCriticalError { get; init; }
 
         public required Action<string, StatusHintKind> ShowStatusHint { get; init; }
+
+        /// <summary>
+        /// 加载时未能识别的 ROI 载荷（与手动保存共用同一份来源）。
+        /// </summary>
+        public IReadOnlyList<RoiPersistenceData> UnresolvedRois { get; set; } = [];
+
+        /// <summary>
+        /// 采集当前需要落盘的一整份状态。
+        /// Chinese: 自动保存与手动保存共用同一份载荷契约。
+        /// English: Auto save and manual save share the same payload contract.
+        /// </summary>
+        public ImageViewerPersistenceSnapshot CaptureSnapshot()
+        {
+            ImageViewerViewportState viewportState = GetCurrentViewportState();
+            return new ImageViewerPersistenceSnapshot(
+                TryGetCurrentImagePath(),
+                GetAllRois(),
+                GetPixelSize(),
+                GetPhysicalUnit(),
+                viewportState.Scale,
+                viewportState.TranslateX,
+                viewportState.TranslateY,
+                GetCalibration())
+            {
+                UnresolvedRois = UnresolvedRois
+            };
+        }
     }
 
     internal sealed class ImageViewerSessionController : IDisposable
@@ -102,6 +158,7 @@ namespace ImageViewer.Controls
         private const string SessionProjectKind = "session";
         private const string PackageProjectKind = "package";
         private readonly ImageViewerSessionPersistenceWorkflow _persistence;
+        private readonly ImageViewerAutoSaveWorkflow _autoSave;
         private readonly ImageViewerRecentProjectCatalog _recentProjectCatalog;
         private readonly ImageViewerAutoSaveController _autoSaveController;
         private string? _currentProjectPath;
@@ -116,6 +173,7 @@ namespace ImageViewer.Controls
             ArgumentNullException.ThrowIfNull(sessionStoragePolicy);
 
             _persistence = dependencies.Persistence ?? throw new ArgumentNullException(nameof(dependencies));
+            _autoSave = dependencies.AutoSave;
             _recentProjectCatalog = new ImageViewerRecentProjectCatalog(_persistence.RecentProjectService, sessionStoragePolicy.RecentProjectsFilePath);
             _autoSaveController = new ImageViewerAutoSaveController(dependencies.AutoSave, periodicTaskSchedulerFactory, sessionStoragePolicy);
         }
@@ -132,18 +190,10 @@ namespace ImageViewer.Controls
 
             try
             {
-                ImageViewerViewportState viewportState = _persistence.GetCurrentViewportState();
                 await _persistence.SessionService.SaveToFileAsync(
                     filePath,
-                    _persistence.TryGetCurrentImagePath(),
-                    _persistence.GetAllRois(),
-                    _persistence.GetPixelSize(),
-                    _persistence.GetPhysicalUnit(),
-                    viewportState.Scale,
-                    viewportState.TranslateX,
-                    viewportState.TranslateY,
-                    _persistence.GetPluginRegistry(),
-                    _persistence.GetCalibration());
+                    _persistence.CaptureSnapshot(),
+                    _persistence.GetPluginRegistry());
                 SetCurrentProject(filePath, SessionProjectKind);
                 _persistence.ShowStatusHint(UiText.Get("StatusSaveSessionSuccess"), StatusHintKind.Success);
             }
@@ -174,16 +224,9 @@ namespace ImageViewer.Controls
 
             try
             {
-                ImageViewerViewportState viewportState = _persistence.GetCurrentViewportState();
                 await _persistence.ProjectPackageService.ExportAsync(
                     filePath,
-                    _persistence.TryGetCurrentImagePath(),
-                    _persistence.GetAllRois(),
-                    _persistence.GetPixelSize(),
-                    _persistence.GetPhysicalUnit(),
-                    viewportState.Scale,
-                    viewportState.TranslateX,
-                    viewportState.TranslateY,
+                    _persistence.CaptureSnapshot(),
                     _persistence.GetPluginRegistry());
                 SetCurrentProject(filePath, PackageProjectKind);
                 _persistence.ShowStatusHint(UiText.Get("StatusExportPackageSuccess"), StatusHintKind.Success);
@@ -249,6 +292,7 @@ namespace ImageViewer.Controls
                 SetCurrentProject(filePath, string.Equals(Path.GetExtension(filePath), ".ivpkg", StringComparison.OrdinalIgnoreCase) ? PackageProjectKind : SessionProjectKind);
                 _persistence.ClearUndoHistory();
                 _persistence.ShowStatusHint(UiText.Get("StatusLoadSessionSuccess"), StatusHintKind.Success);
+                ReportUnresolvedRois(session.UnresolvedRois);
             }
             catch (Exception ex)
             {
@@ -285,6 +329,34 @@ namespace ImageViewer.Controls
             _autoSaveController.SetCurrentProject(_currentProjectPath);
             _recentProjectCatalog.Remember(_currentProjectPath, projectKind);
             _persistence.UpdateContextMenuState();
+        }
+
+        /// <summary>
+        /// 上报并对齐"未识别标注"载荷。
+        /// Chinese: 缺插件或类型键变更时，未识别的标注不再被静默丢弃——状态栏给出数量与类型提示，
+        /// 同时把原始载荷保留在保存链路上，下次保存会原样回写，重新获得插件后仍可正常打开。
+        /// English: Surfaces unresolved ROI payloads (missing plugin / renamed type key) with a status hint and keeps
+        /// them on the save path so the next save writes them back verbatim instead of erasing them.
+        /// </summary>
+        private void ReportUnresolvedRois(IReadOnlyList<RoiPersistenceData> unresolvedRois)
+        {
+            _persistence.UnresolvedRois = unresolvedRois;
+            _autoSave.UnresolvedRois = unresolvedRois;
+            if (unresolvedRois.Count == 0)
+            {
+                return;
+            }
+
+            string typeNames = string.Join(
+                ", ",
+                unresolvedRois
+                    .Select(item => item.Type)
+                    .Where(type => !string.IsNullOrWhiteSpace(type))
+                    .Distinct(StringComparer.OrdinalIgnoreCase));
+
+            _persistence.ShowStatusHint(
+                UiText.Format("StatusProjectUnresolvedRois", unresolvedRois.Count, typeNames),
+                StatusHintKind.Error);
         }
     }
 }

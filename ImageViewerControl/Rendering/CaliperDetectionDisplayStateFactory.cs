@@ -2,6 +2,7 @@ using System;
 using System.Windows;
 using ImageViewer.Models;
 using ImageViewer.Services;
+using ImageViewer.Utils;
 
 namespace ImageViewer.Rendering
 {
@@ -11,7 +12,7 @@ namespace ImageViewer.Rendering
         {
             ArgumentNullException.ThrowIfNull(roi);
 
-            Vector measurementDirection = roi.GetCaliperMeasurementDirection();
+            Vector measurementDirection = roi.GetCaliperMeasurementDirection().ToWpfVector();
             Vector markerDirection = new(-measurementDirection.Y, measurementDirection.X);
             double markerHalfLength = Math.Max(roi.CaliperSamplingHalfWidth + 1, 3);
 
@@ -38,8 +39,8 @@ namespace ImageViewer.Rendering
                     detectionResult.RejectedEdge1Points,
                     detectionResult.RejectedEdge2Points,
                     measurementDirection),
-                Edge1Points = [.. detectionResult.Edge1Points],
-                Edge2Points = [.. detectionResult.Edge2Points],
+                Edge1Points = [.. detectionResult.Edge1Points.ToPointDs()],
+                Edge2Points = [.. detectionResult.Edge2Points.ToPointDs()],
                 Edge1AverageScore = detectionResult.Edge1AverageScore,
                 Edge2AverageScore = detectionResult.Edge2AverageScore,
                 Edge1ResidualRms = detectionResult.Edge1ResidualRms,
@@ -82,7 +83,7 @@ namespace ImageViewer.Rendering
                     detectionResult.EdgeScores,
                     detectionResult.RejectedEdgePoints,
                     measurementDirection),
-                EdgePoints = [.. detectionResult.EdgePoints],
+                EdgePoints = [.. detectionResult.EdgePoints.ToPointDs()],
                 AverageScore = detectionResult.AverageScore,
                 ResidualRms = detectionResult.ResidualRms,
                 ResidualMax = detectionResult.ResidualMax,
@@ -117,7 +118,7 @@ namespace ImageViewer.Rendering
                     detectionResult.EdgeScores,
                     detectionResult.RejectedEdgePoints,
                     detectionResult.ReferenceCenter),
-                EdgePoints = [.. detectionResult.EdgePoints],
+                EdgePoints = [.. detectionResult.EdgePoints.ToPointDs()],
                 AverageScore = detectionResult.AverageScore,
                 ResidualRms = detectionResult.ResidualRms,
                 ResidualMax = detectionResult.ResidualMax,

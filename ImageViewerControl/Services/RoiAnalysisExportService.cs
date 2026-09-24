@@ -29,9 +29,9 @@ namespace ImageViewer.Services
                 lines.Add($"- {group.Key}: {group.Count()}");
             }
 
-            double totalLineLength = roiList.OfType<LineMeasureRoi>().Sum(line => GeometryUtils.Distance(line.P1, line.P2) * RoiCalibrationHelper.GetLengthCorrection(line, calibration) * pixelSize);
+            double totalLineLength = roiList.OfType<LineMeasureRoi>().Sum(line => GeometryUtils.Distance(line.P1.ToWpfPoint(), line.P2.ToWpfPoint()) * RoiCalibrationHelper.GetLengthCorrection(line, calibration) * pixelSize);
             double totalPolylineLength = roiList.OfType<PolylineRoi>().Sum(poly => GetPolylineLength(poly) * RoiCalibrationHelper.GetLengthCorrection(poly, calibration)) * pixelSize;
-            double totalPolygonArea = roiList.OfType<PolygonRoi>().Sum(poly => GeometryUtils.PolygonArea(poly.Points) * RoiCalibrationHelper.GetAreaCorrection(poly, calibration)) * pixelSize * pixelSize;
+            double totalPolygonArea = roiList.OfType<PolygonRoi>().Sum(poly => GeometryUtils.PolygonArea(poly.Points.ToWpfPointArray()) * RoiCalibrationHelper.GetAreaCorrection(poly, calibration)) * pixelSize * pixelSize;
             double totalRectArea = roiList.OfType<RotatedRect>().Sum(rect => rect.Width * rect.Height * RoiCalibrationHelper.GetAreaCorrection(rect, calibration)) * pixelSize * pixelSize;
             double totalEllipseArea = roiList.OfType<EllipseRoi>().Sum(ellipse => Math.PI * ellipse.RadiusX * ellipse.RadiusY * RoiCalibrationHelper.GetAreaCorrection(ellipse, calibration)) * pixelSize * pixelSize;
             double totalCircleArea = roiList.OfType<CircleRoi>().Sum(circle => Math.PI * circle.Radius * circle.Radius * RoiCalibrationHelper.GetAreaCorrection(circle, calibration)) * pixelSize * pixelSize;
@@ -43,7 +43,7 @@ namespace ImageViewer.Services
             lines.Add($"Area Total: {totalPolygonArea + totalRectArea + totalEllipseArea + totalCircleArea:F2} {unit}²");
             if (roiList.OfType<AngleMeasureRoi>().Any())
             {
-                lines.Add($"Average Angle: {roiList.OfType<AngleMeasureRoi>().Average(angle => GeometryUtils.SmallestAngle(angle.P1, angle.Vertex, angle.P2)):F2}°");
+                lines.Add($"Average Angle: {roiList.OfType<AngleMeasureRoi>().Average(angle => GeometryUtils.SmallestAngle(angle.P1.ToWpfPoint(), angle.Vertex.ToWpfPoint(), angle.P2.ToWpfPoint())):F2}°");
             }
 
             if (bitmap != null)
@@ -120,12 +120,12 @@ namespace ImageViewer.Services
                 RotatedRect rect => ($"Width={rect.Width * correction * pixelSize:F2} {unit}", $"Height={rect.Height * correction * pixelSize:F2} {unit}", $"Angle={rect.Angle:F1}°"),
                 EllipseRoi ellipse => ($"RadiusX={ellipse.RadiusX * correction * pixelSize:F2} {unit}", $"RadiusY={ellipse.RadiusY * correction * pixelSize:F2} {unit}", $"Angle={ellipse.Angle:F1}°"),
                 CircleRoi circle => ($"Radius={circle.Radius * correction * pixelSize:F2} {unit}", string.Empty, string.Empty),
-                PolygonRoi polygon => ($"Area={GeometryUtils.PolygonArea(polygon.Points) * areaCorrection * pixelSize * pixelSize:F2} {unit}²", $"Perimeter={GeometryUtils.PolygonPerimeter(polygon.Points) * correction * pixelSize:F2} {unit}", $"Vertices={polygon.Points.Count}"),
+                PolygonRoi polygon => ($"Area={GeometryUtils.PolygonArea(polygon.Points.ToWpfPointArray()) * areaCorrection * pixelSize * pixelSize:F2} {unit}²", $"Perimeter={GeometryUtils.PolygonPerimeter(polygon.Points.ToWpfPointArray()) * correction * pixelSize:F2} {unit}", $"Vertices={polygon.Points.Count}"),
                 PolylineRoi polyline => ($"Length={GetPolylineLength(polyline) * correction * pixelSize:F2} {unit}", $"Points={polyline.Points.Count}", $"Freehand={polyline.IsFreehand}"),
                 PointAnnotationRoi point => ($"X={point.Position.X:F1}", $"Y={point.Position.Y:F1}", string.Empty),
                 TextAnnotationRoi text => ($"X={text.Position.X:F1}", $"Y={text.Position.Y:F1}", string.Empty),
-                LineMeasureRoi line => ($"Length={GeometryUtils.Distance(line.P1, line.P2) * correction * pixelSize:F2} {unit}", $"dX={(line.P2.X - line.P1.X) * correction * pixelSize:F2} {unit}", $"dY={(line.P2.Y - line.P1.Y) * correction * pixelSize:F2} {unit}"),
-                AngleMeasureRoi angle => ($"Angle={GeometryUtils.SmallestAngle(angle.P1, angle.Vertex, angle.P2):F1}°", $"Leg1={GeometryUtils.Distance(angle.P1, angle.Vertex) * correction * pixelSize:F2} {unit}", $"Leg2={GeometryUtils.Distance(angle.Vertex, angle.P2) * correction * pixelSize:F2} {unit}"),
+                LineMeasureRoi line => ($"Length={GeometryUtils.Distance(line.P1.ToWpfPoint(), line.P2.ToWpfPoint()) * correction * pixelSize:F2} {unit}", $"dX={(line.P2.X - line.P1.X) * correction * pixelSize:F2} {unit}", $"dY={(line.P2.Y - line.P1.Y) * correction * pixelSize:F2} {unit}"),
+                AngleMeasureRoi angle => ($"Angle={GeometryUtils.SmallestAngle(angle.P1.ToWpfPoint(), angle.Vertex.ToWpfPoint(), angle.P2.ToWpfPoint()):F1}°", $"Leg1={GeometryUtils.Distance(angle.P1.ToWpfPoint(), angle.Vertex.ToWpfPoint()) * correction * pixelSize:F2} {unit}", $"Leg2={GeometryUtils.Distance(angle.Vertex.ToWpfPoint(), angle.P2.ToWpfPoint()) * correction * pixelSize:F2} {unit}"),
                 _ => (string.Empty, string.Empty, string.Empty)
             };
         }
@@ -135,7 +135,7 @@ namespace ImageViewer.Services
             double length = 0;
             for (int i = 1; i < polyline.Points.Count; i++)
             {
-                length += GeometryUtils.Distance(polyline.Points[i - 1], polyline.Points[i]);
+                length += GeometryUtils.Distance(polyline.Points[i - 1].ToWpfPoint(), polyline.Points[i].ToWpfPoint());
             }
 
             return length;

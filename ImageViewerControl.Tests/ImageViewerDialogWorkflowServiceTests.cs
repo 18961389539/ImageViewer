@@ -37,8 +37,8 @@ namespace ImageViewerControl.Tests
             var service = new ImageViewerDialogWorkflowService(CreateDependencies(state), adapter);
             var roi = new LineMeasureRoi
             {
-                P1 = new Point(0, 0),
-                P2 = new Point(10, 0)
+                P1 = new PointD(0, 0),
+                P2 = new PointD(10, 0)
             };
             adapter.CalibrationResult = new CalibrationDialogResult(25d, "mm", 0.01, -0.002);
 

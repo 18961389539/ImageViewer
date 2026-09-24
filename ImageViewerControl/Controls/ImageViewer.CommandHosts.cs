@@ -62,30 +62,23 @@ namespace ImageViewer.Controls
 
     internal sealed class ImageViewerAnalysisCommandDependencies
     {
-        public required Func<bool> GetEnableAsyncAnalysis { get; init; }
-        public required Action<bool> SetEnableAsyncAnalysis { get; init; }
-        public required Func<bool> GetPauseRealtimeHistogram { get; init; }
-        public required Action<bool> SetPauseRealtimeHistogram { get; init; }
-        public required Func<bool> GetPauseRealtimeProfile { get; init; }
-        public required Action<bool> SetPauseRealtimeProfile { get; init; }
-        public required Func<bool> GetEnableImagePyramid { get; init; }
-        public required Action<bool> SetEnableImagePyramid { get; init; }
-        public required Func<bool> GetAutoSelectPyramidLevel { get; init; }
-        public required Action<bool> SetAutoSelectPyramidLevel { get; init; }
-        public required Func<bool> GetEnableTiledRendering { get; init; }
-        public required Action<bool> SetEnableTiledRendering { get; init; }
-        public required Func<bool> GetPrefetchAdjacentTiles { get; init; }
-        public required Action<bool> SetPrefetchAdjacentTiles { get; init; }
-        public required Func<int> GetTileCacheMaximumMegabytes { get; init; }
-        public required Action<int> SetTileCacheMaximumMegabytes { get; init; }
-        public required Func<int> GetTilePrefetchRadius { get; init; }
-        public required Action<int> SetTilePrefetchRadius { get; init; }
+        /// <summary>
+        /// 分析相关开关的唯一状态源。
+        /// Chinese: 开关集中存放在控件的 ImageViewerRuntimeOptions 上，不再逐项透传 Get/Set 委托，
+        /// 避免同一批开关出现"选项对象 + 控件门面 + 委托"三份定义。
+        /// English: Single source of truth for the analysis switches; per-option get/set delegate pairs were removed.
+        /// </summary>
+        public required ImageViewerRuntimeOptions RuntimeOptions { get; init; }
+
+        /// <summary>
+        /// 启用 GPU 渲染开关。
+        /// Chinese: 该开关是控件依赖属性（可绑定，且变更需触发重绘），因此仍以委托方式桥接。
+        /// English: Kept as a delegated bridge because it stays a bindable dependency property with a change side effect.
+        /// </summary>
         public required Func<bool> GetEnableGpuRendering { get; init; }
+
         public required Action<bool> SetEnableGpuRendering { get; init; }
-        public required Func<bool> GetPreferShaderPseudoColor { get; init; }
-        public required Action<bool> SetPreferShaderPseudoColor { get; init; }
-        public required Func<bool> GetAllowCpuPseudoColorFallback { get; init; }
-        public required Action<bool> SetAllowCpuPseudoColorFallback { get; init; }
+
         public required Action UpdateRenderedImage { get; init; }
         public required Action RefreshAnalysis { get; init; }
         public required Action ClearAnalysisCache { get; init; }

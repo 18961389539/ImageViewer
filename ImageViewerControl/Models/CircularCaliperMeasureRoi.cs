@@ -1,6 +1,5 @@
 using System;
 using System.Runtime.CompilerServices;
-using System.Windows;
 
 namespace ImageViewer.Models
 {
@@ -60,7 +59,7 @@ namespace ImageViewer.Models
             set => SetDetectionDisplayStateValue(DetectionDisplayState.ScoreOverlays, value, static (state, v) => state.ScoreOverlays = v);
         }
 
-        public Point[] EdgePoints
+        public PointD[] EdgePoints
         {
             get => DetectionDisplayState.EdgePoints;
             set => SetDetectionDisplayStateValue(DetectionDisplayState.EdgePoints, value, static (state, v) => state.EdgePoints = v);
@@ -163,7 +162,7 @@ namespace ImageViewer.Models
             LineSegmentOverlay[] edgeMarkers,
             LineSegmentOverlay[] rejectedEdgeMarkers,
             CaliperScoreOverlay[] scoreOverlays,
-            Point[] edgePoints)
+            PointD[] edgePoints)
         {
             this.SetDetectionVisualization(
                 SingleEdgeCaliperDetectionDisplayState.CreateDetected(

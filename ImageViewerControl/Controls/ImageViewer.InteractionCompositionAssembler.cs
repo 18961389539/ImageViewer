@@ -4,7 +4,7 @@ namespace ImageViewer.Controls
 {
     public partial class ImageViewer
     {
-        private sealed class InteractionCompositionAssembler
+        internal sealed class InteractionCompositionAssembler
         {
             private readonly ImageViewer _owner;
 

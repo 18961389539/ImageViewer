@@ -305,7 +305,7 @@ namespace ImageViewer.Plugins
 
         private static RoiPersistenceDescriptor<T> CreateCenterWidthHeightAnglePersistence<T>(
             Func<RoiPersistenceData, T> createRoi,
-            Func<T, Point> getCenter,
+            Func<T, PointD> getCenter,
             Func<T, double> getWidth,
             Func<T, double> getHeight,
             Func<T, double> getAngle,
@@ -324,7 +324,7 @@ namespace ImageViewer.Plugins
 
         private static RoiPersistenceDescriptor<T> CreateCenterEllipsePersistence<T>(
             Func<RoiPersistenceData, T> createRoi,
-            Func<T, Point> getCenter,
+            Func<T, PointD> getCenter,
             Func<T, double> getRadiusX,
             Func<T, double> getRadiusY,
             Func<T, double> getAngle,
@@ -343,7 +343,7 @@ namespace ImageViewer.Plugins
 
         private static RoiPersistenceDescriptor<T> CreateCenterRadiusPersistence<T>(
             Func<RoiPersistenceData, T> createRoi,
-            Func<T, Point> getCenter,
+            Func<T, PointD> getCenter,
             Func<T, double> getRadius,
             Action<T, RoiPersistenceData>? populateExtra = null)
             where T : RoiBase
@@ -358,7 +358,7 @@ namespace ImageViewer.Plugins
 
         private static RoiPersistenceDescriptor<T> CreateCenterRadiusPairPersistence<T>(
             Func<RoiPersistenceData, T> createRoi,
-            Func<T, Point> getCenter,
+            Func<T, PointD> getCenter,
             Func<T, double> getRadius,
             Func<T, double> getRadius2,
             Action<T, RoiPersistenceData>? populateExtra = null)
@@ -375,7 +375,7 @@ namespace ImageViewer.Plugins
 
         private static RoiPersistenceDescriptor<T> CreatePositionPersistence<T>(
             Func<RoiPersistenceData, T> createRoi,
-            Func<T, Point> getPosition,
+            Func<T, PointD> getPosition,
             Action<T, RoiPersistenceData>? populateExtra = null)
             where T : RoiBase
         {
@@ -388,8 +388,8 @@ namespace ImageViewer.Plugins
 
         private static RoiPersistenceDescriptor<T> CreatePointPairPersistence<T>(
             Func<RoiPersistenceData, T> createRoi,
-            Func<T, Point> getP1,
-            Func<T, Point> getP2,
+            Func<T, PointD> getP1,
+            Func<T, PointD> getP2,
             Action<T, RoiPersistenceData>? populateExtra = null)
             where T : RoiBase
         {
@@ -403,9 +403,9 @@ namespace ImageViewer.Plugins
 
         private static RoiPersistenceDescriptor<T> CreatePointTriplePersistence<T>(
             Func<RoiPersistenceData, T> createRoi,
-            Func<T, Point> getP1,
-            Func<T, Point> getP2,
-            Func<T, Point> getVertex,
+            Func<T, PointD> getP1,
+            Func<T, PointD> getP2,
+            Func<T, PointD> getVertex,
             Action<T, RoiPersistenceData>? populateExtra = null)
             where T : RoiBase
         {
@@ -420,10 +420,10 @@ namespace ImageViewer.Plugins
 
         private static RoiPersistenceDescriptor<T> CreatePointQuadPersistence<T>(
             Func<RoiPersistenceData, T> createRoi,
-            Func<T, Point> getP1,
-            Func<T, Point> getP2,
-            Func<T, Point> getVertex,
-            Func<T, Point> getP3,
+            Func<T, PointD> getP1,
+            Func<T, PointD> getP2,
+            Func<T, PointD> getVertex,
+            Func<T, PointD> getP3,
             Action<T, RoiPersistenceData>? populateExtra = null)
             where T : RoiBase
         {
@@ -439,10 +439,10 @@ namespace ImageViewer.Plugins
 
         private static RoiPersistenceDescriptor<T> CreateLinePairPersistence<T>(
             Func<RoiPersistenceData, T> createRoi,
-            Func<T, Point> getLine1P1,
-            Func<T, Point> getLine1P2,
-            Func<T, Point> getLine2P1,
-            Func<T, Point> getLine2P2,
+            Func<T, PointD> getLine1P1,
+            Func<T, PointD> getLine1P2,
+            Func<T, PointD> getLine2P1,
+            Func<T, PointD> getLine2P2,
             Action<T, RoiPersistenceData>? populateExtra = null)
             where T : RoiBase
         {
@@ -457,8 +457,8 @@ namespace ImageViewer.Plugins
 
         private static RoiPersistenceDescriptor<T> CreatePointPairRadiusPairPersistence<T>(
             Func<RoiPersistenceData, T> createRoi,
-            Func<T, Point> getP1,
-            Func<T, Point> getP2,
+            Func<T, PointD> getP1,
+            Func<T, PointD> getP2,
             Func<T, double> getRadius,
             Func<T, double> getRadius2,
             Action<T, RoiPersistenceData>? populateExtra = null)
@@ -474,7 +474,7 @@ namespace ImageViewer.Plugins
 
         private static RoiPersistenceDescriptor<T> CreatePointsPersistence<T>(
             Func<RoiPersistenceData, T> createRoi,
-            Func<T, IEnumerable<Point>> getPoints,
+            Func<T, IEnumerable<PointD>> getPoints,
             Action<T, RoiPersistenceData>? populateExtra = null)
             where T : RoiBase
         {
@@ -749,11 +749,11 @@ namespace ImageViewer.Plugins
 
     internal static class RoiPersistencePointExtensions
     {
-        public static RoiPersistencePoint FromPoint(Point point) => new() { X = point.X, Y = point.Y };
+        public static RoiPersistencePoint FromPoint(PointD point) => new() { X = point.X, Y = point.Y };
 
-        public static Point ToPoint(this RoiPersistencePoint? point)
+        public static PointD ToPoint(this RoiPersistencePoint? point)
         {
-            return point == null ? default : new Point(point.X, point.Y);
+            return point == null ? default : new PointD(point.X, point.Y);
         }
 
         public static void ApplyCommonState(this RoiBase roi, RoiPersistenceData data)
@@ -773,7 +773,10 @@ namespace ImageViewer.Plugins
 
             if (!string.IsNullOrWhiteSpace(data.Common.StrokeColor))
             {
-                roi.StrokeColor = (Color)ColorConverter.ConvertFromString(data.Common.StrokeColor);
+                if (RoiColor.Parse(data.Common.StrokeColor) is RoiColor parsedColor)
+                {
+                    roi.StrokeColor = parsedColor;
+                }
             }
         }
 
@@ -781,7 +784,7 @@ namespace ImageViewer.Plugins
         {
             data.Type = typeKey;
             data.Common.Label = roi.Label;
-            data.Common.StrokeColor = roi.StrokeColor.ToString(CultureInfo.InvariantCulture);
+            data.Common.StrokeColor = roi.StrokeColor.ToString();
             data.Common.StrokeThickness = roi.StrokeThickness;
             data.Common.IsVisible = roi.IsVisible;
             data.Common.IsLocked = roi.IsLocked;

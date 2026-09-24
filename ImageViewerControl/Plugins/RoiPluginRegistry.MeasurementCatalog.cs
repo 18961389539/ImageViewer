@@ -18,7 +18,7 @@ namespace ImageViewer.Plugins
                     hitTestOrder: 78,
                     drawingTools:
                     [
-                        new RoiToolDescriptor(UiText.Get("ToolCircularCaliper"), viewer => viewer.StartCircularCaliperMeasureMode(), 85, CreateCircularCaliperMeasureIcon, isMeasurement: true)
+                        new RoiToolDescriptor(UiText.Get("ToolCircularCaliper"), BuiltInDrawControllers.CircularCaliper, 85, CreateCircularCaliperMeasureIcon, isMeasurement: true)
                     ],
                     persistence: CreateCenterRadiusPersistence(
                         data => new CircularCaliperMeasureRoi
@@ -55,7 +55,7 @@ namespace ImageViewer.Plugins
                     hitTestOrder: 77,
                     drawingTools:
                     [
-                        new RoiToolDescriptor(UiText.Get("ToolArcCaliper"), viewer => viewer.StartArcCaliperMeasureMode(), 86, CreateArcCaliperMeasureIcon, isMeasurement: true)
+                        new RoiToolDescriptor(UiText.Get("ToolArcCaliper"), BuiltInDrawControllers.ArcCaliper, 86, CreateArcCaliperMeasureIcon, isMeasurement: true)
                     ],
                     persistence: CreateCenterRadiusPersistence(
                         data => new ArcCaliperMeasureRoi
@@ -96,7 +96,7 @@ namespace ImageViewer.Plugins
                     hitTestOrder: 20,
                     drawingTools:
                     [
-                        new RoiToolDescriptor(UiText.Get("ToolLineMeasure"), viewer => viewer.StartLineMeasureMode(), 70, CreateLineMeasureIcon, isMeasurement: true)
+                        new RoiToolDescriptor(UiText.Get("ToolLineMeasure"), BuiltInDrawControllers.LineMeasure, 70, CreateLineMeasureIcon, isMeasurement: true)
                     ],
                     persistence: CreatePointPairPersistence(
                         data => new LineMeasureRoi
@@ -112,7 +112,7 @@ namespace ImageViewer.Plugins
                     hitTestOrder: 25,
                     drawingTools:
                     [
-                        new RoiToolDescriptor(UiText.Get("ToolCaliperMeasure"), viewer => viewer.StartCaliperMeasureMode(), 80, CreateCaliperMeasureIcon, isMeasurement: true)
+                        new RoiToolDescriptor(UiText.Get("ToolCaliperMeasure"), BuiltInDrawControllers.CaliperMeasure, 80, CreateCaliperMeasureIcon, isMeasurement: true)
                     ],
                     persistence: CreatePointPairPersistence(
                         data => new CaliperMeasureRoi
@@ -146,7 +146,7 @@ namespace ImageViewer.Plugins
                     hitTestOrder: 24,
                     drawingTools:
                     [
-                        new RoiToolDescriptor(UiText.Get("ToolLineCaliper"), viewer => viewer.StartLineCaliperMeasureMode(), 82, CreateLineCaliperMeasureIcon, isMeasurement: true)
+                        new RoiToolDescriptor(UiText.Get("ToolLineCaliper"), BuiltInDrawControllers.LineCaliper, 82, CreateLineCaliperMeasureIcon, isMeasurement: true)
                     ],
                     persistence: CreatePointPairPersistence(
                         data => new LineCaliperMeasureRoi
@@ -183,7 +183,7 @@ namespace ImageViewer.Plugins
                     hitTestOrder: 10,
                     drawingTools:
                     [
-                        new RoiToolDescriptor(UiText.Get("ToolAngleMeasure"), viewer => viewer.StartAngleMeasureMode(), 90, CreateAngleMeasureIcon, isMeasurement: true)
+                        new RoiToolDescriptor(UiText.Get("ToolAngleMeasure"), BuiltInDrawControllers.AngleMeasure, 90, CreateAngleMeasureIcon, isMeasurement: true)
                     ],
                     persistence: CreatePointTriplePersistence(
                         data => new AngleMeasureRoi
@@ -201,7 +201,7 @@ namespace ImageViewer.Plugins
                     hitTestOrder: 8,
                     drawingTools:
                     [
-                        new RoiToolDescriptor(UiText.Get("ToolArcMeasure"), viewer => viewer.StartArcMeasureMode(), 95, CreateArcMeasureIcon, isMeasurement: true)
+                        new RoiToolDescriptor(UiText.Get("ToolArcMeasure"), BuiltInDrawControllers.ArcMeasure, 95, CreateArcMeasureIcon, isMeasurement: true)
                     ],
                     persistence: CreatePointTriplePersistence(
                         data => new ArcMeasureRoi
@@ -219,7 +219,7 @@ namespace ImageViewer.Plugins
                     hitTestOrder: 7,
                     drawingTools:
                     [
-                        new RoiToolDescriptor(UiText.Get("ToolPointToLineDistance"), viewer => viewer.StartPointToLineMeasureMode(), 96, CreatePointToLineIcon, isMeasurement: true)
+                        new RoiToolDescriptor(UiText.Get("ToolPointToLineDistance"), BuiltInDrawControllers.PointToLineDistance, 96, CreatePointToLineIcon, isMeasurement: true)
                     ],
                     persistence: CreatePointTriplePersistence(
                         data => new PointToLineDistanceRoi
@@ -237,7 +237,7 @@ namespace ImageViewer.Plugins
                     hitTestOrder: 6,
                     drawingTools:
                     [
-                        new RoiToolDescriptor(UiText.Get("ToolPointToCircleDistance"), viewer => viewer.StartPointToCircleMeasureMode(), 97, CreatePointToCircleIcon, isMeasurement: true)
+                        new RoiToolDescriptor(UiText.Get("ToolPointToCircleDistance"), BuiltInDrawControllers.PointToCircleDistance, 97, CreatePointToCircleIcon, isMeasurement: true)
                     ],
                     persistence: CreatePointPairPersistence(
                         data => new PointToCircleDistanceRoi
@@ -255,7 +255,7 @@ namespace ImageViewer.Plugins
                     hitTestOrder: 5,
                     drawingTools:
                     [
-                        new RoiToolDescriptor(UiText.Get("ToolParallelism"), viewer => viewer.StartParallelismMeasureMode(), 98, CreateParallelismIcon, isMeasurement: true)
+                        new RoiToolDescriptor(UiText.Get("ToolParallelism"), BuiltInDrawControllers.Parallelism, 98, CreateParallelismIcon, isMeasurement: true)
                     ],
                     persistence: CreateLinePairPersistence(
                         data => new ParallelismMeasureRoi
@@ -275,7 +275,7 @@ namespace ImageViewer.Plugins
                     hitTestOrder: 4,
                     drawingTools:
                     [
-                        new RoiToolDescriptor(UiText.Get("ToolPerpendicularity"), viewer => viewer.StartPerpendicularityMeasureMode(), 99, CreatePerpendicularityIcon, isMeasurement: true)
+                        new RoiToolDescriptor(UiText.Get("ToolPerpendicularity"), BuiltInDrawControllers.Perpendicularity, 99, CreatePerpendicularityIcon, isMeasurement: true)
                     ],
                     persistence: CreateLinePairPersistence(
                         data => new PerpendicularityMeasureRoi
@@ -295,7 +295,7 @@ namespace ImageViewer.Plugins
                     hitTestOrder: 3,
                     drawingTools:
                     [
-                        new RoiToolDescriptor(UiText.Get("ToolConcentricity"), viewer => viewer.StartConcentricityMeasureMode(), 100, CreateConcentricityIcon, isMeasurement: true)
+                        new RoiToolDescriptor(UiText.Get("ToolConcentricity"), BuiltInDrawControllers.Concentricity, 100, CreateConcentricityIcon, isMeasurement: true)
                     ],
                     persistence: CreatePointPairRadiusPairPersistence(
                         data => new ConcentricityMeasureRoi

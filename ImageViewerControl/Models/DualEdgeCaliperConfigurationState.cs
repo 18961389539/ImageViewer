@@ -1,7 +1,7 @@
 namespace ImageViewer.Models
 {
     internal sealed record DualEdgeCaliperConfigurationState(
-        System.Windows.Point CaliperCenter,
+        PointD CaliperCenter,
         double CaliperAngleDegrees,
         bool HasExplicitCaliperRegion,
         int CaliperCount,

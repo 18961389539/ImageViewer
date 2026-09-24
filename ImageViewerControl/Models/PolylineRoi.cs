@@ -1,20 +1,19 @@
 using System.Collections.ObjectModel;
-using System.Windows;
 using ImageViewer.Common;
 
 namespace ImageViewer.Models
 {
     public class PolylineRoi : RoiBase
     {
-        private ObservableCollection<Point> _points = new();
+        private ObservableCollection<PointD> _points = new();
         private bool _isFreehand;
 
         public PolylineRoi()
         {
-            StrokeColor = System.Windows.Media.Colors.LightGreen;
+            StrokeColor = RoiColors.LightGreen;
         }
 
-        public ObservableCollection<Point> Points
+        public ObservableCollection<PointD> Points
         {
             get => _points;
             set => SetProperty(ref _points, value);
@@ -30,13 +29,14 @@ namespace ImageViewer.Models
         {
             return new PolylineRoi
             {
-                Points = new ObservableCollection<Point>(Points),
+                Points = new ObservableCollection<PointD>(Points),
                 IsFreehand = IsFreehand,
                 Label = Label,
                 StrokeColor = StrokeColor,
                 StrokeThickness = StrokeThickness,
                 IsVisible = IsVisible,
-                IsLocked = IsLocked
+                IsLocked = IsLocked,
+                Tolerance = Tolerance?.Clone()
             };
         }
 
@@ -47,7 +47,7 @@ namespace ImageViewer.Models
                 throw new ArgumentException($"Cannot apply state from {source.GetType().Name} to {nameof(PolylineRoi)}.", nameof(source));
             }
 
-            Points = new ObservableCollection<Point>(polyline.Points);
+            Points = new ObservableCollection<PointD>(polyline.Points);
             IsFreehand = polyline.IsFreehand;
             ApplyCommonState(polyline);
         }

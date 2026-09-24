@@ -1,4 +1,3 @@
-using System.Windows;
 
 namespace ImageViewer.Models
 {
@@ -9,5 +8,5 @@ namespace ImageViewer.Models
         Invalid
     }
 
-    public readonly record struct CaliperScoreOverlay(Point Position, string Text, CaliperOverlayStatus Status);
+    public readonly record struct CaliperScoreOverlay(PointD Position, string Text, CaliperOverlayStatus Status);
 }

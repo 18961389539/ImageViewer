@@ -26,5 +26,21 @@ namespace ImageViewer.Models
             double lower = Nominal.Value - (ToleranceMinus ?? 0);
             return measured >= lower && measured <= upper;
         }
+
+        /// <summary>
+        /// 复制公差参数。
+        /// Chinese: 公差面板会就地修改实例（如 Tolerance.Nominal 双向绑定），因此撤销快照与克隆必须持有独立副本，
+        /// 否则后续编辑会同时改到快照，撤销无法还原。
+        /// English: The tolerance editor mutates the instance in place, so snapshots and clones need their own copy.
+        /// </summary>
+        public MeasurementTolerance Clone()
+        {
+            return new MeasurementTolerance
+            {
+                Nominal = Nominal,
+                TolerancePlus = TolerancePlus,
+                ToleranceMinus = ToleranceMinus
+            };
+        }
     }
 }

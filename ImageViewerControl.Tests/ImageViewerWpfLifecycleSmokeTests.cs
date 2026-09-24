@@ -334,7 +334,7 @@ namespace ImageViewerControl.Tests
                 using var viewer = host.CreateViewer();
                 var roi = new CircleRoi
                 {
-                    Center = new Point(4, 4),
+                    Center = new PointD(4, 4),
                     Radius = 2
                 };
 

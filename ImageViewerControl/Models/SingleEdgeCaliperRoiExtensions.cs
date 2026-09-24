@@ -1,4 +1,3 @@
-using System.Windows;
 
 namespace ImageViewer.Models
 {
@@ -32,7 +31,7 @@ namespace ImageViewer.Models
             LineSegmentOverlay[] edgeMarkers,
             LineSegmentOverlay[] rejectedEdgeMarkers,
             CaliperScoreOverlay[] scoreOverlays,
-            Point[] edgePoints)
+            PointD[] edgePoints)
         {
             roi.SetDetectionVisualization(
                 SingleEdgeCaliperDetectionDisplayState.CreateDetected(

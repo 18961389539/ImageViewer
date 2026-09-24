@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Windows;
 using ImageViewer.Common;
 
 using System.Linq;
@@ -8,15 +7,15 @@ namespace ImageViewer.Models
 {
     /// <summary>
     /// 多边形 ROI
-    /// Chinese: 表示一个多边形 ROI，使用 Point 集合来描述顶点，并支持闭合标记。
+    /// Chinese: 表示一个多边形 ROI，使用 PointD 集合来描述顶点，并支持闭合标记。
     /// English: Represents a polygon ROI defined by a collection of Points and an IsClosed flag.
     /// </summary>
     public class PolygonRoi : RoiBase
     {
-        private ObservableCollection<Point> _points = new ObservableCollection<Point>();
+        private ObservableCollection<PointD> _points = new ObservableCollection<PointD>();
         private bool _isClosed;
 
-        public ObservableCollection<Point> Points
+        public ObservableCollection<PointD> Points
         {
             get => _points;
             set => SetProperty(ref _points, value);
@@ -32,13 +31,14 @@ namespace ImageViewer.Models
         {
             return new PolygonRoi
             {
-                Points = new ObservableCollection<Point>(Points),
+                Points = new ObservableCollection<PointD>(Points),
                 IsClosed = IsClosed,
                 Label = Label,
                 StrokeColor = StrokeColor,
                 StrokeThickness = StrokeThickness,
                 IsVisible = IsVisible,
-                IsLocked = IsLocked
+                IsLocked = IsLocked,
+                Tolerance = Tolerance?.Clone()
             };
         }
 
@@ -49,7 +49,7 @@ namespace ImageViewer.Models
                 throw new ArgumentException($"Cannot apply state from {source.GetType().Name} to {nameof(PolygonRoi)}.", nameof(source));
             }
 
-            Points = new ObservableCollection<Point>(polygon.Points);
+            Points = new ObservableCollection<PointD>(polygon.Points);
             IsClosed = polygon.IsClosed;
             ApplyCommonState(polygon);
         }

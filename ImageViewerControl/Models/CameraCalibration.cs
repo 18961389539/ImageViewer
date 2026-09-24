@@ -1,5 +1,4 @@
 using System;
-using System.Windows;
 
 namespace ImageViewer.Models
 {
@@ -15,12 +14,12 @@ namespace ImageViewer.Models
         private const double MinScaleDenominator = 0.2;
 
         /// <summary>
-        /// 主点 X（像素）。Chinese: 默认取图像中心。English: Principal point X in pixels.
+        /// 主点 X（像素）。Chinese: 默认取图像中心。English: Principal PointD X in pixels.
         /// </summary>
         public double PrincipalX { get; set; }
 
         /// <summary>
-        /// 主点 Y（像素）。Chinese: 默认取图像中心。English: Principal point Y in pixels.
+        /// 主点 Y（像素）。Chinese: 默认取图像中心。English: Principal PointD Y in pixels.
         /// </summary>
         public double PrincipalY { get; set; }
 
@@ -50,9 +49,9 @@ namespace ImageViewer.Models
 
         /// <summary>
         /// 归一化半径平方 r²。
-        /// English: Squared normalized radius at an image point.
+        /// English: Squared normalized radius at an image PointD.
         /// </summary>
-        public double NormalizedRadiusSquared(Point imagePoint)
+        public double NormalizedRadiusSquared(PointD imagePoint)
         {
             if (NormalizationRadius <= 0)
             {
@@ -69,7 +68,7 @@ namespace ImageViewer.Models
         /// Chinese: 取畸变放大倍率的倒数，并对极端参数做截断保护。
         /// English: Factor converting local distorted pixels to ideal pixels.
         /// </summary>
-        public double UndistortScaleFactor(Point imagePoint)
+        public double UndistortScaleFactor(PointD imagePoint)
         {
             if (!IsEnabled)
             {
@@ -91,14 +90,14 @@ namespace ImageViewer.Models
         /// Chinese: 返回校正后的等效像素长度，后端换算物理长度时再乘像素尺寸 PixelSize。
         /// English: Corrects a pixel-length measured at the given midpoint.
         /// </summary>
-        public double CorrectPixelLength(double pixelLength, Point midPoint)
+        public double CorrectPixelLength(double pixelLength, PointD midPoint)
         {
             return pixelLength * UndistortScaleFactor(midPoint);
         }
 
         /// <summary>
         /// 按图像尺寸自动设置主点（图像中心）与归一化半径（短边一半）并创建标定参数。
-        /// English: Creates calibration with principal point and normalization radius inferred from image size.
+        /// English: Creates calibration with principal PointD and normalization radius inferred from image size.
         /// </summary>
         public static CameraCalibration CreateForImage(double k1, double k2, double imageWidth, double imageHeight)
         {

@@ -34,7 +34,7 @@ ROI JSON 由 `RoiPersistenceService` 负责读写，顶层结构如下：
 
 字段说明：
 
-- `Version`：当前固定为 `1`。
+- `Version`：当前固定为 `1`。读取时会校验：高于当前支持版本的文件会被拒绝加载；缺失或非正数视为早期文件，宽容接受。
 - `PixelSize`：像素尺寸；读取时如果小于等于 `0`，会回退到 `1.0`。
 - `PhysicalUnit`：物理单位；空值会回退到 `px`。
 - `Items`：ROI 项数组。
@@ -54,10 +54,16 @@ ROI JSON 由 `RoiPersistenceService` 负责读写，顶层结构如下：
 
 ```json
 {
+  "Version": 2,
   "SessionName": "sample-session",
   "SavedAtUtc": "2025-05-19T08:30:00+00:00",
   "ImagePath": "images/sample.png",
-  "RoiDocumentJson": "<escaped ROI document JSON>",
+  "RoiDocument": {
+    "Version": 1,
+    "PixelSize": 0.5,
+    "PhysicalUnit": "mm",
+    "Items": []
+  },
   "Scale": 1.25,
   "TranslateX": 24.0,
   "TranslateY": -12.0
@@ -66,10 +72,13 @@ ROI JSON 由 `RoiPersistenceService` 负责读写，顶层结构如下：
 
 字段说明：
 
+- `Version`：会话"信封"结构版本，当前为 `2`。读取时会校验：高于当前支持版本的文件会被拒绝加载；缺失或非正数视为早期文件，宽容接受。
+  - `1`：ROI 载荷以转义字符串形式内嵌在 `RoiDocumentJson` 字段中（历史格式）。
+  - `2`：ROI 载荷作为嵌套对象写在 `RoiDocument` 字段中（当前格式）。
 - `SessionName`：默认使用文件名。
 - `SavedAtUtc`：保存时间戳。
 - `ImagePath`：图像路径，可为绝对路径，也可为相对会话文件所在目录的相对路径。
-- `RoiDocumentJson`：完整 ROI JSON 文档的字符串形式。
+- `RoiDocument`：完整的 ROI 文档对象，结构与 `.json` ROI 文件一致（含自己的 `Version`）。
 - `Scale`、`TranslateX`、`TranslateY`：保存当前视图缩放和平移状态。
 
 ## `.ivpkg` 项目包
@@ -100,4 +109,6 @@ assets/<original-image-file>
 
 - ROI JSON 读取时同时支持 `Type` 对应插件类型键，以及旧格式中按 ROI 类型名匹配。
 - ROI 项字段继续保持扁平 JSON 形态，以兼容既有导出文件。
-- 未识别的 ROI 插件项会在加载时跳过，而不是导致整份文件失败。
+- 未识别的 ROI 插件项在加载时跳过，而不是导致整份文件失败；其原始载荷会被原样保留并随下次保存写回，因此缺少插件不再等于标注丢失（加载时会给出状态栏提示）。
+- 会话文件的 ROI 载荷读取时同时接受嵌套对象（当前格式）与转义字符串（历史格式），字段名同时接受 `RoiDocument` 与 `RoiDocumentJson`；写出时统一使用嵌套对象。
+- 版本号只提供单向保护：新程序可以读旧文件，但旧程序读不了新文件（旧程序遇到缺失的 `RoiDocumentJson` 会报解析错误）。因此不要用降级后的程序去打开升级后保存的会话。

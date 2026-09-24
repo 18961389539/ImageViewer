@@ -155,10 +155,10 @@ namespace ImageViewer.ViewModels
     public class RoiColorCommand : IUndoRedoCommand
     {
         private readonly RoiBase _roi;
-        private readonly Color _oldColor;
-        private readonly Color _newColor;
+        private readonly RoiColor _oldColor;
+        private readonly RoiColor _newColor;
 
-        public RoiColorCommand(RoiBase roi, Color newColor)
+        public RoiColorCommand(RoiBase roi, RoiColor newColor)
         {
             _roi = roi;
             _oldColor = roi.StrokeColor;

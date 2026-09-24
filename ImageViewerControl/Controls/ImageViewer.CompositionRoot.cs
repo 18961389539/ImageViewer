@@ -1,140 +1,54 @@
 using System;
+
 namespace ImageViewer.Controls
 {
-    internal sealed class ImageViewerControlCompositionContext
-    {
-        public required ImageViewerCoreCompositionContext Core { get; init; }
-
-        public required ImageViewerAnalysisCompositionContext Analysis { get; init; }
-
-        public required ImageViewerSessionCompositionContext Session { get; init; }
-
-        public required ImageViewerInteractionCompositionContext Interaction { get; init; }
-
-        public required ImageViewerCommandCompositionContext Commands { get; init; }
-    }
-
-    internal sealed class ImageViewerCoreCompositionContext
-    {
-        public required Func<IImageViewStateController> CreateImageViewStateController { get; init; }
-
-        public required Func<RoiSelectionStateController> CreateRoiSelectionStateController { get; init; }
-
-        public required Func<RoiSelectionStateController, ViewModelController> CreateViewModelController { get; init; }
-
-        public required Func<ViewportController> CreateViewportController { get; init; }
-
-        public required Func<RoiSelectionStateController, ViewportController, ImageViewerDialogWorkflowService> CreateDialogWorkflowService { get; init; }
-
-        public required Func<ImageViewerDialogWorkflowService, IImageViewStateController, ImageSourceController> CreateImageSourceController { get; init; }
-
-        public required Func<ImageViewerDialogWorkflowService, RoiEditController> CreateRoiEditController { get; init; }
-
-        public required Func<ImageViewerDialogWorkflowService, CalibrationController> CreateCalibrationController { get; init; }
-
-        public required Func<ViewportController, ImageViewerSessionController, DroppedContentController> CreateDroppedContentController { get; init; }
-
-        public required Func<ExternalImageSourceBindingController> CreateExternalImageSourceBindingController { get; init; }
-    }
-
-    internal sealed class ImageViewerAnalysisCompositionContext
-    {
-        public required Func<ImageViewerDialogWorkflowService, ImageViewerAnalysisComposition> CreateAnalysisComposition { get; init; }
-    }
-
-    internal sealed class ImageViewerSessionCompositionContext
-    {
-        public required Func<ImageViewerDialogWorkflowService, ViewportController, ImageViewerSessionComposition> CreateSessionComposition { get; init; }
-    }
-
-    internal sealed class ImageViewerInteractionCompositionContext
-    {
-        public required Func<ViewportController, RoiEditController, ImageViewerSessionController, ImageViewerAnalysisCoordinator, ImageViewerInteractionComposition> CreateInteractionComposition { get; init; }
-    }
-
-    internal sealed class ImageViewerCommandCompositionContext
-    {
-        public required Func<ImageViewerDialogWorkflowService, ImageViewerFeatureMenuCommandController> CreateFeatureMenuCommandController { get; init; }
-
-        public required Func<ImageViewerDialogWorkflowService, RoiEditController, CalibrationController, ImageViewerRoiMenuCommandController> CreateRoiMenuCommandController { get; init; }
-
-        public required Func<ViewportController, ImageViewerViewCommandController> CreateViewCommandController { get; init; }
-
-        public required Func<ImageViewerModeCommandController> CreateModeCommandController { get; init; }
-    }
-
     internal sealed class ImageViewerControlCompositionRoot
     {
+        /// <summary>
+        /// 装配控件所需的全部控制器。
+        /// Chinese: 直接使用各装配器（Assembler）构造组合，不再经由 ControllerFactory 逐方法转发，
+        /// 也不再把同一批构造签名重复声明成 Func 委托；新增控制器只需改对应装配器与这里的一处调用。
+        /// English: Composes the control directly from the assemblers. The pure-forwarding controller factory and the
+        /// duplicated Func signature declarations it required were removed.
+        /// </summary>
         public static ImageViewerControlComposition Create(ImageViewer owner, ImageViewerDependencies dependencies)
         {
             ArgumentNullException.ThrowIfNull(owner);
             ArgumentNullException.ThrowIfNull(dependencies);
 
-            var controllerFactory = new ImageViewer.ControllerFactory(owner, dependencies);
+            var coreAssembler = new ImageViewer.CoreControllerAssembler(owner, dependencies);
+            var analysisAssembler = new ImageViewer.AnalysisCompositionAssembler(owner);
+            var sessionAssembler = new ImageViewer.SessionCompositionAssembler(owner);
+            var interactionAssembler = new ImageViewer.InteractionCompositionAssembler(owner);
+            var commandAssembler = new ImageViewer.CommandControllerAssembler(owner);
 
-            return Create(new ImageViewerControlCompositionContext
-            {
-                Core = new ImageViewerCoreCompositionContext
-                {
-                    CreateImageViewStateController = controllerFactory.CreateImageViewStateController,
-                    CreateRoiSelectionStateController = controllerFactory.CreateRoiSelectionStateController,
-                    CreateViewModelController = controllerFactory.CreateViewModelController,
-                    CreateViewportController = controllerFactory.CreateViewportController,
-                    CreateDialogWorkflowService = controllerFactory.CreateDialogWorkflowService,
-                    CreateImageSourceController = controllerFactory.CreateImageSourceController,
-                    CreateRoiEditController = controllerFactory.CreateRoiEditController,
-                    CreateCalibrationController = controllerFactory.CreateCalibrationController,
-                    CreateDroppedContentController = controllerFactory.CreateDroppedContentController,
-                    CreateExternalImageSourceBindingController = controllerFactory.CreateExternalImageSourceBindingController
-                },
-                Analysis = new ImageViewerAnalysisCompositionContext
-                {
-                    CreateAnalysisComposition = controllerFactory.CreateAnalysisComposition
-                },
-                Session = new ImageViewerSessionCompositionContext
-                {
-                    CreateSessionComposition = controllerFactory.CreateSessionComposition
-                },
-                Interaction = new ImageViewerInteractionCompositionContext
-                {
-                    CreateInteractionComposition = controllerFactory.CreateInteractionComposition
-                },
-                Commands = new ImageViewerCommandCompositionContext
-                {
-                    CreateFeatureMenuCommandController = controllerFactory.CreateFeatureMenuCommandController,
-                    CreateRoiMenuCommandController = controllerFactory.CreateRoiMenuCommandController,
-                    CreateViewCommandController = controllerFactory.CreateViewCommandController,
-                    CreateModeCommandController = controllerFactory.CreateModeCommandController
-                }
-            });
-        }
-
-        internal static ImageViewerControlComposition Create(ImageViewerControlCompositionContext context)
-        {
-            ArgumentNullException.ThrowIfNull(context);
-
-            ImageViewerControlCompositionParts parts = BuildParts(context);
-            ImageViewerControlComposition composition = CreateComposition(parts, context.Commands);
+            ImageViewerControlCompositionParts parts = BuildParts(coreAssembler, analysisAssembler, sessionAssembler, interactionAssembler, commandAssembler);
+            ImageViewerControlComposition composition = CreateComposition(parts, commandAssembler);
             ValidateWiring(parts, composition);
             return composition;
         }
 
-        private static ImageViewerControlCompositionParts BuildParts(ImageViewerControlCompositionContext context)
+        private static ImageViewerControlCompositionParts BuildParts(
+            ImageViewer.CoreControllerAssembler coreAssembler,
+            ImageViewer.AnalysisCompositionAssembler analysisAssembler,
+            ImageViewer.SessionCompositionAssembler sessionAssembler,
+            ImageViewer.InteractionCompositionAssembler interactionAssembler,
+            ImageViewer.CommandControllerAssembler commandAssembler)
         {
-            IImageViewStateController imageViewStateController = context.Core.CreateImageViewStateController();
-            RoiSelectionStateController roiSelectionStateController = context.Core.CreateRoiSelectionStateController();
-            ViewModelController viewModelController = context.Core.CreateViewModelController(roiSelectionStateController);
-            ViewportController viewportController = context.Core.CreateViewportController();
-            ImageViewerDialogWorkflowService dialogWorkflowService = context.Core.CreateDialogWorkflowService(roiSelectionStateController, viewportController);
-            ImageViewerAnalysisComposition analysisComposition = context.Analysis.CreateAnalysisComposition(dialogWorkflowService);
-            ImageViewerSessionComposition sessionComposition = context.Session.CreateSessionComposition(dialogWorkflowService, viewportController);
-            ImageSourceController imageSourceController = context.Core.CreateImageSourceController(dialogWorkflowService, imageViewStateController);
-            RoiEditController roiEditController = context.Core.CreateRoiEditController(dialogWorkflowService);
-            CalibrationController calibrationController = context.Core.CreateCalibrationController(dialogWorkflowService);
-            DroppedContentController droppedContentController = context.Core.CreateDroppedContentController(viewportController, sessionComposition.SessionController);
-            ImageViewerInteractionComposition interactionComposition = context.Interaction.CreateInteractionComposition(viewportController, roiEditController, sessionComposition.SessionController, analysisComposition.AnalysisController);
-            ImageViewerFeatureMenuCommandController featureMenuCommandController = context.Commands.CreateFeatureMenuCommandController(dialogWorkflowService);
-            ExternalImageSourceBindingController externalImageSourceBindingController = context.Core.CreateExternalImageSourceBindingController();
+            IImageViewStateController imageViewStateController = coreAssembler.CreateImageViewStateController();
+            RoiSelectionStateController roiSelectionStateController = coreAssembler.CreateRoiSelectionStateController();
+            ViewModelController viewModelController = coreAssembler.CreateViewModelController(roiSelectionStateController);
+            ViewportController viewportController = coreAssembler.CreateViewportController();
+            ImageViewerDialogWorkflowService dialogWorkflowService = coreAssembler.CreateDialogWorkflowService(roiSelectionStateController, viewportController);
+            ImageViewerAnalysisComposition analysisComposition = analysisAssembler.CreateAnalysisComposition(dialogWorkflowService);
+            ImageViewerSessionComposition sessionComposition = sessionAssembler.CreateSessionComposition(dialogWorkflowService, viewportController);
+            ImageSourceController imageSourceController = coreAssembler.CreateImageSourceController(dialogWorkflowService, imageViewStateController);
+            RoiEditController roiEditController = coreAssembler.CreateRoiEditController(dialogWorkflowService);
+            CalibrationController calibrationController = coreAssembler.CreateCalibrationController(dialogWorkflowService);
+            DroppedContentController droppedContentController = coreAssembler.CreateDroppedContentController(viewportController, sessionComposition.SessionController);
+            ImageViewerInteractionComposition interactionComposition = interactionAssembler.CreateInteractionComposition(viewportController, roiEditController, sessionComposition.SessionController, analysisComposition.AnalysisController);
+            ImageViewerFeatureMenuCommandController featureMenuCommandController = commandAssembler.CreateFeatureMenuCommandController(dialogWorkflowService);
+            ExternalImageSourceBindingController externalImageSourceBindingController = coreAssembler.CreateExternalImageSourceBindingController();
 
             return new ImageViewerControlCompositionParts(
                 dialogWorkflowService,
@@ -155,10 +69,10 @@ namespace ImageViewer.Controls
 
         private static ImageViewerControlComposition CreateComposition(
             ImageViewerControlCompositionParts parts,
-            ImageViewerCommandCompositionContext commandContext)
+            ImageViewer.CommandControllerAssembler commandAssembler)
         {
             ArgumentNullException.ThrowIfNull(parts);
-            ArgumentNullException.ThrowIfNull(commandContext);
+            ArgumentNullException.ThrowIfNull(commandAssembler);
 
             return new ImageViewerControlComposition(
                 parts.DialogWorkflowService,
@@ -168,11 +82,11 @@ namespace ImageViewer.Controls
                 parts.InteractionComposition.InteractionController,
                 parts.ViewModelController,
                 parts.RoiEditController,
-                commandContext.CreateRoiMenuCommandController(parts.DialogWorkflowService, parts.RoiEditController, parts.CalibrationController),
+                commandAssembler.CreateRoiMenuCommandController(parts.DialogWorkflowService, parts.RoiEditController, parts.CalibrationController),
                 parts.SessionComposition.FileMenuCommandController,
                 parts.FeatureMenuCommandController,
-                commandContext.CreateViewCommandController(parts.ViewportController),
-                commandContext.CreateModeCommandController(),
+                commandAssembler.CreateViewCommandController(parts.ViewportController),
+                commandAssembler.CreateModeCommandController(),
                 parts.ViewportController,
                 parts.SessionComposition.SessionController,
                 parts.SessionComposition.RoiPersistenceController,

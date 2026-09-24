@@ -1,7 +1,5 @@
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using ImageViewer.Models;
 using ImageViewer.Plugins;
 using ImageViewer.Services;
 
@@ -9,11 +7,11 @@ namespace ImageViewer.Abstractions
 {
     public interface IImageViewerSessionService
     {
-        void SaveToFile(string filePath, string? imagePath, IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, double scale, double translateX, double translateY, RoiPluginRegistry? pluginRegistry = null, CameraCalibration? calibration = null);
+        void SaveToFile(string filePath, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry? pluginRegistry = null);
 
-        Task SaveToFileAsync(string filePath, string? imagePath, IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, double scale, double translateX, double translateY, RoiPluginRegistry? pluginRegistry = null, CameraCalibration? calibration = null, CancellationToken cancellationToken = default);
+        Task SaveToFileAsync(string filePath, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry? pluginRegistry = null, CancellationToken cancellationToken = default);
 
-        string SerializeSession(string? sessionName, string? imagePath, IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, double scale, double translateX, double translateY, RoiPluginRegistry? pluginRegistry = null, CameraCalibration? calibration = null);
+        string SerializeSession(string? sessionName, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry? pluginRegistry = null);
 
         ImageViewerSessionData LoadFromFile(string filePath, RoiPluginRegistry? pluginRegistry = null);
 

@@ -8,64 +8,66 @@ namespace ImageViewer.Controls
     internal sealed class ImageViewerAnalysisCommandHostAdapter : IImageViewerAnalysisCommandHost
     {
         private readonly ImageViewerAnalysisCommandDependencies _dependencies;
+        private readonly ImageViewerRuntimeOptions _runtimeOptions;
 
         public ImageViewerAnalysisCommandHostAdapter(ImageViewerAnalysisCommandDependencies dependencies)
         {
             _dependencies = dependencies ?? throw new ArgumentNullException(nameof(dependencies));
+            _runtimeOptions = dependencies.RuntimeOptions;
         }
 
         public bool EnableAsyncAnalysis
         {
-            get => _dependencies.GetEnableAsyncAnalysis();
-            set => _dependencies.SetEnableAsyncAnalysis(value);
+            get => _runtimeOptions.EnableAsyncAnalysis;
+            set => _runtimeOptions.EnableAsyncAnalysis = value;
         }
 
         public bool PauseRealtimeHistogram
         {
-            get => _dependencies.GetPauseRealtimeHistogram();
-            set => _dependencies.SetPauseRealtimeHistogram(value);
+            get => _runtimeOptions.PauseRealtimeHistogram;
+            set => _runtimeOptions.PauseRealtimeHistogram = value;
         }
 
         public bool PauseRealtimeProfile
         {
-            get => _dependencies.GetPauseRealtimeProfile();
-            set => _dependencies.SetPauseRealtimeProfile(value);
+            get => _runtimeOptions.PauseRealtimeProfile;
+            set => _runtimeOptions.PauseRealtimeProfile = value;
         }
 
         public bool EnableImagePyramid
         {
-            get => _dependencies.GetEnableImagePyramid();
-            set => _dependencies.SetEnableImagePyramid(value);
+            get => _runtimeOptions.EnableImagePyramid;
+            set => _runtimeOptions.EnableImagePyramid = value;
         }
 
         public bool AutoSelectPyramidLevel
         {
-            get => _dependencies.GetAutoSelectPyramidLevel();
-            set => _dependencies.SetAutoSelectPyramidLevel(value);
+            get => _runtimeOptions.AutoSelectPyramidLevel;
+            set => _runtimeOptions.AutoSelectPyramidLevel = value;
         }
 
         public bool EnableTiledRendering
         {
-            get => _dependencies.GetEnableTiledRendering();
-            set => _dependencies.SetEnableTiledRendering(value);
+            get => _runtimeOptions.EnableTiledRendering;
+            set => _runtimeOptions.EnableTiledRendering = value;
         }
 
         public bool PrefetchAdjacentTiles
         {
-            get => _dependencies.GetPrefetchAdjacentTiles();
-            set => _dependencies.SetPrefetchAdjacentTiles(value);
+            get => _runtimeOptions.PrefetchAdjacentTiles;
+            set => _runtimeOptions.PrefetchAdjacentTiles = value;
         }
 
         public int TileCacheMaximumMegabytes
         {
-            get => _dependencies.GetTileCacheMaximumMegabytes();
-            set => _dependencies.SetTileCacheMaximumMegabytes(value);
+            get => _runtimeOptions.TileCacheMaximumMegabytes;
+            set => _runtimeOptions.TileCacheMaximumMegabytes = value;
         }
 
         public int TilePrefetchRadius
         {
-            get => _dependencies.GetTilePrefetchRadius();
-            set => _dependencies.SetTilePrefetchRadius(value);
+            get => _runtimeOptions.TilePrefetchRadius;
+            set => _runtimeOptions.TilePrefetchRadius = value;
         }
 
         public bool EnableGpuRendering
@@ -76,14 +78,14 @@ namespace ImageViewer.Controls
 
         public bool PreferShaderPseudoColor
         {
-            get => _dependencies.GetPreferShaderPseudoColor();
-            set => _dependencies.SetPreferShaderPseudoColor(value);
+            get => _runtimeOptions.PreferShaderPseudoColor;
+            set => _runtimeOptions.PreferShaderPseudoColor = value;
         }
 
         public bool AllowCpuPseudoColorFallback
         {
-            get => _dependencies.GetAllowCpuPseudoColorFallback();
-            set => _dependencies.SetAllowCpuPseudoColorFallback(value);
+            get => _runtimeOptions.AllowCpuPseudoColorFallback;
+            set => _runtimeOptions.AllowCpuPseudoColorFallback = value;
         }
 
         public void UpdateRenderedImage() => _dependencies.UpdateRenderedImage();

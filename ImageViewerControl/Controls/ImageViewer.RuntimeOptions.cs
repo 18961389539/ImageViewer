@@ -2,84 +2,13 @@ namespace ImageViewer.Controls
 {
     public partial class ImageViewer
     {
+        /// <summary>
+        /// 运行时开关的唯一状态源。
+        /// Chinese: 分析/渲染/金字塔等开关集中在这里，命令层与装配层都直接读写该对象，
+        /// 不再由控件再转发一层同名属性，也不再逐项透传 Get/Set 委托。
+        /// English: The single option store for analysis/render/pyramid switches; both the command layer and the
+        /// composition layer read and write this object directly.
+        /// </summary>
         public ImageViewerRuntimeOptions RuntimeOptions { get; } = new();
-
-        public bool EnableImagePyramid
-        {
-            get => RuntimeOptions.EnableImagePyramid;
-            set => RuntimeOptions.EnableImagePyramid = value;
-        }
-
-        public bool AutoSelectPyramidLevel
-        {
-            get => RuntimeOptions.AutoSelectPyramidLevel;
-            set => RuntimeOptions.AutoSelectPyramidLevel = value;
-        }
-
-        public bool EnableTiledRendering
-        {
-            get => RuntimeOptions.EnableTiledRendering;
-            set => RuntimeOptions.EnableTiledRendering = value;
-        }
-
-        public bool PrefetchAdjacentTiles
-        {
-            get => RuntimeOptions.PrefetchAdjacentTiles;
-            set => RuntimeOptions.PrefetchAdjacentTiles = value;
-        }
-
-        public int TileCacheMaximumMegabytes
-        {
-            get => RuntimeOptions.TileCacheMaximumMegabytes;
-            set => RuntimeOptions.TileCacheMaximumMegabytes = value;
-        }
-
-        public int TilePrefetchRadius
-        {
-            get => RuntimeOptions.TilePrefetchRadius;
-            set => RuntimeOptions.TilePrefetchRadius = value;
-        }
-
-        public int ImageLoadRetryCount
-        {
-            get => RuntimeOptions.ImageLoadRetryCount;
-            set => RuntimeOptions.ImageLoadRetryCount = value;
-        }
-
-        public int ImageLoadRetryDelayMilliseconds
-        {
-            get => RuntimeOptions.ImageLoadRetryDelayMilliseconds;
-            set => RuntimeOptions.ImageLoadRetryDelayMilliseconds = value;
-        }
-
-        public bool EnableAsyncAnalysis
-        {
-            get => RuntimeOptions.EnableAsyncAnalysis;
-            set => RuntimeOptions.EnableAsyncAnalysis = value;
-        }
-
-        public bool PauseRealtimeHistogram
-        {
-            get => RuntimeOptions.PauseRealtimeHistogram;
-            set => RuntimeOptions.PauseRealtimeHistogram = value;
-        }
-
-        public bool PauseRealtimeProfile
-        {
-            get => RuntimeOptions.PauseRealtimeProfile;
-            set => RuntimeOptions.PauseRealtimeProfile = value;
-        }
-
-        public bool PreferShaderPseudoColor
-        {
-            get => RuntimeOptions.PreferShaderPseudoColor;
-            set => RuntimeOptions.PreferShaderPseudoColor = value;
-        }
-
-        public bool AllowCpuPseudoColorFallback
-        {
-            get => RuntimeOptions.AllowCpuPseudoColorFallback;
-            set => RuntimeOptions.AllowCpuPseudoColorFallback = value;
-        }
     }
 }

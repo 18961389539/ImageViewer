@@ -1,5 +1,4 @@
 using System;
-using System.Windows;
 
 using ImageViewer.Common;
 
@@ -12,17 +11,17 @@ namespace ImageViewer.Models
     /// </summary>
     public class RotatedRect : RoiBase
     {
-        private Point _center;
+        private PointD _center;
         private double _width;
         private double _height;
         private double _angle;
 
         public RotatedRect()
         {
-            StrokeColor = System.Windows.Media.Colors.Lime;
+            StrokeColor = RoiColors.Lime;
         }
 
-        public Point Center
+        public PointD Center
         {
             get => _center;
             set => SetProperty(ref _center, value);
@@ -58,7 +57,8 @@ namespace ImageViewer.Models
                 StrokeColor = StrokeColor,
                 StrokeThickness = StrokeThickness,
                 IsVisible = IsVisible,
-                IsLocked = IsLocked
+                IsLocked = IsLocked,
+                Tolerance = Tolerance?.Clone()
             };
         }
 

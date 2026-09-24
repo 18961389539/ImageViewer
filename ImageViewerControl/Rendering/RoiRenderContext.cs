@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -6,12 +7,14 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using ImageViewer.Controls;
+using ImageViewer.Models;
 
 namespace ImageViewer.Rendering
 {
     public sealed class RoiRenderContext
     {
-        private static readonly Dictionary<Color, Brush> StrokeBrushCache = new();
+        // 线程安全：ResolveStroke 是公开静态方法，可能被后台渲染或第三方插件并发调用。
+        private static readonly ConcurrentDictionary<Color, Brush> StrokeBrushCache = new();
 
         public RoiRenderContext(
             Canvas overlayCanvas,
@@ -25,7 +28,8 @@ namespace ImageViewer.Rendering
             double infoTextOffset,
             double angleArcRadius,
             double pointAnnotationSize,
-            double polygonResizeHandlePadding)
+            double polygonResizeHandlePadding,
+            double polygonCloseHighlightPadding)
         {
             OverlayCanvas = overlayCanvas;
             ScreenOverlayCanvas = screenOverlayCanvas;
@@ -39,6 +43,7 @@ namespace ImageViewer.Rendering
             AngleArcRadius = angleArcRadius;
             PointAnnotationSize = pointAnnotationSize;
             PolygonResizeHandlePadding = polygonResizeHandlePadding;
+            PolygonCloseHighlightPadding = polygonCloseHighlightPadding;
         }
 
         public Canvas OverlayCanvas { get; }
@@ -53,6 +58,13 @@ namespace ImageViewer.Rendering
         public double AngleArcRadius { get; }
         public double PointAnnotationSize { get; }
         public double PolygonResizeHandlePadding { get; }
+
+        /// <summary>
+        /// 多边形闭合高亮手柄相对普通手柄的额外放大值。
+        /// Chinese: 用于绘制"松开即闭合"时的黄色高亮提示。
+        /// English: Extra size added to the close highlight handle of a polygon.
+        /// </summary>
+        public double PolygonCloseHighlightPadding { get; }
 
         public double ToScreenLength(double imageLength)
         {
@@ -185,22 +197,22 @@ namespace ImageViewer.Rendering
             ScreenOverlayCanvas.Children.Add(dot);
         }
 
-        public static Brush ResolveStroke(Brush? strokeOverride, Color fallback)
+        public static Brush ResolveStroke(Brush? strokeOverride, RoiColor fallback)
         {
             if (strokeOverride != null)
             {
                 return strokeOverride;
             }
 
-            if (StrokeBrushCache.TryGetValue(fallback, out Brush? cachedBrush))
+            Color color = fallback.ToColor();
+            if (StrokeBrushCache.TryGetValue(color, out Brush? cachedBrush))
             {
                 return cachedBrush;
             }
 
-            var brush = new SolidColorBrush(fallback);
+            var brush = new SolidColorBrush(color);
             brush.Freeze();
-            StrokeBrushCache[fallback] = brush;
-            return brush;
+            return StrokeBrushCache.GetOrAdd(color, brush);
         }
 
         public static Brush CreateTranslucentFill(Brush stroke, byte alpha = 64)

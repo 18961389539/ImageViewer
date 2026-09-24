@@ -17,30 +17,30 @@ namespace ImageViewer.Services
             public bool HitTest(RoiBase roi, Point point, double scale, double hitTestTolerance)
             {
                 var line = (LineMeasureRoi)roi;
-                return GeometryUtils.IsPointNearSegment(point, line.P1, line.P2, hitTestTolerance / scale);
+                return GeometryUtils.IsPointNearSegment(point, line.P1.ToWpfPoint(), line.P2.ToWpfPoint(), hitTestTolerance / scale);
             }
 
             public ResizeHandle GetHandleAt(RoiBase roi, Point point, double scale, double handleSize, double handleHitPadding, double infoTextOffset, double polygonVertexHitPadding)
             {
                 var line = (LineMeasureRoi)roi;
                 double hSize = (handleSize + handleHitPadding) / scale;
-                if (IsNear(point, line.P1, hSize)) return ResizeHandle.P1;
-                if (IsNear(point, line.P2, hSize)) return ResizeHandle.P2;
+                if (IsNear(point, line.P1.ToWpfPoint(), hSize)) return ResizeHandle.P1;
+                if (IsNear(point, line.P2.ToWpfPoint(), hSize)) return ResizeHandle.P2;
                 return ResizeHandle.None;
             }
 
             public void Move(RoiBase roi, double dx, double dy)
             {
                 var line = (LineMeasureRoi)roi;
-                line.P1 = new Point(line.P1.X + dx, line.P1.Y + dy);
-                line.P2 = new Point(line.P2.X + dx, line.P2.Y + dy);
+                line.P1 = new Point(line.P1.X + dx, line.P1.Y + dy).ToPointD();
+                line.P2 = new Point(line.P2.X + dx, line.P2.Y + dy).ToPointD();
             }
 
             public void Resize(RoiBase roi, ResizeHandle handle, double dx, double dy, Point currentPos, double minimumRoiDimension)
             {
                 var line = (LineMeasureRoi)roi;
-                if (handle == ResizeHandle.P1) line.P1 = currentPos;
-                else if (handle == ResizeHandle.P2) line.P2 = currentPos;
+                if (handle == ResizeHandle.P1) line.P1 = currentPos.ToPointD();
+                else if (handle == ResizeHandle.P2) line.P2 = currentPos.ToPointD();
             }
         }
 
@@ -68,7 +68,7 @@ namespace ImageViewer.Services
                 double halfW = caliper.GetResolvedCaliperRegionLength() / 2;
                 double halfH = caliper.CaliperSearchRange;
                 double hSize = (handleSize + handleHitPadding) / scale;
-                var handlePositions = CreateBoxHandlePositions(caliper.CaliperCenter, halfW, halfH);
+                var handlePositions = CreateBoxHandlePositions(caliper.CaliperCenter.ToWpfPoint(), halfW, halfH);
                 handlePositions[ResizeHandle.Rotation] = new Point(caliper.CaliperCenter.X, caliper.CaliperCenter.Y - halfH - infoTextOffset / scale);
                 var rotateTransform = new RotateTransform(caliper.CaliperAngleDegrees + 90, caliper.CaliperCenter.X, caliper.CaliperCenter.Y);
 
@@ -87,9 +87,9 @@ namespace ImageViewer.Services
             {
                 var caliper = (CaliperMeasureRoi)roi;
                 caliper.EnsureCaliperRegion();
-                caliper.CaliperCenter = new Point(caliper.CaliperCenter.X + dx, caliper.CaliperCenter.Y + dy);
-                caliper.P1 = new Point(caliper.P1.X + dx, caliper.P1.Y + dy);
-                caliper.P2 = new Point(caliper.P2.X + dx, caliper.P2.Y + dy);
+                caliper.CaliperCenter = new Point(caliper.CaliperCenter.X + dx, caliper.CaliperCenter.Y + dy).ToPointD();
+                caliper.P1 = new Point(caliper.P1.X + dx, caliper.P1.Y + dy).ToPointD();
+                caliper.P2 = new Point(caliper.P2.X + dx, caliper.P2.Y + dy).ToPointD();
             }
 
             public void Resize(RoiBase roi, ResizeHandle handle, double dx, double dy, Point currentPos, double minimumRoiDimension)
@@ -121,7 +121,7 @@ namespace ImageViewer.Services
                 double radBack = visualAngle * Math.PI / 180.0;
                 double globalOffsetX = offsetX * Math.Cos(radBack) - offsetY * Math.Sin(radBack);
                 double globalOffsetY = offsetX * Math.Sin(radBack) + offsetY * Math.Cos(radBack);
-                caliper.CaliperCenter = new Point(caliper.CaliperCenter.X + globalOffsetX, caliper.CaliperCenter.Y + globalOffsetY);
+                caliper.CaliperCenter = new Point(caliper.CaliperCenter.X + globalOffsetX, caliper.CaliperCenter.Y + globalOffsetY).ToPointD();
             }
         }
 
@@ -132,34 +132,34 @@ namespace ImageViewer.Services
             public bool HitTest(RoiBase roi, Point point, double scale, double hitTestTolerance)
             {
                 var angle = (AngleMeasureRoi)roi;
-                return GeometryUtils.IsPointNearSegment(point, angle.P1, angle.Vertex, hitTestTolerance / scale) ||
-                       GeometryUtils.IsPointNearSegment(point, angle.Vertex, angle.P2, hitTestTolerance / scale);
+                return GeometryUtils.IsPointNearSegment(point, angle.P1.ToWpfPoint(), angle.Vertex.ToWpfPoint(), hitTestTolerance / scale) ||
+                       GeometryUtils.IsPointNearSegment(point, angle.Vertex.ToWpfPoint(), angle.P2.ToWpfPoint(), hitTestTolerance / scale);
             }
 
             public ResizeHandle GetHandleAt(RoiBase roi, Point point, double scale, double handleSize, double handleHitPadding, double infoTextOffset, double polygonVertexHitPadding)
             {
                 var angle = (AngleMeasureRoi)roi;
                 double hSize = (handleSize + handleHitPadding) / scale;
-                if (IsNear(point, angle.P1, hSize)) return ResizeHandle.P1;
-                if (IsNear(point, angle.Vertex, hSize)) return ResizeHandle.Vertex;
-                if (IsNear(point, angle.P2, hSize)) return ResizeHandle.P2;
+                if (IsNear(point, angle.P1.ToWpfPoint(), hSize)) return ResizeHandle.P1;
+                if (IsNear(point, angle.Vertex.ToWpfPoint(), hSize)) return ResizeHandle.Vertex;
+                if (IsNear(point, angle.P2.ToWpfPoint(), hSize)) return ResizeHandle.P2;
                 return ResizeHandle.None;
             }
 
             public void Move(RoiBase roi, double dx, double dy)
             {
                 var angle = (AngleMeasureRoi)roi;
-                angle.P1 = new Point(angle.P1.X + dx, angle.P1.Y + dy);
-                angle.Vertex = new Point(angle.Vertex.X + dx, angle.Vertex.Y + dy);
-                angle.P2 = new Point(angle.P2.X + dx, angle.P2.Y + dy);
+                angle.P1 = new Point(angle.P1.X + dx, angle.P1.Y + dy).ToPointD();
+                angle.Vertex = new Point(angle.Vertex.X + dx, angle.Vertex.Y + dy).ToPointD();
+                angle.P2 = new Point(angle.P2.X + dx, angle.P2.Y + dy).ToPointD();
             }
 
             public void Resize(RoiBase roi, ResizeHandle handle, double dx, double dy, Point currentPos, double minimumRoiDimension)
             {
                 var angle = (AngleMeasureRoi)roi;
-                if (handle == ResizeHandle.P1) angle.P1 = currentPos;
-                else if (handle == ResizeHandle.Vertex) angle.Vertex = currentPos;
-                else if (handle == ResizeHandle.P2) angle.P2 = currentPos;
+                if (handle == ResizeHandle.P1) angle.P1 = currentPos.ToPointD();
+                else if (handle == ResizeHandle.Vertex) angle.Vertex = currentPos.ToPointD();
+                else if (handle == ResizeHandle.P2) angle.P2 = currentPos.ToPointD();
             }
         }
 
@@ -170,35 +170,35 @@ namespace ImageViewer.Services
             public bool HitTest(RoiBase roi, Point point, double scale, double hitTestTolerance)
             {
                 var arc = (ArcMeasureRoi)roi;
-                return GeometryUtils.IsPointNearSegment(point, arc.StartPoint, arc.EndPoint, hitTestTolerance / scale) ||
-                       GeometryUtils.IsPointNearSegment(point, arc.StartPoint, arc.ArcPoint, hitTestTolerance / scale) ||
-                       GeometryUtils.IsPointNearSegment(point, arc.ArcPoint, arc.EndPoint, hitTestTolerance / scale);
+                return GeometryUtils.IsPointNearSegment(point, arc.StartPoint.ToWpfPoint(), arc.EndPoint.ToWpfPoint(), hitTestTolerance / scale) ||
+                       GeometryUtils.IsPointNearSegment(point, arc.StartPoint.ToWpfPoint(), arc.ArcPoint.ToWpfPoint(), hitTestTolerance / scale) ||
+                       GeometryUtils.IsPointNearSegment(point, arc.ArcPoint.ToWpfPoint(), arc.EndPoint.ToWpfPoint(), hitTestTolerance / scale);
             }
 
             public ResizeHandle GetHandleAt(RoiBase roi, Point point, double scale, double handleSize, double handleHitPadding, double infoTextOffset, double polygonVertexHitPadding)
             {
                 var arc = (ArcMeasureRoi)roi;
                 double hSize = (handleSize + handleHitPadding) / scale;
-                if (IsNear(point, arc.StartPoint, hSize)) return ResizeHandle.P1;
-                if (IsNear(point, arc.EndPoint, hSize)) return ResizeHandle.P2;
-                if (IsNear(point, arc.ArcPoint, hSize)) return ResizeHandle.Vertex;
+                if (IsNear(point, arc.StartPoint.ToWpfPoint(), hSize)) return ResizeHandle.P1;
+                if (IsNear(point, arc.EndPoint.ToWpfPoint(), hSize)) return ResizeHandle.P2;
+                if (IsNear(point, arc.ArcPoint.ToWpfPoint(), hSize)) return ResizeHandle.Vertex;
                 return ResizeHandle.None;
             }
 
             public void Move(RoiBase roi, double dx, double dy)
             {
                 var arc = (ArcMeasureRoi)roi;
-                arc.StartPoint = new Point(arc.StartPoint.X + dx, arc.StartPoint.Y + dy);
-                arc.EndPoint = new Point(arc.EndPoint.X + dx, arc.EndPoint.Y + dy);
-                arc.ArcPoint = new Point(arc.ArcPoint.X + dx, arc.ArcPoint.Y + dy);
+                arc.StartPoint = new Point(arc.StartPoint.X + dx, arc.StartPoint.Y + dy).ToPointD();
+                arc.EndPoint = new Point(arc.EndPoint.X + dx, arc.EndPoint.Y + dy).ToPointD();
+                arc.ArcPoint = new Point(arc.ArcPoint.X + dx, arc.ArcPoint.Y + dy).ToPointD();
             }
 
             public void Resize(RoiBase roi, ResizeHandle handle, double dx, double dy, Point currentPos, double minimumRoiDimension)
             {
                 var arc = (ArcMeasureRoi)roi;
-                if (handle == ResizeHandle.P1) arc.StartPoint = currentPos;
-                else if (handle == ResizeHandle.P2) arc.EndPoint = currentPos;
-                else if (handle == ResizeHandle.Vertex) arc.ArcPoint = currentPos;
+                if (handle == ResizeHandle.P1) arc.StartPoint = currentPos.ToPointD();
+                else if (handle == ResizeHandle.P2) arc.EndPoint = currentPos.ToPointD();
+                else if (handle == ResizeHandle.Vertex) arc.ArcPoint = currentPos.ToPointD();
             }
         }
 
@@ -209,34 +209,34 @@ namespace ImageViewer.Services
             public bool HitTest(RoiBase roi, Point point, double scale, double hitTestTolerance)
             {
                 var p2l = (PointToLineDistanceRoi)roi;
-                return GeometryUtils.Distance(p2l.Point, point) <= hitTestTolerance / scale ||
-                       GeometryUtils.IsPointNearSegment(point, p2l.LineP1, p2l.LineP2, hitTestTolerance / scale);
+                return GeometryUtils.Distance(p2l.Point.ToWpfPoint(), point) <= hitTestTolerance / scale ||
+                       GeometryUtils.IsPointNearSegment(point, p2l.LineP1.ToWpfPoint(), p2l.LineP2.ToWpfPoint(), hitTestTolerance / scale);
             }
 
             public ResizeHandle GetHandleAt(RoiBase roi, Point point, double scale, double handleSize, double handleHitPadding, double infoTextOffset, double polygonVertexHitPadding)
             {
                 var p2l = (PointToLineDistanceRoi)roi;
                 double hSize = (handleSize + handleHitPadding) / scale;
-                if (IsNear(point, p2l.Point, hSize)) return ResizeHandle.P1;
-                if (IsNear(point, p2l.LineP1, hSize)) return ResizeHandle.P2;
-                if (IsNear(point, p2l.LineP2, hSize)) return ResizeHandle.Vertex;
+                if (IsNear(point, p2l.Point.ToWpfPoint(), hSize)) return ResizeHandle.P1;
+                if (IsNear(point, p2l.LineP1.ToWpfPoint(), hSize)) return ResizeHandle.P2;
+                if (IsNear(point, p2l.LineP2.ToWpfPoint(), hSize)) return ResizeHandle.Vertex;
                 return ResizeHandle.None;
             }
 
             public void Move(RoiBase roi, double dx, double dy)
             {
                 var p2l = (PointToLineDistanceRoi)roi;
-                p2l.Point = new Point(p2l.Point.X + dx, p2l.Point.Y + dy);
-                p2l.LineP1 = new Point(p2l.LineP1.X + dx, p2l.LineP1.Y + dy);
-                p2l.LineP2 = new Point(p2l.LineP2.X + dx, p2l.LineP2.Y + dy);
+                p2l.Point = new Point(p2l.Point.X + dx, p2l.Point.Y + dy).ToPointD();
+                p2l.LineP1 = new Point(p2l.LineP1.X + dx, p2l.LineP1.Y + dy).ToPointD();
+                p2l.LineP2 = new Point(p2l.LineP2.X + dx, p2l.LineP2.Y + dy).ToPointD();
             }
 
             public void Resize(RoiBase roi, ResizeHandle handle, double dx, double dy, Point currentPos, double minimumRoiDimension)
             {
                 var p2l = (PointToLineDistanceRoi)roi;
-                if (handle == ResizeHandle.P1) p2l.Point = currentPos;
-                else if (handle == ResizeHandle.P2) p2l.LineP1 = currentPos;
-                else if (handle == ResizeHandle.Vertex) p2l.LineP2 = currentPos;
+                if (handle == ResizeHandle.P1) p2l.Point = currentPos.ToPointD();
+                else if (handle == ResizeHandle.P2) p2l.LineP1 = currentPos.ToPointD();
+                else if (handle == ResizeHandle.Vertex) p2l.LineP2 = currentPos.ToPointD();
             }
         }
 
@@ -247,30 +247,30 @@ namespace ImageViewer.Services
             public bool HitTest(RoiBase roi, Point point, double scale, double hitTestTolerance)
             {
                 var p2c = (PointToCircleDistanceRoi)roi;
-                return GeometryUtils.Distance(p2c.Point, point) <= hitTestTolerance / scale ||
-                       GeometryUtils.Distance(p2c.Center, point) <= p2c.Radius + hitTestTolerance / scale;
+                return GeometryUtils.Distance(p2c.Point.ToWpfPoint(), point) <= hitTestTolerance / scale ||
+                       GeometryUtils.Distance(p2c.Center.ToWpfPoint(), point) <= p2c.Radius + hitTestTolerance / scale;
             }
 
             public ResizeHandle GetHandleAt(RoiBase roi, Point point, double scale, double handleSize, double handleHitPadding, double infoTextOffset, double polygonVertexHitPadding)
             {
                 var p2c = (PointToCircleDistanceRoi)roi;
                 double hSize = (handleSize + handleHitPadding) / scale;
-                if (IsNear(point, p2c.Point, hSize)) return ResizeHandle.P1;
-                if (IsNear(point, p2c.Center, hSize)) return ResizeHandle.P2;
+                if (IsNear(point, p2c.Point.ToWpfPoint(), hSize)) return ResizeHandle.P1;
+                if (IsNear(point, p2c.Center.ToWpfPoint(), hSize)) return ResizeHandle.P2;
                 return ResizeHandle.None;
             }
 
             public void Move(RoiBase roi, double dx, double dy)
             {
                 var p2c = (PointToCircleDistanceRoi)roi;
-                p2c.Point = new Point(p2c.Point.X + dx, p2c.Point.Y + dy);
-                p2c.Center = new Point(p2c.Center.X + dx, p2c.Center.Y + dy);
+                p2c.Point = new Point(p2c.Point.X + dx, p2c.Point.Y + dy).ToPointD();
+                p2c.Center = new Point(p2c.Center.X + dx, p2c.Center.Y + dy).ToPointD();
             }
 
             public void Resize(RoiBase roi, ResizeHandle handle, double dx, double dy, Point currentPos, double minimumRoiDimension)
             {
                 var p2c = (PointToCircleDistanceRoi)roi;
-                if (handle == ResizeHandle.P1) p2c.Point = currentPos;
+                if (handle == ResizeHandle.P1) p2c.Point = currentPos.ToPointD();
                 else if (handle == ResizeHandle.P2)
                 {
                     double dx2 = currentPos.X - p2c.Center.X;
@@ -287,37 +287,37 @@ namespace ImageViewer.Services
             public bool HitTest(RoiBase roi, Point point, double scale, double hitTestTolerance)
             {
                 var para = (ParallelismMeasureRoi)roi;
-                return GeometryUtils.IsPointNearSegment(point, para.Line1P1, para.Line1P2, hitTestTolerance / scale) ||
-                       GeometryUtils.IsPointNearSegment(point, para.Line2P1, para.Line2P2, hitTestTolerance / scale);
+                return GeometryUtils.IsPointNearSegment(point, para.Line1P1.ToWpfPoint(), para.Line1P2.ToWpfPoint(), hitTestTolerance / scale) ||
+                       GeometryUtils.IsPointNearSegment(point, para.Line2P1.ToWpfPoint(), para.Line2P2.ToWpfPoint(), hitTestTolerance / scale);
             }
 
             public ResizeHandle GetHandleAt(RoiBase roi, Point point, double scale, double handleSize, double handleHitPadding, double infoTextOffset, double polygonVertexHitPadding)
             {
                 var para = (ParallelismMeasureRoi)roi;
                 double hSize = (handleSize + handleHitPadding) / scale;
-                if (IsNear(point, para.Line1P1, hSize)) return ResizeHandle.P1;
-                if (IsNear(point, para.Line1P2, hSize)) return ResizeHandle.P2;
-                if (IsNear(point, para.Line2P1, hSize)) return ResizeHandle.Vertex;
-                if (IsNear(point, para.Line2P2, hSize)) return ResizeHandle.P3;
+                if (IsNear(point, para.Line1P1.ToWpfPoint(), hSize)) return ResizeHandle.P1;
+                if (IsNear(point, para.Line1P2.ToWpfPoint(), hSize)) return ResizeHandle.P2;
+                if (IsNear(point, para.Line2P1.ToWpfPoint(), hSize)) return ResizeHandle.Vertex;
+                if (IsNear(point, para.Line2P2.ToWpfPoint(), hSize)) return ResizeHandle.P3;
                 return ResizeHandle.None;
             }
 
             public void Move(RoiBase roi, double dx, double dy)
             {
                 var para = (ParallelismMeasureRoi)roi;
-                para.Line1P1 = new Point(para.Line1P1.X + dx, para.Line1P1.Y + dy);
-                para.Line1P2 = new Point(para.Line1P2.X + dx, para.Line1P2.Y + dy);
-                para.Line2P1 = new Point(para.Line2P1.X + dx, para.Line2P1.Y + dy);
-                para.Line2P2 = new Point(para.Line2P2.X + dx, para.Line2P2.Y + dy);
+                para.Line1P1 = new Point(para.Line1P1.X + dx, para.Line1P1.Y + dy).ToPointD();
+                para.Line1P2 = new Point(para.Line1P2.X + dx, para.Line1P2.Y + dy).ToPointD();
+                para.Line2P1 = new Point(para.Line2P1.X + dx, para.Line2P1.Y + dy).ToPointD();
+                para.Line2P2 = new Point(para.Line2P2.X + dx, para.Line2P2.Y + dy).ToPointD();
             }
 
             public void Resize(RoiBase roi, ResizeHandle handle, double dx, double dy, Point currentPos, double minimumRoiDimension)
             {
                 var para = (ParallelismMeasureRoi)roi;
-                if (handle == ResizeHandle.P1) para.Line1P1 = currentPos;
-                else if (handle == ResizeHandle.P2) para.Line1P2 = currentPos;
-                else if (handle == ResizeHandle.Vertex) para.Line2P1 = currentPos;
-                else if (handle == ResizeHandle.P3) para.Line2P2 = currentPos;
+                if (handle == ResizeHandle.P1) para.Line1P1 = currentPos.ToPointD();
+                else if (handle == ResizeHandle.P2) para.Line1P2 = currentPos.ToPointD();
+                else if (handle == ResizeHandle.Vertex) para.Line2P1 = currentPos.ToPointD();
+                else if (handle == ResizeHandle.P3) para.Line2P2 = currentPos.ToPointD();
             }
         }
 
@@ -328,37 +328,37 @@ namespace ImageViewer.Services
             public bool HitTest(RoiBase roi, Point point, double scale, double hitTestTolerance)
             {
                 var perp = (PerpendicularityMeasureRoi)roi;
-                return GeometryUtils.IsPointNearSegment(point, perp.Line1P1, perp.Line1P2, hitTestTolerance / scale) ||
-                       GeometryUtils.IsPointNearSegment(point, perp.Line2P1, perp.Line2P2, hitTestTolerance / scale);
+                return GeometryUtils.IsPointNearSegment(point, perp.Line1P1.ToWpfPoint(), perp.Line1P2.ToWpfPoint(), hitTestTolerance / scale) ||
+                       GeometryUtils.IsPointNearSegment(point, perp.Line2P1.ToWpfPoint(), perp.Line2P2.ToWpfPoint(), hitTestTolerance / scale);
             }
 
             public ResizeHandle GetHandleAt(RoiBase roi, Point point, double scale, double handleSize, double handleHitPadding, double infoTextOffset, double polygonVertexHitPadding)
             {
                 var perp = (PerpendicularityMeasureRoi)roi;
                 double hSize = (handleSize + handleHitPadding) / scale;
-                if (IsNear(point, perp.Line1P1, hSize)) return ResizeHandle.P1;
-                if (IsNear(point, perp.Line1P2, hSize)) return ResizeHandle.P2;
-                if (IsNear(point, perp.Line2P1, hSize)) return ResizeHandle.Vertex;
-                if (IsNear(point, perp.Line2P2, hSize)) return ResizeHandle.P3;
+                if (IsNear(point, perp.Line1P1.ToWpfPoint(), hSize)) return ResizeHandle.P1;
+                if (IsNear(point, perp.Line1P2.ToWpfPoint(), hSize)) return ResizeHandle.P2;
+                if (IsNear(point, perp.Line2P1.ToWpfPoint(), hSize)) return ResizeHandle.Vertex;
+                if (IsNear(point, perp.Line2P2.ToWpfPoint(), hSize)) return ResizeHandle.P3;
                 return ResizeHandle.None;
             }
 
             public void Move(RoiBase roi, double dx, double dy)
             {
                 var perp = (PerpendicularityMeasureRoi)roi;
-                perp.Line1P1 = new Point(perp.Line1P1.X + dx, perp.Line1P1.Y + dy);
-                perp.Line1P2 = new Point(perp.Line1P2.X + dx, perp.Line1P2.Y + dy);
-                perp.Line2P1 = new Point(perp.Line2P1.X + dx, perp.Line2P1.Y + dy);
-                perp.Line2P2 = new Point(perp.Line2P2.X + dx, perp.Line2P2.Y + dy);
+                perp.Line1P1 = new Point(perp.Line1P1.X + dx, perp.Line1P1.Y + dy).ToPointD();
+                perp.Line1P2 = new Point(perp.Line1P2.X + dx, perp.Line1P2.Y + dy).ToPointD();
+                perp.Line2P1 = new Point(perp.Line2P1.X + dx, perp.Line2P1.Y + dy).ToPointD();
+                perp.Line2P2 = new Point(perp.Line2P2.X + dx, perp.Line2P2.Y + dy).ToPointD();
             }
 
             public void Resize(RoiBase roi, ResizeHandle handle, double dx, double dy, Point currentPos, double minimumRoiDimension)
             {
                 var perp = (PerpendicularityMeasureRoi)roi;
-                if (handle == ResizeHandle.P1) perp.Line1P1 = currentPos;
-                else if (handle == ResizeHandle.P2) perp.Line1P2 = currentPos;
-                else if (handle == ResizeHandle.Vertex) perp.Line2P1 = currentPos;
-                else if (handle == ResizeHandle.P3) perp.Line2P2 = currentPos;
+                if (handle == ResizeHandle.P1) perp.Line1P1 = currentPos.ToPointD();
+                else if (handle == ResizeHandle.P2) perp.Line1P2 = currentPos.ToPointD();
+                else if (handle == ResizeHandle.Vertex) perp.Line2P1 = currentPos.ToPointD();
+                else if (handle == ResizeHandle.P3) perp.Line2P2 = currentPos.ToPointD();
             }
         }
 
@@ -369,24 +369,24 @@ namespace ImageViewer.Services
             public bool HitTest(RoiBase roi, Point point, double scale, double hitTestTolerance)
             {
                 var conc = (ConcentricityMeasureRoi)roi;
-                return GeometryUtils.Distance(conc.Center1, point) <= conc.Radius1 + hitTestTolerance / scale ||
-                       GeometryUtils.Distance(conc.Center2, point) <= conc.Radius2 + hitTestTolerance / scale;
+                return GeometryUtils.Distance(conc.Center1.ToWpfPoint(), point) <= conc.Radius1 + hitTestTolerance / scale ||
+                       GeometryUtils.Distance(conc.Center2.ToWpfPoint(), point) <= conc.Radius2 + hitTestTolerance / scale;
             }
 
             public ResizeHandle GetHandleAt(RoiBase roi, Point point, double scale, double handleSize, double handleHitPadding, double infoTextOffset, double polygonVertexHitPadding)
             {
                 var conc = (ConcentricityMeasureRoi)roi;
                 double hSize = (handleSize + handleHitPadding) / scale;
-                if (IsNear(point, conc.Center1, hSize)) return ResizeHandle.P1;
-                if (IsNear(point, conc.Center2, hSize)) return ResizeHandle.P2;
+                if (IsNear(point, conc.Center1.ToWpfPoint(), hSize)) return ResizeHandle.P1;
+                if (IsNear(point, conc.Center2.ToWpfPoint(), hSize)) return ResizeHandle.P2;
                 return ResizeHandle.None;
             }
 
             public void Move(RoiBase roi, double dx, double dy)
             {
                 var conc = (ConcentricityMeasureRoi)roi;
-                conc.Center1 = new Point(conc.Center1.X + dx, conc.Center1.Y + dy);
-                conc.Center2 = new Point(conc.Center2.X + dx, conc.Center2.Y + dy);
+                conc.Center1 = new Point(conc.Center1.X + dx, conc.Center1.Y + dy).ToPointD();
+                conc.Center2 = new Point(conc.Center2.X + dx, conc.Center2.Y + dy).ToPointD();
             }
 
             public void Resize(RoiBase roi, ResizeHandle handle, double dx, double dy, Point currentPos, double minimumRoiDimension)

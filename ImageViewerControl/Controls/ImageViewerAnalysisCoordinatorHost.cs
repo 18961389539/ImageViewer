@@ -28,15 +28,15 @@ namespace ImageViewer.Controls
         public IImageViewerRenderService RenderService => _owner.RuntimeServices.RenderService;
         public ImageSource? ImageSource => _owner.ImageSource;
         public bool EnableGpuRendering => _owner.EnableGpuRendering;
-        public bool PreferShaderPseudoColor => _owner.PreferShaderPseudoColor;
-        public bool AllowCpuPseudoColorFallback => _owner.AllowCpuPseudoColorFallback;
+        public bool PreferShaderPseudoColor => _owner.RuntimeOptions.PreferShaderPseudoColor;
+        public bool AllowCpuPseudoColorFallback => _owner.RuntimeOptions.AllowCpuPseudoColorFallback;
         public PseudoColorPalette PseudoColorPalette => _owner.PseudoColorPalette;
-        public bool EnableImagePyramid => _owner.EnableImagePyramid;
-        public bool AutoSelectPyramidLevel => _owner.AutoSelectPyramidLevel;
-        public bool EnableTiledRendering => _owner.EnableTiledRendering;
-        public bool PrefetchAdjacentTiles => _owner.PrefetchAdjacentTiles;
-        public int TileCacheMaximumMegabytes => _owner.TileCacheMaximumMegabytes;
-        public int TilePrefetchRadius => _owner.TilePrefetchRadius;
+        public bool EnableImagePyramid => _owner.RuntimeOptions.EnableImagePyramid;
+        public bool AutoSelectPyramidLevel => _owner.RuntimeOptions.AutoSelectPyramidLevel;
+        public bool EnableTiledRendering => _owner.RuntimeOptions.EnableTiledRendering;
+        public bool PrefetchAdjacentTiles => _owner.RuntimeOptions.PrefetchAdjacentTiles;
+        public int TileCacheMaximumMegabytes => _owner.RuntimeOptions.TileCacheMaximumMegabytes;
+        public int TilePrefetchRadius => _owner.RuntimeOptions.TilePrefetchRadius;
         public double Scale => _owner.Scale;
         public Point Translation => _translationProvider();
         public Size ViewportSize => _viewportSizeProvider();
@@ -44,8 +44,8 @@ namespace ImageViewer.Controls
         public int HistogramBinCount => ImageViewerAnalysisCoordinator.HistogramBinCount;
         public bool ShowHistogram => _owner.ShowHistogram;
         public bool ShowProfile => _owner.ShowProfile;
-        public bool EnableAsyncAnalysis => _owner.EnableAsyncAnalysis;
-        public bool PauseRealtimeHistogram => _owner.PauseRealtimeHistogram;
-        public bool PauseRealtimeProfile => _owner.PauseRealtimeProfile;
+        public bool EnableAsyncAnalysis => _owner.RuntimeOptions.EnableAsyncAnalysis;
+        public bool PauseRealtimeHistogram => _owner.RuntimeOptions.PauseRealtimeHistogram;
+        public bool PauseRealtimeProfile => _owner.RuntimeOptions.PauseRealtimeProfile;
     }
 }

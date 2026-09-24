@@ -5,7 +5,7 @@ namespace ImageViewer.Controls
 {
     public partial class ImageViewer
     {
-        private sealed class CommandControllerAssembler
+        internal sealed class CommandControllerAssembler
         {
             private readonly ImageViewer _owner;
 

@@ -1,5 +1,4 @@
 using System;
-using System.Windows.Media;
 using ImageViewer.Models;
 
 namespace ImageViewer.Controls
@@ -41,7 +40,7 @@ namespace ImageViewer.Controls
 
         public void SetSelectedLabel() => _dependencies.RoiEditController.SetSelectedLabel();
 
-        public void SetSelectedColor(Color color) => _dependencies.RoiEditController.SetSelectedColor(color);
+        public void SetSelectedColor(RoiColor color) => _dependencies.RoiEditController.SetSelectedColor(color);
 
         public void CalibrateSelectedRoi() => _dependencies.CalibrationController.CalibrateSelectedRoi();
 

@@ -1,4 +1,3 @@
-using System.Windows;
 using ImageViewer.Common;
 
 namespace ImageViewer.Models
@@ -10,28 +9,28 @@ namespace ImageViewer.Models
     /// </summary>
     public class AngleMeasureRoi : RoiBase
     {
-        private Point _p1;
-        private Point _vertex;
-        private Point _p2;
+        private PointD _p1;
+        private PointD _vertex;
+        private PointD _p2;
 
         public AngleMeasureRoi()
         {
-            StrokeColor = System.Windows.Media.Colors.Orange;
+            StrokeColor = RoiColors.Orange;
         }
 
-        public Point P1
+        public PointD P1
         {
             get => _p1;
             set => SetProperty(ref _p1, value);
         }
 
-        public Point Vertex
+        public PointD Vertex
         {
             get => _vertex;
             set => SetProperty(ref _vertex, value);
         }
 
-        public Point P2
+        public PointD P2
         {
             get => _p2;
             set => SetProperty(ref _p2, value);
@@ -48,7 +47,8 @@ namespace ImageViewer.Models
                 StrokeColor = StrokeColor,
                 StrokeThickness = StrokeThickness,
                 IsVisible = IsVisible,
-                IsLocked = IsLocked
+                IsLocked = IsLocked,
+                Tolerance = Tolerance?.Clone()
             };
         }
 

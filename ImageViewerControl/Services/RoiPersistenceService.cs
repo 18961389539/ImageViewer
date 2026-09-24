@@ -35,21 +35,35 @@ namespace ImageViewer.Services
 
         public static string Serialize(IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, RoiPluginRegistry? pluginRegistry = null)
         {
-            ArgumentNullException.ThrowIfNull(rois);
             var roiPlugins = pluginRegistry ?? throw new ArgumentNullException(nameof(pluginRegistry));
+            return JsonSerializer.Serialize(CreateDocument(rois, pixelSize, physicalUnit, roiPlugins), ImageViewerJsonSerializationContext.Default.RoiDocument);
+        }
 
-            var document = new RoiDocument
+        /// <summary>
+        /// 构造 ROI 文档对象。
+        /// Chinese: 供会话文档直接内嵌使用，避免把 ROI 文档再序列化成字符串造成 JSON 套 JSON；
+        /// unresolvedItems 为加载时未能识别的载荷，原样附在文档尾部，保证缺插件时数据不被抹掉。
+        /// English: Builds the ROI document object so session files can embed it directly instead of nesting JSON
+        /// in a string. Unresolved payloads are appended verbatim so a missing plugin never erases data.
+        /// </summary>
+        internal static RoiDocument CreateDocument(IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, RoiPluginRegistry pluginRegistry, IEnumerable<RoiPersistenceData>? unresolvedItems = null)
+        {
+            ArgumentNullException.ThrowIfNull(rois);
+            ArgumentNullException.ThrowIfNull(pluginRegistry);
+
+            return new RoiDocument
             {
                 Version = CurrentDocumentVersion,
                 PixelSize = pixelSize,
                 PhysicalUnit = string.IsNullOrWhiteSpace(physicalUnit) ? "px" : physicalUnit,
-                Items = rois.Select(roi => CreateItem(roi, roiPlugins)).ToList()
+                Items = rois
+                    .Select(roi => CreateItem(roi, pluginRegistry))
+                    .Concat(unresolvedItems ?? [])
+                    .ToList()
             };
-
-            return JsonSerializer.Serialize(document, ImageViewerJsonSerializationContext.Default.RoiDocument);
         }
 
-        public static (IReadOnlyList<RoiBase> Rois, double PixelSize, string PhysicalUnit) LoadFromFile(string filePath, RoiPluginRegistry? pluginRegistry = null)
+        public static RoiDocumentLoadResult LoadFromFile(string filePath, RoiPluginRegistry? pluginRegistry = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
             ArgumentNullException.ThrowIfNull(pluginRegistry);
@@ -57,7 +71,7 @@ namespace ImageViewer.Services
             return Deserialize(File.ReadAllText(filePath), pluginRegistry);
         }
 
-        public static async Task<(IReadOnlyList<RoiBase> Rois, double PixelSize, string PhysicalUnit)> LoadFromFileAsync(string filePath, RoiPluginRegistry? pluginRegistry = null, CancellationToken cancellationToken = default)
+        public static async Task<RoiDocumentLoadResult> LoadFromFileAsync(string filePath, RoiPluginRegistry? pluginRegistry = null, CancellationToken cancellationToken = default)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
             ArgumentNullException.ThrowIfNull(pluginRegistry);
@@ -65,22 +79,63 @@ namespace ImageViewer.Services
             return Deserialize(await File.ReadAllTextAsync(filePath, cancellationToken).ConfigureAwait(false), pluginRegistry);
         }
 
-        public static (IReadOnlyList<RoiBase> Rois, double PixelSize, string PhysicalUnit) Deserialize(string json, RoiPluginRegistry? pluginRegistry = null)
+        public static RoiDocumentLoadResult Deserialize(string json, RoiPluginRegistry? pluginRegistry = null)
         {
             ArgumentNullException.ThrowIfNull(json);
             var roiPlugins = pluginRegistry ?? throw new ArgumentNullException(nameof(pluginRegistry));
 
             var document = JsonSerializer.Deserialize(json, ImageViewerJsonSerializationContext.Default.RoiDocument) ?? new RoiDocument();
-            var rois = document.Items
-                .Select(item => CreateRoi(item, roiPlugins))
-                .Where(roi => roi != null)
-                .Cast<RoiBase>()
-                .ToList();
+            return CreateRois(document, roiPlugins);
+        }
 
-            return (
+        /// <summary>
+        /// 从 ROI 文档对象还原 ROI 集合。
+        /// Chinese: 供会话文档直接内嵌使用；版本校验集中在这里，只保留一份。
+        /// 无法识别的类型（插件缺失 / 类型键变更）不再静默丢弃，而是随结果带出，供调用方告警并在保存时原样保留。
+        /// English: Restores ROIs from the ROI document object; version validation lives here only. Payloads with no
+        /// registered plugin are returned as unresolved items instead of being dropped silently.
+        /// </summary>
+        internal static RoiDocumentLoadResult CreateRois(RoiDocument document, RoiPluginRegistry pluginRegistry)
+        {
+            ArgumentNullException.ThrowIfNull(document);
+            ArgumentNullException.ThrowIfNull(pluginRegistry);
+
+            ValidateDocumentVersion(document.Version);
+
+            var rois = new List<RoiBase>(document.Items.Count);
+            var unresolvedItems = new List<RoiPersistenceData>();
+            foreach (RoiPersistenceData item in document.Items)
+            {
+                RoiBase? roi = CreateRoi(item, pluginRegistry);
+                if (roi == null)
+                {
+                    unresolvedItems.Add(item);
+                    continue;
+                }
+
+                rois.Add(roi);
+            }
+
+            return new RoiDocumentLoadResult(
                 rois,
+                unresolvedItems,
                 document.PixelSize <= 0 ? 1.0 : document.PixelSize,
                 string.IsNullOrWhiteSpace(document.PhysicalUnit) ? "px" : document.PhysicalUnit);
+        }
+
+        /// <summary>
+        /// 校验 ROI 文档版本。
+        /// Chinese: 版本号高于当前支持版本时拒绝加载，避免用旧代码误读新格式；缺失或非正数视为早期文件，宽容接受。
+        /// English: Rejects documents written by a newer format so old code never misreads a new layout.
+        /// Missing or non-positive versions are treated as early files and accepted leniently.
+        /// </summary>
+        private static void ValidateDocumentVersion(int version)
+        {
+            if (version > CurrentDocumentVersion)
+            {
+                throw new NotSupportedException(
+                    $"The ROI document version {version} is newer than the supported version {CurrentDocumentVersion}.");
+            }
         }
 
         private static RoiPersistenceData CreateItem(RoiBase roi, RoiPluginRegistry roiPlugins)
@@ -119,4 +174,17 @@ namespace ImageViewer.Services
         }
 
     }
+
+    /// <summary>
+    /// ROI 文档加载结果。
+    /// Chinese: 除解析成功的标注外，还带出未能识别的载荷（缺插件 / 类型键变更），
+    /// 调用方据此告警并在保存时原样回写，避免"打开即丢"。
+    /// English: Load result carrying both the parsed ROIs and the payloads no plugin could resolve, so callers can
+    /// warn the operator and preserve them on the next save.
+    /// </summary>
+    public sealed record RoiDocumentLoadResult(
+        IReadOnlyList<RoiBase> Rois,
+        IReadOnlyList<RoiPersistenceData> UnresolvedItems,
+        double PixelSize,
+        string PhysicalUnit);
 }

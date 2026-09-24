@@ -1,35 +1,34 @@
 using System;
-using System.Windows;
 using ImageViewer.Common;
 
 namespace ImageViewer.Models
 {
     public class PointToLineDistanceRoi : RoiBase
     {
-        private Point _point;
-        private Point _lineP1;
-        private Point _lineP2;
+        private PointD _point;
+        private PointD _lineP1;
+        private PointD _lineP2;
 
         public PointToLineDistanceRoi()
         {
-            StrokeColor = System.Windows.Media.Colors.LimeGreen;
+            StrokeColor = RoiColors.LimeGreen;
         }
 
         public override string RoiTypeName => "PointToLineDistance";
 
-        public Point Point
+        public PointD Point
         {
             get => _point;
             set => SetProperty(ref _point, value);
         }
 
-        public Point LineP1
+        public PointD LineP1
         {
             get => _lineP1;
             set => SetProperty(ref _lineP1, value);
         }
 
-        public Point LineP2
+        public PointD LineP2
         {
             get => _lineP2;
             set => SetProperty(ref _lineP2, value);
@@ -60,7 +59,7 @@ namespace ImageViewer.Models
             }
         }
 
-        public Point FootPoint
+        public PointD FootPoint
         {
             get
             {
@@ -76,7 +75,7 @@ namespace ImageViewer.Models
                 double t = ((Point.X - LineP1.X) * dx + (Point.Y - LineP1.Y) * dy) / lineLengthSquared;
                 t = Math.Max(0, Math.Min(1, t));
 
-                return new Point(LineP1.X + t * dx, LineP1.Y + t * dy);
+                return new PointD(LineP1.X + t * dx, LineP1.Y + t * dy);
             }
         }
 
@@ -91,7 +90,8 @@ namespace ImageViewer.Models
                 StrokeColor = StrokeColor,
                 StrokeThickness = StrokeThickness,
                 IsVisible = IsVisible,
-                IsLocked = IsLocked
+                IsLocked = IsLocked,
+                Tolerance = Tolerance?.Clone()
             };
         }
 

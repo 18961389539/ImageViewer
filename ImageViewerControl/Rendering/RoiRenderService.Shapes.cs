@@ -20,13 +20,13 @@ namespace ImageViewer.Rendering
                 if (!rect.IsVisible) return;
 
                 Brush brush = RoiRenderContext.ResolveStroke(strokeOverride, rect.StrokeColor);
-                context.DrawRectangleOutline(rect.Center, rect.Width, rect.Height, rect.Angle, brush, (isSelected ? 3 : rect.StrokeThickness) / context.Scale, RoiRenderContext.CreateTranslucentFill(brush));
+                context.DrawRectangleOutline(rect.Center.ToWpfPoint(), rect.Width, rect.Height, rect.Angle, brush, (isSelected ? 3 : rect.StrokeThickness) / context.Scale, RoiRenderContext.CreateTranslucentFill(brush));
 
-                context.DrawInfoText(StandardRoiInfoTextFormatter.BuildRotatedRectText(rect, context), StandardRoiLayoutHelper.GetTopInfoAnchor(rect.Center, rect.Height / 2, context), brush, true);
+                context.DrawInfoText(StandardRoiInfoTextFormatter.BuildRotatedRectText(rect, context), StandardRoiLayoutHelper.GetTopInfoAnchor(rect.Center.ToWpfPoint(), rect.Height / 2, context), brush, true);
 
                 if (isSelected)
                 {
-                    StandardRoiLayoutHelper.DrawRotatedBoxHandles(context, rect.Center, rect.Width / 2, rect.Height / 2, rect.Angle);
+                    StandardRoiLayoutHelper.DrawRotatedBoxHandles(context, rect.Center.ToWpfPoint(), rect.Width / 2, rect.Height / 2, rect.Angle);
                 }
             }
         }
@@ -41,12 +41,12 @@ namespace ImageViewer.Rendering
                 if (!blobRoi.IsVisible) return;
 
                 Brush brush = RoiRenderContext.ResolveStroke(strokeOverride, blobRoi.StrokeColor);
-                context.DrawRectangleOutline(blobRoi.Center, blobRoi.Width, blobRoi.Height, blobRoi.Angle, brush, (isSelected ? 3 : blobRoi.StrokeThickness) / context.Scale, RoiRenderContext.CreateTranslucentFill(brush));
-                context.DrawInfoText(StandardRoiInfoTextFormatter.BuildBlobAnalysisText(blobRoi), StandardRoiLayoutHelper.GetTopInfoAnchor(blobRoi.Center, blobRoi.Height / 2, context), brush, true);
+                context.DrawRectangleOutline(blobRoi.Center.ToWpfPoint(), blobRoi.Width, blobRoi.Height, blobRoi.Angle, brush, (isSelected ? 3 : blobRoi.StrokeThickness) / context.Scale, RoiRenderContext.CreateTranslucentFill(brush));
+                context.DrawInfoText(StandardRoiInfoTextFormatter.BuildBlobAnalysisText(blobRoi), StandardRoiLayoutHelper.GetTopInfoAnchor(blobRoi.Center.ToWpfPoint(), blobRoi.Height / 2, context), brush, true);
 
                 if (isSelected)
                 {
-                    StandardRoiLayoutHelper.DrawRotatedBoxHandles(context, blobRoi.Center, blobRoi.Width / 2, blobRoi.Height / 2, blobRoi.Angle);
+                    StandardRoiLayoutHelper.DrawRotatedBoxHandles(context, blobRoi.Center.ToWpfPoint(), blobRoi.Width / 2, blobRoi.Height / 2, blobRoi.Angle);
                 }
 
                 Brush blobBrush = Brushes.Magenta;
@@ -59,7 +59,7 @@ namespace ImageViewer.Rendering
                         0,
                         blobBrush,
                         1.0 / context.Scale);
-                    context.DrawHandle(blob.Centroid, ResizeHandle.None, 2 / context.Scale, false, blobBrush);
+                    context.DrawHandle(blob.Centroid.ToWpfPoint(), ResizeHandle.None, 2 / context.Scale, false, blobBrush);
 
                     if (isSelected)
                     {
@@ -82,12 +82,12 @@ namespace ImageViewer.Rendering
                 if (!ellipse.IsVisible) return;
 
                 Brush brush = RoiRenderContext.ResolveStroke(strokeOverride, ellipse.StrokeColor);
-                context.DrawEllipseOutline(ellipse.Center, ellipse.RadiusX, ellipse.RadiusY, ellipse.Angle, brush, (isSelected ? 3 : ellipse.StrokeThickness) / context.Scale, RoiRenderContext.CreateTranslucentFill(brush));
-                context.DrawInfoText(StandardRoiInfoTextFormatter.BuildFittedEllipseText(ellipse, context), StandardRoiLayoutHelper.GetTopInfoAnchor(ellipse.Center, ellipse.RadiusY, context), brush, true);
+                context.DrawEllipseOutline(ellipse.Center.ToWpfPoint(), ellipse.RadiusX, ellipse.RadiusY, ellipse.Angle, brush, (isSelected ? 3 : ellipse.StrokeThickness) / context.Scale, RoiRenderContext.CreateTranslucentFill(brush));
+                context.DrawInfoText(StandardRoiInfoTextFormatter.BuildFittedEllipseText(ellipse, context), StandardRoiLayoutHelper.GetTopInfoAnchor(ellipse.Center.ToWpfPoint(), ellipse.RadiusY, context), brush, true);
 
                 if (isSelected)
                 {
-                    StandardRoiLayoutHelper.DrawRotatedBoxHandles(context, ellipse.Center, ellipse.RadiusX, ellipse.RadiusY, ellipse.Angle);
+                    StandardRoiLayoutHelper.DrawRotatedBoxHandles(context, ellipse.Center.ToWpfPoint(), ellipse.RadiusX, ellipse.RadiusY, ellipse.Angle);
                 }
             }
         }
@@ -103,7 +103,7 @@ namespace ImageViewer.Rendering
 
                 Brush brush = RoiRenderContext.ResolveStroke(strokeOverride, ring.StrokeColor);
                 double thickness = (isSelected ? 3 : ring.StrokeThickness) / context.Scale;
-                Point center = context.ToScreenPoint(ring.Center);
+                Point center = context.ToScreenPoint(ring.Center.ToWpfPoint());
                 double outer = context.ToScreenLength(ring.OuterRadius);
                 double inner = context.ToScreenLength(ring.InnerRadius);
 
@@ -124,11 +124,11 @@ namespace ImageViewer.Rendering
                     IsHitTestVisible = false
                 };
                 context.ScreenOverlayCanvas.Children.Add(path);
-                context.DrawInfoText(StandardRoiInfoTextFormatter.BuildRingText(ring, context), StandardRoiLayoutHelper.GetTopInfoAnchor(ring.Center, ring.OuterRadius, context), brush, true);
+                context.DrawInfoText(StandardRoiInfoTextFormatter.BuildRingText(ring, context), StandardRoiLayoutHelper.GetTopInfoAnchor(ring.Center.ToWpfPoint(), ring.OuterRadius, context), brush, true);
 
                 if (isSelected)
                 {
-                    StandardRoiLayoutHelper.DrawCircleHandles(context, ring.Center, ring.OuterRadius);
+                    StandardRoiLayoutHelper.DrawCircleHandles(context, ring.Center.ToWpfPoint(), ring.OuterRadius);
                     context.DrawHandle(new Point(ring.Center.X + ring.InnerRadius, ring.Center.Y), ResizeHandle.P1, context.HandleSize / context.Scale, false, brush);
                 }
             }
@@ -144,12 +144,12 @@ namespace ImageViewer.Rendering
                 if (!ellipse.IsVisible) return;
 
                 Brush brush = RoiRenderContext.ResolveStroke(strokeOverride, ellipse.StrokeColor);
-                context.DrawEllipseOutline(ellipse.Center, ellipse.RadiusX, ellipse.RadiusY, ellipse.Angle, brush, (isSelected ? 3 : ellipse.StrokeThickness) / context.Scale, RoiRenderContext.CreateTranslucentFill(brush));
-                context.DrawInfoText(StandardRoiInfoTextFormatter.BuildEllipseText(ellipse, context), StandardRoiLayoutHelper.GetTopInfoAnchor(ellipse.Center, ellipse.RadiusY, context), brush, true);
+                context.DrawEllipseOutline(ellipse.Center.ToWpfPoint(), ellipse.RadiusX, ellipse.RadiusY, ellipse.Angle, brush, (isSelected ? 3 : ellipse.StrokeThickness) / context.Scale, RoiRenderContext.CreateTranslucentFill(brush));
+                context.DrawInfoText(StandardRoiInfoTextFormatter.BuildEllipseText(ellipse, context), StandardRoiLayoutHelper.GetTopInfoAnchor(ellipse.Center.ToWpfPoint(), ellipse.RadiusY, context), brush, true);
 
                 if (isSelected)
                 {
-                    StandardRoiLayoutHelper.DrawRotatedBoxHandles(context, ellipse.Center, ellipse.RadiusX, ellipse.RadiusY, ellipse.Angle);
+                    StandardRoiLayoutHelper.DrawRotatedBoxHandles(context, ellipse.Center.ToWpfPoint(), ellipse.RadiusX, ellipse.RadiusY, ellipse.Angle);
                 }
             }
         }
@@ -164,12 +164,12 @@ namespace ImageViewer.Rendering
                 if (!circle.IsVisible) return;
 
                 Brush brush = RoiRenderContext.ResolveStroke(strokeOverride, circle.StrokeColor);
-                context.DrawEllipseOutline(circle.Center, circle.Radius, circle.Radius, 0, brush, (isSelected ? 3 : circle.StrokeThickness) / context.Scale, RoiRenderContext.CreateTranslucentFill(brush));
-                context.DrawInfoText(StandardRoiInfoTextFormatter.BuildCircleText(circle, context), StandardRoiLayoutHelper.GetTopInfoAnchor(circle.Center, circle.Radius, context), brush, true);
+                context.DrawEllipseOutline(circle.Center.ToWpfPoint(), circle.Radius, circle.Radius, 0, brush, (isSelected ? 3 : circle.StrokeThickness) / context.Scale, RoiRenderContext.CreateTranslucentFill(brush));
+                context.DrawInfoText(StandardRoiInfoTextFormatter.BuildCircleText(circle, context), StandardRoiLayoutHelper.GetTopInfoAnchor(circle.Center.ToWpfPoint(), circle.Radius, context), brush, true);
 
                 if (isSelected)
                 {
-                    StandardRoiLayoutHelper.DrawCircleHandles(context, circle.Center, circle.Radius);
+                    StandardRoiLayoutHelper.DrawCircleHandles(context, circle.Center.ToWpfPoint(), circle.Radius);
                 }
             }
         }
@@ -186,11 +186,11 @@ namespace ImageViewer.Rendering
                 Brush brush = RoiRenderContext.ResolveStroke(strokeOverride, poly.StrokeColor);
                 if (poly.Points.Count > 1)
                 {
-                    context.DrawPolyline(poly.Points, brush, (isSelected ? 3 : poly.StrokeThickness) / context.Scale, closed: true, fill: RoiRenderContext.CreateTranslucentFill(brush));
+                    context.DrawPolyline(poly.Points.ToWpfPointArray(), brush, (isSelected ? 3 : poly.StrokeThickness) / context.Scale, closed: true, fill: RoiRenderContext.CreateTranslucentFill(brush));
 
                     if (!poly.IsClosed && poly.Points.Count > 2)
                     {
-                        context.DrawLineSegment(poly.Points.Last(), poly.Points.First(), brush, 1 / context.Scale, new DoubleCollection { 4, 4 });
+                        context.DrawLineSegment(poly.Points.Last().ToWpfPoint(), poly.Points.First().ToWpfPoint(), brush, 1 / context.Scale, new DoubleCollection { 4, 4 });
                     }
                 }
 
@@ -198,13 +198,13 @@ namespace ImageViewer.Rendering
                 {
                     foreach (var point in poly.Points)
                     {
-                        context.DrawDot(point, 4 / context.Scale, brush);
+                        context.DrawDot(point.ToWpfPoint(), 4 / context.Scale, brush);
                     }
                 }
 
                 if (poly.IsClosed)
                 {
-                    var metrics = GeometryUtils.GetPolygonMetrics(poly.Points);
+                    var metrics = GeometryUtils.GetPolygonMetrics(poly.Points.ToWpfPointArray());
                     context.DrawInfoText(StandardRoiInfoTextFormatter.BuildPolygonText(poly, metrics, context), StandardRoiLayoutHelper.GetPolygonInfoAnchor(metrics), brush, true);
                 }
 
@@ -213,7 +213,7 @@ namespace ImageViewer.Rendering
                     double handleSize = (context.HandleSize + context.PolygonResizeHandlePadding) / context.Scale;
                     foreach (var point in poly.Points)
                     {
-                        context.DrawHandle(point, ResizeHandle.Vertex, handleSize, false);
+                        context.DrawHandle(point.ToWpfPoint(), ResizeHandle.Vertex, handleSize, false);
                     }
                 }
             }
@@ -229,16 +229,16 @@ namespace ImageViewer.Rendering
                 if (!polyline.IsVisible || polyline.Points.Count == 0) return;
 
                 Brush brush = RoiRenderContext.ResolveStroke(strokeOverride, polyline.StrokeColor);
-                context.DrawPolyline(polyline.Points, brush, (isSelected ? 3 : polyline.StrokeThickness) / context.Scale);
+                context.DrawPolyline(polyline.Points.ToWpfPointArray(), brush, (isSelected ? 3 : polyline.StrokeThickness) / context.Scale);
 
                 foreach (var point in polyline.Points)
                 {
-                    context.DrawHandle(point, ResizeHandle.None, context.PointAnnotationSize / context.Scale, false, brush);
+                    context.DrawHandle(point.ToWpfPoint(), ResizeHandle.None, context.PointAnnotationSize / context.Scale, false, brush);
                 }
 
                 if (!string.IsNullOrWhiteSpace(polyline.Label))
                 {
-                    context.DrawInfoText(StandardRoiInfoTextFormatter.BuildPolylineText(polyline), StandardRoiLayoutHelper.GetPolylineInfoAnchor(polyline.Points), brush, true);
+                    context.DrawInfoText(StandardRoiInfoTextFormatter.BuildPolylineText(polyline), StandardRoiLayoutHelper.GetPolylineInfoAnchor(polyline.Points.ToWpfPointArray()), brush, true);
                 }
             }
         }

@@ -1,6 +1,4 @@
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
-using System.Windows.Media;
+using System;
 using ImageViewer.Common;
 using ImageViewer.Localization;
 
@@ -9,14 +7,18 @@ namespace ImageViewer.Models
     /// <summary>
     /// ROI 基类
     /// Chinese: 表示所有 ROI（感兴趣区域）对象的基类，包含共享属性如标签、边框颜色、粗细、可见性等。
-    /// English: Base class for all ROI (Region of Interest) objects. Provides common properties such as Label,
-    /// StrokeColor, StrokeThickness, visibility and locking.
+    /// English: Base class for all ROI (Region of Interest) objects. Provides common properties such as
+    /// Label, StrokeColor, StrokeThickness, visibility and locking.
     /// </summary>
     public abstract class RoiBase : BaseViewModel
     {
         private string _label = string.Empty;
-
-        private RoiVisualState VisualState => RoiVisualStateStore.GetOrCreate(this);
+        private RoiColor _strokeColor = RoiColors.Cyan;
+        private double _strokeThickness = 2.0;
+        private bool _isSelected;
+        private bool _isVisible = true;
+        private bool _isLocked;
+        private MeasurementTolerance? _tolerance;
 
         public string Label
         {
@@ -36,43 +38,66 @@ namespace ImageViewer.Models
 
         public string DisplayName => string.IsNullOrWhiteSpace(Label) ? DisplayTypeName : $"{DisplayTypeName}: {Label}";
 
-        protected void ApplyCommonState(RoiBase source)
+        /// <summary>
+        /// 复制共享的视觉状态（颜色、粗细、可见性、锁定）。
+        /// Chinese: 不复制选中态——选中是瞬时 UI 状态，不属于可快照的视觉状态。
+        /// English: Copies the shared visual state. Selection is deliberately excluded: it is transient
+        /// UI state, not part of a snapshot.
+        /// </summary>
+        public void CopyVisualStateFrom(RoiBase source)
         {
-            Label = source.Label;
-            RoiVisualState.Capture(source).ApplyTo(this, includeSelection: false);
+            ArgumentNullException.ThrowIfNull(source);
+
+            StrokeColor = source.StrokeColor;
+            StrokeThickness = source.StrokeThickness;
+            IsVisible = source.IsVisible;
+            IsLocked = source.IsLocked;
         }
 
-        public Color StrokeColor
+        protected void ApplyCommonState(RoiBase source)
         {
-            get => VisualState.StrokeColor;
-            set => SetVisualStateValue(VisualState.StrokeColor, value, static (state, next) => state.StrokeColor = next);
+            ArgumentNullException.ThrowIfNull(source);
+
+            Label = source.Label;
+            Tolerance = source.Tolerance?.Clone();
+            CopyVisualStateFrom(source);
+        }
+
+        public RoiColor StrokeColor
+        {
+            get => _strokeColor;
+            set => SetProperty(ref _strokeColor, value);
         }
 
         public double StrokeThickness
         {
-            get => VisualState.StrokeThickness;
-            set => SetVisualStateValue(VisualState.StrokeThickness, value, static (state, next) => state.StrokeThickness = next);
+            get => _strokeThickness;
+            set => SetProperty(ref _strokeThickness, value);
         }
 
+        /// <summary>
+        /// 该 ROI 当前是否被选中。
+        /// Chinese: 由 ViewModel 维护；仅用于外部读取，绘制选中态由渲染层独立处理。
+        /// English: Whether this ROI is currently selected. Maintained by the ViewModel; rendering of the
+        /// selection is handled independently by the render layer.
+        /// </summary>
         public bool IsSelected
         {
-            get => VisualState.IsSelected;
-            set => SetVisualStateValue(VisualState.IsSelected, value, static (state, next) => state.IsSelected = next);
+            get => _isSelected;
+            set => SetProperty(ref _isSelected, value);
         }
 
         public bool IsVisible
         {
-            get => VisualState.IsVisible;
-            set => SetVisualStateValue(VisualState.IsVisible, value, static (state, next) => state.IsVisible = next);
+            get => _isVisible;
+            set => SetProperty(ref _isVisible, value);
         }
 
         public bool IsLocked
         {
-            get => VisualState.IsLocked;
-            set => SetVisualStateValue(VisualState.IsLocked, value, static (state, next) => state.IsLocked = next);
+            get => _isLocked;
+            set => SetProperty(ref _isLocked, value);
         }
-
-        private MeasurementTolerance? _tolerance;
 
         /// <summary>
         /// 测量公差判定参数（标称值 + 上下公差）；非测量 ROI 不使用。
@@ -83,17 +108,6 @@ namespace ImageViewer.Models
         {
             get => _tolerance;
             set => SetProperty(ref _tolerance, value);
-        }
-
-        private void SetVisualStateValue<T>(T currentValue, T newValue, Action<RoiVisualState, T> assign, [CallerMemberName] string? propertyName = null)
-        {
-            if (EqualityComparer<T>.Default.Equals(currentValue, newValue))
-            {
-                return;
-            }
-
-            assign(VisualState, newValue);
-            OnPropertyChanged(propertyName);
         }
 
         public abstract RoiBase Clone();

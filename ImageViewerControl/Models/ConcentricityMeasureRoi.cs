@@ -1,24 +1,23 @@
 using System;
-using System.Windows;
 using ImageViewer.Common;
 
 namespace ImageViewer.Models
 {
     public class ConcentricityMeasureRoi : RoiBase
     {
-        private Point _center1;
+        private PointD _center1;
         private double _radius1;
-        private Point _center2;
+        private PointD _center2;
         private double _radius2;
 
         public ConcentricityMeasureRoi()
         {
-            StrokeColor = System.Windows.Media.Colors.Coral;
+            StrokeColor = RoiColors.Coral;
         }
 
         public override string RoiTypeName => "Concentricity";
 
-        public Point Center1
+        public PointD Center1
         {
             get => _center1;
             set => SetProperty(ref _center1, value);
@@ -30,7 +29,7 @@ namespace ImageViewer.Models
             set => SetProperty(ref _radius1, value);
         }
 
-        public Point Center2
+        public PointD Center2
         {
             get => _center2;
             set => SetProperty(ref _center2, value);
@@ -60,7 +59,7 @@ namespace ImageViewer.Models
 
         public double AverageRadius => (Radius1 + Radius2) / 2;
 
-        public Point MidCenter => new Point(
+        public PointD MidCenter => new PointD(
             (Center1.X + Center2.X) / 2,
             (Center1.Y + Center2.Y) / 2);
 
@@ -86,7 +85,8 @@ namespace ImageViewer.Models
                 StrokeColor = StrokeColor,
                 StrokeThickness = StrokeThickness,
                 IsVisible = IsVisible,
-                IsLocked = IsLocked
+                IsLocked = IsLocked,
+                Tolerance = Tolerance?.Clone()
             };
         }
 

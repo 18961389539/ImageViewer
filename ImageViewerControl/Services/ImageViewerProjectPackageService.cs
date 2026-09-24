@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -7,7 +6,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using ImageViewer.Abstractions;
 using ImageViewer.Controls;
-using ImageViewer.Models;
 using ImageViewer.Plugins;
 
 namespace ImageViewer.Services
@@ -28,10 +26,10 @@ namespace ImageViewer.Services
             _sessionStoragePolicy = sessionStoragePolicy ?? throw new ArgumentNullException(nameof(sessionStoragePolicy));
         }
 
-        public async Task ExportAsync(string packagePath, string? imagePath, IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, double scale, double translateX, double translateY, RoiPluginRegistry? pluginRegistry = null, CancellationToken cancellationToken = default)
+        public async Task ExportAsync(string packagePath, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry? pluginRegistry = null, CancellationToken cancellationToken = default)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(packagePath);
-            ArgumentNullException.ThrowIfNull(rois);
+            ArgumentNullException.ThrowIfNull(snapshot);
             ArgumentNullException.ThrowIfNull(pluginRegistry);
 
             string fullPackagePath = Path.GetFullPath(packagePath);
@@ -45,6 +43,7 @@ namespace ImageViewer.Services
                 directory ?? Directory.GetCurrentDirectory(),
                 $".{Path.GetFileName(fullPackagePath)}.{Guid.NewGuid():N}.tmp");
 
+            string? imagePath = snapshot.ImagePath;
             string? packagedImagePath = null;
             if (!string.IsNullOrWhiteSpace(imagePath) && File.Exists(imagePath))
             {
@@ -53,13 +52,7 @@ namespace ImageViewer.Services
 
             string sessionJson = _sessionService.SerializeSession(
                 Path.GetFileNameWithoutExtension(fullPackagePath),
-                packagedImagePath ?? imagePath,
-                rois,
-                pixelSize,
-                physicalUnit,
-                scale,
-                translateX,
-                translateY,
+                snapshot with { ImagePath = packagedImagePath ?? imagePath },
                 pluginRegistry);
 
             try

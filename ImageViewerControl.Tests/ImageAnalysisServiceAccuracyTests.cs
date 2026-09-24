@@ -135,17 +135,34 @@ namespace ImageViewerControl.Tests
 
             double offset = ImageAnalysisService.RefineGrayMomentOffset(3, profile);
 
-            Assert.InRange(offset, 3.0, 3.9);
+            Assert.Equal(3.5, offset, precision: 3);
         }
 
         [Fact]
         public void RefineGrayMomentOffset_FallingStep_MirrorsRisingStep()
         {
+            // 与上升阶跃镜像的下降阶跃，同一几何边缘（3.5），暗侧位于窗口右端。
             double[] profile = [100, 100, 100, 100, 0, 0, 0, 0];
 
             double offset = ImageAnalysisService.RefineGrayMomentOffset(3, profile);
 
-            Assert.InRange(offset, 3.0, 3.9);
+            Assert.Equal(3.5, offset, precision: 3);
+        }
+
+        [Theory]
+        [InlineData(0.16)]
+        [InlineData(1.0)]
+        [InlineData(2.55)]
+        public void RefineGrayMomentOffset_SameGeometry_IndependentOfContrast(double contrastScale)
+        {
+            // 同一几何边缘（真实边缘位于 3.5）在不同灰度幅值下必须给出同一亚像素位置：
+            // 闭式解需使用无量纲偏度；用 σ/√|μ3| 逐项作比例时量纲为灰度^-0.5，结果会随对比度漂移。
+            double high = 100 * contrastScale;
+            double[] profile = [0, 0, 0, 0, high, high, high, high];
+
+            double offset = ImageAnalysisService.RefineGrayMomentOffset(3, profile);
+
+            Assert.Equal(3.5, offset, precision: 3);
         }
 
         [Fact]
@@ -192,7 +209,7 @@ namespace ImageViewerControl.Tests
 
             var caliper = new CircularCaliperMeasureRoi
             {
-                Center = new Point(centerX, centerY),
+                Center = new PointD(centerX, centerY),
                 Radius = 8.0,
                 CaliperCount = 24,
                 CaliperSearchRange = 5
@@ -215,8 +232,8 @@ namespace ImageViewerControl.Tests
             // 测量线水平横跨亮带：搜索沿 x 方向穿过左右两个边缘。
             var line = new CaliperMeasureRoi
             {
-                P1 = new Point(5, 20),
-                P2 = new Point(25, 20),
+                P1 = new PointD(5, 20),
+                P2 = new PointD(25, 20),
                 CaliperCount = 12,
                 CaliperSamplingHalfWidth = 1,
                 CaliperMinimumGradient = 10,
@@ -246,7 +263,7 @@ namespace ImageViewerControl.Tests
 
             var caliper = new CircularCaliperMeasureRoi
             {
-                Center = new Point(10, 10),
+                Center = new PointD(10, 10),
                 Radius = 4.0,
                 CaliperCount = 12,
                 CaliperSearchRange = 3

@@ -17,7 +17,7 @@ namespace ImageViewer.Services
         {
             Point? center = GetMeasurementCenter(roi);
             return center.HasValue && calibration is { IsEnabled: true }
-                ? calibration.UndistortScaleFactor(center.Value)
+                ? calibration.UndistortScaleFactor(center.Value.ToPointD())
                 : 1.0;
         }
 
@@ -33,27 +33,27 @@ namespace ImageViewer.Services
         /// </summary>
         public static Point? GetMeasurementCenter(RoiBase roi) => roi switch
         {
-            CaliperMeasureRoi caliper => Midpoint(caliper.P1, caliper.P2),
-            LineCaliperMeasureRoi lineCaliper => Midpoint(lineCaliper.P1, lineCaliper.P2),
-            ArrowAnnotationRoi arrow => Midpoint(arrow.P1, arrow.P2),
-            LineMeasureRoi line => Midpoint(line.P1, line.P2),
-            ArcCaliperMeasureRoi arcCaliper => arcCaliper.Center,
-            CircularCaliperMeasureRoi circular => circular.Center,
-            BlobAnalysisRoi blob => blob.Center,
-            RotatedRect rect => rect.Center,
-            FittedEllipseRoi fittedEllipse => fittedEllipse.Center,
-            EllipseRoi ellipse => ellipse.Center,
-            CircleRoi circle => circle.Center,
-            RingRoi ring => ring.Center,
-            PolygonRoi polygon => GeometryUtils.GetCentroid(polygon.Points),
-            PolylineRoi polyline => GeometryUtils.GetCentroid(polyline.Points),
-            AngleMeasureRoi angle => angle.Vertex,
-            ArcMeasureRoi arc => arc.Center,
-            PointToLineDistanceRoi pointToLine => pointToLine.Point,
-            PointToCircleDistanceRoi pointToCircle => pointToCircle.Point,
-            ConcentricityMeasureRoi concentricity => concentricity.MidCenter,
-            PointAnnotationRoi point => point.Position,
-            TextAnnotationRoi text => text.Position,
+            CaliperMeasureRoi caliper => Midpoint(caliper.P1.ToWpfPoint(), caliper.P2.ToWpfPoint()),
+            LineCaliperMeasureRoi lineCaliper => Midpoint(lineCaliper.P1.ToWpfPoint(), lineCaliper.P2.ToWpfPoint()),
+            ArrowAnnotationRoi arrow => Midpoint(arrow.P1.ToWpfPoint(), arrow.P2.ToWpfPoint()),
+            LineMeasureRoi line => Midpoint(line.P1.ToWpfPoint(), line.P2.ToWpfPoint()),
+            ArcCaliperMeasureRoi arcCaliper => arcCaliper.Center.ToWpfPoint(),
+            CircularCaliperMeasureRoi circular => circular.Center.ToWpfPoint(),
+            BlobAnalysisRoi blob => blob.Center.ToWpfPoint(),
+            RotatedRect rect => rect.Center.ToWpfPoint(),
+            FittedEllipseRoi fittedEllipse => fittedEllipse.Center.ToWpfPoint(),
+            EllipseRoi ellipse => ellipse.Center.ToWpfPoint(),
+            CircleRoi circle => circle.Center.ToWpfPoint(),
+            RingRoi ring => ring.Center.ToWpfPoint(),
+            PolygonRoi polygon => GeometryUtils.GetCentroid(polygon.Points.ToWpfPointArray()),
+            PolylineRoi polyline => GeometryUtils.GetCentroid(polyline.Points.ToWpfPointArray()),
+            AngleMeasureRoi angle => angle.Vertex.ToWpfPoint(),
+            ArcMeasureRoi arc => arc.Center.ToWpfPoint(),
+            PointToLineDistanceRoi pointToLine => pointToLine.Point.ToWpfPoint(),
+            PointToCircleDistanceRoi pointToCircle => pointToCircle.Point.ToWpfPoint(),
+            ConcentricityMeasureRoi concentricity => concentricity.MidCenter.ToWpfPoint(),
+            PointAnnotationRoi point => point.Position.ToWpfPoint(),
+            TextAnnotationRoi text => text.Position.ToWpfPoint(),
             _ => null
         };
 

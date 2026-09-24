@@ -1,13 +1,11 @@
 using System;
 using System.Runtime.CompilerServices;
-using System.Windows;
-using ImageViewer.Utils;
 
 namespace ImageViewer.Models
 {
     public class CaliperMeasureRoi : LineMeasureRoi, ICaliperInfoSource
     {
-        private Point _caliperCenter;
+        private PointD _caliperCenter;
         private double _caliperAngleDegrees;
         private bool _hasExplicitCaliperRegion;
         private int _caliperCount = 9;
@@ -23,7 +21,7 @@ namespace ImageViewer.Models
 
         public override string RoiTypeName => nameof(CaliperMeasureRoi);
 
-        public Point CaliperCenter
+        public PointD CaliperCenter
         {
             get => _caliperCenter;
             set => SetProperty(ref _caliperCenter, value);
@@ -47,25 +45,25 @@ namespace ImageViewer.Models
             set => SetDetectionDisplayStateValue(DetectionDisplayState.HasDetection, value, static (state, v) => state.HasDetection = v);
         }
 
-        public Point Edge1Start
+        public PointD Edge1Start
         {
             get => DetectionDisplayState.Edge1Start;
             set => SetDetectionDisplayStateValue(DetectionDisplayState.Edge1Start, value, static (state, v) => state.Edge1Start = v);
         }
 
-        public Point Edge1End
+        public PointD Edge1End
         {
             get => DetectionDisplayState.Edge1End;
             set => SetDetectionDisplayStateValue(DetectionDisplayState.Edge1End, value, static (state, v) => state.Edge1End = v);
         }
 
-        public Point Edge2Start
+        public PointD Edge2Start
         {
             get => DetectionDisplayState.Edge2Start;
             set => SetDetectionDisplayStateValue(DetectionDisplayState.Edge2Start, value, static (state, v) => state.Edge2Start = v);
         }
 
-        public Point Edge2End
+        public PointD Edge2End
         {
             get => DetectionDisplayState.Edge2End;
             set => SetDetectionDisplayStateValue(DetectionDisplayState.Edge2End, value, static (state, v) => state.Edge2End = v);
@@ -119,13 +117,13 @@ namespace ImageViewer.Models
             set => SetDetectionDisplayStateValue(DetectionDisplayState.ScoreOverlays, value, static (state, v) => state.ScoreOverlays = v);
         }
 
-        public Point[] Edge1Points
+        public PointD[] Edge1Points
         {
             get => DetectionDisplayState.Edge1Points;
             set => SetDetectionDisplayStateValue(DetectionDisplayState.Edge1Points, value, static (state, v) => state.Edge1Points = v);
         }
 
-        public Point[] Edge2Points
+        public PointD[] Edge2Points
         {
             get => DetectionDisplayState.Edge2Points;
             set => SetDetectionDisplayStateValue(DetectionDisplayState.Edge2Points, value, static (state, v) => state.Edge2Points = v);
@@ -284,7 +282,7 @@ namespace ImageViewer.Models
             set => SetDetectionDisplayStateValue(DetectionDisplayState.Confidence, Math.Clamp(value, 0, 1), static (state, v) => state.Confidence = v);
         }
 
-        public void SetDetectedEdges(Point edge1Start, Point edge1End, Point edge2Start, Point edge2End)
+        public void SetDetectedEdges(PointD edge1Start, PointD edge1End, PointD edge2Start, PointD edge2End)
         {
             Edge1Start = edge1Start;
             Edge1End = edge1End;
@@ -300,14 +298,14 @@ namespace ImageViewer.Models
 
         public void SyncCaliperRegionFromMeasurementLine(bool updateSearchRange = true)
         {
-            Vector measurementVector = P2 - P1;
+            VectorD measurementVector = P2 - P1;
             double distance = measurementVector.Length;
             if (distance <= 0)
             {
                 return;
             }
 
-            CaliperCenter = new Point((P1.X + P2.X) / 2, (P1.Y + P2.Y) / 2);
+            CaliperCenter = new PointD((P1.X + P2.X) / 2, (P1.Y + P2.Y) / 2);
             CaliperAngleDegrees = Math.Atan2(measurementVector.Y, measurementVector.X) * 180 / Math.PI;
             if (updateSearchRange)
             {
@@ -332,13 +330,13 @@ namespace ImageViewer.Models
                 return;
             }
 
-            CaliperCenter = new Point(CaliperCenter.X + dx, CaliperCenter.Y + dy);
+            CaliperCenter = new PointD(CaliperCenter.X + dx, CaliperCenter.Y + dy);
         }
 
-        public Vector GetCaliperMeasurementDirection()
+        public VectorD GetCaliperMeasurementDirection()
         {
             double radians = CaliperAngleDegrees * Math.PI / 180.0;
-            Vector direction = new(Math.Cos(radians), Math.Sin(radians));
+            VectorD direction = new(Math.Cos(radians), Math.Sin(radians));
             if (direction.LengthSquared < 1e-6)
             {
                 direction = P2 - P1;
@@ -346,10 +344,10 @@ namespace ImageViewer.Models
 
             if (direction.LengthSquared < 1e-6)
             {
-                direction = new Vector(0, 1);
+                direction = new VectorD(0, 1);
             }
 
-            direction.Normalize();
+            direction = direction.Normalized();
             return direction;
         }
 
@@ -357,7 +355,7 @@ namespace ImageViewer.Models
         {
             return CaliperRegionLength > 0
                 ? Math.Max(6, CaliperRegionLength)
-                : Math.Max(10, Math.Min(48, GeometryUtils.Distance(P1, P2) * 0.1));
+                : Math.Max(10, Math.Min(48, P1.DistanceTo(P2) * 0.1));
         }
 
         public void SetCaliperVisualization(
@@ -369,8 +367,8 @@ namespace ImageViewer.Models
             LineSegmentOverlay[] rejectedEdge1Markers,
             LineSegmentOverlay[] rejectedEdge2Markers,
             CaliperScoreOverlay[] scoreOverlays,
-            Point[] edge1Points,
-            Point[] edge2Points)
+            PointD[] edge1Points,
+            PointD[] edge2Points)
         {
             RegionSegments = [..regionSegments];
             CaliperBars = [..caliperBars];

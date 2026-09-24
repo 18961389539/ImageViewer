@@ -1,0 +1,86 @@
+using System.Windows;
+using System.Windows.Input;
+using ImageViewer.Models;
+using ImageViewer.ViewModels;
+
+namespace ImageViewer.Drawing
+{
+    /// <summary>
+    /// 绘制宿主：绘制会话与 ImageViewer 控件之间的适配面。
+    /// Chinese: 让会话不直接依赖 ImageViewer，从而可脱离 WPF 事件单独单测。
+    /// English: Adapter surface between a draw session and the ImageViewer control. Lets sessions
+    /// avoid depending on the control directly, so they can be unit tested without WPF input events.
+    /// </summary>
+    public interface IRoiDrawHost
+    {
+        ImageViewerViewModel ViewModel { get; }
+
+        double Scale { get; }
+
+        double MinimumDrawableSize { get; }
+
+        /// <summary>
+        /// 判定"有效长度"的最小值。
+        /// Chinese: 低于该长度时卡尺类工具不再做边缘检测，避免噪声结果。
+        /// English: Minimum length for a drag to be considered meaningful. Below it, caliper tools skip
+        /// edge detection to avoid noise-driven results.
+        /// </summary>
+        double MinimumLineLength { get; }
+
+        double HitTestTolerance { get; }
+
+        /// <summary>
+        /// 按当前网格设置吸附坐标。
+        /// Chinese: 多数工具使用吸附坐标；外部落点工具使用原始坐标。
+        /// English: Applies the current snap-to-grid setting. Most tools snap; external placement
+        /// tools use the raw coordinate.
+        /// </summary>
+        Point SnapPoint(Point rawImagePoint);
+
+        RoiBase? HitTest(Point point);
+
+        bool TryCaptureMouse();
+
+        void ReleaseMouseCapture();
+
+        void SetCursor(Cursor cursor);
+
+        /// <summary>
+        /// 请求重绘 ROI 图层（含进行中的预览）。
+        /// Chinese: 对应控件的 DrawRois()，可能被合并延后执行。
+        /// English: Requests an overlay redraw; may be coalesced and deferred by the control.
+        /// </summary>
+        void InvalidateOverlay();
+
+        /// <summary>
+        /// 请求一段文本输入。
+        /// Chinese: 返回 null 或空白表示用户取消，会话应放弃本次绘制并留在当前模式。
+        /// English: Requests a text input from the user. Returning null or whitespace means the user
+        /// cancelled; the session should abandon the draw and stay in the current mode.
+        /// </summary>
+        string? RequestTextInput(string message, string defaultValue);
+
+        /// <summary>
+        /// 触发指定 ROI 的检测/分析（斑块、卡尺类）。
+        /// Chinese: 必须在 <see cref="Commit"/> 之前调用，否则检测结果不会进入撤销命令捕获的状态。
+        /// English: Runs detection/analysis for the ROI. Must be called before <see cref="Commit"/>,
+        /// otherwise the detected geometry will not be captured by the undo command's state snapshot.
+        /// </summary>
+        bool TryApplyAnalysis(RoiBase roi);
+
+        /// <summary>
+        /// 把 ROI 提交进集合（经撤销栈）。
+        /// Chinese: 对应控件的 CommitRoi()。
+        /// English: Commits the ROI into its collection through the undo stack.
+        /// </summary>
+        void Commit(RoiBase roi);
+
+        /// <summary>
+        /// 结束本次绘制：释放鼠标捕获、离开交互模式并刷新。
+        /// Chinese: 必须释放捕获，否则后续平移/选择/编辑会失效。
+        /// English: Ends the draw: releases mouse capture, leaves the interaction mode and refreshes.
+        /// Releasing capture is mandatory, otherwise later pan/select/edit interactions break.
+        /// </summary>
+        void EndDraw();
+    }
+}

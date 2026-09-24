@@ -1,4 +1,3 @@
-using System.Windows;
 
 namespace ImageViewer.Models
 {
@@ -11,7 +10,7 @@ namespace ImageViewer.Models
         LineSegmentOverlay[] EdgeMarkers { get; set; }
         LineSegmentOverlay[] RejectedEdgeMarkers { get; set; }
         CaliperScoreOverlay[] ScoreOverlays { get; set; }
-        Point[] EdgePoints { get; set; }
+        PointD[] EdgePoints { get; set; }
         double AverageScore { get; set; }
         double ResidualRms { get; set; }
         double ResidualMax { get; set; }

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Windows;
 using ImageViewer.Localization;
 using ImageViewer.Models;
 
@@ -21,7 +20,7 @@ namespace ImageViewer.Plugins
                     hitTestOrder: 60,
                     drawingTools:
                     [
-                        new RoiToolDescriptor(UiText.Get("ToolRotatedRect"), viewer => viewer.StartRoiMode(), 10, CreateRectangleIcon)
+                        new RoiToolDescriptor(UiText.Get("ToolRotatedRect"), BuiltInDrawControllers.RotatedRect, 10, CreateRectangleIcon)
                     ],
                     persistence: CreateCenterWidthHeightAnglePersistence(
                         data => new RotatedRect
@@ -41,7 +40,7 @@ namespace ImageViewer.Plugins
                     hitTestOrder: 55,
                     drawingTools:
                     [
-                        new RoiToolDescriptor(UiText.Get("ToolBlobAnalysis"), viewer => viewer.StartBlobAnalysisMode(), 15, CreateBlobIcon)
+                        new RoiToolDescriptor(UiText.Get("ToolBlobAnalysis"), BuiltInDrawControllers.BlobAnalysis, 15, CreateBlobIcon)
                     ],
                     persistence: CreateCenterWidthHeightAnglePersistence(
                         data => new BlobAnalysisRoi
@@ -72,7 +71,7 @@ namespace ImageViewer.Plugins
                     hitTestOrder: 90,
                     drawingTools:
                     [
-                        new RoiToolDescriptor(UiText.Get("ToolEllipse"), viewer => viewer.StartEllipseRoiMode(), 20, CreateEllipseIcon)
+                        new RoiToolDescriptor(UiText.Get("ToolEllipse"), BuiltInDrawControllers.Ellipse, 20, CreateEllipseIcon)
                     ],
                     persistence: CreateCenterEllipsePersistence(
                         data => new EllipseRoi
@@ -92,7 +91,7 @@ namespace ImageViewer.Plugins
                     hitTestOrder: 89,
                     drawingTools:
                     [
-                        new RoiToolDescriptor(UiText.Get("ToolFittedEllipse"), viewer => viewer.StartFitEllipseMode(), 25, CreateFittedEllipseIcon, isMeasurement: true)
+                        new RoiToolDescriptor(UiText.Get("ToolFittedEllipse"), BuiltInDrawControllers.FittedEllipse, 25, CreateFittedEllipseIcon, isMeasurement: true)
                     ],
                     persistence: CreateCenterEllipsePersistence(
                         data => new FittedEllipseRoi
@@ -114,12 +113,12 @@ namespace ImageViewer.Plugins
                     hitTestOrder: 100,
                     drawingTools:
                     [
-                        new RoiToolDescriptor(UiText.Get("ToolPolygon"), viewer => viewer.StartPolygonRoiMode(), 30, CreatePolygonIcon)
+                        new RoiToolDescriptor(UiText.Get("ToolPolygon"), BuiltInDrawControllers.Polygon, 30, CreatePolygonIcon)
                     ],
                     persistence: CreatePointsPersistence(
                         data => new PolygonRoi
                         {
-                            Points = new ObservableCollection<Point>((data.Geometry.Points ?? []).Select(point => point.ToPoint())),
+                            Points = new ObservableCollection<PointD>((data.Geometry.Points ?? []).Select(point => point.ToPoint())),
                             IsClosed = data.Options.IsClosed
                         },
                         static roi => roi.Points,
@@ -130,7 +129,7 @@ namespace ImageViewer.Plugins
                     hitTestOrder: 79,
                     drawingTools:
                     [
-                        new RoiToolDescriptor(UiText.Get("ToolRing"), viewer => viewer.StartRingRoiMode(), 45, CreateRingIcon)
+                        new RoiToolDescriptor(UiText.Get("ToolRing"), BuiltInDrawControllers.Ring, 45, CreateRingIcon)
                     ],
                     persistence: CreateCenterRadiusPairPersistence(
                         data => new RingRoi
@@ -148,7 +147,7 @@ namespace ImageViewer.Plugins
                     hitTestOrder: 80,
                     drawingTools:
                     [
-                        new RoiToolDescriptor(UiText.Get("ToolCircle"), viewer => viewer.StartCircleRoiMode(), 40, CreateCircleIcon)
+                        new RoiToolDescriptor(UiText.Get("ToolCircle"), BuiltInDrawControllers.Circle, 40, CreateCircleIcon)
                     ],
                     persistence: CreateCenterRadiusPersistence(
                         data => new CircleRoi
@@ -164,13 +163,13 @@ namespace ImageViewer.Plugins
                     hitTestOrder: 50,
                     drawingTools:
                     [
-                        new RoiToolDescriptor(UiText.Get("ToolPolyline"), viewer => viewer.StartPolylineRoiMode(false), 50, CreatePolylineIcon),
-                        new RoiToolDescriptor(UiText.Get("ToolFreehand"), viewer => viewer.StartPolylineRoiMode(true), 60, CreateFreehandIcon)
+                        new RoiToolDescriptor(UiText.Get("ToolPolyline"), BuiltInDrawControllers.Polyline, 50, CreatePolylineIcon),
+                        new RoiToolDescriptor(UiText.Get("ToolFreehand"), BuiltInDrawControllers.FreehandPolyline, 60, CreateFreehandIcon)
                     ],
                     persistence: CreatePointsPersistence(
                         data => new PolylineRoi
                         {
-                            Points = new ObservableCollection<Point>((data.Geometry.Points ?? []).Select(point => point.ToPoint())),
+                            Points = new ObservableCollection<PointD>((data.Geometry.Points ?? []).Select(point => point.ToPoint())),
                             IsFreehand = data.Options.IsFreehand
                         },
                         static roi => roi.Points,

@@ -32,7 +32,7 @@ namespace ImageViewer.Services
                 double halfW = rect.Width / 2;
                 double halfH = rect.Height / 2;
                 double hSize = (handleSize + handleHitPadding) / scale;
-                var handlePositions = CreateBoxHandlePositions(rect.Center, halfW, halfH);
+                var handlePositions = CreateBoxHandlePositions(rect.Center.ToWpfPoint(), halfW, halfH);
                 handlePositions[ResizeHandle.Rotation] = new Point(rect.Center.X, rect.Center.Y - halfH - infoTextOffset / scale);
                 var rotateTransform = new RotateTransform(rect.Angle, rect.Center.X, rect.Center.Y);
 
@@ -50,7 +50,7 @@ namespace ImageViewer.Services
             public void Move(RoiBase roi, double dx, double dy)
             {
                 var rect = (RotatedRect)roi;
-                rect.Center = new Point(rect.Center.X + dx, rect.Center.Y + dy);
+                rect.Center = new Point(rect.Center.X + dx, rect.Center.Y + dy).ToPointD();
             }
 
             public void Resize(RoiBase roi, ResizeHandle handle, double dx, double dy, Point currentPos, double minimumRoiDimension)
@@ -80,7 +80,7 @@ namespace ImageViewer.Services
                 double radBack = rect.Angle * Math.PI / 180.0;
                 double globalOffsetX = offsetX * Math.Cos(radBack) - offsetY * Math.Sin(radBack);
                 double globalOffsetY = offsetX * Math.Sin(radBack) + offsetY * Math.Cos(radBack);
-                rect.Center = new Point(rect.Center.X + globalOffsetX, rect.Center.Y + globalOffsetY);
+                rect.Center = new Point(rect.Center.X + globalOffsetX, rect.Center.Y + globalOffsetY).ToPointD();
             }
         }
 
@@ -104,7 +104,7 @@ namespace ImageViewer.Services
             {
                 var ellipse = (EllipseRoi)roi;
                 double hSize = (handleSize + handleHitPadding) / scale;
-                var handlePositions = CreateBoxHandlePositions(ellipse.Center, ellipse.RadiusX, ellipse.RadiusY);
+                var handlePositions = CreateBoxHandlePositions(ellipse.Center.ToWpfPoint(), ellipse.RadiusX, ellipse.RadiusY);
                 handlePositions[ResizeHandle.Rotation] = new Point(ellipse.Center.X, ellipse.Center.Y - ellipse.RadiusY - infoTextOffset / scale);
                 var rotateTransform = new RotateTransform(ellipse.Angle, ellipse.Center.X, ellipse.Center.Y);
 
@@ -122,7 +122,7 @@ namespace ImageViewer.Services
             public void Move(RoiBase roi, double dx, double dy)
             {
                 var ellipse = (EllipseRoi)roi;
-                ellipse.Center = new Point(ellipse.Center.X + dx, ellipse.Center.Y + dy);
+                ellipse.Center = new Point(ellipse.Center.X + dx, ellipse.Center.Y + dy).ToPointD();
             }
 
             public void Resize(RoiBase roi, ResizeHandle handle, double dx, double dy, Point currentPos, double minimumRoiDimension)
@@ -150,7 +150,7 @@ namespace ImageViewer.Services
                 double radBack = ellipse.Angle * Math.PI / 180.0;
                 double globalOffsetX = offsetX * Math.Cos(radBack) - offsetY * Math.Sin(radBack);
                 double globalOffsetY = offsetX * Math.Sin(radBack) + offsetY * Math.Cos(radBack);
-                ellipse.Center = new Point(ellipse.Center.X + globalOffsetX, ellipse.Center.Y + globalOffsetY);
+                ellipse.Center = new Point(ellipse.Center.X + globalOffsetX, ellipse.Center.Y + globalOffsetY).ToPointD();
             }
         }
 
@@ -161,14 +161,14 @@ namespace ImageViewer.Services
             public bool HitTest(RoiBase roi, Point point, double scale, double hitTestTolerance)
             {
                 var circle = (CircleRoi)roi;
-                return GeometryUtils.Distance(circle.Center, point) <= circle.Radius;
+                return GeometryUtils.Distance(circle.Center.ToWpfPoint(), point) <= circle.Radius;
             }
 
             public ResizeHandle GetHandleAt(RoiBase roi, Point point, double scale, double handleSize, double handleHitPadding, double infoTextOffset, double polygonVertexHitPadding)
             {
                 var circle = (CircleRoi)roi;
                 double hSize = (handleSize + handleHitPadding) / scale;
-                foreach (var kvp in CreateBoxHandlePositions(circle.Center, circle.Radius, circle.Radius))
+                foreach (var kvp in CreateBoxHandlePositions(circle.Center.ToWpfPoint(), circle.Radius, circle.Radius))
                 {
                     if (IsWithinHandle(point, kvp.Value, hSize))
                     {
@@ -182,7 +182,7 @@ namespace ImageViewer.Services
             public void Move(RoiBase roi, double dx, double dy)
             {
                 var circle = (CircleRoi)roi;
-                circle.Center = new Point(circle.Center.X + dx, circle.Center.Y + dy);
+                circle.Center = new Point(circle.Center.X + dx, circle.Center.Y + dy).ToPointD();
             }
 
             public void Resize(RoiBase roi, ResizeHandle handle, double dx, double dy, Point currentPos, double minimumRoiDimension)
@@ -190,7 +190,7 @@ namespace ImageViewer.Services
                 var circle = (CircleRoi)roi;
                 if (handle != ResizeHandle.None)
                 {
-                    circle.Radius = Math.Max(minimumRoiDimension, GeometryUtils.Distance(circle.Center, currentPos));
+                    circle.Radius = Math.Max(minimumRoiDimension, GeometryUtils.Distance(circle.Center.ToWpfPoint(), currentPos));
                 }
             }
         }
@@ -202,7 +202,7 @@ namespace ImageViewer.Services
             public bool HitTest(RoiBase roi, Point point, double scale, double hitTestTolerance)
             {
                 var ring = (RingRoi)roi;
-                double distance = GeometryUtils.Distance(ring.Center, point);
+                double distance = GeometryUtils.Distance(ring.Center.ToWpfPoint(), point);
                 return distance >= ring.InnerRadius - hitTestTolerance / scale && distance <= ring.OuterRadius + hitTestTolerance / scale;
             }
 
@@ -210,7 +210,7 @@ namespace ImageViewer.Services
             {
                 var ring = (RingRoi)roi;
                 double hSize = (handleSize + handleHitPadding) / scale;
-                foreach (var kvp in CreateBoxHandlePositions(ring.Center, ring.OuterRadius, ring.OuterRadius))
+                foreach (var kvp in CreateBoxHandlePositions(ring.Center.ToWpfPoint(), ring.OuterRadius, ring.OuterRadius))
                 {
                     if (IsWithinHandle(point, kvp.Value, hSize))
                     {
@@ -229,13 +229,13 @@ namespace ImageViewer.Services
             public void Move(RoiBase roi, double dx, double dy)
             {
                 var ring = (RingRoi)roi;
-                ring.Center = new Point(ring.Center.X + dx, ring.Center.Y + dy);
+                ring.Center = new Point(ring.Center.X + dx, ring.Center.Y + dy).ToPointD();
             }
 
             public void Resize(RoiBase roi, ResizeHandle handle, double dx, double dy, Point currentPos, double minimumRoiDimension)
             {
                 var ring = (RingRoi)roi;
-                double radius = Math.Max(minimumRoiDimension, GeometryUtils.Distance(ring.Center, currentPos));
+                double radius = Math.Max(minimumRoiDimension, GeometryUtils.Distance(ring.Center.ToWpfPoint(), currentPos));
                 if (handle == ResizeHandle.P1)
                 {
                     ring.InnerRadius = Math.Min(radius, Math.Max(minimumRoiDimension, ring.OuterRadius - minimumRoiDimension));
@@ -254,7 +254,7 @@ namespace ImageViewer.Services
             public bool HitTest(RoiBase roi, Point point, double scale, double hitTestTolerance)
             {
                 var poly = (PolygonRoi)roi;
-                return GeometryUtils.IsPointInPolygon(point, poly.Points);
+                return GeometryUtils.IsPointInPolygon(point, poly.Points.ToWpfPointArray());
             }
 
             public ResizeHandle GetHandleAt(RoiBase roi, Point point, double scale, double handleSize, double handleHitPadding, double infoTextOffset, double polygonVertexHitPadding)
@@ -268,7 +268,7 @@ namespace ImageViewer.Services
                 double hSize = (handleSize + polygonVertexHitPadding) / scale;
                 for (int i = 0; i < poly.Points.Count; i++)
                 {
-                    if (IsWithinHandle(point, poly.Points[i], hSize))
+                    if (IsWithinHandle(point, poly.Points[i].ToWpfPoint(), hSize))
                     {
                         return i;
                     }
@@ -283,8 +283,8 @@ namespace ImageViewer.Services
                 double threshold = hitTestTolerance / scale;
                 for (int i = 0; i < poly.Points.Count; i++)
                 {
-                    Point p1 = poly.Points[i];
-                    Point p2 = poly.Points[(i + 1) % poly.Points.Count];
+                    Point p1 = poly.Points[i].ToWpfPoint();
+                    Point p2 = poly.Points[(i + 1) % poly.Points.Count].ToWpfPoint();
                     if (GeometryUtils.IsPointNearSegment(point, p1, p2, threshold))
                     {
                         return i;
@@ -299,7 +299,7 @@ namespace ImageViewer.Services
                 var poly = (PolygonRoi)roi;
                 for (int i = 0; i < poly.Points.Count; i++)
                 {
-                    poly.Points[i] = new Point(poly.Points[i].X + dx, poly.Points[i].Y + dy);
+                    poly.Points[i] = new Point(poly.Points[i].X + dx, poly.Points[i].Y + dy).ToPointD();
                 }
             }
 
@@ -317,7 +317,7 @@ namespace ImageViewer.Services
                 var polyline = (PolylineRoi)roi;
                 for (int i = 1; i < polyline.Points.Count; i++)
                 {
-                    if (GeometryUtils.IsPointNearSegment(point, polyline.Points[i - 1], polyline.Points[i], hitTestTolerance / scale))
+                    if (GeometryUtils.IsPointNearSegment(point, polyline.Points[i - 1].ToWpfPoint(), polyline.Points[i].ToWpfPoint(), hitTestTolerance / scale))
                     {
                         return true;
                     }
@@ -336,7 +336,7 @@ namespace ImageViewer.Services
                 var polyline = (PolylineRoi)roi;
                 for (int i = 0; i < polyline.Points.Count; i++)
                 {
-                    polyline.Points[i] = new Point(polyline.Points[i].X + dx, polyline.Points[i].Y + dy);
+                    polyline.Points[i] = new Point(polyline.Points[i].X + dx, polyline.Points[i].Y + dy).ToPointD();
                 }
             }
 
@@ -365,7 +365,7 @@ namespace ImageViewer.Services
             {
                 var rect = (BlobAnalysisRoi)roi;
                 double hSize = (handleSize + handleHitPadding) / scale;
-                foreach (var kvp in CreateBoxHandlePositions(rect.Center, rect.Width / 2, rect.Height / 2))
+                foreach (var kvp in CreateBoxHandlePositions(rect.Center.ToWpfPoint(), rect.Width / 2, rect.Height / 2))
                 {
                     var matrix = new Matrix();
                     matrix.RotateAt(rect.Angle, rect.Center.X, rect.Center.Y);
@@ -389,7 +389,7 @@ namespace ImageViewer.Services
             public void Move(RoiBase roi, double dx, double dy)
             {
                 var rect = (BlobAnalysisRoi)roi;
-                rect.Center = new Point(rect.Center.X + dx, rect.Center.Y + dy);
+                rect.Center = new Point(rect.Center.X + dx, rect.Center.Y + dy).ToPointD();
             }
 
             public void Resize(RoiBase roi, ResizeHandle handle, double dx, double dy, Point currentPos, double minimumRoiDimension)
@@ -419,7 +419,7 @@ namespace ImageViewer.Services
                 double radBack = rect.Angle * Math.PI / 180.0;
                 double globalOffsetX = offsetX * Math.Cos(radBack) - offsetY * Math.Sin(radBack);
                 double globalOffsetY = offsetX * Math.Sin(radBack) + offsetY * Math.Cos(radBack);
-                rect.Center = new Point(rect.Center.X + globalOffsetX, rect.Center.Y + globalOffsetY);
+                rect.Center = new Point(rect.Center.X + globalOffsetX, rect.Center.Y + globalOffsetY).ToPointD();
             }
         }
     }

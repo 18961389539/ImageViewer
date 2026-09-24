@@ -72,7 +72,7 @@ namespace ImageViewer.Services
                     AppendSingleEdgeCaliperInfoLines(
                         lines,
                         UiText.Get("InfoTitleLineCaliper"),
-                        $"Distance:{FormatLength(GeometryUtils.Distance(lineCaliper.P1, lineCaliper.P2) * correction, pixelSize, physicalUnit)}",
+                        $"Distance:{FormatLength(GeometryUtils.Distance(lineCaliper.P1.ToWpfPoint(), lineCaliper.P2.ToWpfPoint()) * correction, pixelSize, physicalUnit)}",
                         lineCaliper,
                         pixelSize,
                         physicalUnit,
@@ -122,27 +122,27 @@ namespace ImageViewer.Services
                     lines.Add(UiText.FormatInvariant("InfoLineArea", FormatArea(ring.Area * areaCorrection, pixelSize, physicalUnit)));
                     break;
                 case PolygonRoi polygon:
-                    lines.Add(UiText.FormatInvariant("InfoLinePolygon", FormatLength(GeometryUtils.PolygonPerimeter(polygon.Points) * correction, pixelSize, physicalUnit)));
-                    lines.Add(UiText.FormatInvariant("InfoLineArea", FormatArea(GeometryUtils.PolygonArea(polygon.Points) * areaCorrection, pixelSize, physicalUnit)));
+                    lines.Add(UiText.FormatInvariant("InfoLinePolygon", FormatLength(GeometryUtils.PolygonPerimeter(polygon.Points.ToWpfPointArray()) * correction, pixelSize, physicalUnit)));
+                    lines.Add(UiText.FormatInvariant("InfoLineArea", FormatArea(GeometryUtils.PolygonArea(polygon.Points.ToWpfPointArray()) * areaCorrection, pixelSize, physicalUnit)));
                     break;
                 case PolylineRoi polyline when polyline.Points.Count > 1:
                     double length = 0;
                     for (int i = 1; i < polyline.Points.Count; i++)
                     {
-                        length += GeometryUtils.Distance(polyline.Points[i - 1], polyline.Points[i]);
+                        length += GeometryUtils.Distance(polyline.Points[i - 1].ToWpfPoint(), polyline.Points[i].ToWpfPoint());
                     }
                     lines.Add(UiText.FormatInvariant("InfoLinePolyline", FormatLength(length * correction, pixelSize, physicalUnit)));
                     break;
                 case ArrowAnnotationRoi arrow:
-                    lines.Add(UiText.FormatInvariant("InfoLineArrow", FormatLength(GeometryUtils.Distance(arrow.P1, arrow.P2) * correction, pixelSize, physicalUnit)));
+                    lines.Add(UiText.FormatInvariant("InfoLineArrow", FormatLength(GeometryUtils.Distance(arrow.P1.ToWpfPoint(), arrow.P2.ToWpfPoint()) * correction, pixelSize, physicalUnit)));
                     lines.Add(UiText.FormatInvariant("InfoLinePointPair", arrow.P1.X, arrow.P1.Y, arrow.P2.X, arrow.P2.Y));
                     break;
                 case LineMeasureRoi line:
-                    lines.Add(UiText.FormatInvariant("InfoLineLineMeasure", FormatLength(GeometryUtils.Distance(line.P1, line.P2) * correction, pixelSize, physicalUnit)));
+                    lines.Add(UiText.FormatInvariant("InfoLineLineMeasure", FormatLength(GeometryUtils.Distance(line.P1.ToWpfPoint(), line.P2.ToWpfPoint()) * correction, pixelSize, physicalUnit)));
                     lines.Add(UiText.FormatInvariant("InfoLinePointPair", line.P1.X, line.P1.Y, line.P2.X, line.P2.Y));
                     break;
                 case AngleMeasureRoi angle:
-                    lines.Add(UiText.FormatInvariant("InfoLineAngleMeasure", GeometryUtils.SmallestAngle(angle.P1, angle.Vertex, angle.P2)));
+                    lines.Add(UiText.FormatInvariant("InfoLineAngleMeasure", GeometryUtils.SmallestAngle(angle.P1.ToWpfPoint(), angle.Vertex.ToWpfPoint(), angle.P2.ToWpfPoint())));
                     break;
                 case ArcMeasureRoi arc:
                     if (arc.IsValid)
@@ -222,7 +222,7 @@ namespace ImageViewer.Services
             double correction = RoiCalibrationHelper.GetLengthCorrection(roi, calibration);
             return roi switch
             {
-                LineMeasureRoi line => GeometryUtils.Distance(line.P1, line.P2) * correction * pixelSize,
+                LineMeasureRoi line => GeometryUtils.Distance(line.P1.ToWpfPoint(), line.P2.ToWpfPoint()) * correction * pixelSize,
                 CircularCaliperMeasureRoi circular => circular.Radius * correction * pixelSize,
                 ArcMeasureRoi arc => arc.Radius * correction * pixelSize,
                 _ => null
@@ -264,7 +264,7 @@ namespace ImageViewer.Services
 
         private static void AppendDualEdgeCaliperInfoLines(List<string> lines, CaliperMeasureRoi caliper, double pixelSize, string? physicalUnit, double correction)
         {
-            lines.Add(UiText.FormatInvariant("InfoLineCaliperMeasure", FormatLength(GeometryUtils.Distance(caliper.P1, caliper.P2) * correction, pixelSize, physicalUnit)));
+            lines.Add(UiText.FormatInvariant("InfoLineCaliperMeasure", FormatLength(GeometryUtils.Distance(caliper.P1.ToWpfPoint(), caliper.P2.ToWpfPoint()) * correction, pixelSize, physicalUnit)));
             lines.Add(UiText.FormatInvariant("InfoLineRegionSearch", FormatLength(caliper.GetResolvedCaliperRegionLength() * correction, pixelSize, physicalUnit), FormatLength(caliper.CaliperSearchRange * 2 * correction, pixelSize, physicalUnit)));
             AppendCaliperParameterLine(lines, caliper);
             if (!caliper.HasDetectedEdges)

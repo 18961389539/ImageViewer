@@ -1,4 +1,3 @@
-using System.Windows.Media;
 using ImageViewer.Controls;
 using ImageViewer.Models;
 using ImageViewer.Plugins;
@@ -17,7 +16,7 @@ namespace ImageViewerControl.Tests
 
             controller.Execute(ImageViewerRoiMenuCommand.SetColorYellow);
 
-            Assert.Equal(Colors.Yellow, host.LastColor);
+            Assert.Equal(RoiColors.Yellow, host.LastColor);
             Assert.Equal(1, host.UpdateContextMenuStateCount);
         }
 
@@ -56,7 +55,7 @@ namespace ImageViewerControl.Tests
         {
             public int EditSelectedPropertiesCount { get; private set; }
             public int UpdateContextMenuStateCount { get; private set; }
-            public Color? LastColor { get; private set; }
+            public RoiColor? LastColor { get; private set; }
 
             public void Undo() { }
             public void Redo() { }
@@ -64,7 +63,7 @@ namespace ImageViewerControl.Tests
             public void ClearAll() { }
             public void EditSelectedProperties() => EditSelectedPropertiesCount++;
             public void SetSelectedLabel() { }
-            public void SetSelectedColor(Color color) => LastColor = color;
+            public void SetSelectedColor(RoiColor color) => LastColor = color;
             public void CalibrateSelectedRoi() { }
             public void EditSelectedCaliperSettings() { }
             public void UpdateContextMenuState() => UpdateContextMenuStateCount++;

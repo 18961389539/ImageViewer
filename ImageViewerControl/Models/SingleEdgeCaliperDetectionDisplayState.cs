@@ -1,4 +1,3 @@
-using System.Windows;
 
 namespace ImageViewer.Models
 {
@@ -18,7 +17,7 @@ namespace ImageViewer.Models
 
         public CaliperScoreOverlay[] ScoreOverlays { get; set; } = [];
 
-        public Point[] EdgePoints { get; set; } = [];
+        public PointD[] EdgePoints { get; set; } = [];
 
         public double AverageScore { get; set; }
 
@@ -59,7 +58,7 @@ namespace ImageViewer.Models
             LineSegmentOverlay[] edgeMarkers,
             LineSegmentOverlay[] rejectedEdgeMarkers,
             CaliperScoreOverlay[] scoreOverlays,
-            Point[] edgePoints)
+            PointD[] edgePoints)
         {
             return new SingleEdgeCaliperDetectionDisplayState
             {
@@ -134,7 +133,7 @@ namespace ImageViewer.Models
             public LineSegmentOverlay[] EdgeMarkers { get => _state.EdgeMarkers; set => _state.EdgeMarkers = value; }
             public LineSegmentOverlay[] RejectedEdgeMarkers { get => _state.RejectedEdgeMarkers; set => _state.RejectedEdgeMarkers = value; }
             public CaliperScoreOverlay[] ScoreOverlays { get => _state.ScoreOverlays; set => _state.ScoreOverlays = value; }
-            public Point[] EdgePoints { get => _state.EdgePoints; set => _state.EdgePoints = value; }
+            public PointD[] EdgePoints { get => _state.EdgePoints; set => _state.EdgePoints = value; }
             public double AverageScore { get => _state.AverageScore; set => _state.AverageScore = value; }
             public double ResidualRms { get => _state.ResidualRms; set => _state.ResidualRms = value; }
             public double ResidualMax { get => _state.ResidualMax; set => _state.ResidualMax = value; }

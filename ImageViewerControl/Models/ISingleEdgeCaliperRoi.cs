@@ -1,5 +1,3 @@
-using System.Windows;
-
 namespace ImageViewer.Models
 {
     public interface ISingleEdgeCaliperRoi

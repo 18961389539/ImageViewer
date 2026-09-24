@@ -1,16 +1,14 @@
 using System;
-using System.Windows;
-using System.Windows.Media;
 using ImageViewer.Common;
 
 namespace ImageViewer.Models
 {
     public class ArcMeasureRoi : RoiBase
     {
-        private Point _startPoint;
-        private Point _endPoint;
-        private Point _arcPoint;
-        private Point _center;
+        private PointD _startPoint;
+        private PointD _endPoint;
+        private PointD _arcPoint;
+        private PointD _center;
         private double _radius;
         private double _startAngle;
         private double _sweepAngle;
@@ -18,12 +16,12 @@ namespace ImageViewer.Models
 
         public ArcMeasureRoi()
         {
-            StrokeColor = Colors.Coral;
+            StrokeColor = RoiColors.Coral;
         }
 
         public override string RoiTypeName => nameof(ArcMeasureRoi);
 
-        public Point StartPoint
+        public PointD StartPoint
         {
             get => _startPoint;
             set
@@ -35,7 +33,7 @@ namespace ImageViewer.Models
             }
         }
 
-        public Point EndPoint
+        public PointD EndPoint
         {
             get => _endPoint;
             set
@@ -47,7 +45,7 @@ namespace ImageViewer.Models
             }
         }
 
-        public Point ArcPoint
+        public PointD ArcPoint
         {
             get => _arcPoint;
             set
@@ -59,7 +57,7 @@ namespace ImageViewer.Models
             }
         }
 
-        public Point Center
+        public PointD Center
         {
             get
             {
@@ -127,7 +125,7 @@ namespace ImageViewer.Models
             }
         }
 
-        public static bool TryComputeArcParameters(Point start, Point end, Point arcPoint, out Point center, out double radius, out double startAngle, out double sweepAngle)
+        public static bool TryComputeArcParameters(PointD start, PointD end, PointD arcPoint, out PointD center, out double radius, out double startAngle, out double sweepAngle)
         {
             center = default;
             radius = 0;
@@ -156,7 +154,7 @@ namespace ImageViewer.Models
             double ux = ((ax * ax + ay * ay) * (by - cy) + (bx * bx + by * by) * (cy - ay) + (cx * cx + cy * cy) * (ay - by)) / d;
             double uy = ((ax * ax + ay * ay) * (cx - bx) + (bx * bx + by * by) * (ax - cx) + (cx * cx + cy * cy) * (bx - ax)) / d;
 
-            center = new Point(ux, uy);
+            center = new PointD(ux, uy);
             radius = Math.Sqrt(DistanceSquared(center, start));
 
             startAngle = Math.Atan2(start.Y - center.Y, start.X - center.X) * 180.0 / Math.PI;
@@ -196,7 +194,7 @@ namespace ImageViewer.Models
             return angle;
         }
 
-        private static double DistanceSquared(Point p1, Point p2)
+        private static double DistanceSquared(PointD p1, PointD p2)
         {
             double dx = p2.X - p1.X;
             double dy = p2.Y - p1.Y;
@@ -214,7 +212,8 @@ namespace ImageViewer.Models
                 StrokeColor = StrokeColor,
                 StrokeThickness = StrokeThickness,
                 IsVisible = IsVisible,
-                IsLocked = IsLocked
+                IsLocked = IsLocked,
+                Tolerance = Tolerance?.Clone()
             };
         }
 

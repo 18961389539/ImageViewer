@@ -1,29 +1,28 @@
 using System;
-using System.Windows;
 using ImageViewer.Common;
 
 namespace ImageViewer.Models
 {
     public class PointToCircleDistanceRoi : RoiBase
     {
-        private Point _point;
-        private Point _center;
+        private PointD _point;
+        private PointD _center;
         private double _radius;
 
         public PointToCircleDistanceRoi()
         {
-            StrokeColor = System.Windows.Media.Colors.Turquoise;
+            StrokeColor = RoiColors.Turquoise;
         }
 
         public override string RoiTypeName => "PointToCircleDistance";
 
-        public Point Point
+        public PointD Point
         {
             get => _point;
             set => SetProperty(ref _point, value);
         }
 
-        public Point Center
+        public PointD Center
         {
             get => _center;
             set => SetProperty(ref _center, value);
@@ -57,18 +56,18 @@ namespace ImageViewer.Models
 
         public bool IsOnCircle => Math.Abs(DistanceToCenter - Radius) < 0.5;
 
-        public Point NearestPointOnCircle
+        public PointD NearestPointOnCircle
         {
             get
             {
                 double dist = DistanceToCenter;
                 if (dist < 1e-10)
                 {
-                    return new Point(Center.X + Radius, Center.Y);
+                    return new PointD(Center.X + Radius, Center.Y);
                 }
 
                 double ratio = Radius / dist;
-                return new Point(
+                return new PointD(
                     Center.X + (Point.X - Center.X) * ratio,
                     Center.Y + (Point.Y - Center.Y) * ratio);
             }
@@ -85,7 +84,8 @@ namespace ImageViewer.Models
                 StrokeColor = StrokeColor,
                 StrokeThickness = StrokeThickness,
                 IsVisible = IsVisible,
-                IsLocked = IsLocked
+                IsLocked = IsLocked,
+                Tolerance = Tolerance?.Clone()
             };
         }
 

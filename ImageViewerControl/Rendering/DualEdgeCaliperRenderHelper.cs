@@ -25,7 +25,7 @@ namespace ImageViewer.Rendering
 
         public static string BuildSummaryText(RoiRenderContext context, CaliperMeasureRoi caliper)
         {
-            string geometryText = $"D:{context.FormatLength(GeometryUtils.Distance(caliper.P1, caliper.P2))}";
+            string geometryText = $"D:{context.FormatLength(GeometryUtils.Distance(caliper.P1.ToWpfPoint(), caliper.P2.ToWpfPoint()))}";
             return SingleEdgeCaliperRenderHelper.BuildSummaryText(caliper, geometryText, "Caliper");
         }
     }

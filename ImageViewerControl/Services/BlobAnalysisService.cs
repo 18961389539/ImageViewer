@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using ImageViewer.Models;
 
 namespace ImageViewer.Services
 {
@@ -133,8 +134,8 @@ namespace ImageViewer.Services
                     results.Add(new BlobFeature(
                         blob.Label,
                         blob.Area,
-                        new Point(centroidX + x, centroidY + y),
-                        new Rect(blob.MinX + x, blob.MinY + y, blob.MaxX - blob.MinX + 1, blob.MaxY - blob.MinY + 1)
+                        new PointD(centroidX + x, centroidY + y),
+                        new RectD(blob.MinX + x, blob.MinY + y, blob.MaxX - blob.MinX + 1, blob.MaxY - blob.MinY + 1)
                     ));
                 }
             }

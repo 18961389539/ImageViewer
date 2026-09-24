@@ -1,31 +1,12 @@
-using System;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
-using System.Windows.Shapes;
 using ImageViewer.Models;
 using ImageViewer.Rendering;
-using ImageViewer.Utils;
 
 namespace ImageViewer.Controls
 {
     public partial class ImageViewer
     {
-        private static bool IsNear(Point p1, Point p2, double threshold)
-        {
-            return Math.Abs(p1.X - p2.X) < threshold / 2 && Math.Abs(p1.Y - p2.Y) < threshold / 2;
-        }
-
-        private static Brush ResolveStroke(Brush stroke, Color fallback)
-        {
-            return stroke ?? new SolidColorBrush(fallback);
-        }
-
-        private RoiBase? CreateFittedEllipseAt(Point position)
-        {
-            return CreateRoiFromSelectionCore(position, CreateFittedEllipseFromSource);
-        }
-
         private RoiRenderContext CreateRoiRenderContext(Canvas targetCanvas)
         {
             return new RoiRenderContext(
@@ -40,7 +21,8 @@ namespace ImageViewer.Controls
                 InfoTextOffset,
                 AngleArcRadius,
                 PointAnnotationSize,
-                PolygonResizeHandlePadding);
+                PolygonResizeHandlePadding,
+                PolygonCloseHighlightPadding);
         }
 
         private Point ImageToScreen(Point point)
@@ -48,14 +30,20 @@ namespace ImageViewer.Controls
             return new Point(point.X * Scale + translateTransform.X, point.Y * Scale + translateTransform.Y);
         }
 
-        private string GetDisplayUnit()
-        {
-            return string.IsNullOrWhiteSpace(PhysicalUnit) ? "px" : PhysicalUnit;
-        }
-
+        /// <summary>
+        /// 把像素长度格式化为"数值 + 物理单位"文本。
+        /// Chinese: 比例尺与信息面板共用，故保留在控件侧。
+        /// English: Formats a pixel length as "value + physical unit". Shared by the scale bar and the
+        /// info panel, hence kept on the control.
+        /// </summary>
         private string FormatLength(double pixelLength)
         {
             return $"{pixelLength * PixelSize:F2} {GetDisplayUnit()}";
+        }
+
+        private string GetDisplayUnit()
+        {
+            return string.IsNullOrWhiteSpace(PhysicalUnit) ? "px" : PhysicalUnit;
         }
 
         public ResizeHandle GetHandleAt(Point point)
@@ -79,63 +67,6 @@ namespace ImageViewer.Controls
         public RoiBase? HitTest(Point point)
         {
             return RoiInteraction.HitTest(ViewModel, point, Scale, HitTestTolerance);
-        }
-
-        private void DrawHandle(Point pos, ResizeHandle handleType, double size, bool isRect = true, Brush? stroke = null)
-        {
-            Shape handle = isRect ? new Rectangle() : new Ellipse();
-            handle.Width = size;
-            handle.Height = size;
-            handle.Fill = Brushes.White;
-            handle.Stroke = stroke ?? Brushes.Blue;
-            handle.StrokeThickness = 1 / Scale;
-            handle.Tag = handleType;
-            handle.IsHitTestVisible = false;
-
-            Canvas.SetLeft(handle, pos.X - size / 2);
-            Canvas.SetTop(handle, pos.Y - size / 2);
-            overlayCanvas.Children.Add(handle);
-        }
-
-        private void DrawInfoText(string text, Point pos, Brush brush, bool centerAlign = false)
-        {
-            double fontSize = 12 / Scale;
-            double paddingValue = 2 / Scale;
-            var cacheKey = (text, fontSize, paddingValue);
-
-            if (!_infoTextSizeCache.TryGetValue(cacheKey, out Size measuredSize))
-            {
-                var measureTextBlock = new TextBlock
-                {
-                    Text = text,
-                    FontSize = fontSize,
-                    FontWeight = FontWeights.Bold,
-                    Padding = new Thickness(paddingValue),
-                    IsHitTestVisible = false
-                };
-
-                measureTextBlock.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-                measuredSize = measureTextBlock.DesiredSize;
-                _infoTextSizeCache[cacheKey] = measuredSize;
-            }
-
-            var textBlock = new TextBlock
-            {
-                Text = text,
-                Foreground = brush,
-                FontSize = fontSize,
-                FontWeight = FontWeights.Bold,
-                Background = InfoTextBackgroundBrush,
-                Padding = new Thickness(paddingValue),
-                IsHitTestVisible = false
-            };
-
-            double offsetX = centerAlign ? -measuredSize.Width / 2 : 0;
-            double offsetY = centerAlign ? -measuredSize.Height / 2 : 0;
-
-            Canvas.SetLeft(textBlock, pos.X + offsetX);
-            Canvas.SetTop(textBlock, pos.Y + offsetY);
-            overlayCanvas.Children.Add(textBlock);
         }
     }
 }

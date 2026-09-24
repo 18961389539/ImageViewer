@@ -17,7 +17,7 @@ namespace ImageViewerControl.Tests
             new(
                 new BlobAnalysisRoi
                 {
-                    Center = new Point(10, 12),
+                    Center = new PointD(10, 12),
                     Width = 14,
                     Height = 16,
                     Angle = 18,
@@ -29,7 +29,7 @@ namespace ImageViewerControl.Tests
                 roi =>
                 {
                     var roundTripped = Assert.IsType<BlobAnalysisRoi>(roi);
-                    Assert.Equal(new Point(10, 12), roundTripped.Center);
+                    Assert.Equal(new PointD(10, 12), roundTripped.Center);
                     Assert.Equal(14, roundTripped.Width);
                     Assert.Equal(16, roundTripped.Height);
                     Assert.Equal(18, roundTripped.Angle);
@@ -41,7 +41,7 @@ namespace ImageViewerControl.Tests
             new(
                 new CircularCaliperMeasureRoi
                 {
-                    Center = new Point(25, 30),
+                    Center = new PointD(25, 30),
                     Radius = 11,
                     CaliperCount = 21,
                     CaliperSearchRange = 9,
@@ -54,7 +54,7 @@ namespace ImageViewerControl.Tests
                 roi =>
                 {
                     var roundTripped = Assert.IsType<CircularCaliperMeasureRoi>(roi);
-                    Assert.Equal(new Point(25, 30), roundTripped.Center);
+                    Assert.Equal(new PointD(25, 30), roundTripped.Center);
                     Assert.Equal(11, roundTripped.Radius);
                     Assert.Equal(21, roundTripped.CaliperCount);
                     Assert.Equal(9, roundTripped.CaliperSearchRange);
@@ -67,17 +67,17 @@ namespace ImageViewerControl.Tests
             new(
                 new ConcentricityMeasureRoi
                 {
-                    Center1 = new Point(4, 5),
+                    Center1 = new PointD(4, 5),
                     Radius1 = 6,
-                    Center2 = new Point(7, 8),
+                    Center2 = new PointD(7, 8),
                     Radius2 = 9
                 },
                 roi =>
                 {
                     var roundTripped = Assert.IsType<ConcentricityMeasureRoi>(roi);
-                    Assert.Equal(new Point(4, 5), roundTripped.Center1);
+                    Assert.Equal(new PointD(4, 5), roundTripped.Center1);
                     Assert.Equal(6, roundTripped.Radius1);
-                    Assert.Equal(new Point(7, 8), roundTripped.Center2);
+                    Assert.Equal(new PointD(7, 8), roundTripped.Center2);
                     Assert.Equal(9, roundTripped.Radius2);
                 })
         ];
@@ -98,7 +98,7 @@ namespace ImageViewerControl.Tests
                         {
                             var roundTripped = Assert.IsType<BlobAnalysisRoi>(roi);
                             Assert.Equal("legacy-blob", roundTripped.Label);
-                            Assert.Equal(new Point(10, 12), roundTripped.Center);
+                            Assert.Equal(new PointD(10, 12), roundTripped.Center);
                             Assert.Equal(14, roundTripped.Width);
                             Assert.Equal(16, roundTripped.Height);
                             Assert.Equal(18, roundTripped.Angle);
@@ -118,7 +118,7 @@ namespace ImageViewerControl.Tests
                         {
                             var roundTripped = Assert.IsType<CircularCaliperMeasureRoi>(roi);
                             Assert.Equal("legacy-circular-caliper", roundTripped.Label);
-                            Assert.Equal(new Point(25, 30), roundTripped.Center);
+                            Assert.Equal(new PointD(25, 30), roundTripped.Center);
                             Assert.Equal(11, roundTripped.Radius);
                             Assert.Equal(21, roundTripped.CaliperCount);
                             Assert.Equal(9, roundTripped.CaliperSearchRange);
@@ -141,7 +141,7 @@ namespace ImageViewerControl.Tests
                             Assert.Equal("legacy-polygon", roundTripped.Label);
                             Assert.True(roundTripped.IsClosed);
                             Assert.Equal(3, roundTripped.Points.Count);
-                            Assert.Equal(new Point(5, 5), roundTripped.Points[2]);
+                            Assert.Equal(new PointD(5, 5), roundTripped.Points[2]);
                         })
                 }
             };
@@ -159,7 +159,7 @@ namespace ImageViewerControl.Tests
             Assert.DoesNotContain("\"Measurement\"", json, StringComparison.Ordinal);
             Assert.DoesNotContain("\"Options\"", json, StringComparison.Ordinal);
 
-            var (rois, pixelSize, physicalUnit) = RoiPersistenceService.Deserialize(json, registry);
+            var (rois, _, pixelSize, physicalUnit) = RoiPersistenceService.Deserialize(json, registry);
             RoiBase roi = Assert.Single(rois);
 
             Assert.Equal(2.5, pixelSize);
@@ -174,7 +174,7 @@ namespace ImageViewerControl.Tests
             RoiPluginRegistry registry = RoiPluginRegistry.CreateBuiltIn();
             string fixtureJson = File.ReadAllText(GetFixturePath(expectation.FileName));
 
-            var (rois, pixelSize, physicalUnit) = RoiPersistenceService.Deserialize(fixtureJson, registry);
+            var (rois, _, pixelSize, physicalUnit) = RoiPersistenceService.Deserialize(fixtureJson, registry);
             RoiBase roi = Assert.Single(rois);
 
             Assert.Equal(expectation.ExpectedPixelSize, pixelSize);
@@ -219,7 +219,7 @@ namespace ImageViewerControl.Tests
                 writer.WriteEndObject();
             }
 
-            var (rois, pixelSize, physicalUnit) = RoiPersistenceService.Deserialize(
+            var (rois, _, pixelSize, physicalUnit) = RoiPersistenceService.Deserialize(
                 System.Text.Encoding.UTF8.GetString(stream.ToArray()),
                 registry);
 
@@ -227,6 +227,153 @@ namespace ImageViewerControl.Tests
             Assert.IsType<CircleRoi>(rois[0]);
             Assert.Equal(2.0, pixelSize);
             Assert.Equal("mm", physicalUnit);
+        }
+
+        [Theory]
+        [InlineData(2)]
+        [InlineData(99)]
+        public void Deserialize_FutureDocumentVersion_ThrowsNotSupportedException(int version)
+        {
+            RoiPluginRegistry registry = RoiPluginRegistry.CreateBuiltIn();
+
+            Assert.Throws<NotSupportedException>(() =>
+                RoiPersistenceService.Deserialize(BuildDocumentJsonWithVersion(version), registry));
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(-1)]
+        [InlineData(null)]
+        public void Deserialize_MissingOrNonPositiveVersion_IsAcceptedAsLegacy(int? version)
+        {
+            RoiPluginRegistry registry = RoiPluginRegistry.CreateBuiltIn();
+
+            var (rois, _, pixelSize, physicalUnit) = RoiPersistenceService.Deserialize(BuildDocumentJsonWithVersion(version), registry);
+
+            Assert.IsType<CircleRoi>(Assert.Single(rois));
+            Assert.Equal(2.0, pixelSize);
+            Assert.Equal("mm", physicalUnit);
+        }
+
+        /// <summary>
+        /// 既有的颜色字符串必须继续可读。
+        /// Chinese: 会话文件里存的是 WPF Color.ToString 的结果（#AARRGGBB），也兼容命名色与简写。
+        /// English: Existing color strings must remain readable. Session files store the result of
+        /// WPF Color.ToString ("#AARRGGBB"); named colors and short hex are also accepted.
+        /// </summary>
+        [Theory]
+        [InlineData("#FF00FFFF", 255, 0, 255, 255)]
+        [InlineData("#FFD700", 255, 255, 215, 0)]
+        [InlineData("#0FF", 255, 0, 255, 255)]
+        [InlineData("Yellow", 255, 255, 255, 0)]
+        [InlineData("gold", 255, 255, 215, 0)]
+        public void Deserialize_LegacyColorFormats_AreAccepted(string storedColor, byte a, byte r, byte g, byte b)
+        {
+            RoiPluginRegistry registry = RoiPluginRegistry.CreateBuiltIn();
+
+            var (rois, _, _, _) = RoiPersistenceService.Deserialize(BuildLegacyCircleJson(storedColor), registry);
+
+            var circle = Assert.IsType<CircleRoi>(Assert.Single(rois));
+            Assert.Equal(RoiColor.FromArgb(a, r, g, b), circle.StrokeColor);
+        }
+
+        [Fact]
+        public void Deserialize_ColorRoundTripsToSameString()
+        {
+            RoiPluginRegistry registry = RoiPluginRegistry.CreateBuiltIn();
+
+            var (rois, _, _, _) = RoiPersistenceService.Deserialize(BuildLegacyCircleJson("#FF00FFFF"), registry);
+            string reserialized = RoiPersistenceService.Serialize(rois, 1.0, "px", registry);
+
+            Assert.Contains("\"StrokeColor\": \"#FF00FFFF\"", reserialized, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public void Deserialize_InvalidColorString_KeepsDefaultInsteadOfThrowing()
+        {
+            RoiPluginRegistry registry = RoiPluginRegistry.CreateBuiltIn();
+
+            var (rois, _, _, _) = RoiPersistenceService.Deserialize(BuildLegacyCircleJson("NotAColor"), registry);
+
+            var circle = Assert.IsType<CircleRoi>(Assert.Single(rois));
+            Assert.Equal(RoiColors.Gold, circle.StrokeColor);
+        }
+
+        [Fact]
+        public void Deserialize_UnknownTypeKey_ReportsUnresolvedPayloadInsteadOfDroppingIt()
+        {
+            // 缺插件时旧实现会静默丢弃整条标注；现在必须把原始载荷带出来，供调用方告警并原样回写。
+            RoiPluginRegistry registry = RoiPluginRegistry.CreateBuiltIn();
+            const string documentJson = """
+                {
+                  "Version": 1,
+                  "PixelSize": 2.0,
+                  "PhysicalUnit": "mm",
+                  "Items": [
+                    {
+                      "Type": "circle",
+                      "Center": { "X": 5, "Y": 6 },
+                      "Radius": 7
+                    },
+                    {
+                      "Type": "future-plugin-roi",
+                      "Label": "keep-me",
+                      "Center": { "X": 1, "Y": 2 }
+                    }
+                  ]
+                }
+                """;
+
+            RoiDocumentLoadResult result = RoiPersistenceService.Deserialize(documentJson, registry);
+
+            Assert.IsType<CircleRoi>(Assert.Single(result.Rois));
+            RoiPersistenceData unresolved = Assert.Single(result.UnresolvedItems);
+            Assert.Equal("future-plugin-roi", unresolved.Type);
+            Assert.Equal("keep-me", unresolved.Label);
+            Assert.Equal(2.0, result.PixelSize);
+            Assert.Equal("mm", result.PhysicalUnit);
+        }
+
+        private static string BuildLegacyCircleJson(string strokeColor)
+        {
+            return $$"""
+                {
+                  "Version": 1,
+                  "PixelSize": 1.0,
+                  "PhysicalUnit": "px",
+                  "Items": [
+                    {
+                      "Type": "circle",
+                      "Label": "legacy",
+                      "StrokeColor": "{{strokeColor}}",
+                      "StrokeThickness": 3.5,
+                      "IsVisible": false,
+                      "IsLocked": true,
+                      "Center": { "X": 5, "Y": 6 },
+                      "Radius": 7
+                    }
+                  ]
+                }
+                """;
+        }
+
+        private static string BuildDocumentJsonWithVersion(int? version)
+        {
+            string versionProperty = version.HasValue ? $"\"Version\": {version.Value}," : string.Empty;
+            return $$"""
+                {
+                  {{versionProperty}}
+                  "PixelSize": 2.0,
+                  "PhysicalUnit": "mm",
+                  "Items": [
+                    {
+                      "Type": "circle",
+                      "Center": { "X": 5, "Y": 6 },
+                      "Radius": 7
+                    }
+                  ]
+                }
+                """;
         }
 
         private static string GetFixturePath(string fileName)

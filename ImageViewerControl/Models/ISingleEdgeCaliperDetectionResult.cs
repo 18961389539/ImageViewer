@@ -8,7 +8,7 @@ namespace ImageViewer.Models
         LineSegmentOverlay[] EdgeMarkers { get; }
         LineSegmentOverlay[] RejectedEdgeMarkers { get; }
         CaliperScoreOverlay[] ScoreOverlays { get; }
-        System.Windows.Point[] EdgePoints { get; }
+        PointD[] EdgePoints { get; }
         double AverageScore { get; }
         double ResidualRms { get; }
         double ResidualMax { get; }

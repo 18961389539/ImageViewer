@@ -16,7 +16,7 @@ namespace ImageViewer.Services
             public bool HitTest(RoiBase roi, Point point, double scale, double hitTestTolerance)
             {
                 var annotation = (PointAnnotationRoi)roi;
-                return GeometryUtils.Distance(annotation.Position, point) <= 8 / scale;
+                return GeometryUtils.Distance(annotation.Position.ToWpfPoint(), point) <= 8 / scale;
             }
 
             public ResizeHandle GetHandleAt(RoiBase roi, Point point, double scale, double handleSize, double handleHitPadding, double infoTextOffset, double polygonVertexHitPadding)
@@ -27,7 +27,7 @@ namespace ImageViewer.Services
             public void Move(RoiBase roi, double dx, double dy)
             {
                 var point = (PointAnnotationRoi)roi;
-                point.Position = new Point(point.Position.X + dx, point.Position.Y + dy);
+                point.Position = new Point(point.Position.X + dx, point.Position.Y + dy).ToPointD();
             }
 
             public void Resize(RoiBase roi, ResizeHandle handle, double dx, double dy, Point currentPos, double minimumRoiDimension)
@@ -42,7 +42,7 @@ namespace ImageViewer.Services
             public bool HitTest(RoiBase roi, Point point, double scale, double hitTestTolerance)
             {
                 var text = (TextAnnotationRoi)roi;
-                return GeometryUtils.Distance(text.Position, point) <= 14 / scale;
+                return GeometryUtils.Distance(text.Position.ToWpfPoint(), point) <= 14 / scale;
             }
 
             public ResizeHandle GetHandleAt(RoiBase roi, Point point, double scale, double handleSize, double handleHitPadding, double infoTextOffset, double polygonVertexHitPadding)
@@ -53,7 +53,7 @@ namespace ImageViewer.Services
             public void Move(RoiBase roi, double dx, double dy)
             {
                 var text = (TextAnnotationRoi)roi;
-                text.Position = new Point(text.Position.X + dx, text.Position.Y + dy);
+                text.Position = new Point(text.Position.X + dx, text.Position.Y + dy).ToPointD();
             }
 
             public void Resize(RoiBase roi, ResizeHandle handle, double dx, double dy, Point currentPos, double minimumRoiDimension)

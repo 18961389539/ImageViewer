@@ -1,18 +1,17 @@
-using System.Windows;
 using ImageViewer.Common;
 
 namespace ImageViewer.Models
 {
     public class TextAnnotationRoi : RoiBase
     {
-        private Point _position;
+        private PointD _position;
 
         public TextAnnotationRoi()
         {
-            StrokeColor = System.Windows.Media.Colors.White;
+            StrokeColor = RoiColors.White;
         }
 
-        public Point Position
+        public PointD Position
         {
             get => _position;
             set => SetProperty(ref _position, value);
@@ -27,7 +26,8 @@ namespace ImageViewer.Models
                 StrokeColor = StrokeColor,
                 StrokeThickness = StrokeThickness,
                 IsVisible = IsVisible,
-                IsLocked = IsLocked
+                IsLocked = IsLocked,
+                Tolerance = Tolerance?.Clone()
             };
         }
 

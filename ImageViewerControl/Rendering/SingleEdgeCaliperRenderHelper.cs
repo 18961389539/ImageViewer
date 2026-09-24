@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Media;
 using ImageViewer.Models;
 using ImageViewer.Services;
+using ImageViewer.Utils;
 
 namespace ImageViewer.Rendering
 {
@@ -12,7 +13,7 @@ namespace ImageViewer.Rendering
         {
             foreach (LineSegmentOverlay marker in markers)
             {
-                context.DrawLineSegment(marker.Start, marker.End, brush, 1.4 / context.Scale);
+                context.DrawLineSegment(marker.Start.ToWpfPoint(), marker.End.ToWpfPoint(), brush, 1.4 / context.Scale);
             }
         }
 
@@ -32,7 +33,7 @@ namespace ImageViewer.Rendering
                     _ => Brushes.Gold
                 };
 
-                context.DrawInfoText(overlay.Text, overlay.Position, brush, true);
+                context.DrawInfoText(overlay.Text, overlay.Position.ToWpfPoint(), brush, true);
             }
         }
 

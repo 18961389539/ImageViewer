@@ -72,7 +72,7 @@ namespace ImageViewer.Rendering
 
         public static string BuildLineMeasureText(LineMeasureRoi line, RoiRenderContext context)
         {
-            return BuildInline(line.Label, $"D:{context.FormatLength(GeometryUtils.Distance(line.P1, line.P2))}");
+            return BuildInline(line.Label, $"D:{context.FormatLength(GeometryUtils.Distance(line.P1.ToWpfPoint(), line.P2.ToWpfPoint()))}");
         }
 
         public static string BuildAngleMeasureText(AngleMeasureRoi angle, double angleValue)

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Windows;
 
 namespace ImageViewer.Models
 {
@@ -10,7 +9,7 @@ namespace ImageViewer.Models
         private int _manualThreshold = 128;
         private bool _detectDark;
         private int _minArea = 10;
-        private List<Services.BlobFeature> _detectedBlobs = new List<Services.BlobFeature>();
+        private List<BlobFeature> _detectedBlobs = new List<BlobFeature>();
 
         public override string RoiTypeName => nameof(BlobAnalysisRoi);
 
@@ -38,7 +37,7 @@ namespace ImageViewer.Models
             set => SetProperty(ref _minArea, Math.Max(1, value));
         }
 
-        public List<Services.BlobFeature> DetectedBlobs
+        public List<BlobFeature> DetectedBlobs
         {
             get => _detectedBlobs;
             set => SetProperty(ref _detectedBlobs, value);
@@ -57,6 +56,7 @@ namespace ImageViewer.Models
                 StrokeThickness = StrokeThickness,
                 IsVisible = IsVisible,
                 IsLocked = IsLocked,
+                Tolerance = Tolerance?.Clone(),
                 UseOtsu = UseOtsu,
                 ManualThreshold = ManualThreshold,
                 DetectDark = DetectDark,

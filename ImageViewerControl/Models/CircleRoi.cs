@@ -1,19 +1,18 @@
-using System.Windows;
 using ImageViewer.Common;
 
 namespace ImageViewer.Models
 {
     public class CircleRoi : RoiBase
     {
-        private Point _center;
+        private PointD _center;
         private double _radius;
 
         public CircleRoi()
         {
-            StrokeColor = System.Windows.Media.Colors.Gold;
+            StrokeColor = RoiColors.Gold;
         }
 
-        public Point Center
+        public PointD Center
         {
             get => _center;
             set => SetProperty(ref _center, value);
@@ -35,7 +34,8 @@ namespace ImageViewer.Models
                 StrokeColor = StrokeColor,
                 StrokeThickness = StrokeThickness,
                 IsVisible = IsVisible,
-                IsLocked = IsLocked
+                IsLocked = IsLocked,
+                Tolerance = Tolerance?.Clone()
             };
         }
 

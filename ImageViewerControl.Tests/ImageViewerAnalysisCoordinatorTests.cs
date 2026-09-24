@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -329,8 +329,8 @@ namespace ImageViewerControl.Tests
         {
             return new LineMeasureRoi
             {
-                P1 = new Point(0, 0),
-                P2 = new Point(1, 0)
+                P1 = new PointD(0, 0),
+                P2 = new PointD(1, 0)
             };
         }
 

@@ -429,8 +429,10 @@
   <data name="RecentProjectHeader" xml:space="preserve"><value>{0} ({1})</value></data>
   <data name="StatusSaveRoiSuccess" xml:space="preserve"><value>已保存 ROI 文件</value></data>
   <data name="StatusLoadRoiSuccess" xml:space="preserve"><value>已加载 {0} 个 ROI</value></data>
+  <data name="StatusLoadRoiUnresolved" xml:space="preserve"><value>有 {0} 个标注因缺少对应插件未能载入（{1}），未加入当前视图；ROI 文件本身未被修改。</value></data>
   <data name="StatusSaveSessionSuccess" xml:space="preserve"><value>会话已保存</value></data>
   <data name="StatusLoadSessionSuccess" xml:space="preserve"><value>会话已加载</value></data>
+  <data name="StatusProjectUnresolvedRois" xml:space="preserve"><value>工程中有 {0} 个标注因缺少对应插件未能载入（{1}）；原件已原样保留，安装插件后可重新打开。</value></data>
   <data name="StatusExportPngSuccess" xml:space="preserve"><value>已导出当前视图为 PNG</value></data>
   <data name="StatusExportCsvSuccess" xml:space="preserve"><value>已导出分析结果为 CSV</value></data>
   <data name="StatusExportPackageSuccess" xml:space="preserve"><value>已导出项目包</value></data>

@@ -16,7 +16,7 @@ namespace ImageViewer.Services
             public bool HitTest(RoiBase roi, Point point, double scale, double hitTestTolerance)
             {
                 var caliper = (CircularCaliperMeasureRoi)roi;
-                double distance = GeometryUtils.Distance(caliper.Center, point);
+                double distance = GeometryUtils.Distance(caliper.Center.ToWpfPoint(), point);
                 double innerRadius = Math.Max(0, caliper.Radius - caliper.CaliperSearchRange);
                 double outerRadius = caliper.Radius + caliper.CaliperSearchRange;
                 return distance >= innerRadius && distance <= outerRadius;
@@ -26,7 +26,7 @@ namespace ImageViewer.Services
             {
                 var caliper = (CircularCaliperMeasureRoi)roi;
                 double hSize = (handleSize + handleHitPadding) / scale;
-                foreach (var kvp in CreateBoxHandlePositions(caliper.Center, caliper.Radius, caliper.Radius))
+                foreach (var kvp in CreateBoxHandlePositions(caliper.Center.ToWpfPoint(), caliper.Radius, caliper.Radius))
                 {
                     if (IsWithinHandle(point, kvp.Value, hSize))
                     {
@@ -40,7 +40,7 @@ namespace ImageViewer.Services
             public void Move(RoiBase roi, double dx, double dy)
             {
                 var caliper = (CircularCaliperMeasureRoi)roi;
-                caliper.Center = new Point(caliper.Center.X + dx, caliper.Center.Y + dy);
+                caliper.Center = new Point(caliper.Center.X + dx, caliper.Center.Y + dy).ToPointD();
             }
 
             public void Resize(RoiBase roi, ResizeHandle handle, double dx, double dy, Point currentPos, double minimumRoiDimension)
@@ -48,7 +48,7 @@ namespace ImageViewer.Services
                 var caliper = (CircularCaliperMeasureRoi)roi;
                 if (handle != ResizeHandle.None)
                 {
-                    caliper.Radius = Math.Max(minimumRoiDimension, GeometryUtils.Distance(caliper.Center, currentPos));
+                    caliper.Radius = Math.Max(minimumRoiDimension, GeometryUtils.Distance(caliper.Center.ToWpfPoint(), currentPos));
                 }
             }
         }
@@ -60,7 +60,7 @@ namespace ImageViewer.Services
             public bool HitTest(RoiBase roi, Point point, double scale, double hitTestTolerance)
             {
                 var caliper = (ArcCaliperMeasureRoi)roi;
-                double distance = GeometryUtils.Distance(caliper.Center, point);
+                double distance = GeometryUtils.Distance(caliper.Center.ToWpfPoint(), point);
                 double innerRadius = Math.Max(0, caliper.Radius - caliper.CaliperSearchRange);
                 double outerRadius = caliper.Radius + caliper.CaliperSearchRange;
                 if (distance < innerRadius || distance > outerRadius)
@@ -76,7 +76,7 @@ namespace ImageViewer.Services
             {
                 var caliper = (ArcCaliperMeasureRoi)roi;
                 double hSize = (handleSize + handleHitPadding) / scale;
-                foreach (var kvp in CreateBoxHandlePositions(caliper.Center, caliper.Radius, caliper.Radius))
+                foreach (var kvp in CreateBoxHandlePositions(caliper.Center.ToWpfPoint(), caliper.Radius, caliper.Radius))
                 {
                     if (IsWithinHandle(point, kvp.Value, hSize))
                     {
@@ -90,7 +90,7 @@ namespace ImageViewer.Services
             public void Move(RoiBase roi, double dx, double dy)
             {
                 var caliper = (ArcCaliperMeasureRoi)roi;
-                caliper.Center = new Point(caliper.Center.X + dx, caliper.Center.Y + dy);
+                caliper.Center = new Point(caliper.Center.X + dx, caliper.Center.Y + dy).ToPointD();
             }
 
             public void Resize(RoiBase roi, ResizeHandle handle, double dx, double dy, Point currentPos, double minimumRoiDimension)
@@ -98,7 +98,7 @@ namespace ImageViewer.Services
                 var caliper = (ArcCaliperMeasureRoi)roi;
                 if (handle != ResizeHandle.None)
                 {
-                    caliper.Radius = Math.Max(minimumRoiDimension, GeometryUtils.Distance(caliper.Center, currentPos));
+                    caliper.Radius = Math.Max(minimumRoiDimension, GeometryUtils.Distance(caliper.Center.ToWpfPoint(), currentPos));
                 }
             }
 

@@ -248,12 +248,12 @@ namespace ImageViewer.Controls
             switch (selectedRoi)
             {
                 case CaliperMeasureRoi caliper:
-                    p1 = caliper.P1;
-                    p2 = caliper.P2;
+                    p1 = caliper.P1.ToWpfPoint();
+                    p2 = caliper.P2.ToWpfPoint();
                     break;
                 case LineMeasureRoi line:
-                    p1 = line.P1;
-                    p2 = line.P2;
+                    p1 = line.P1.ToWpfPoint();
+                    p2 = line.P2.ToWpfPoint();
                     break;
                 default:
                     return;
@@ -366,7 +366,7 @@ namespace ImageViewer.Controls
         private static void CopyCommonRoiState(RoiBase source, RoiBase target)
         {
             target.Label = source.Label;
-            RoiVisualState.Capture(source).ApplyTo(target, includeSelection: false);
+            target.CopyVisualStateFrom(source);
         }
 
         private static void CopyLineGeometry(LineMeasureRoi source, LineMeasureRoi target)

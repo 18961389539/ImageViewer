@@ -17,7 +17,7 @@ namespace ImageViewer.Plugins
                     hitTestOrder: 29,
                     drawingTools:
                     [
-                        new RoiToolDescriptor(UiText.Get("ToolArrowAnnotation"), viewer => viewer.StartArrowAnnotationMode(), 101, CreateArrowAnnotationIcon)
+                        new RoiToolDescriptor(UiText.Get("ToolArrowAnnotation"), BuiltInDrawControllers.ArrowAnnotation, 101, CreateArrowAnnotationIcon)
                     ],
                     persistence: CreatePointPairPersistence(
                         data => new ArrowAnnotationRoi
@@ -35,7 +35,7 @@ namespace ImageViewer.Plugins
                     hitTestOrder: 40,
                     drawingTools:
                     [
-                        new RoiToolDescriptor(UiText.Get("ToolPointAnnotation"), viewer => viewer.StartPointAnnotationMode(), 100, CreatePointAnnotationIcon)
+                        new RoiToolDescriptor(UiText.Get("ToolPointAnnotation"), BuiltInDrawControllers.PointAnnotation, 100, CreatePointAnnotationIcon)
                     ],
                     persistence: CreatePositionPersistence(
                         data => new PointAnnotationRoi
@@ -49,7 +49,7 @@ namespace ImageViewer.Plugins
                     hitTestOrder: 30,
                     drawingTools:
                     [
-                        new RoiToolDescriptor(UiText.Get("ToolTextAnnotation"), viewer => viewer.StartTextAnnotationMode(), 110, CreateTextIcon)
+                        new RoiToolDescriptor(UiText.Get("ToolTextAnnotation"), BuiltInDrawControllers.TextAnnotation, 110, CreateTextIcon)
                     ],
                     persistence: CreatePositionPersistence(
                         data => new TextAnnotationRoi

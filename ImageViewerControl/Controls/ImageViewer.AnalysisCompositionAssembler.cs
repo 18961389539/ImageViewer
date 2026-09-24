@@ -9,7 +9,7 @@ namespace ImageViewer.Controls
 {
     public partial class ImageViewer
     {
-        private sealed class AnalysisCompositionAssembler
+        internal sealed class AnalysisCompositionAssembler
         {
             private readonly ImageViewer _owner;
 
@@ -34,7 +34,7 @@ namespace ImageViewer.Controls
                     _owner.profileCanvas,
                     _owner.pseudoColorMenuItem.Items.OfType<MenuItem>(),
                     new WpfImageViewerRenderedImageApplier(_owner.imageContainer, _owner.image, _owner.RuntimeServices.RenderService));
-                IImageViewerProfileTargetResolver profileTargetResolver = new ImageViewerProfileTargetResolver(() => _owner._currentLineMeasure, () => _owner.ViewerState.SelectedRoi);
+                IImageViewerProfileTargetResolver profileTargetResolver = new ImageViewerProfileTargetResolver(() => _owner.ResolveInProgressProfileLine(), () => _owner.ViewerState.SelectedRoi);
                 IImageViewerAnalysisErrorSink errorSink = new ImageViewerAnalysisDiagnostics(_owner.HostServices.AnalysisDiagnostics, _owner.Logger);
                 var analysisController = new ImageViewerAnalysisCoordinator(host, uiFacade, profileTargetResolver, errorSink);
 
@@ -51,30 +51,9 @@ namespace ImageViewer.Controls
                     new ImageViewerAnalysisCommandHostAdapter(
                         new ImageViewerAnalysisCommandDependencies
                         {
-                            GetEnableAsyncAnalysis = () => _owner.EnableAsyncAnalysis,
-                            SetEnableAsyncAnalysis = value => _owner.EnableAsyncAnalysis = value,
-                            GetPauseRealtimeHistogram = () => _owner.PauseRealtimeHistogram,
-                            SetPauseRealtimeHistogram = value => _owner.PauseRealtimeHistogram = value,
-                            GetPauseRealtimeProfile = () => _owner.PauseRealtimeProfile,
-                            SetPauseRealtimeProfile = value => _owner.PauseRealtimeProfile = value,
-                            GetEnableImagePyramid = () => _owner.EnableImagePyramid,
-                            SetEnableImagePyramid = value => _owner.EnableImagePyramid = value,
-                            GetAutoSelectPyramidLevel = () => _owner.AutoSelectPyramidLevel,
-                            SetAutoSelectPyramidLevel = value => _owner.AutoSelectPyramidLevel = value,
-                            GetEnableTiledRendering = () => _owner.EnableTiledRendering,
-                            SetEnableTiledRendering = value => _owner.EnableTiledRendering = value,
-                            GetPrefetchAdjacentTiles = () => _owner.PrefetchAdjacentTiles,
-                            SetPrefetchAdjacentTiles = value => _owner.PrefetchAdjacentTiles = value,
-                            GetTileCacheMaximumMegabytes = () => _owner.TileCacheMaximumMegabytes,
-                            SetTileCacheMaximumMegabytes = value => _owner.TileCacheMaximumMegabytes = value,
-                            GetTilePrefetchRadius = () => _owner.TilePrefetchRadius,
-                            SetTilePrefetchRadius = value => _owner.TilePrefetchRadius = value,
+                            RuntimeOptions = _owner.RuntimeOptions,
                             GetEnableGpuRendering = () => _owner.EnableGpuRendering,
                             SetEnableGpuRendering = value => _owner.EnableGpuRendering = value,
-                            GetPreferShaderPseudoColor = () => _owner.PreferShaderPseudoColor,
-                            SetPreferShaderPseudoColor = value => _owner.PreferShaderPseudoColor = value,
-                            GetAllowCpuPseudoColorFallback = () => _owner.AllowCpuPseudoColorFallback,
-                            SetAllowCpuPseudoColorFallback = value => _owner.AllowCpuPseudoColorFallback = value,
                             UpdateRenderedImage = _owner.UpdateRenderedImage,
                             RefreshAnalysis = analysisController.HandleRefreshAnalysisRequested,
                             ClearAnalysisCache = analysisController.HandleClearAnalysisCacheRequested,

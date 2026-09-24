@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Input;
 using ImageViewer.Localization;
 using ImageViewer.Models;
+using ImageViewer.Utils;
 using ImageViewer.ViewModels;
 
 namespace ImageViewer.Controls
@@ -142,7 +143,7 @@ namespace ImageViewer.Controls
             if (segmentIndex != -1 && viewModel.SelectedRoi is PolygonRoi segmentPolygon)
             {
                 PolygonRoi? oldState = segmentPolygon.Clone() as PolygonRoi;
-                segmentPolygon.Points.Insert(segmentIndex + 1, imagePosition);
+                segmentPolygon.Points.Insert(segmentIndex + 1, imagePosition.ToPointD());
                 PolygonRoi? newState = segmentPolygon.Clone() as PolygonRoi;
 
                 if (oldState != null && newState != null)
@@ -193,7 +194,7 @@ namespace ImageViewer.Controls
 
             if (_state.ActivePolygonPointIndex != -1 && viewModel.SelectedRoi is PolygonRoi polygon)
             {
-                polygon.Points[_state.ActivePolygonPointIndex] = imagePosition;
+                polygon.Points[_state.ActivePolygonPointIndex] = imagePosition.ToPointD();
                 _state.LastMousePosition = imagePosition;
                 _host.DrawSelectedRoiLayer();
                 return true;

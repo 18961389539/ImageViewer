@@ -102,18 +102,10 @@ namespace ImageViewer.Controls
                 cancellationToken.ThrowIfCancellationRequested();
                 Directory.CreateDirectory(_autoSaveDirectory);
                 string filePath = Path.Combine(_autoSaveDirectory, $"{GetAutoSaveFileName()}.ivsession");
-                ImageViewerViewportState viewportState = _workflow.GetCurrentViewportState();
                 await _workflow.SessionService.SaveToFileAsync(
                     filePath,
-                    _workflow.TryGetCurrentImagePath(),
-                    _workflow.GetAllRois(),
-                    _workflow.GetPixelSize(),
-                    _workflow.GetPhysicalUnit(),
-                    viewportState.Scale,
-                    viewportState.TranslateX,
-                    viewportState.TranslateY,
+                    _workflow.CaptureSnapshot(),
                     _workflow.GetPluginRegistry(),
-                    _workflow.GetCalibration(),
                     cancellationToken);
                 _lastAutoSaveFailed = false;
             }

@@ -1,42 +1,41 @@
 using System;
-using System.Windows;
 using ImageViewer.Common;
 
 namespace ImageViewer.Models
 {
     public class PerpendicularityMeasureRoi : RoiBase
     {
-        private Point _line1P1;
-        private Point _line1P2;
-        private Point _line2P1;
-        private Point _line2P2;
+        private PointD _line1P1;
+        private PointD _line1P2;
+        private PointD _line2P1;
+        private PointD _line2P2;
 
         public PerpendicularityMeasureRoi()
         {
-            StrokeColor = System.Windows.Media.Colors.Orchid;
+            StrokeColor = RoiColors.Orchid;
         }
 
         public override string RoiTypeName => "Perpendicularity";
 
-        public Point Line1P1
+        public PointD Line1P1
         {
             get => _line1P1;
             set => SetProperty(ref _line1P1, value);
         }
 
-        public Point Line1P2
+        public PointD Line1P2
         {
             get => _line1P2;
             set => SetProperty(ref _line1P2, value);
         }
 
-        public Point Line2P1
+        public PointD Line2P1
         {
             get => _line2P1;
             set => SetProperty(ref _line2P1, value);
         }
 
-        public Point Line2P2
+        public PointD Line2P2
         {
             get => _line2P2;
             set => SetProperty(ref _line2P2, value);
@@ -79,7 +78,7 @@ namespace ImageViewer.Models
 
         public double AngleBetweenLines => AngleDifference;
 
-        public Point? IntersectionPoint
+        public PointD? IntersectionPoint
         {
             get
             {
@@ -99,7 +98,7 @@ namespace ImageViewer.Models
                 double ix = x1 + t * (x2 - x1);
                 double iy = y1 + t * (y2 - y1);
 
-                return new Point(ix, iy);
+                return new PointD(ix, iy);
             }
         }
 
@@ -115,7 +114,8 @@ namespace ImageViewer.Models
                 StrokeColor = StrokeColor,
                 StrokeThickness = StrokeThickness,
                 IsVisible = IsVisible,
-                IsLocked = IsLocked
+                IsLocked = IsLocked,
+                Tolerance = Tolerance?.Clone()
             };
         }
 

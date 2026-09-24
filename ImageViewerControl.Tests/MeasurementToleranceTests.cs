@@ -47,8 +47,8 @@ namespace ImageViewerControl.Tests
             RoiPluginRegistry registry = RoiPluginRegistry.CreateBuiltIn();
             var roi = new LineMeasureRoi
             {
-                P1 = new Point(0, 0),
-                P2 = new Point(10, 0),
+                P1 = new PointD(0, 0),
+                P2 = new PointD(10, 0),
                 Tolerance = new MeasurementTolerance { Nominal = 12.5, TolerancePlus = 0.25, ToleranceMinus = 0.75 }
             };
 
@@ -65,22 +65,60 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
+        public void Tolerance_SurvivesCloneAndApplyFrom_AsIndependentCopy()
+        {
+            var line = new LineMeasureRoi
+            {
+                P1 = new PointD(0, 0),
+                P2 = new PointD(10, 0),
+                Tolerance = new MeasurementTolerance { Nominal = 5, TolerancePlus = 0.1, ToleranceMinus = 0.2 }
+            };
+
+            var clone = (LineMeasureRoi)line.Clone();
+
+            Assert.Equal(5, clone.Tolerance!.Nominal);
+            Assert.Equal(0.1, clone.Tolerance.TolerancePlus);
+            Assert.Equal(0.2, clone.Tolerance.ToleranceMinus);
+
+            // 公差面板会就地修改实例，快照必须持有独立副本，撤销才能还原。
+            clone.Tolerance!.Nominal = 9;
+            Assert.Equal(5, line.Tolerance!.Nominal);
+
+            var restored = new LineMeasureRoi();
+            restored.ApplyFrom(line);
+            Assert.Equal(5, restored.Tolerance!.Nominal);
+        }
+
+        [Fact]
+        public void Tolerance_SurvivesClone_ForCaliperTypeUsingApplyFrom()
+        {
+            var caliper = new LineCaliperMeasureRoi
+            {
+                Tolerance = new MeasurementTolerance { Nominal = 3.5 }
+            };
+
+            var clone = (LineCaliperMeasureRoi)caliper.Clone();
+
+            Assert.Equal(3.5, clone.Tolerance!.Nominal);
+        }
+
+        [Fact]
         public void Tolerance_NewEdgeSelectionAndMinimumGap_PersistRoundTrip()
         {
             RoiPluginRegistry registry = RoiPluginRegistry.CreateBuiltIn();
             var lineCaliper = new LineCaliperMeasureRoi
             {
-                P1 = new Point(0, 0),
-                P2 = new Point(10, 0),
+                P1 = new PointD(0, 0),
+                P2 = new PointD(10, 0),
                 EdgeSelection = 3
             };
             var widthCaliper = new CaliperMeasureRoi
             {
-                P1 = new Point(0, 0),
-                P2 = new Point(10, 0),
+                P1 = new PointD(0, 0),
+                P2 = new PointD(10, 0),
                 MinimumEdgeGap = 4.5,
                 HasExplicitCaliperRegion = true,
-                CaliperCenter = new Point(5, 0),
+                CaliperCenter = new PointD(5, 0),
                 CaliperAngleDegrees = 0,
                 CaliperSearchRange = 8
             };

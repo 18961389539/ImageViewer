@@ -106,7 +106,7 @@ namespace ImageViewer.Controls
             _drawRois();
         }
 
-        public void SetSelectedColor(Color color)
+        public void SetSelectedColor(RoiColor color)
         {
             if (_viewModel.SelectedRoi is not RoiBase roi)
             {

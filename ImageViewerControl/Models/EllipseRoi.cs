@@ -1,4 +1,3 @@
-using System.Windows;
 using ImageViewer.Common;
 
 namespace ImageViewer.Models
@@ -10,17 +9,17 @@ namespace ImageViewer.Models
     /// </summary>
     public class EllipseRoi : RoiBase
     {
-        private Point _center;
+        private PointD _center;
         private double _radiusX;
         private double _radiusY;
         private double _angle;
 
         public EllipseRoi()
         {
-            StrokeColor = System.Windows.Media.Colors.Yellow;
+            StrokeColor = RoiColors.Yellow;
         }
 
-        public Point Center
+        public PointD Center
         {
             get => _center;
             set => SetProperty(ref _center, value);
@@ -56,7 +55,8 @@ namespace ImageViewer.Models
                 StrokeColor = StrokeColor,
                 StrokeThickness = StrokeThickness,
                 IsVisible = IsVisible,
-                IsLocked = IsLocked
+                IsLocked = IsLocked,
+                Tolerance = Tolerance?.Clone()
             };
         }
 
