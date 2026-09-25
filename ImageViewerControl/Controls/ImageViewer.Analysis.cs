@@ -11,6 +11,8 @@ namespace ImageViewer.Controls
 {
     public partial class ImageViewer
     {
+        private string? _lastLargeImageProfileKey;
+
         private void OnRuntimeOptionsPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             switch (e.PropertyName)
@@ -21,6 +23,8 @@ namespace ImageViewer.Controls
                 case nameof(ImageViewerRuntimeOptions.AutoSelectPyramidLevel):
                 case nameof(ImageViewerRuntimeOptions.EnableTiledRendering):
                 case nameof(ImageViewerRuntimeOptions.PrefetchAdjacentTiles):
+                case nameof(ImageViewerRuntimeOptions.TileCacheMaximumMegabytes):
+                case nameof(ImageViewerRuntimeOptions.TilePrefetchRadius):
                     UpdateRenderedImage();
                     break;
                 case nameof(ImageViewerRuntimeOptions.EnableAsyncAnalysis):
@@ -53,7 +57,26 @@ namespace ImageViewer.Controls
 
         private BitmapSource? GetAnalysisBitmapSource() => _analysisController.GetAnalysisBitmapSource();
 
-        private Task PrepareAnalysisResourcesAsync(ImageSource? source) => _analysisController.PrepareAnalysisResourcesAsync(source);
+        private Task PrepareAnalysisResourcesAsync(ImageSource? source)
+        {
+            if (source is BitmapSource bitmap)
+            {
+                string? profile = RuntimeOptions.ApplyLargeImageProfile(bitmap.PixelWidth, bitmap.PixelHeight);
+                string profileKey = $"{bitmap.PixelWidth}x{bitmap.PixelHeight}:{profile}";
+                if (profile != null && !string.Equals(_lastLargeImageProfileKey, profileKey, System.StringComparison.Ordinal))
+                {
+                    ShowStatusHint(UiText.Get(profile), StatusHintKind.Info, durationMs: 4500);
+                }
+
+                _lastLargeImageProfileKey = profileKey;
+            }
+            else
+            {
+                _lastLargeImageProfileKey = null;
+            }
+
+            return _analysisController.PrepareAnalysisResourcesAsync(source);
+        }
 
         private void RefreshAnalysisDisplays(bool force = false) => _ = BackgroundOperationObserver.ObserveAsync(_analysisController.RefreshAnalysisDisplays(force), "Refresh analysis displays");
 

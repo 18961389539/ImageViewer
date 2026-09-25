@@ -11,6 +11,7 @@ namespace ImageViewer.Models
         private int _caliperCount = 9;
         private int _caliperSearchRange = 24;
         private int _caliperSamplingHalfWidth = 3;
+        private double _caliperEdgeSigma = 1.0;
         private double _caliperRegionLength;
         private double _caliperMinimumGradient = 8;
         private int _minimumValidCalipers = 4;
@@ -184,6 +185,12 @@ namespace ImageViewer.Models
         {
             get => _caliperSamplingHalfWidth;
             set => SetProperty(ref _caliperSamplingHalfWidth, Math.Max(0, value));
+        }
+
+        public double CaliperEdgeSigma
+        {
+            get => _caliperEdgeSigma;
+            set => SetProperty(ref _caliperEdgeSigma, Math.Clamp(value, 0.5, 5.0));
         }
 
         public double CaliperRegionLength

@@ -134,6 +134,54 @@ namespace ImageViewer.Plugins
             set => Geometry.Angle = value;
         }
 
+        public double FitResidualRms
+        {
+            get => Geometry.FitResidualRms;
+            set => Geometry.FitResidualRms = value;
+        }
+
+        public double FitResidualMedian
+        {
+            get => Geometry.FitResidualMedian;
+            set => Geometry.FitResidualMedian = value;
+        }
+
+        public double FitResidualMax
+        {
+            get => Geometry.FitResidualMax;
+            set => Geometry.FitResidualMax = value;
+        }
+
+        public double FitNoiseScale
+        {
+            get => Geometry.FitNoiseScale;
+            set => Geometry.FitNoiseScale = value;
+        }
+
+        public int FitInlierCount
+        {
+            get => Geometry.FitInlierCount;
+            set => Geometry.FitInlierCount = value;
+        }
+
+        public int FitOutlierCount
+        {
+            get => Geometry.FitOutlierCount;
+            set => Geometry.FitOutlierCount = value;
+        }
+
+        public double FitAspectRatio
+        {
+            get => Geometry.FitAspectRatio;
+            set => Geometry.FitAspectRatio = value;
+        }
+
+        public string? FitAlgorithm
+        {
+            get => Geometry.FitAlgorithm;
+            set => Geometry.FitAlgorithm = value;
+        }
+
         public int CaliperCount
         {
             get => Measurement.CaliperCount;
@@ -150,6 +198,12 @@ namespace ImageViewer.Plugins
         {
             get => Measurement.CaliperSamplingHalfWidth;
             set => Measurement.CaliperSamplingHalfWidth = value;
+        }
+
+        public double CaliperEdgeSigma
+        {
+            get => Measurement.CaliperEdgeSigma;
+            set => Measurement.CaliperEdgeSigma = value;
         }
 
         public int MinimumValidCalipers
@@ -198,6 +252,24 @@ namespace ImageViewer.Plugins
         {
             get => Measurement.EdgeSelection;
             set => Measurement.EdgeSelection = value;
+        }
+
+        public double EdgeScore
+        {
+            get => Measurement.EdgeScore;
+            set => Measurement.EdgeScore = value;
+        }
+
+        public double EdgeConfidence
+        {
+            get => Measurement.EdgeConfidence;
+            set => Measurement.EdgeConfidence = value;
+        }
+
+        public bool IsEdgeSnapped
+        {
+            get => Measurement.IsEdgeSnapped;
+            set => Measurement.IsEdgeSnapped = value;
         }
 
         public bool IsClosed
@@ -263,6 +335,14 @@ namespace ImageViewer.Plugins
         public double Radius { get; set; }
         public double Radius2 { get; set; }
         public double Angle { get; set; }
+        public double FitResidualRms { get; set; }
+        public double FitResidualMedian { get; set; }
+        public double FitResidualMax { get; set; }
+        public double FitNoiseScale { get; set; }
+        public int FitInlierCount { get; set; }
+        public int FitOutlierCount { get; set; }
+        public double FitAspectRatio { get; set; }
+        public string? FitAlgorithm { get; set; }
     }
 
     public sealed class RoiPersistenceMeasurementData
@@ -270,6 +350,7 @@ namespace ImageViewer.Plugins
         public int CaliperCount { get; set; }
         public int CaliperSearchRange { get; set; }
         public int CaliperSamplingHalfWidth { get; set; }
+        public double CaliperEdgeSigma { get; set; } = 1.0;
         public int MinimumValidCalipers { get; set; }
         public double CaliperMinimumGradient { get; set; }
         public double CaliperOutlierThreshold { get; set; }
@@ -278,6 +359,9 @@ namespace ImageViewer.Plugins
         public double NominalEdgeGap { get; set; }
         public double NominalEdgeGapTolerance { get; set; }
         public int EdgeSelection { get; set; } = 1;
+        public double EdgeScore { get; set; }
+        public double EdgeConfidence { get; set; }
+        public bool IsEdgeSnapped { get; set; }
     }
 
     public sealed class RoiPersistenceOptionsData

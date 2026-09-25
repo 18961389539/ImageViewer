@@ -30,6 +30,7 @@ namespace ImageViewer.Rendering
                 [typeof(BlobAnalysisRoi)] = new BlobAnalysisRenderer(),
                 [typeof(PolylineRoi)] = new PolylineRoiRenderer(),
                 [typeof(PointAnnotationRoi)] = new PointAnnotationRenderer(),
+                [typeof(PointCoordinateMeasureRoi)] = new PointCoordinateMeasureRenderer(),
                 [typeof(TextAnnotationRoi)] = new TextAnnotationRenderer(),
                 [typeof(ArrowAnnotationRoi)] = new ArrowAnnotationRenderer(),
                 [typeof(LineMeasureRoi)] = new LineMeasureRenderer(),
@@ -41,7 +42,9 @@ namespace ImageViewer.Rendering
                 [typeof(PointToCircleDistanceRoi)] = new PointToCircleDistanceRenderer(),
                 [typeof(ParallelismMeasureRoi)] = new ParallelismMeasureRenderer(),
                 [typeof(PerpendicularityMeasureRoi)] = new PerpendicularityMeasureRenderer(),
-                [typeof(ConcentricityMeasureRoi)] = new ConcentricityMeasureRenderer()
+                [typeof(ConcentricityMeasureRoi)] = new ConcentricityMeasureRenderer(),
+                [typeof(CenterDistanceMeasureRoi)] = new CenterDistanceMeasureRenderer(),
+                [typeof(ThreePointCircleMeasureRoi)] = new ThreePointCircleMeasureRenderer()
             };
         }
 

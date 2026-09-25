@@ -35,6 +35,30 @@ namespace ImageViewer.Services
             }
         }
 
+        private sealed class PointCoordinateMeasureBehavior : IRoiBehavior
+        {
+            public bool CanHandle(RoiBase roi) => roi is PointCoordinateMeasureRoi;
+
+            public bool HitTest(RoiBase roi, Point point, double scale, double hitTestTolerance)
+            {
+                var measure = (PointCoordinateMeasureRoi)roi;
+                return GeometryUtils.Distance(measure.Position.ToWpfPoint(), point) <= Math.Max(8, hitTestTolerance) / scale;
+            }
+
+            public ResizeHandle GetHandleAt(RoiBase roi, Point point, double scale, double handleSize, double handleHitPadding, double infoTextOffset, double polygonVertexHitPadding)
+                => ResizeHandle.None;
+
+            public void Move(RoiBase roi, double dx, double dy)
+            {
+                var measure = (PointCoordinateMeasureRoi)roi;
+                measure.Position = new Point(measure.Position.X + dx, measure.Position.Y + dy).ToPointD();
+            }
+
+            public void Resize(RoiBase roi, ResizeHandle handle, double dx, double dy, Point currentPos, double minimumRoiDimension)
+            {
+            }
+        }
+
         private sealed class TextAnnotationBehavior : IRoiBehavior
         {
             public bool CanHandle(RoiBase roi) => roi is TextAnnotationRoi;

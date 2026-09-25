@@ -34,6 +34,7 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <Border Padding="8" Background="#18212E" BorderBrush="#314158" BorderThickness="0,0,0,1">
+            <StackPanel>
             <WrapPanel>
                 <Button x:Name="autoButton" Content="{localization:UiText AdaptiveAuto}" Click="OnAutoClick" Margin="0,0,6,0" ToolTip="{localization:UiText AdaptiveAutoTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
                 <Button x:Name="twoDimensionalButton" Content="{localization:UiText Adaptive2D}" Click="OnTwoDimensionalClick" Margin="0,0,6,0" ToolTip="{localization:UiText Adaptive2DTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
@@ -45,8 +46,47 @@
                 <Button x:Name="segmentButton" Content="{localization:UiText AdaptiveSegment}" Click="OnSegmentClick" Margin="0,0,6,0" ToolTip="{localization:UiText AdaptiveSegmentTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
                 <Button x:Name="cancelButton" Content="{localization:UiText AdaptiveCancel}" Click="OnCancelClick" Style="{StaticResource AdaptiveBarButtonStyle}" ToolTip="{localization:UiText AdaptiveCancelTooltip}" />
             </WrapPanel>
+            <Border x:Name="mprSliceBar"
+                    Margin="0,8,0,0"
+                    Padding="8,5"
+                    Background="#111824"
+                    BorderBrush="#35506D"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    Visibility="Collapsed">
+                <DockPanel LastChildFill="True">
+                    <TextBlock x:Name="mprSliceStatusText"
+                               DockPanel.Dock="Left"
+                               Margin="0,0,10,0"
+                               VerticalAlignment="Center"
+                               Foreground="#F5F8FC" />
+                    <Button x:Name="mprPreviousButton"
+                            DockPanel.Dock="Right"
+                            Margin="6,0,0,0"
+                            Padding="8,3"
+                            Content="{localization:UiText AdaptivePreviousSlice}"
+                            Click="OnPreviousMprSliceClick"
+                            Style="{StaticResource AdaptiveBarButtonStyle}" />
+                    <Button x:Name="mprNextButton"
+                            DockPanel.Dock="Right"
+                            Padding="8,3"
+                            Content="{localization:UiText AdaptiveNextSlice}"
+                            Click="OnNextMprSliceClick"
+                            Style="{StaticResource AdaptiveBarButtonStyle}" />
+                    <Slider x:Name="mprSliceSlider"
+                            Minimum="0"
+                            Maximum="1"
+                            SmallChange="1"
+                            LargeChange="1"
+                            IsSnapToTickEnabled="True"
+                            TickFrequency="1"
+                            ValueChanged="OnMprSliceValueChanged"
+                            AutomationProperties.Name="{localization:UiText AdaptiveMprSliceSliderName}" />
+                </DockPanel>
+            </Border>
+            </StackPanel>
         </Border>
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="1" PreviewMouseWheel="OnPreviewMouseWheel">
             <ContentControl x:Name="contentHost" />
             <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10" Padding="8" Background="#C018212E" BorderBrush="#49627D" BorderThickness="1" CornerRadius="8">
                 <StackPanel>

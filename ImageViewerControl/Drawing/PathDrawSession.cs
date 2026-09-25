@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Windows;
 using ImageViewer.Models;
 using ImageViewer.Rendering;
+using ImageViewer.Utils;
 
 namespace ImageViewer.Drawing
 {
@@ -194,6 +196,23 @@ namespace ImageViewer.Drawing
             }
 
             Point lastPoint = points[points.Count - 1];
+
+            IReadOnlyList<Point> previewPoints = _previewPoint is Point preview
+                ? [..points, preview]
+                : [..points];
+            string? measurementText = _roi switch
+            {
+                PolylineRoi when previewPoints.Count > 1 => $"Length: {context.FormatLength(GeometryUtils.PolylineLength(previewPoints))}",
+                PolygonRoi when previewPoints.Count >= 3 => $"Area: {context.FormatArea(GeometryUtils.PolygonArea(previewPoints))}",
+                _ => null
+            };
+            if (measurementText != null)
+            {
+                context.DrawInfoText(
+                    measurementText,
+                    new Point(lastPoint.X, lastPoint.Y - (context.InfoTextOffset + 18) / context.Scale),
+                    System.Windows.Media.Brushes.Orange);
+            }
 
             if (_options.ShowPointCountInfo)
             {

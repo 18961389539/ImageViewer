@@ -64,7 +64,8 @@ namespace ImageViewer.Controls
                     _owner.ViewModel,
                     _owner.UpdateContextMenuState,
                     roiSelectionStateController.HandleSelectedRoiChanged,
-                    () => _owner.DrawRois());
+                    () => _owner.DrawRois(),
+                    _owner.MarkDocumentDirty);
             }
 
             public ViewportController CreateViewportController()

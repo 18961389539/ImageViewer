@@ -7,6 +7,7 @@ namespace ImageViewer.Models
         int CaliperCount,
         int CaliperSearchRange,
         int CaliperSamplingHalfWidth,
+        double CaliperEdgeSigma,
         double CaliperRegionLength,
         double CaliperMinimumGradient,
         int MinimumValidCalipers,
@@ -22,6 +23,7 @@ namespace ImageViewer.Models
                 roi.CaliperCount,
                 roi.CaliperSearchRange,
                 roi.CaliperSamplingHalfWidth,
+                roi.CaliperEdgeSigma,
                 roi.CaliperRegionLength,
                 roi.CaliperMinimumGradient,
                 roi.MinimumValidCalipers,
@@ -37,6 +39,7 @@ namespace ImageViewer.Models
             roi.CaliperCount = CaliperCount;
             roi.CaliperSearchRange = CaliperSearchRange;
             roi.CaliperSamplingHalfWidth = CaliperSamplingHalfWidth;
+            roi.CaliperEdgeSigma = CaliperEdgeSigma;
             roi.CaliperRegionLength = CaliperRegionLength;
             roi.CaliperMinimumGradient = CaliperMinimumGradient;
             roi.MinimumValidCalipers = MinimumValidCalipers;

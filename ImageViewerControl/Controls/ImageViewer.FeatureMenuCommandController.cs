@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media.Imaging;
 using ImageViewer.Models;
+using ImageViewer.Plugins;
 using ImageViewer.ViewModels;
 
 namespace ImageViewer.Controls
@@ -23,6 +24,9 @@ namespace ImageViewer.Controls
         public required Func<double> GetPixelSize { get; init; }
         public required Func<string> GetPhysicalUnit { get; init; }
         public required Func<CameraCalibration?> GetCalibration { get; init; }
+        public required Func<string?> GetCurrentImagePath { get; init; }
+        public required Func<RoiPluginRegistry> GetPluginRegistry { get; init; }
+        public required Func<IReadOnlyDictionary<string, string>> GetRenderSettings { get; init; }
         public required Action<string, string, Exception> ShowNonCriticalError { get; init; }
         public required Action<string, StatusHintKind> ShowStatusHint { get; init; }
         public required Action UpdateContextMenuState { get; init; }

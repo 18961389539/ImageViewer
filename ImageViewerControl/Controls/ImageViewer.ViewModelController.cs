@@ -13,18 +13,21 @@ namespace ImageViewer.Controls
         private readonly Action _updateContextMenuState;
         private readonly Action _handleSelectedRoiChanged;
         private readonly Action _drawRois;
+        private readonly Action _markDocumentDirty;
         private bool _isAttached;
 
         public ViewModelController(
             ImageViewerViewModel viewModel,
             Action updateContextMenuState,
             Action handleSelectedRoiChanged,
-            Action drawRois)
+            Action drawRois,
+            Action markDocumentDirty)
         {
             _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
             _updateContextMenuState = updateContextMenuState ?? throw new ArgumentNullException(nameof(updateContextMenuState));
             _handleSelectedRoiChanged = handleSelectedRoiChanged ?? throw new ArgumentNullException(nameof(handleSelectedRoiChanged));
             _drawRois = drawRois ?? throw new ArgumentNullException(nameof(drawRois));
+            _markDocumentDirty = markDocumentDirty ?? throw new ArgumentNullException(nameof(markDocumentDirty));
         }
 
         public void Attach()
@@ -100,11 +103,20 @@ namespace ImageViewer.Controls
                     item.PropertyChanged += OnRoiPropertyChanged;
                 }
             }
+
+            if (e.Action != NotifyCollectionChangedAction.Move)
+            {
+                _markDocumentDirty();
+            }
         }
 
         private void OnRoiPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             _drawRois();
+            if (e.PropertyName != nameof(RoiBase.IsSelected))
+            {
+                _markDocumentDirty();
+            }
         }
     }
 }

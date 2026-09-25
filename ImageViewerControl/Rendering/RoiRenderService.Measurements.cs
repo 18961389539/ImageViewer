@@ -276,5 +276,66 @@ namespace ImageViewer.Rendering
                 context.DrawHandle(concCenter2, isSelected ? ResizeHandle.P2 : ResizeHandle.None, handleSize, false, brush);
             }
         }
+
+        private sealed class CenterDistanceMeasureRenderer : IRoiRenderer
+        {
+            public bool CanRender(RoiBase roi) => roi is CenterDistanceMeasureRoi;
+
+            public void Render(RoiBase roi, RoiRenderContext context, Brush? strokeOverride, bool isSelected)
+            {
+                var distance = (CenterDistanceMeasureRoi)roi;
+                if (!distance.IsVisible) return;
+
+                Brush brush = RoiRenderContext.ResolveStroke(strokeOverride, distance.StrokeColor);
+                double thickness = (isSelected ? 3 : distance.StrokeThickness) / context.Scale;
+                Point center1 = distance.Center1.ToWpfPoint();
+                Point center2 = distance.Center2.ToWpfPoint();
+                context.DrawLineSegment(center1, center2, brush, thickness);
+                context.DrawDot(center1, 3 / context.Scale, brush);
+                context.DrawDot(center2, 3 / context.Scale, brush);
+                context.DrawInfoText(StandardRoiInfoTextFormatter.BuildCenterDistanceText(distance, context), distance.MidCenter.ToWpfPoint(), brush, true);
+
+                double handleSize = context.HandleSize / context.Scale;
+                context.DrawHandle(center1, isSelected ? ResizeHandle.P1 : ResizeHandle.None, handleSize, false, brush);
+                context.DrawHandle(center2, isSelected ? ResizeHandle.P2 : ResizeHandle.None, handleSize, false, brush);
+            }
+        }
+
+        private sealed class ThreePointCircleMeasureRenderer : IRoiRenderer
+        {
+            public bool CanRender(RoiBase roi) => roi is ThreePointCircleMeasureRoi;
+
+            public void Render(RoiBase roi, RoiRenderContext context, Brush? strokeOverride, bool isSelected)
+            {
+                var circle = (ThreePointCircleMeasureRoi)roi;
+                if (!circle.IsVisible) return;
+
+                Brush brush = RoiRenderContext.ResolveStroke(strokeOverride, circle.StrokeColor);
+                double thickness = (isSelected ? 3 : circle.StrokeThickness) / context.Scale;
+                Point p1 = circle.P1.ToWpfPoint();
+                Point p2 = circle.P2.ToWpfPoint();
+                Point p3 = circle.P3.ToWpfPoint();
+
+                if (circle.IsValid)
+                {
+                    Point center = circle.Center.ToWpfPoint();
+                    context.DrawCircleOutline(center, circle.Radius, brush, thickness);
+                    context.DrawDot(center, 3 / context.Scale, brush);
+                    context.DrawInfoText(StandardRoiInfoTextFormatter.BuildThreePointCircleText(circle, context), center, brush, true);
+                }
+                else
+                {
+                    context.DrawLineSegment(p1, p2, brush, thickness);
+                    context.DrawLineSegment(p2, p3, brush, thickness);
+                    context.DrawLineSegment(p3, p1, brush, thickness);
+                    context.DrawInfoText(StandardRoiInfoTextFormatter.BuildThreePointCircleText(circle, context), p3, brush, true);
+                }
+
+                double handleSize = context.HandleSize / context.Scale;
+                context.DrawHandle(p1, isSelected ? ResizeHandle.P1 : ResizeHandle.None, handleSize, false, brush);
+                context.DrawHandle(p2, isSelected ? ResizeHandle.P2 : ResizeHandle.None, handleSize, false, brush);
+                context.DrawHandle(p3, isSelected ? ResizeHandle.P3 : ResizeHandle.None, handleSize, false, brush);
+            }
+        }
     }
 }

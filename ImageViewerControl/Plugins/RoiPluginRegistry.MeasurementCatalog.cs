@@ -13,11 +13,36 @@ namespace ImageViewer.Plugins
             {
                 return
                 [
+                    CreateRegistration<PointCoordinateMeasureRoi>(
+                    typeKey: "point-coordinate-measure",
+                    hitTestOrder: 41,
+                    drawingTools:
+                    [
+                        new RoiToolDescriptor(UiText.Get("ToolPointCoordinate"), BuiltInDrawControllers.PointCoordinate, 102, CreatePointCoordinateIcon, isMeasurement: true),
+                        new RoiToolDescriptor(UiText.Get("ToolAutomaticEdgePoint"), BuiltInDrawControllers.AutomaticEdgePoint, 103, CreateAutomaticEdgePointIcon, isMeasurement: true)
+                    ],
+                    persistence: CreatePositionPersistence(
+                        data => new PointCoordinateMeasureRoi
+                        {
+                            Position = data.Geometry.Position.ToPoint(),
+                            EdgeScore = data.Measurement.EdgeScore,
+                            EdgeConfidence = data.Measurement.EdgeConfidence,
+                            IsEdgeSnapped = data.Measurement.IsEdgeSnapped
+                        },
+                        static roi => roi.Position,
+                        static (roi, data) =>
+                        {
+                            data.Measurement.EdgeScore = roi.EdgeScore;
+                            data.Measurement.EdgeConfidence = roi.EdgeConfidence;
+                            data.Measurement.IsEdgeSnapped = roi.IsEdgeSnapped;
+                        })),
+
                     CreateRegistration<CircularCaliperMeasureRoi>(
                     typeKey: "circular-caliper-measure",
                     hitTestOrder: 78,
                     drawingTools:
                     [
+                        new RoiToolDescriptor(UiText.Get("ToolAutomaticCircle"), BuiltInDrawControllers.AutomaticCircle, 84, CreateCircularCaliperMeasureIcon, isMeasurement: true),
                         new RoiToolDescriptor(UiText.Get("ToolCircularCaliper"), BuiltInDrawControllers.CircularCaliper, 85, CreateCircularCaliperMeasureIcon, isMeasurement: true)
                     ],
                     persistence: CreateCenterRadiusPersistence(
@@ -28,6 +53,7 @@ namespace ImageViewer.Plugins
                             CaliperCount = data.Measurement.CaliperCount > 0 ? data.Measurement.CaliperCount : 16,
                             CaliperSearchRange = data.Measurement.CaliperSearchRange > 0 ? data.Measurement.CaliperSearchRange : 18,
                             CaliperSamplingHalfWidth = data.Measurement.CaliperSamplingHalfWidth,
+                            CaliperEdgeSigma = data.Measurement.CaliperEdgeSigma > 0 ? data.Measurement.CaliperEdgeSigma : 1.0,
                             MinimumValidCalipers = data.Measurement.MinimumValidCalipers > 0 ? data.Measurement.MinimumValidCalipers : 8,
                             CaliperMinimumGradient = data.Measurement.CaliperMinimumGradient > 0 ? data.Measurement.CaliperMinimumGradient : 8,
                             CaliperOutlierThreshold = data.Measurement.CaliperOutlierThreshold > 0 ? data.Measurement.CaliperOutlierThreshold : 2.5,
@@ -43,6 +69,7 @@ namespace ImageViewer.Plugins
                                 roi.CaliperCount,
                                 roi.CaliperSearchRange,
                                 roi.CaliperSamplingHalfWidth,
+                                roi.CaliperEdgeSigma,
                                 roi.MinimumValidCalipers,
                                 roi.CaliperMinimumGradient,
                                 roi.CaliperOutlierThreshold,
@@ -67,6 +94,7 @@ namespace ImageViewer.Plugins
                             CaliperCount = data.Measurement.CaliperCount > 0 ? data.Measurement.CaliperCount : 16,
                             CaliperSearchRange = data.Measurement.CaliperSearchRange > 0 ? data.Measurement.CaliperSearchRange : 18,
                             CaliperSamplingHalfWidth = data.Measurement.CaliperSamplingHalfWidth,
+                            CaliperEdgeSigma = data.Measurement.CaliperEdgeSigma > 0 ? data.Measurement.CaliperEdgeSigma : 1.0,
                             MinimumValidCalipers = data.Measurement.MinimumValidCalipers > 0 ? data.Measurement.MinimumValidCalipers : 8,
                             CaliperMinimumGradient = data.Measurement.CaliperMinimumGradient > 0 ? data.Measurement.CaliperMinimumGradient : 8,
                             CaliperOutlierThreshold = data.Measurement.CaliperOutlierThreshold > 0 ? data.Measurement.CaliperOutlierThreshold : 2.5,
@@ -83,7 +111,8 @@ namespace ImageViewer.Plugins
                                 data,
                                 roi.CaliperCount,
                                 roi.CaliperSearchRange,
-                                roi.CaliperSamplingHalfWidth,
+                                 roi.CaliperSamplingHalfWidth,
+                                 roi.CaliperEdgeSigma,
                                 roi.MinimumValidCalipers,
                                 roi.CaliperMinimumGradient,
                                 roi.CaliperOutlierThreshold,
@@ -123,6 +152,7 @@ namespace ImageViewer.Plugins
                             CaliperRegionLength = data.Geometry.Width,
                             CaliperSearchRange = data.Geometry.Height > 0 ? (int)Math.Round(data.Geometry.Height / 2) : 24,
                             CaliperAngleDegrees = data.Geometry.Angle,
+                            CaliperEdgeSigma = data.Measurement.CaliperEdgeSigma > 0 ? data.Measurement.CaliperEdgeSigma : 1.0,
                             HasExplicitCaliperRegion = data.Geometry.Center != null,
                             MinimumEdgeGap = data.Measurement.MinimumEdgeGap,
                             NominalEdgeGap = data.Measurement.NominalEdgeGap,
@@ -136,6 +166,7 @@ namespace ImageViewer.Plugins
                             data.Geometry.Width = roi.GetResolvedCaliperRegionLength();
                             data.Geometry.Height = roi.CaliperSearchRange * 2;
                             data.Geometry.Angle = roi.CaliperAngleDegrees;
+                            data.Measurement.CaliperEdgeSigma = roi.CaliperEdgeSigma;
                             data.Measurement.MinimumEdgeGap = roi.MinimumEdgeGap;
                             data.Measurement.NominalEdgeGap = roi.NominalEdgeGap;
                             data.Measurement.NominalEdgeGapTolerance = roi.NominalEdgeGapTolerance;
@@ -156,6 +187,7 @@ namespace ImageViewer.Plugins
                             CaliperCount = data.Measurement.CaliperCount > 0 ? data.Measurement.CaliperCount : 16,
                             CaliperSearchRange = data.Measurement.CaliperSearchRange > 0 ? data.Measurement.CaliperSearchRange : 18,
                             CaliperSamplingHalfWidth = data.Measurement.CaliperSamplingHalfWidth,
+                            CaliperEdgeSigma = data.Measurement.CaliperEdgeSigma > 0 ? data.Measurement.CaliperEdgeSigma : 1.0,
                             MinimumValidCalipers = data.Measurement.MinimumValidCalipers > 0 ? data.Measurement.MinimumValidCalipers : 8,
                             CaliperMinimumGradient = data.Measurement.CaliperMinimumGradient > 0 ? data.Measurement.CaliperMinimumGradient : 8,
                             CaliperOutlierThreshold = data.Measurement.CaliperOutlierThreshold > 0 ? data.Measurement.CaliperOutlierThreshold : 2.5,
@@ -171,6 +203,7 @@ namespace ImageViewer.Plugins
                                 roi.CaliperCount,
                                 roi.CaliperSearchRange,
                                 roi.CaliperSamplingHalfWidth,
+                                roi.CaliperEdgeSigma,
                                 roi.MinimumValidCalipers,
                                 roi.CaliperMinimumGradient,
                                 roi.CaliperOutlierThreshold,
@@ -213,6 +246,24 @@ namespace ImageViewer.Plugins
                         static roi => roi.StartPoint,
                         static roi => roi.EndPoint,
                         static roi => roi.ArcPoint)),
+
+                    CreateRegistration<ThreePointCircleMeasureRoi>(
+                    typeKey: "three-point-circle",
+                    hitTestOrder: 9,
+                    drawingTools:
+                    [
+                        new RoiToolDescriptor(UiText.Get("ToolThreePointCircle"), BuiltInDrawControllers.ThreePointCircle, 92, CreateThreePointCircleIcon, isMeasurement: true)
+                    ],
+                    persistence: CreatePointTriplePersistence(
+                        data => new ThreePointCircleMeasureRoi
+                        {
+                            P1 = data.Geometry.P1.ToPoint(),
+                            P2 = data.Geometry.P2.ToPoint(),
+                            P3 = data.Geometry.Vertex.ToPoint()
+                        },
+                        static roi => roi.P1,
+                        static roi => roi.P2,
+                        static roi => roi.P3)),
 
                     CreateRegistration<PointToLineDistanceRoi>(
                     typeKey: "point-to-line-distance",
@@ -308,7 +359,23 @@ namespace ImageViewer.Plugins
                         static roi => roi.Center1,
                         static roi => roi.Center2,
                         static roi => roi.Radius1,
-                        static roi => roi.Radius2))
+                        static roi => roi.Radius2)),
+
+                    CreateRegistration<CenterDistanceMeasureRoi>(
+                    typeKey: "center-distance-measure",
+                    hitTestOrder: 2,
+                    drawingTools:
+                    [
+                        new RoiToolDescriptor(UiText.Get("ToolCenterDistance"), BuiltInDrawControllers.CenterDistance, 101, CreateCenterDistanceIcon, isMeasurement: true)
+                    ],
+                    persistence: CreatePointPairPersistence(
+                        data => new CenterDistanceMeasureRoi
+                        {
+                            Center1 = data.Geometry.P1.ToPoint(),
+                            Center2 = data.Geometry.P2.ToPoint()
+                        },
+                        static roi => roi.Center1,
+                        static roi => roi.Center2))
                 ];
             }
         }

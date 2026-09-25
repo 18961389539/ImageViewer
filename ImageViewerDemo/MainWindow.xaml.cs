@@ -1,9 +1,13 @@
 using Microsoft.Win32;
 using System;
 using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media.Imaging;
+using ImageViewer.Controls;
 using ImageViewerDemo.Localization;
+using ImageViewer.Models;
 
 namespace ImageViewerDemo;
 
@@ -54,11 +58,51 @@ public partial class MainWindow : Window
 
         try
         {
+            Viewer.Volume = null;
             Viewer.ImageSource = LoadBitmap(dialog.FileName);
+            Viewer.DisplayMode = AdaptiveDisplayMode.Auto;
         }
         catch (Exception ex)
         {
             MessageBox.Show(this, ex.Message, DemoText.Get("OpenImageErrorTitle"), MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private async void OnOpenVolumeClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = DemoText.Get("OpenVolumeDialogTitle"),
+            Filter = DemoText.Get("OpenVolumeDialogFilter"),
+            Multiselect = true,
+            CheckFileExists = true
+        };
+
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        if (dialog.FileNames.Length < 2)
+        {
+            MessageBox.Show(this, DemoText.Get("OpenVolumeNeedMultiple"), DemoText.Get("OpenVolumeErrorTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        try
+        {
+            string[] orderedPaths = dialog.FileNames
+                .OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            BitmapSource[] slices = await Task.Run(() => orderedPaths.Select(LoadBitmap).ToArray());
+            var volume = new VolumeData(slices);
+            Viewer.Volume = volume;
+            Viewer.ImageSource = volume.GetAxialSlice(0);
+            Viewer.DisplayMode = AdaptiveDisplayMode.Auto;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, DemoText.Get("OpenVolumeErrorTitle"), MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 

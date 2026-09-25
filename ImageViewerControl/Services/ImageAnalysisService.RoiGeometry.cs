@@ -117,8 +117,13 @@ namespace ImageViewer.Services
                     GeometryUtils.RotatePoint(new Point(ellipse.Center.X - ellipse.RadiusX, ellipse.Center.Y + ellipse.RadiusY), ellipse.Center.ToWpfPoint(), ellipse.Angle)
                 }),
                 CircleRoi circle => new Rect(circle.Center.X - circle.Radius, circle.Center.Y - circle.Radius, circle.Radius * 2, circle.Radius * 2),
+                PointAnnotationRoi point => new Rect(point.Position.X - 1, point.Position.Y - 1, 2, 2),
+                PointCoordinateMeasureRoi pointCoordinate => new Rect(pointCoordinate.Position.X - 1, pointCoordinate.Position.Y - 1, 2, 2),
+                ThreePointCircleMeasureRoi threePointCircle when threePointCircle.IsValid => new Rect(threePointCircle.Center.X - threePointCircle.Radius, threePointCircle.Center.Y - threePointCircle.Radius, threePointCircle.Radius * 2, threePointCircle.Radius * 2),
+                ThreePointCircleMeasureRoi threePointCircle => GeometryUtils.GetBoundingBox(new[] { threePointCircle.P1.ToWpfPoint(), threePointCircle.P2.ToWpfPoint(), threePointCircle.P3.ToWpfPoint() }),
                 RingRoi ring => new Rect(ring.Center.X - ring.OuterRadius, ring.Center.Y - ring.OuterRadius, ring.OuterRadius * 2, ring.OuterRadius * 2),
-                PolygonRoi poly => GeometryUtils.GetBoundingBox(poly.Points.ToWpfPoints()),
+                PolygonRoi poly when poly.IsClosed && poly.Points.Count >= 3 => GeometryUtils.GetBoundingBox(poly.Points.ToWpfPoints()),
+                PolylineRoi polyline when polyline.Points.Count > 1 => GeometryUtils.GetBoundingBox(polyline.Points.ToWpfPoints()),
                 _ => Rect.Empty
             };
         }
@@ -148,12 +153,32 @@ namespace ImageViewer.Services
                 case CircleRoi circle:
                     return GeometryUtils.Distance(circle.Center.ToWpfPoint(), point) <= circle.Radius;
 
+                case PointAnnotationRoi annotation:
+                    return GeometryUtils.Distance(annotation.Position.ToWpfPoint(), point) <= 1;
+
+                case PointCoordinateMeasureRoi pointCoordinate:
+                    return GeometryUtils.Distance(pointCoordinate.Position.ToWpfPoint(), point) <= 1;
+
+                case ThreePointCircleMeasureRoi threePointCircle:
+                    return threePointCircle.IsValid && GeometryUtils.Distance(threePointCircle.Center.ToWpfPoint(), point) <= threePointCircle.Radius;
+
+                case PolylineRoi polyline:
+                    for (int i = 1; i < polyline.Points.Count; i++)
+                    {
+                        if (GeometryUtils.DistanceToSegment(point, polyline.Points[i - 1].ToWpfPoint(), polyline.Points[i].ToWpfPoint()) <= 1.5)
+                        {
+                            return true;
+                        }
+                    }
+
+                    return false;
+
                 case RingRoi ring:
                     double distance = GeometryUtils.Distance(ring.Center.ToWpfPoint(), point);
                     return distance >= ring.InnerRadius && distance <= ring.OuterRadius;
 
                 case PolygonRoi poly:
-                    return GeometryUtils.IsPointInPolygon(point, poly.Points.ToWpfPointArray());
+                    return poly.IsClosed && GeometryUtils.IsPointInPolygon(point, poly.Points.ToWpfPointArray());
 
                 default:
                     return false;

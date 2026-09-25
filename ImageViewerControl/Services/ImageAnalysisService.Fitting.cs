@@ -39,9 +39,12 @@ namespace ImageViewer.Services
                 distances.Add((sample, DistanceToLine(sample.Point, provisionalFit.Start.ToWpfPoint(), fitDirection)));
             }
 
+            double[] distanceValues = distances.Select(item => item.Distance).ToArray();
+            double distanceMedian = MedianOf(distanceValues);
+            double distanceScale = 1.4826 * MedianOf(distanceValues.Select(value => Math.Abs(value - distanceMedian)).ToArray());
             double threshold = configuredThreshold > 0
                 ? configuredThreshold
-                : Math.Max(1.0, distances.Select(item => item.Distance).OrderBy(value => value).Skip(distances.Count / 2).FirstOrDefault() * 2.5);
+                : Math.Clamp(Math.Max(0.75, distanceMedian + 3.0 * distanceScale), 0.75, 8.0);
 
             List<CaliperEdgeSample> filtered = distances
                 .Where(item => item.Distance <= threshold)
@@ -71,9 +74,12 @@ namespace ImageViewer.Services
                 distances.Add((sample, Math.Abs(GeometryUtils.Distance(sample.Point, center) - radius)));
             }
 
+            double[] distanceValues = distances.Select(item => item.Distance).ToArray();
+            double distanceMedian = MedianOf(distanceValues);
+            double distanceScale = 1.4826 * MedianOf(distanceValues.Select(value => Math.Abs(value - distanceMedian)).ToArray());
             double threshold = configuredThreshold > 0
                 ? configuredThreshold
-                : Math.Max(1.0, distances.Select(item => item.Distance).OrderBy(value => value).Skip(distances.Count / 2).FirstOrDefault() * 2.5);
+                : Math.Clamp(Math.Max(0.75, distanceMedian + 3.0 * distanceScale), 0.75, 8.0);
 
             List<CaliperEdgeSample> filtered = distances
                 .Where(item => item.Distance <= threshold)
@@ -132,7 +138,7 @@ namespace ImageViewer.Services
             }
 
             // RANSAC 预处理：压制强离群（遮挡/飞溅），输出一致性子集后再进入代数+几何拟合。
-            const double ransacInlierThreshold = 1.5;
+            double ransacInlierThreshold = ComputeAdaptiveCircleThreshold(points);
             (Point[] ransacPoints, double[]? ransacWeights) = SelectRansacCircleInliers(points, weights, ransacInlierThreshold);
             points = ransacPoints;
             weights = ransacWeights;
@@ -141,6 +147,11 @@ namespace ImageViewer.Services
                 return false;
             }
 
+            Point origin = new(
+                MedianOf(points.Select(point => point.X).ToArray()),
+                MedianOf(points.Select(point => point.Y).ToArray()));
+            double coordinateScale = points.Max(point => GeometryUtils.Distance(point, origin));
+            coordinateScale = Math.Max(1.0, coordinateScale);
             double sumX = 0;
             double sumY = 0;
             double sumXX = 0;
@@ -149,27 +160,40 @@ namespace ImageViewer.Services
             double sumXr2 = 0;
             double sumYr2 = 0;
             double sumR2 = 0;
+            double weightSum = 0;
 
-            foreach (Point point in points)
+            for (int index = 0; index < points.Length; index++)
             {
-                double x = point.X;
-                double y = point.Y;
+                double weight = weights?[index] ?? 1.0;
+                if (weight <= 1e-9)
+                {
+                    continue;
+                }
+
+                double x = (points[index].X - origin.X) / coordinateScale;
+                double y = (points[index].Y - origin.Y) / coordinateScale;
                 double r2 = x * x + y * y;
-                sumX += x;
-                sumY += y;
-                sumXX += x * x;
-                sumYY += y * y;
-                sumXY += x * y;
-                sumXr2 += x * r2;
-                sumYr2 += y * r2;
-                sumR2 += r2;
+                weightSum += weight;
+                sumX += weight * x;
+                sumY += weight * y;
+                sumXX += weight * x * x;
+                sumYY += weight * y * y;
+                sumXY += weight * x * y;
+                sumXr2 += weight * x * r2;
+                sumYr2 += weight * y * r2;
+                sumR2 += weight * r2;
+            }
+
+            if (weightSum < 3)
+            {
+                return false;
             }
 
             double[,] matrix =
             {
                 { sumXX, sumXY, sumX },
                 { sumXY, sumYY, sumY },
-                { sumX, sumY, points.Length }
+                { sumX, sumY, weightSum }
             };
             double[] rhs =
             {
@@ -186,14 +210,15 @@ namespace ImageViewer.Services
             double d = solution[0];
             double e = solution[1];
             double f = solution[2];
-            center = new Point(-d / 2, -e / 2);
-            double radiusSquared = center.X * center.X + center.Y * center.Y - f;
+            Point normalizedCenter = new(-d / 2, -e / 2);
+            double radiusSquared = normalizedCenter.X * normalizedCenter.X + normalizedCenter.Y * normalizedCenter.Y - f;
             if (radiusSquared <= 0)
             {
                 return false;
             }
 
-            radius = Math.Sqrt(radiusSquared);
+            center = new Point(origin.X + normalizedCenter.X * coordinateScale, origin.Y + normalizedCenter.Y * coordinateScale);
+            radius = Math.Sqrt(radiusSquared) * coordinateScale;
 
             // 几何精化：以代数拟合为初值，用加权 Gauss-Newton 迭代最小化点到圆周的欧氏距离平方和，
             // 消除代数法（最小化代数距离）在小圆/带噪点时的系统性偏置；weights 提供边缘分数与稳健权重。
@@ -211,7 +236,7 @@ namespace ImageViewer.Services
             const double k = 4.685;
             double[]? workingWeights = weights;
 
-            for (int iteration = 0; iteration < 2; iteration++)
+            for (int iteration = 0; iteration < 4; iteration++)
             {
                 double[] residuals = new double[points.Length];
                 for (int i = 0; i < points.Length; i++)
@@ -220,14 +245,14 @@ namespace ImageViewer.Services
                 }
 
                 double median = MedianOf(residuals);
-                if (median < 1e-9)
+                double scale = 1.4826 * MedianOf(residuals.Select(value => Math.Abs(value - median)).ToArray());
+                if (scale < 1e-9)
                 {
                     // 残差已接近零（完美圆），执行最后一次不加稳健权重的 GN 然后退出。
                     ApplyWeightedCircleGaussNewtonStep(points, ref center, ref radius, weights);
                     return;
                 }
 
-                double scale = 1.4826 * median;
                 double[] robust = new double[points.Length];
                 for (int i = 0; i < points.Length; i++)
                 {
@@ -408,7 +433,7 @@ namespace ImageViewer.Services
             }
 
             // RANSAC 预处理：压制强离群（遮挡/飞溅），输出一致性子集后再进入加权稳健拟合。
-            const double ransacInlierThreshold = 1.5;
+            double ransacInlierThreshold = ComputeAdaptiveLineThreshold(points);
             (Point[] ransacPoints, double[]? ransacWeights) = SelectRansacLineInliers(points, weights, ransacInlierThreshold);
             points = ransacPoints;
             weights = ransacWeights;
@@ -574,10 +599,71 @@ namespace ImageViewer.Services
 
         private static double MedianOf(double[] values)
         {
+            if (values.Length == 0)
+            {
+                return 0;
+            }
+
             double[] sorted = [.. values];
             Array.Sort(sorted);
             int middle = sorted.Length / 2;
             return sorted.Length % 2 == 1 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+        }
+
+        private static double ComputeAdaptiveLineThreshold(Point[] points)
+        {
+            if (points.Length < 4)
+            {
+                return 1.5;
+            }
+
+            Point center = new(
+                MedianOf(points.Select(point => point.X).ToArray()),
+                MedianOf(points.Select(point => point.Y).ToArray()));
+            Vector direction = ComputeWeightedPrincipalDirection(points, center, weights: null);
+            if (direction.LengthSquared < 1e-9)
+            {
+                return 1.5;
+            }
+
+            double[] residuals = points
+                .Select(point => DistanceToLine(point, center, direction))
+                .ToArray();
+            double median = MedianOf(residuals);
+            double scale = 1.4826 * MedianOf(residuals.Select(value => Math.Abs(value - median)).ToArray());
+            if (scale < 1e-6)
+            {
+                scale = Math.Sqrt(residuals.Select(value => value * value).Average());
+            }
+
+            return Math.Clamp(Math.Max(0.75, scale * 3.0), 0.75, 6.0);
+        }
+
+        private static double ComputeAdaptiveCircleThreshold(Point[] points)
+        {
+            if (points.Length < 4)
+            {
+                return 1.5;
+            }
+
+            Point center = new(
+                MedianOf(points.Select(point => point.X).ToArray()),
+                MedianOf(points.Select(point => point.Y).ToArray()));
+            double[] radii = points
+                .Select(point => GeometryUtils.Distance(point, center))
+                .ToArray();
+            double medianRadius = MedianOf(radii);
+            double[] residuals = radii
+                .Select(value => Math.Abs(value - medianRadius))
+                .ToArray();
+            double medianResidual = MedianOf(residuals);
+            double scale = 1.4826 * MedianOf(residuals.Select(value => Math.Abs(value - medianResidual)).ToArray());
+            if (scale < 1e-6)
+            {
+                scale = Math.Sqrt(residuals.Select(value => value * value).Average());
+            }
+
+            return Math.Clamp(Math.Max(0.75, scale * 3.0), 0.75, 6.0);
         }
 
         /// <summary>

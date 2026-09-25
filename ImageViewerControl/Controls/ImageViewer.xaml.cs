@@ -3,7 +3,9 @@ using System.Threading.Tasks;
 using System.Windows.Controls;
 using System.Windows.Media;
 using ImageViewer.Localization;
+using ImageViewer.Models;
 using ImageViewer.Services;
+using ImageViewer.ViewModels;
 
 namespace ImageViewer.Controls
 {
@@ -111,6 +113,31 @@ namespace ImageViewer.Controls
             ImageSource = source;
         }
 
+        /// <summary>
+        /// 添加一个 ROI，并把操作纳入撤销栈。
+        /// Chinese: 供宿主或分析流程提交程序生成的 ROI；与鼠标绘制使用同一撤销语义。
+        /// English: Adds a programmatically generated ROI through the same undo stack used by interactive drawing.
+        /// </summary>
+        public bool AddRoi(RoiBase roi)
+        {
+            ArgumentNullException.ThrowIfNull(roi);
+            if (ViewerState.PluginRegistry.FindByRoi(roi) == null)
+            {
+                return false;
+            }
+
+            ViewerState.UndoRedo.Execute(new AddRoiCommand(roi, ViewerState));
+            ViewerState.SelectedRoi = roi;
+            DrawRois();
+            UpdateContextMenuState();
+            return true;
+        }
+
+        internal void MarkDocumentDirty()
+        {
+            _controlComposition.SessionController.MarkDirty();
+        }
+
         internal void SetImageLoadState(bool isLoading, string statusText, double progress, bool canRetry)
         {
             IsImageLoading = isLoading;
@@ -124,6 +151,7 @@ namespace ImageViewer.Controls
 
         public void Dispose()
         {
+            _controlComposition.SessionController.StateChanged -= OnSessionStateChanged;
             _lifetime.Dispose();
             _ownedHost?.Dispose();
             GC.SuppressFinalize(this);
@@ -131,6 +159,7 @@ namespace ImageViewer.Controls
 
         public async ValueTask DisposeAsync()
         {
+            _controlComposition.SessionController.StateChanged -= OnSessionStateChanged;
             _lifetime.Dispose();
             if (_ownedHost != null)
             {
@@ -138,6 +167,13 @@ namespace ImageViewer.Controls
             }
 
             GC.SuppressFinalize(this);
+        }
+
+        private void OnSessionStateChanged(object? sender, EventArgs e)
+        {
+            IsDirty = _controlComposition.SessionController.IsDirty;
+            HasRecoverySnapshot = _controlComposition.SessionController.HasRecoverySnapshot;
+            UpdateStatusBar();
         }
     }
 }

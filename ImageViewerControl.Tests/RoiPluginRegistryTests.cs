@@ -22,6 +22,7 @@ namespace ImageViewerControl.Tests
             new("circle", typeof(CircleRoi)),
             new("circular-caliper-measure", typeof(CircularCaliperMeasureRoi)),
             new("concentricity-measure", typeof(ConcentricityMeasureRoi)),
+            new("center-distance-measure", typeof(CenterDistanceMeasureRoi)),
             new("ellipse", typeof(EllipseRoi)),
             new("fitted-ellipse", typeof(FittedEllipseRoi)),
             new("line-caliper-measure", typeof(LineCaliperMeasureRoi)),
@@ -29,13 +30,15 @@ namespace ImageViewerControl.Tests
             new("parallelism-measure", typeof(ParallelismMeasureRoi)),
             new("perpendicularity-measure", typeof(PerpendicularityMeasureRoi)),
             new("point-annotation", typeof(PointAnnotationRoi)),
+            new("point-coordinate-measure", typeof(PointCoordinateMeasureRoi)),
             new("point-to-circle-distance", typeof(PointToCircleDistanceRoi)),
             new("point-to-line-distance", typeof(PointToLineDistanceRoi)),
             new("polygon", typeof(PolygonRoi)),
             new("polyline", typeof(PolylineRoi)),
             new("ring", typeof(RingRoi)),
             new("rotated-rect", typeof(RotatedRect)),
-            new("text-annotation", typeof(TextAnnotationRoi))
+            new("text-annotation", typeof(TextAnnotationRoi)),
+            new("three-point-circle", typeof(ThreePointCircleMeasureRoi))
         ];
 
         private static readonly RoiPersistenceRoundTripExpectation[] PersistenceRoundTripExpectations =

@@ -236,9 +236,9 @@ namespace ImageViewer.Rendering
                     context.DrawHandle(point.ToWpfPoint(), ResizeHandle.None, context.PointAnnotationSize / context.Scale, false, brush);
                 }
 
-                if (!string.IsNullOrWhiteSpace(polyline.Label))
+                if (polyline.Points.Count > 1)
                 {
-                    context.DrawInfoText(StandardRoiInfoTextFormatter.BuildPolylineText(polyline), StandardRoiLayoutHelper.GetPolylineInfoAnchor(polyline.Points.ToWpfPointArray()), brush, true);
+                    context.DrawInfoText(StandardRoiInfoTextFormatter.BuildPolylineText(polyline, context), StandardRoiLayoutHelper.GetPolylineInfoAnchor(polyline.Points.ToWpfPointArray()), brush, true);
                 }
             }
         }

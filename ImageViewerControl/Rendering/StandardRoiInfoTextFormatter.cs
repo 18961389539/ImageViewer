@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using ImageViewer.Models;
@@ -47,17 +48,38 @@ namespace ImageViewer.Rendering
 
         public static string BuildPolygonText(PolygonRoi polygon, (double Area, double Perimeter, Point Centroid) metrics, RoiRenderContext context)
         {
-            return BuildMultiline(polygon.Label, $"Area:{context.FormatArea(metrics.Area)} Peri:{context.FormatPerimeter(metrics.Perimeter)}");
+            return BuildMultiline(polygon.Label, $"Area:{context.FormatArea(metrics.Area)} Peri:{context.FormatPerimeter(metrics.Perimeter)}", $"Vertices:{polygon.Points.Count}");
         }
 
-        public static string BuildPolylineText(PolylineRoi polyline)
+        public static string BuildPolylineText(PolylineRoi polyline, RoiRenderContext context)
         {
-            return polyline.Label ?? string.Empty;
+            IReadOnlyList<Point> points = polyline.Points.ToWpfPointArray();
+            IReadOnlyList<double> segments = GeometryUtils.GetPolylineSegmentLengths(points);
+            if (segments.Count == 0)
+            {
+                return polyline.Label ?? string.Empty;
+            }
+
+            return BuildMultiline(
+                polyline.Label,
+                $"Length:{context.FormatLength(GeometryUtils.PolylineLength(points))}",
+                $"Segments:{segments.Count} Min:{context.FormatLength(segments.Min())} Max:{context.FormatLength(segments.Max())}");
         }
 
         public static string BuildPointAnnotationText(PointAnnotationRoi annotation)
         {
             return annotation.Label ?? string.Empty;
+        }
+
+        public static string BuildPointCoordinateText(PointCoordinateMeasureRoi point)
+        {
+            string coordinates = $"X:{point.Position.X:F1} Y:{point.Position.Y:F1}";
+            if (!point.IsEdgeSnapped)
+            {
+                return BuildInline(point.Label, coordinates);
+            }
+
+            return BuildMultiline(point.Label, coordinates, $"Edge:{point.EdgeConfidence * 100:F0}%");
         }
 
         public static string BuildTextAnnotationText(TextAnnotationRoi annotation)
@@ -122,6 +144,18 @@ namespace ImageViewer.Rendering
                 roi.Label,
                 $"Center Dist: {context.FormatLength(roi.CenterDistance)}",
                 $"R1: {context.FormatLength(roi.Radius1)} R2: {context.FormatLength(roi.Radius2)}");
+        }
+
+        public static string BuildCenterDistanceText(CenterDistanceMeasureRoi roi, RoiRenderContext context)
+        {
+            return BuildInline(roi.Label, $"Center D:{context.FormatLength(roi.CenterDistance)}");
+        }
+
+        public static string BuildThreePointCircleText(ThreePointCircleMeasureRoi roi, RoiRenderContext context)
+        {
+            return roi.IsValid
+                ? BuildMultiline(roi.Label, $"R:{context.FormatLength(roi.Radius)} 3 Points")
+                : BuildInline(roi.Label, "Invalid 3-point circle");
         }
 
         private static string BuildInline(string? label, string content)

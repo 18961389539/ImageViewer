@@ -406,5 +406,87 @@ namespace ImageViewer.Services
                 }
             }
         }
+
+        private sealed class CenterDistanceMeasureBehavior : IRoiBehavior
+        {
+            public bool CanHandle(RoiBase roi) => roi is CenterDistanceMeasureRoi;
+
+            public bool HitTest(RoiBase roi, Point point, double scale, double hitTestTolerance)
+            {
+                var distance = (CenterDistanceMeasureRoi)roi;
+                double tolerance = hitTestTolerance / scale;
+                return GeometryUtils.Distance(distance.Center1.ToWpfPoint(), point) <= tolerance ||
+                       GeometryUtils.Distance(distance.Center2.ToWpfPoint(), point) <= tolerance ||
+                       GeometryUtils.IsPointNearSegment(point, distance.Center1.ToWpfPoint(), distance.Center2.ToWpfPoint(), tolerance);
+            }
+
+            public ResizeHandle GetHandleAt(RoiBase roi, Point point, double scale, double handleSize, double handleHitPadding, double infoTextOffset, double polygonVertexHitPadding)
+            {
+                var distance = (CenterDistanceMeasureRoi)roi;
+                double size = (handleSize + handleHitPadding) / scale;
+                if (IsNear(point, distance.Center1.ToWpfPoint(), size)) return ResizeHandle.P1;
+                if (IsNear(point, distance.Center2.ToWpfPoint(), size)) return ResizeHandle.P2;
+                return ResizeHandle.None;
+            }
+
+            public void Move(RoiBase roi, double dx, double dy)
+            {
+                var distance = (CenterDistanceMeasureRoi)roi;
+                distance.Center1 = new Point(distance.Center1.X + dx, distance.Center1.Y + dy).ToPointD();
+                distance.Center2 = new Point(distance.Center2.X + dx, distance.Center2.Y + dy).ToPointD();
+            }
+
+            public void Resize(RoiBase roi, ResizeHandle handle, double dx, double dy, Point currentPos, double minimumRoiDimension)
+            {
+                var distance = (CenterDistanceMeasureRoi)roi;
+                if (handle == ResizeHandle.P1) distance.Center1 = currentPos.ToPointD();
+                else if (handle == ResizeHandle.P2) distance.Center2 = currentPos.ToPointD();
+            }
+        }
+
+        private sealed class ThreePointCircleMeasureBehavior : IRoiBehavior
+        {
+            public bool CanHandle(RoiBase roi) => roi is ThreePointCircleMeasureRoi;
+
+            public bool HitTest(RoiBase roi, Point point, double scale, double hitTestTolerance)
+            {
+                var circle = (ThreePointCircleMeasureRoi)roi;
+                double tolerance = hitTestTolerance / scale;
+                if (circle.IsValid && Math.Abs(GeometryUtils.Distance(circle.Center.ToWpfPoint(), point) - circle.Radius) <= tolerance)
+                {
+                    return true;
+                }
+
+                return GeometryUtils.Distance(circle.P1.ToWpfPoint(), point) <= tolerance ||
+                       GeometryUtils.Distance(circle.P2.ToWpfPoint(), point) <= tolerance ||
+                       GeometryUtils.Distance(circle.P3.ToWpfPoint(), point) <= tolerance;
+            }
+
+            public ResizeHandle GetHandleAt(RoiBase roi, Point point, double scale, double handleSize, double handleHitPadding, double infoTextOffset, double polygonVertexHitPadding)
+            {
+                var circle = (ThreePointCircleMeasureRoi)roi;
+                double size = (handleSize + handleHitPadding) / scale;
+                if (IsNear(point, circle.P1.ToWpfPoint(), size)) return ResizeHandle.P1;
+                if (IsNear(point, circle.P2.ToWpfPoint(), size)) return ResizeHandle.P2;
+                if (IsNear(point, circle.P3.ToWpfPoint(), size)) return ResizeHandle.P3;
+                return ResizeHandle.None;
+            }
+
+            public void Move(RoiBase roi, double dx, double dy)
+            {
+                var circle = (ThreePointCircleMeasureRoi)roi;
+                circle.P1 = new Point(circle.P1.X + dx, circle.P1.Y + dy).ToPointD();
+                circle.P2 = new Point(circle.P2.X + dx, circle.P2.Y + dy).ToPointD();
+                circle.P3 = new Point(circle.P3.X + dx, circle.P3.Y + dy).ToPointD();
+            }
+
+            public void Resize(RoiBase roi, ResizeHandle handle, double dx, double dy, Point currentPos, double minimumRoiDimension)
+            {
+                var circle = (ThreePointCircleMeasureRoi)roi;
+                if (handle == ResizeHandle.P1) circle.P1 = currentPos.ToPointD();
+                else if (handle == ResizeHandle.P2) circle.P2 = currentPos.ToPointD();
+                else if (handle == ResizeHandle.P3) circle.P3 = currentPos.ToPointD();
+            }
+        }
     }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
@@ -7,6 +8,7 @@ using System.Windows.Data;
 using System.Windows.Media;
 using ImageViewer.Localization;
 using ImageViewer.Models;
+using ImageViewer.Utils;
 
 namespace ImageViewer.Plugins
 {
@@ -30,6 +32,7 @@ namespace ImageViewer.Plugins
                 PolygonRoi typed => CreateEditor(typed),
                 PolylineRoi typed => CreateEditor(typed),
                 PointAnnotationRoi typed => CreateEditor(typed),
+                PointCoordinateMeasureRoi typed => CreateEditor(typed),
                 TextAnnotationRoi typed => CreateEditor(typed),
                 LineMeasureRoi typed => CreateEditor(typed),
                 AngleMeasureRoi typed => CreateEditor(typed),
@@ -39,6 +42,8 @@ namespace ImageViewer.Plugins
                 ParallelismMeasureRoi typed => CreateEditor(typed),
                 PerpendicularityMeasureRoi typed => CreateEditor(typed),
                 ConcentricityMeasureRoi typed => CreateEditor(typed),
+                CenterDistanceMeasureRoi typed => CreateEditor(typed),
+                ThreePointCircleMeasureRoi typed => CreateEditor(typed),
                 _ => null
             };
         }
@@ -85,11 +90,31 @@ namespace ImageViewer.Plugins
             return panel;
         }
 
-        public static FrameworkElement CreateEditor(PolygonRoi roi) => CreatePanel(roi, readOnlyText: UiText.FormatInvariant("EditorVertices", roi.Points.Count));
+        public static FrameworkElement CreateEditor(PolygonRoi roi)
+        {
+            Point[] points = roi.Points.ToWpfPointArray();
+            var metrics = GeometryUtils.GetPolygonMetrics(points);
+            string details = roi.IsClosed && points.Length >= 3
+                ? UiText.FormatInvariant("EditorPolygonMeasureDetails", points.Length, metrics.Area, metrics.Perimeter, metrics.Centroid.X, metrics.Centroid.Y)
+                : UiText.FormatInvariant("EditorPolygonOpenDetails", points.Length, GeometryUtils.PolylineLength(points));
+            return CreatePanel(roi, readOnlyText: details);
+        }
 
-        public static FrameworkElement CreateEditor(PolylineRoi roi) => CreatePanel(roi, readOnlyText: UiText.FormatInvariant("EditorPoints", roi.Points.Count, roi.IsFreehand ? UiText.Get("CommonYes") : UiText.Get("CommonNo")));
+        public static FrameworkElement CreateEditor(PolylineRoi roi)
+        {
+            Point[] points = roi.Points.ToWpfPointArray();
+            IReadOnlyList<double> segments = GeometryUtils.GetPolylineSegmentLengths(points);
+            string details = UiText.FormatInvariant("EditorPolylineMeasureDetails", points.Length, segments.Count, GeometryUtils.PolylineLength(points), roi.IsFreehand ? UiText.Get("CommonYes") : UiText.Get("CommonNo"));
+            return CreatePanel(roi, readOnlyText: details);
+        }
 
         public static FrameworkElement CreateEditor(PointAnnotationRoi roi) => CreatePanel(roi, readOnlyPointPath: nameof(PointAnnotationRoi.Position));
+
+        public static FrameworkElement CreateEditor(PointCoordinateMeasureRoi roi)
+        {
+            string details = UiText.FormatInvariant("EditorPointCoordinateDetails", roi.Position.X, roi.Position.Y, roi.IsEdgeSnapped ? UiText.Get("CommonYes") : UiText.Get("CommonNo"), roi.EdgeConfidence * 100);
+            return CreatePanel(roi, readOnlyPointPath: nameof(PointCoordinateMeasureRoi.Position), readOnlyText: details);
+        }
 
         public static FrameworkElement CreateEditor(TextAnnotationRoi roi) => CreatePanel(roi, readOnlyPointPath: nameof(TextAnnotationRoi.Position), includeLabel: true);
 
@@ -161,6 +186,22 @@ namespace ImageViewer.Plugins
         public static FrameworkElement CreateEditor(ConcentricityMeasureRoi roi)
         {
             return CreatePanel(roi, readOnlyText: UiText.FormatInvariant("EditorConcentricityDetails", roi.Center1.X, roi.Center1.Y, roi.Radius1, roi.Center2.X, roi.Center2.Y, roi.Radius2, roi.CenterDistance));
+        }
+
+        public static FrameworkElement CreateEditor(CenterDistanceMeasureRoi roi)
+        {
+            return CreatePanel(roi, readOnlyText: UiText.FormatInvariant("EditorCenterDistanceDetails", roi.Center1.X, roi.Center1.Y, roi.Center2.X, roi.Center2.Y, roi.CenterDistance));
+        }
+
+        public static FrameworkElement CreateEditor(ThreePointCircleMeasureRoi roi)
+        {
+            string text = UiText.FormatInvariant("EditorThreePointCircleDetails", roi.P1.X, roi.P1.Y, roi.P2.X, roi.P2.Y, roi.P3.X, roi.P3.Y);
+            if (roi.IsValid)
+            {
+                text += UiText.FormatInvariant("EditorThreePointCircleResult", roi.Center.X, roi.Center.Y, roi.Radius);
+            }
+
+            return CreatePanel(roi, readOnlyText: text);
         }
 
         private static StackPanel CreateBasePanel(RoiBase roi, bool includeLabel = true)

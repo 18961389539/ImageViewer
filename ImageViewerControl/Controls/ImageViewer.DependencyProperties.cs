@@ -35,6 +35,14 @@ namespace ImageViewer.Controls
             DependencyProperty.Register(nameof(HasDiagnosticError), typeof(bool), typeof(ImageViewer),
                 new PropertyMetadata(false));
 
+        public static readonly DependencyProperty IsDirtyProperty =
+            DependencyProperty.Register(nameof(IsDirty), typeof(bool), typeof(ImageViewer),
+                new PropertyMetadata(false));
+
+        public static readonly DependencyProperty HasRecoverySnapshotProperty =
+            DependencyProperty.Register(nameof(HasRecoverySnapshot), typeof(bool), typeof(ImageViewer),
+                new PropertyMetadata(false));
+
         public static readonly DependencyProperty DiagnosticErrorTextProperty =
             DependencyProperty.Register(nameof(DiagnosticErrorText), typeof(string), typeof(ImageViewer),
                 new PropertyMetadata(string.Empty));
@@ -155,6 +163,18 @@ namespace ImageViewer.Controls
         {
             get => (bool)GetValue(HasDiagnosticErrorProperty);
             set => SetValue(HasDiagnosticErrorProperty, value);
+        }
+
+        public bool IsDirty
+        {
+            get => (bool)GetValue(IsDirtyProperty);
+            private set => SetValue(IsDirtyProperty, value);
+        }
+
+        public bool HasRecoverySnapshot
+        {
+            get => (bool)GetValue(HasRecoverySnapshotProperty);
+            private set => SetValue(HasRecoverySnapshotProperty, value);
         }
 
         public string DiagnosticErrorText
@@ -313,12 +333,23 @@ namespace ImageViewer.Controls
             {
                 viewer._imageSourceController.HandleImageSourceChanged(e.NewValue as ImageSource);
                 viewer.UpdateStatusBar();
+                if (viewer.IsLoaded)
+                {
+                    viewer.MarkDocumentDirty();
+                }
             });
         }
 
         private static void OnCalibrationChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            WithViewer(d, viewer => viewer._imageViewStateController.HandleCalibrationChanged());
+            WithViewer(d, viewer =>
+            {
+                viewer._imageViewStateController.HandleCalibrationChanged();
+                if (viewer.IsLoaded)
+                {
+                    viewer.MarkDocumentDirty();
+                }
+            });
         }
 
         private static void OnShowPixelGridChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -353,7 +384,14 @@ namespace ImageViewer.Controls
 
         private static void OnScaleChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            WithViewer<double>(d, e, (viewer, value) => viewer._imageViewStateController.HandleScaleChanged(value));
+            WithViewer<double>(d, e, (viewer, value) =>
+            {
+                viewer._imageViewStateController.HandleScaleChanged(value);
+                if (viewer.IsLoaded)
+                {
+                    viewer.MarkDocumentDirty();
+                }
+            });
         }
     }
 }

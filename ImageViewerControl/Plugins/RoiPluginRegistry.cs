@@ -492,6 +492,7 @@ namespace ImageViewer.Plugins
             int caliperCount,
             int caliperSearchRange,
             int caliperSamplingHalfWidth,
+            double caliperEdgeSigma,
             int minimumValidCalipers,
             double caliperMinimumGradient,
             double caliperOutlierThreshold,
@@ -500,6 +501,7 @@ namespace ImageViewer.Plugins
             data.Measurement.CaliperCount = caliperCount;
             data.Measurement.CaliperSearchRange = caliperSearchRange;
             data.Measurement.CaliperSamplingHalfWidth = caliperSamplingHalfWidth;
+            data.Measurement.CaliperEdgeSigma = caliperEdgeSigma;
             data.Measurement.MinimumValidCalipers = minimumValidCalipers;
             data.Measurement.CaliperMinimumGradient = caliperMinimumGradient;
             data.Measurement.CaliperOutlierThreshold = caliperOutlierThreshold;
@@ -605,6 +607,29 @@ namespace ImageViewer.Plugins
 
         private static Ellipse CreatePointAnnotationIcon() => new() { Width = 4, Height = 4, Fill = Brushes.Black };
 
+        private static Canvas CreatePointCoordinateIcon() => new()
+        {
+            Width = 12,
+            Height = 12,
+            Children =
+            {
+                new Ellipse { Width = 4, Height = 4, Fill = Brushes.Black, Margin = new Thickness(4) },
+                new Line { X1 = 0, Y1 = 6, X2 = 12, Y2 = 6, Stroke = Brushes.Black, StrokeThickness = 1 },
+                new Line { X1 = 6, Y1 = 0, X2 = 6, Y2 = 12, Stroke = Brushes.Black, StrokeThickness = 1 }
+            }
+        };
+
+        private static Canvas CreateAutomaticEdgePointIcon() => new()
+        {
+            Width = 12,
+            Height = 12,
+            Children =
+            {
+                new Line { X1 = 1, Y1 = 10, X2 = 11, Y2 = 2, Stroke = Brushes.Black, StrokeThickness = 1 },
+                new Ellipse { Width = 4, Height = 4, Fill = Brushes.Black, Margin = new Thickness(4) }
+            }
+        };
+
         private static TextBlock CreateTextIcon() => new() { Text = "T", FontWeight = FontWeights.Bold };
 
         private static Canvas CreateArrowAnnotationIcon() => new()
@@ -686,6 +711,31 @@ namespace ImageViewer.Plugins
         private static Path CreateAngleMeasureIcon() => new() { Data = Geometry.Parse("M 0,10 L 10,10 L 10,0"), Stroke = Brushes.Black, StrokeThickness = 1 };
 
         private static Path CreateArcMeasureIcon() => new() { Data = Geometry.Parse("M 0,8 A 8,8 0 0 1 12,4"), Stroke = Brushes.Black, StrokeThickness = 1 };
+
+        private static Canvas CreateThreePointCircleIcon() => new()
+        {
+            Width = 12,
+            Height = 12,
+            Children =
+            {
+                new Ellipse { Width = 9, Height = 9, Stroke = Brushes.Black, StrokeThickness = 1, Margin = new Thickness(1.5) },
+                new Ellipse { Width = 2, Height = 2, Fill = Brushes.Black, Margin = new Thickness(1, 1, 0, 0) },
+                new Ellipse { Width = 2, Height = 2, Fill = Brushes.Black, Margin = new Thickness(9, 2, 0, 0) },
+                new Ellipse { Width = 2, Height = 2, Fill = Brushes.Black, Margin = new Thickness(4, 9, 0, 0) }
+            }
+        };
+
+        private static Canvas CreateCenterDistanceIcon() => new()
+        {
+            Width = 12,
+            Height = 12,
+            Children =
+            {
+                new Line { X1 = 2, Y1 = 6, X2 = 10, Y2 = 6, Stroke = Brushes.Black, StrokeThickness = 1 },
+                new Ellipse { Width = 3, Height = 3, Fill = Brushes.Black, Margin = new Thickness(0.5, 4.5, 0, 0) },
+                new Ellipse { Width = 3, Height = 3, Fill = Brushes.Black, Margin = new Thickness(8.5, 4.5, 0, 0) }
+            }
+        };
 
         private static Canvas CreatePointToLineIcon() => new()
         {

@@ -39,6 +39,35 @@ namespace ImageViewer.Utils
             return Distance(point, projection);
         }
 
+        public static double PolylineLength(IReadOnlyList<Point> points)
+        {
+            ArgumentNullException.ThrowIfNull(points);
+            double length = 0;
+            for (int i = 1; i < points.Count; i++)
+            {
+                length += Distance(points[i - 1], points[i]);
+            }
+
+            return length;
+        }
+
+        public static IReadOnlyList<double> GetPolylineSegmentLengths(IReadOnlyList<Point> points)
+        {
+            ArgumentNullException.ThrowIfNull(points);
+            if (points.Count < 2)
+            {
+                return Array.Empty<double>();
+            }
+
+            var lengths = new double[points.Count - 1];
+            for (int i = 1; i < points.Count; i++)
+            {
+                lengths[i - 1] = Distance(points[i - 1], points[i]);
+            }
+
+            return lengths;
+        }
+
         public static bool IsPointNearSegment(Point point, Point segmentStart, Point segmentEnd, double threshold)
         {
             return DistanceToSegment(point, segmentStart, segmentEnd) < threshold;
@@ -206,6 +235,8 @@ namespace ImageViewer.Utils
             }
 
             double areaAccumulator = 0;
+            double centroidXAccumulator = 0;
+            double centroidYAccumulator = 0;
             double perimeter = 0;
             double sumX = 0;
             double sumY = 0;
@@ -224,11 +255,22 @@ namespace ImageViewer.Utils
 
                 if (points.Count >= 3)
                 {
-                    areaAccumulator += (current.X * next.Y) - (next.X * current.Y);
+                    double cross = (current.X * next.Y) - (next.X * current.Y);
+                    areaAccumulator += cross;
+                    centroidXAccumulator += (current.X + next.X) * cross;
+                    centroidYAccumulator += (current.Y + next.Y) * cross;
                 }
             }
 
-            return (Math.Abs(areaAccumulator) / 2, perimeter, new Point(sumX / points.Count, sumY / points.Count));
+            Point centroid = new(sumX / points.Count, sumY / points.Count);
+            if (points.Count >= 3 && Math.Abs(areaAccumulator) > 1e-9)
+            {
+                centroid = new Point(
+                    centroidXAccumulator / (3 * areaAccumulator),
+                    centroidYAccumulator / (3 * areaAccumulator));
+            }
+
+            return (Math.Abs(areaAccumulator) / 2, perimeter, centroid);
         }
 
         public static double SmallestAngle(Point p1, Point vertex, Point p2)
@@ -242,18 +284,324 @@ namespace ImageViewer.Utils
 
         public static bool TryFitEllipse(IReadOnlyList<Point> points, out Point center, out double radiusX, out double radiusY, out double angleDegrees)
         {
-            center = default;
-            radiusX = 0;
-            radiusY = 0;
-            angleDegrees = 0;
+            if (!TryFitEllipse(points, EllipseFitOptions.Default, out EllipseFitResult fit))
+            {
+                center = default;
+                radiusX = 0;
+                radiusY = 0;
+                angleDegrees = 0;
+                return false;
+            }
 
+            center = fit.Center;
+            radiusX = fit.RadiusX;
+            radiusY = fit.RadiusY;
+            angleDegrees = fit.AngleDegrees;
+            return true;
+        }
+
+        /// <summary>
+        /// Robust geometric ellipse fit with deterministic RANSAC initialization and Huber/Tukey reweighting.
+        /// The optimization uses a radial geometric residual and normalized coordinates to remain stable for
+        /// large image coordinates and elongated ellipses.
+        /// </summary>
+        public static bool TryFitEllipse(IReadOnlyList<Point> points, EllipseFitOptions? options, out EllipseFitResult result)
+        {
+            result = null!;
             if (points == null || points.Count < 5)
             {
                 return false;
             }
 
-            center = GetCentroid(points);
+            List<(int Index, Point Point)> finitePoints = new(points.Count);
+            for (int i = 0; i < points.Count; i++)
+            {
+                if (double.IsFinite(points[i].X) && double.IsFinite(points[i].Y))
+                {
+                    finitePoints.Add((i, points[i]));
+                }
+            }
 
+            EllipseFitOptions fitOptions = (options ?? EllipseFitOptions.Default).Normalize();
+            if (finitePoints.Count < fitOptions.MinimumInliers)
+            {
+                return false;
+            }
+
+            Point origin = new(
+                Median(finitePoints.Select(item => item.Point.X).ToArray()),
+                Median(finitePoints.Select(item => item.Point.Y).ToArray()));
+            double scale = ComputeEllipseCoordinateScale(finitePoints, origin);
+            if (!double.IsFinite(scale) || scale <= 1e-9)
+            {
+                return false;
+            }
+
+            List<Point> normalizedPoints = finitePoints
+                .Select(item => new Point((item.Point.X - origin.X) / scale, (item.Point.Y - origin.Y) / scale))
+                .ToList();
+            if (!TryInitializeEllipse(normalizedPoints, out double[] parameters, out double conditionNumber))
+            {
+                return false;
+            }
+
+            double initialNoiseScale = ComputeResidualScale(normalizedPoints, parameters);
+            double inlierThreshold = fitOptions.InlierThreshold > 0
+                ? fitOptions.InlierThreshold / scale
+                : Math.Max(0.02, initialNoiseScale * 3.0);
+
+            if (fitOptions.MaxRansacSamples > 0 && normalizedPoints.Count > fitOptions.MinimumInliers)
+            {
+                parameters = SelectEllipseRansacSeed(normalizedPoints, parameters, fitOptions, inlierThreshold);
+            }
+
+            double finalNoiseScale = OptimizeEllipse(normalizedPoints, parameters, fitOptions);
+            if (!TryGetEllipseGeometry(parameters, origin, scale, out Point center, out double radiusX, out double radiusY, out double angle))
+            {
+                return false;
+            }
+
+            if (!TryNormalizeEllipseParameters(ref center, ref radiusX, ref radiusY, ref angle))
+            {
+                return false;
+            }
+
+            double[] residuals = normalizedPoints
+                .Select(point => Math.Abs(ComputeEllipseRadialResidual(point, parameters)) * scale)
+                .ToArray();
+            double noiseScale = Math.Max(1e-6, finalNoiseScale * scale);
+            double distanceThreshold = fitOptions.InlierThreshold > 0
+                ? fitOptions.InlierThreshold
+                : Math.Max(0.75, noiseScale * (fitOptions.Loss == RobustFitLoss.Tukey ? fitOptions.TukeyK : 3.0));
+            bool[] inlierMask = new bool[points.Count];
+            int inlierCount = 0;
+            double residualSum = 0;
+            double residualMax = 0;
+            for (int i = 0; i < residuals.Length; i++)
+            {
+                bool inlier = residuals[i] <= distanceThreshold;
+                inlierMask[finitePoints[i].Index] = inlier;
+                if (inlier)
+                {
+                    inlierCount++;
+                }
+
+                residualSum += residuals[i] * residuals[i];
+                residualMax = Math.Max(residualMax, residuals[i]);
+            }
+
+            if (inlierCount < fitOptions.MinimumInliers)
+            {
+                return false;
+            }
+
+            double residualMedian = Median(residuals);
+            result = new EllipseFitResult(
+                center,
+                radiusX,
+                radiusY,
+                NormalizeAngleDegrees(angle * 180 / Math.PI),
+                Math.Sqrt(residualSum / residuals.Length),
+                residualMedian,
+                residualMax,
+                noiseScale,
+                inlierCount,
+                points.Count - inlierCount,
+                Math.Max(radiusX, radiusY) / Math.Max(1e-9, Math.Min(radiusX, radiusY)),
+                inlierMask,
+                $"{FittingAlgorithmMetadata.Ellipse}:{fitOptions.Loss}");
+            return true;
+        }
+
+        private static double[] SelectEllipseRansacSeed(IReadOnlyList<Point> points, double[] fallback, EllipseFitOptions options, double threshold)
+        {
+            double[] best = (double[])fallback.Clone();
+            int bestInliers = CountEllipseInliers(points, best, threshold, out double bestError);
+            Random random = new(options.RandomSeed);
+            int sampleCount = Math.Min(options.MaxRansacSamples, Math.Max(1, points.Count * 2));
+
+            for (int sample = 0; sample < sampleCount; sample++)
+            {
+                HashSet<int> indices = [];
+                while (indices.Count < options.MinimumInliers)
+                {
+                    indices.Add(random.Next(points.Count));
+                }
+
+                List<Point> candidatePoints = indices.Select(index => points[index]).ToList();
+                if (!TryInitializeEllipse(candidatePoints, out double[] candidate, out _))
+                {
+                    continue;
+                }
+
+                int inliers = CountEllipseInliers(points, candidate, threshold, out double error);
+                if (inliers > bestInliers || (inliers == bestInliers && error < bestError))
+                {
+                    best = candidate;
+                    bestInliers = inliers;
+                    bestError = error;
+                }
+            }
+
+            return best;
+        }
+
+        private static int CountEllipseInliers(IReadOnlyList<Point> points, double[] parameters, double threshold, out double error)
+        {
+            int count = 0;
+            error = 0;
+            foreach (Point point in points)
+            {
+                double residual = Math.Abs(ComputeEllipseRadialResidual(point, parameters));
+                if (residual <= threshold)
+                {
+                    count++;
+                }
+
+                error += residual * residual;
+            }
+
+            return count;
+        }
+
+        private static double OptimizeEllipse(IReadOnlyList<Point> points, double[] parameters, EllipseFitOptions options)
+        {
+            double damping = 1e-3;
+            double noiseScale = ComputeResidualScale(points, parameters);
+            double objective = ComputeRobustEllipseObjective(points, parameters, options, noiseScale);
+
+            for (int iteration = 0; iteration < options.MaxIterations; iteration++)
+            {
+                double[] residuals = points.Select(point => ComputeEllipseRadialResidual(point, parameters)).ToArray();
+                noiseScale = ComputeResidualScale(residuals);
+                double[,] normal = new double[5, 5];
+                double[] gradient = new double[5];
+                for (int i = 0; i < points.Count; i++)
+                {
+                    double weight = ComputeRobustWeight(residuals[i], noiseScale, options);
+                    if (weight <= 1e-9)
+                    {
+                        continue;
+                    }
+
+                    double[] jacobian = new double[5];
+                    for (int parameterIndex = 0; parameterIndex < jacobian.Length; parameterIndex++)
+                    {
+                        double step = parameterIndex < 2 ? 1e-5 : parameterIndex < 4 ? 1e-4 : 1e-5;
+                        double[] candidate = (double[])parameters.Clone();
+                        candidate[parameterIndex] += step;
+                        jacobian[parameterIndex] = (ComputeEllipseRadialResidual(points[i], candidate) - residuals[i]) / step;
+                    }
+
+                    for (int row = 0; row < jacobian.Length; row++)
+                    {
+                        gradient[row] -= weight * jacobian[row] * residuals[i];
+                        for (int column = row; column < jacobian.Length; column++)
+                        {
+                            normal[row, column] += weight * jacobian[row] * jacobian[column];
+                        }
+                    }
+                }
+
+                for (int row = 0; row < 5; row++)
+                {
+                    for (int column = 0; column < row; column++)
+                    {
+                        normal[row, column] = normal[column, row];
+                    }
+
+                    normal[row, row] += damping;
+                }
+
+                if (!TrySolveLinearSystem(normal, gradient, out double[] delta))
+                {
+                    break;
+                }
+
+                if (delta.All(value => Math.Abs(value) < 1e-7))
+                {
+                    break;
+                }
+
+                double[] candidateParameters = new double[5];
+                for (int i = 0; i < candidateParameters.Length; i++)
+                {
+                    candidateParameters[i] = parameters[i] + delta[i];
+                }
+
+                if (!IsValidEllipseParameters(candidateParameters))
+                {
+                    damping = Math.Min(1e8, damping * 4);
+                    continue;
+                }
+
+                double candidateScale = ComputeResidualScale(points, candidateParameters);
+                double candidateObjective = ComputeRobustEllipseObjective(points, candidateParameters, options, candidateScale);
+                if (double.IsFinite(candidateObjective) && candidateObjective < objective)
+                {
+                    Array.Copy(candidateParameters, parameters, parameters.Length);
+                    objective = candidateObjective;
+                    noiseScale = candidateScale;
+                    damping = Math.Max(1e-7, damping * 0.45);
+                }
+                else
+                {
+                    damping = Math.Min(1e8, damping * 4);
+                }
+            }
+
+            return noiseScale;
+        }
+
+        private static double ComputeRobustEllipseObjective(IReadOnlyList<Point> points, double[] parameters, EllipseFitOptions options, double scale)
+        {
+            double objective = 0;
+            foreach (Point point in points)
+            {
+                double residual = ComputeEllipseRadialResidual(point, parameters);
+                double weight = ComputeRobustWeight(residual, scale, options);
+                objective += weight * residual * residual;
+            }
+
+            return objective;
+        }
+
+        private static double ComputeRobustWeight(double residual, double scale, EllipseFitOptions options)
+        {
+            if (options.Loss == RobustFitLoss.LeastSquares || scale < 1e-8)
+            {
+                return 1;
+            }
+
+            double absolute = Math.Abs(residual);
+            if (options.Loss == RobustFitLoss.Huber)
+            {
+                double limit = options.HuberK * scale;
+                return absolute <= limit ? 1 : limit / Math.Max(absolute, 1e-12);
+            }
+
+            double u = absolute / Math.Max(1e-12, options.TukeyK * scale);
+            if (u >= 1)
+            {
+                return 0;
+            }
+
+            double factor = 1 - u * u;
+            return factor * factor;
+        }
+
+        private static bool TryInitializeEllipse(IReadOnlyList<Point> points, out double[] parameters, out double conditionNumber)
+        {
+            parameters = new double[5];
+            conditionNumber = double.PositiveInfinity;
+            if (points.Count < 5)
+            {
+                return false;
+            }
+
+            Point center = new(
+                Median(points.Select(point => point.X).ToArray()),
+                Median(points.Select(point => point.Y).ToArray()));
             double xx = 0;
             double xy = 0;
             double yy = 0;
@@ -281,151 +629,120 @@ namespace ImageViewer.Utils
                 sumLocalY2 += localY * localY;
             }
 
-            radiusX = Math.Sqrt(Math.Max(sumLocalX2 * 2 / points.Count, 1e-6));
-            radiusY = Math.Sqrt(Math.Max(sumLocalY2 * 2 / points.Count, 1e-6));
-            if (!TryNormalizeEllipseParameters(ref center, ref radiusX, ref radiusY, ref angle))
+            double radiusX = Math.Sqrt(Math.Max(2 * sumLocalX2 / points.Count, 1e-8));
+            double radiusY = Math.Sqrt(Math.Max(2 * sumLocalY2 / points.Count, 1e-8));
+            if (radiusX <= 1e-4 || radiusY <= 1e-4)
             {
                 return false;
             }
 
-            double[] parameters = [center.X, center.Y, Math.Log(radiusX), Math.Log(radiusY), angle];
-            double damping = 1e-3;
-            double error = ComputeEllipseResidualError(points, parameters);
-
-            for (int iteration = 0; iteration < 24; iteration++)
+            conditionNumber = Math.Max(radiusX, radiusY) / Math.Max(1e-9, Math.Min(radiusX, radiusY));
+            if (!double.IsFinite(conditionNumber) || conditionNumber > 1e6)
             {
-                if (!TryBuildEllipseNormalEquations(points, parameters, damping, out double[,] normalMatrix, out double[] gradient) ||
-                    !TrySolveLinearSystem(normalMatrix, gradient, out double[] delta))
-                {
-                    break;
-                }
-
-                if (delta.All(value => Math.Abs(value) < 1e-6))
-                {
-                    break;
-                }
-
-                double[] candidate = new double[parameters.Length];
-                for (int i = 0; i < parameters.Length; i++)
-                {
-                    candidate[i] = parameters[i] + delta[i];
-                }
-
-                double candidateError = ComputeEllipseResidualError(points, candidate);
-                if (double.IsFinite(candidateError) && candidateError < error)
-                {
-                    parameters = candidate;
-                    error = candidateError;
-                    damping = Math.Max(1e-6, damping * 0.4);
-                }
-                else
-                {
-                    damping = Math.Min(1e6, damping * 4);
-                }
+                return false;
             }
 
-            center = new Point(parameters[0], parameters[1]);
-            radiusX = Math.Exp(parameters[2]);
-            radiusY = Math.Exp(parameters[3]);
+            if (radiusY > radiusX)
+            {
+                (radiusX, radiusY) = (radiusY, radiusX);
+                angle += Math.PI / 2;
+            }
+
+            parameters = [center.X, center.Y, Math.Log(radiusX), Math.Log(radiusY), NormalizeAngleRadians(angle)];
+            return IsValidEllipseParameters(parameters);
+        }
+
+        private static bool IsValidEllipseParameters(double[] parameters)
+        {
+            if (parameters.Length != 5 || parameters.Any(value => !double.IsFinite(value)))
+            {
+                return false;
+            }
+
+            double radiusX = Math.Exp(parameters[2]);
+            double radiusY = Math.Exp(parameters[3]);
+            return radiusX >= 1e-6 && radiusY >= 1e-6 &&
+                   Math.Max(radiusX, radiusY) / Math.Max(1e-9, Math.Min(radiusX, radiusY)) <= 1e6;
+        }
+
+        private static bool TryGetEllipseGeometry(double[] parameters, Point origin, double scale, out Point center, out double radiusX, out double radiusY, out double angle)
+        {
+            center = new Point(origin.X + parameters[0] * scale, origin.Y + parameters[1] * scale);
+            radiusX = Math.Exp(parameters[2]) * scale;
+            radiusY = Math.Exp(parameters[3]) * scale;
             angle = parameters[4];
-
-            if (!TryNormalizeEllipseParameters(ref center, ref radiusX, ref radiusY, ref angle))
-            {
-                return false;
-            }
-
-            angleDegrees = NormalizeAngleDegrees(angle * 180 / Math.PI);
-            return true;
+            return IsValidEllipseParameters(parameters) &&
+                   double.IsFinite(center.X) && double.IsFinite(center.Y) &&
+                   double.IsFinite(radiusX) && double.IsFinite(radiusY);
         }
 
-        private static bool TryBuildEllipseNormalEquations(IReadOnlyList<Point> points, double[] parameters, double damping, out double[,] normalMatrix, out double[] gradient)
+        private static double ComputeEllipseRadialResidual(Point point, double[] parameters)
         {
-            normalMatrix = new double[5, 5];
-            gradient = new double[5];
-
-            double centerX = parameters[0];
-            double centerY = parameters[1];
             double radiusX = Math.Exp(parameters[2]);
             double radiusY = Math.Exp(parameters[3]);
-            double angle = parameters[4];
-            if (radiusX <= 0 || radiusY <= 0 || !double.IsFinite(radiusX) || !double.IsFinite(radiusY))
+            double cos = Math.Cos(parameters[4]);
+            double sin = Math.Sin(parameters[4]);
+            double dx = point.X - parameters[0];
+            double dy = point.Y - parameters[1];
+            double localX = dx * cos + dy * sin;
+            double localY = -dx * sin + dy * cos;
+            double radial = Math.Sqrt(localX * localX + localY * localY);
+            if (radial < 1e-10)
             {
-                return false;
+                return 0;
             }
 
-            double cos = Math.Cos(angle);
-            double sin = Math.Sin(angle);
-            double invRadiusX2 = 1 / (radiusX * radiusX);
-            double invRadiusY2 = 1 / (radiusY * radiusY);
-
-            foreach (Point point in points)
-            {
-                double dx = point.X - centerX;
-                double dy = point.Y - centerY;
-                double localX = dx * cos + dy * sin;
-                double localY = -dx * sin + dy * cos;
-                double residual = localX * localX * invRadiusX2 + localY * localY * invRadiusY2 - 1;
-
-                double[] jacobian =
-                [
-                    (-2 * localX * cos * invRadiusX2) + (2 * localY * sin * invRadiusY2),
-                    (-2 * localX * sin * invRadiusX2) - (2 * localY * cos * invRadiusY2),
-                    -2 * localX * localX * invRadiusX2,
-                    -2 * localY * localY * invRadiusY2,
-                    2 * localX * localY * (invRadiusX2 - invRadiusY2)
-                ];
-
-                for (int row = 0; row < jacobian.Length; row++)
-                {
-                    gradient[row] -= jacobian[row] * residual;
-                    for (int column = row; column < jacobian.Length; column++)
-                    {
-                        normalMatrix[row, column] += jacobian[row] * jacobian[column];
-                    }
-                }
-            }
-
-            for (int row = 0; row < 5; row++)
-            {
-                for (int column = 0; column < row; column++)
-                {
-                    normalMatrix[row, column] = normalMatrix[column, row];
-                }
-
-                normalMatrix[row, row] += damping;
-            }
-
-            return true;
+            double directionX = localX / radial;
+            double directionY = localY / radial;
+            double denominator = directionX * directionX / (radiusX * radiusX) + directionY * directionY / (radiusY * radiusY);
+            double target = denominator > 1e-12 ? 1 / Math.Sqrt(denominator) : radial;
+            return radial - target;
         }
 
-        private static double ComputeEllipseResidualError(IReadOnlyList<Point> points, double[] parameters)
+        private static double ComputeResidualScale(IReadOnlyList<Point> points, double[] parameters)
         {
-            double centerX = parameters[0];
-            double centerY = parameters[1];
-            double radiusX = Math.Exp(parameters[2]);
-            double radiusY = Math.Exp(parameters[3]);
-            double angle = parameters[4];
-            if (radiusX <= 0 || radiusY <= 0 || !double.IsFinite(radiusX) || !double.IsFinite(radiusY))
+            return ComputeResidualScale(points.Select(point => ComputeEllipseRadialResidual(point, parameters)).ToArray());
+        }
+
+        private static double ComputeResidualScale(IReadOnlyList<double> residuals)
+        {
+            if (residuals.Count == 0)
             {
-                return double.PositiveInfinity;
+                return 1e-4;
             }
 
-            double cos = Math.Cos(angle);
-            double sin = Math.Sin(angle);
-            double invRadiusX2 = 1 / (radiusX * radiusX);
-            double invRadiusY2 = 1 / (radiusY * radiusY);
-            double error = 0;
-            foreach (Point point in points)
+            double median = Median(residuals.ToArray());
+            double[] deviations = residuals.Select(value => Math.Abs(value - median)).ToArray();
+            double scale = 1.4826 * Median(deviations);
+            if (scale < 1e-8)
             {
-                double dx = point.X - centerX;
-                double dy = point.Y - centerY;
-                double localX = dx * cos + dy * sin;
-                double localY = -dx * sin + dy * cos;
-                double residual = localX * localX * invRadiusX2 + localY * localY * invRadiusY2 - 1;
-                error += residual * residual;
+                scale = Math.Sqrt(residuals.Select(value => value * value).Average());
             }
 
-            return error;
+            return Math.Max(1e-4, double.IsFinite(scale) ? scale : 1e-4);
+        }
+
+        private static double ComputeEllipseCoordinateScale(IReadOnlyList<(int Index, Point Point)> points, Point origin)
+        {
+            double maxDistance = 0;
+            foreach (var item in points)
+            {
+                maxDistance = Math.Max(maxDistance, Distance(item.Point, origin));
+            }
+
+            return Math.Max(1, maxDistance);
+        }
+
+        private static double Median(double[] values)
+        {
+            if (values.Length == 0)
+            {
+                return 0;
+            }
+
+            Array.Sort(values);
+            int middle = values.Length / 2;
+            return values.Length % 2 == 0 ? (values[middle - 1] + values[middle]) / 2 : values[middle];
         }
 
         private static bool TryNormalizeEllipseParameters(ref Point center, ref double radiusX, ref double radiusY, ref double angle)

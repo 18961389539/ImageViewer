@@ -42,6 +42,11 @@ namespace ImageViewer.Controls
             StartDraw(BuiltInDrawControllers.CircularCaliper);
         }
 
+        public void StartAutomaticCircleMeasureMode()
+        {
+            StartDraw(BuiltInDrawControllers.AutomaticCircle);
+        }
+
         public void StartArcCaliperMeasureMode()
         {
             StartDraw(BuiltInDrawControllers.ArcCaliper);
@@ -55,6 +60,16 @@ namespace ImageViewer.Controls
         public void StartPointAnnotationMode()
         {
             StartDraw(BuiltInDrawControllers.PointAnnotation);
+        }
+
+        public void StartPointCoordinateMeasureMode()
+        {
+            StartDraw(BuiltInDrawControllers.PointCoordinate);
+        }
+
+        public void StartAutomaticEdgePointMeasureMode()
+        {
+            StartDraw(BuiltInDrawControllers.AutomaticEdgePoint);
         }
 
         public void StartArrowAnnotationMode()
@@ -75,6 +90,16 @@ namespace ImageViewer.Controls
         public void StartPolygonRoiMode()
         {
             StartDraw(BuiltInDrawControllers.Polygon);
+        }
+
+        public void StartAreaMeasureMode()
+        {
+            StartDraw(BuiltInDrawControllers.Polygon);
+        }
+
+        public void StartPolylineMeasureMode()
+        {
+            StartDraw(BuiltInDrawControllers.Polyline);
         }
 
         /// <summary>
@@ -120,6 +145,11 @@ namespace ImageViewer.Controls
             StartDraw(BuiltInDrawControllers.ArcMeasure);
         }
 
+        public void StartThreePointCircleMeasureMode()
+        {
+            StartDraw(BuiltInDrawControllers.ThreePointCircle);
+        }
+
         public void StartPointToLineMeasureMode()
         {
             StartDraw(BuiltInDrawControllers.PointToLineDistance);
@@ -143,6 +173,11 @@ namespace ImageViewer.Controls
         public void StartConcentricityMeasureMode()
         {
             StartDraw(BuiltInDrawControllers.Concentricity);
+        }
+
+        public void StartCenterDistanceMeasureMode()
+        {
+            StartDraw(BuiltInDrawControllers.CenterDistance);
         }
 
     }

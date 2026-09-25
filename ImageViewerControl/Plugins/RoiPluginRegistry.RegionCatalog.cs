@@ -100,20 +100,40 @@ namespace ImageViewer.Plugins
                             RadiusX = data.Geometry.RadiusX,
                             RadiusY = data.Geometry.RadiusY,
                             Angle = data.Geometry.Angle,
-                            SourcePointCount = (int)Math.Round(data.Geometry.Width)
+                            SourcePointCount = (int)Math.Round(data.Geometry.Width),
+                            FitResidualRms = data.Geometry.FitResidualRms,
+                            FitResidualMedian = data.Geometry.FitResidualMedian,
+                            FitResidualMax = data.Geometry.FitResidualMax,
+                            FitNoiseScale = data.Geometry.FitNoiseScale,
+                            FitInlierCount = data.Geometry.FitInlierCount,
+                            FitOutlierCount = data.Geometry.FitOutlierCount,
+                            FitAspectRatio = data.Geometry.FitAspectRatio,
+                            FitAlgorithm = data.Geometry.FitAlgorithm ?? string.Empty
                         },
                         static roi => roi.Center,
                         static roi => roi.RadiusX,
                         static roi => roi.RadiusY,
                         static roi => roi.Angle,
-                        static (roi, data) => data.Geometry.Width = roi.SourcePointCount)),
+                        static (roi, data) =>
+                        {
+                            data.Geometry.Width = roi.SourcePointCount;
+                            data.Geometry.FitResidualRms = roi.FitResidualRms;
+                            data.Geometry.FitResidualMedian = roi.FitResidualMedian;
+                            data.Geometry.FitResidualMax = roi.FitResidualMax;
+                            data.Geometry.FitNoiseScale = roi.FitNoiseScale;
+                            data.Geometry.FitInlierCount = roi.FitInlierCount;
+                            data.Geometry.FitOutlierCount = roi.FitOutlierCount;
+                            data.Geometry.FitAspectRatio = roi.FitAspectRatio;
+                            data.Geometry.FitAlgorithm = roi.FitAlgorithm;
+                        })),
 
                     CreateRegistration<PolygonRoi>(
                     typeKey: "polygon",
                     hitTestOrder: 100,
                     drawingTools:
                     [
-                        new RoiToolDescriptor(UiText.Get("ToolPolygon"), BuiltInDrawControllers.Polygon, 30, CreatePolygonIcon)
+                        new RoiToolDescriptor(UiText.Get("ToolPolygon"), BuiltInDrawControllers.Polygon, 30, CreatePolygonIcon),
+                        new RoiToolDescriptor(UiText.Get("ToolAreaMeasure"), BuiltInDrawControllers.Polygon, 65, CreatePolygonIcon, isMeasurement: true)
                     ],
                     persistence: CreatePointsPersistence(
                         data => new PolygonRoi
@@ -164,7 +184,8 @@ namespace ImageViewer.Plugins
                     drawingTools:
                     [
                         new RoiToolDescriptor(UiText.Get("ToolPolyline"), BuiltInDrawControllers.Polyline, 50, CreatePolylineIcon),
-                        new RoiToolDescriptor(UiText.Get("ToolFreehand"), BuiltInDrawControllers.FreehandPolyline, 60, CreateFreehandIcon)
+                        new RoiToolDescriptor(UiText.Get("ToolFreehand"), BuiltInDrawControllers.FreehandPolyline, 60, CreateFreehandIcon),
+                        new RoiToolDescriptor(UiText.Get("ToolPolylineMeasure"), BuiltInDrawControllers.Polyline, 66, CreatePolylineIcon, isMeasurement: true)
                     ],
                     persistence: CreatePointsPersistence(
                         data => new PolylineRoi

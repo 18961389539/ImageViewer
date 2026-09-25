@@ -20,6 +20,7 @@ namespace ImageViewer.Localization
                 _ when type == typeof(PolylineRoi) => UiText.Get("RoiDisplayPolyline"),
                 _ when type == typeof(ArrowAnnotationRoi) => UiText.Get("RoiDisplayArrowAnnotation"),
                 _ when type == typeof(PointAnnotationRoi) => UiText.Get("RoiDisplayPointAnnotation"),
+                _ when type == typeof(PointCoordinateMeasureRoi) => UiText.Get("RoiDisplayPointCoordinate"),
                 _ when type == typeof(TextAnnotationRoi) => UiText.Get("RoiDisplayTextAnnotation"),
                 _ when type == typeof(LineCaliperMeasureRoi) => UiText.Get("RoiDisplayLineCaliperMeasure"),
                 _ when type == typeof(CircularCaliperMeasureRoi) => UiText.Get("RoiDisplayCircularCaliperMeasure"),
@@ -28,11 +29,13 @@ namespace ImageViewer.Localization
                 _ when type == typeof(LineMeasureRoi) => UiText.Get("RoiDisplayLineMeasure"),
                 _ when type == typeof(AngleMeasureRoi) => UiText.Get("RoiDisplayAngleMeasure"),
                 _ when type == typeof(ArcMeasureRoi) => UiText.Get("RoiDisplayArcMeasure"),
+                _ when type == typeof(ThreePointCircleMeasureRoi) => UiText.Get("RoiDisplayThreePointCircle"),
                 _ when type == typeof(PointToLineDistanceRoi) => UiText.Get("RoiDisplayPointToLineDistance"),
                 _ when type == typeof(PointToCircleDistanceRoi) => UiText.Get("RoiDisplayPointToCircleDistance"),
                 _ when type == typeof(ParallelismMeasureRoi) => UiText.Get("RoiDisplayParallelismMeasure"),
                 _ when type == typeof(PerpendicularityMeasureRoi) => UiText.Get("RoiDisplayPerpendicularityMeasure"),
                 _ when type == typeof(ConcentricityMeasureRoi) => UiText.Get("RoiDisplayConcentricityMeasure"),
+                _ when type == typeof(CenterDistanceMeasureRoi) => UiText.Get("RoiDisplayCenterDistance"),
                 _ => roi.RoiTypeName
             };
         }

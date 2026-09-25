@@ -2,6 +2,7 @@ using System;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Threading;
 
 namespace ImageViewerControl.Tests
@@ -21,6 +22,43 @@ namespace ImageViewerControl.Tests
                 catch (Exception ex)
                 {
                     exception = ex;
+                }
+            });
+
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            thread.Join();
+
+            if (exception != null)
+            {
+                ExceptionDispatchInfo.Capture(exception).Throw();
+            }
+        }
+
+        public static void RunAsync(Func<Task> action)
+        {
+            ArgumentNullException.ThrowIfNull(action);
+
+            Exception? exception = null;
+            var thread = new Thread(() =>
+            {
+                Dispatcher dispatcher = Dispatcher.CurrentDispatcher;
+                try
+                {
+                    SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(dispatcher));
+                    Task task = action();
+                    _ = task.ContinueWith(
+                        _ => dispatcher.BeginInvokeShutdown(DispatcherPriority.Background),
+                        CancellationToken.None,
+                        TaskContinuationOptions.None,
+                        TaskScheduler.Default);
+                    Dispatcher.Run();
+                    task.GetAwaiter().GetResult();
+                }
+                catch (Exception ex)
+                {
+                    exception = ex;
+                    dispatcher.BeginInvokeShutdown(DispatcherPriority.Send);
                 }
             });
 

@@ -9,6 +9,7 @@ namespace ImageViewer.Controls
         private bool _autoSelectPyramidLevel = true;
         private bool _enableTiledRendering = true;
         private bool _prefetchAdjacentTiles = true;
+        private bool _autoTuneLargeImageRendering = true;
         private int _tileCacheMaximumMegabytes = 128;
         private int _tilePrefetchRadius = 1;
         private int _imageLoadRetryCount = 2;
@@ -43,6 +44,15 @@ namespace ImageViewer.Controls
         {
             get => _prefetchAdjacentTiles;
             set => SetProperty(ref _prefetchAdjacentTiles, value);
+        }
+
+        /// <summary>
+        /// 根据当前图像尺寸自动选择大图的金字塔、分块和缓存参数。
+        /// </summary>
+        public bool AutoTuneLargeImageRendering
+        {
+            get => _autoTuneLargeImageRendering;
+            set => SetProperty(ref _autoTuneLargeImageRendering, value);
         }
 
         public int TileCacheMaximumMegabytes
@@ -97,6 +107,45 @@ namespace ImageViewer.Controls
         {
             get => _allowCpuPseudoColorFallback;
             set => SetProperty(ref _allowCpuPseudoColorFallback, value);
+        }
+
+        internal string? ApplyLargeImageProfile(int pixelWidth, int pixelHeight)
+        {
+            if (!AutoTuneLargeImageRendering || pixelWidth <= 0 || pixelHeight <= 0)
+            {
+                return null;
+            }
+
+            long pixels = (long)pixelWidth * pixelHeight;
+            if (pixels < 4_000_000)
+            {
+                return null;
+            }
+
+            EnableImagePyramid = true;
+            AutoSelectPyramidLevel = true;
+            EnableTiledRendering = true;
+
+            if (pixels >= 64_000_000)
+            {
+                TileCacheMaximumMegabytes = 256;
+                TilePrefetchRadius = 1;
+                PrefetchAdjacentTiles = true;
+                return "LargeImageProfileVeryLarge";
+            }
+
+            if (pixels >= 16_000_000)
+            {
+                TileCacheMaximumMegabytes = 192;
+                TilePrefetchRadius = 1;
+                PrefetchAdjacentTiles = true;
+                return "LargeImageProfileLarge";
+            }
+
+            TileCacheMaximumMegabytes = 128;
+            TilePrefetchRadius = 1;
+            PrefetchAdjacentTiles = true;
+            return "LargeImageProfileStandard";
         }
 
         private bool SetProperty(ref bool storage, bool value, [CallerMemberName] string? propertyName = null)

@@ -304,7 +304,7 @@
                 <MenuItem Header="{localization:UiText MenuFileAndProjects}">
                     <MenuItem x:Name="openImageMenuItem" x:FieldModifier="internal" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.OpenImage}" Header="{localization:UiText MenuOpenImageFile}" InputGestureText="Ctrl+O" />
                     <Separator />
-                    <MenuItem x:Name="saveSessionMenuItem" x:FieldModifier="internal" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.SaveSession}" Header="{localization:UiText MenuSaveSession}" IsEnabled="{Binding MenuState.File.SaveSessionEnabled}" />
+                    <MenuItem x:Name="saveSessionMenuItem" x:FieldModifier="internal" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.SaveSession}" Header="{localization:UiText MenuSaveSession}" InputGestureText="Ctrl+S" IsEnabled="{Binding MenuState.File.SaveSessionEnabled}" />
                     <MenuItem x:Name="loadSessionMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.LoadSession}" Header="{localization:UiText MenuOpenProjectOrSession}" />
                     <MenuItem x:Name="recentProjectsMenuItem" Header="{localization:UiText MenuRecentProjects}" ItemsSource="{Binding MenuState.File.RecentProjects}" IsEnabled="{Binding MenuState.File.RecentProjectsEnabled}">
                         <MenuItem.ItemContainerStyle>
@@ -521,7 +521,7 @@
                 HorizontalAlignment="Center"
                 VerticalAlignment="Bottom"
                 Margin="10,0,10,10"
-                MaxWidth="420"
+                MaxWidth="520"
                 Padding="10,6"
                 Background="#C0141D29"
                 BorderBrush="#334A63"
@@ -529,12 +529,53 @@
                 CornerRadius="12"
                 IsHitTestVisible="False"
                 Panel.ZIndex="5">
-            <TextBlock x:Name="statusBarTextBlock" x:FieldModifier="internal"
-                       Foreground="{StaticResource ViewerTextPrimaryBrush}"
-                       FontWeight="SemiBold"
-                       FontSize="12"
-                       TextTrimming="CharacterEllipsis"
-                       automation:AutomationProperties.LiveSetting="Polite" />
+            <StackPanel Orientation="Horizontal">
+                <TextBlock x:Name="statusBarTextBlock" x:FieldModifier="internal"
+                           Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                           FontWeight="SemiBold"
+                           FontSize="12"
+                           TextTrimming="CharacterEllipsis"
+                           automation:AutomationProperties.LiveSetting="Polite" />
+                <TextBlock Margin="8,0,0,0"
+                           Text="{localization:UiText StatusUnsavedMarker}"
+                           Foreground="{StaticResource ViewerAccentBrush}"
+                           FontWeight="Bold"
+                           Visibility="{Binding IsDirty, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}"
+                           automation:AutomationProperties.Name="{localization:UiText StatusUnsavedAccessibleName}" />
+            </StackPanel>
+        </Border>
+
+        <Border x:Name="recoveryBanner"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Top"
+                Margin="10"
+                Padding="10,7"
+                Background="{StaticResource ViewerSurfaceBrush}"
+                BorderBrush="{StaticResource ViewerAccentBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="10"
+                Panel.ZIndex="125"
+                Visibility="{Binding HasRecoverySnapshot, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <DockPanel LastChildFill="False">
+                <TextBlock VerticalAlignment="Center"
+                           Margin="0,0,10,0"
+                           Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                           Text="{localization:UiText RecoveryBannerText}"
+                           automation:AutomationProperties.LiveSetting="Polite" />
+                <Button Padding="10,4"
+                        Content="{localization:UiText RecoveryRestoreButton}"
+                        Click="OnRecoverAutoSaveClick"
+                        Background="{StaticResource ViewerAccentSoftBrush}"
+                        BorderBrush="{StaticResource ViewerAccentBorderBrush}"
+                        Foreground="{StaticResource ViewerTextPrimaryBrush}" />
+                <Button Margin="6,0,0,0"
+                        Padding="8,4"
+                        Content="{localization:UiText RecoveryDismissButton}"
+                        Click="OnDismissRecoveryClick"
+                        Background="Transparent"
+                        BorderBrush="{StaticResource ViewerPanelBorderBrush}"
+                        Foreground="{StaticResource ViewerTextSecondaryBrush}" />
+            </DockPanel>
         </Border>
 
         <!-- 信息面板 -->

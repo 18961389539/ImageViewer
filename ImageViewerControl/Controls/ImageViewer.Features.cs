@@ -50,6 +50,32 @@ namespace ImageViewer.Controls
                 RoiDetectionResultMapper.Apply);
         }
 
+        private bool TryCreateAutomaticCircle(Point seed, out CircularCaliperMeasureRoi roi)
+        {
+            if (GetAnalysisBitmapSource() is BitmapSource bitmap &&
+                ImageAnalysisService.TryDetectAutomaticCircle(bitmap, seed, out roi))
+            {
+                return true;
+            }
+
+            roi = null!;
+            return false;
+        }
+
+        private bool TrySnapPointToEdge(Point seed, out Point snapped, out double score, out double confidence)
+        {
+            if (GetAnalysisBitmapSource() is BitmapSource bitmap &&
+                ImageAnalysisService.TrySnapPointToEdge(bitmap, seed, out snapped, out score, out confidence))
+            {
+                return true;
+            }
+
+            snapped = default;
+            score = 0;
+            confidence = 0;
+            return false;
+        }
+
         private bool TryApplyArcCaliperDetection(ArcCaliperMeasureRoi caliper)
         {
             return TryApplyCircularCaliperDetection(caliper);

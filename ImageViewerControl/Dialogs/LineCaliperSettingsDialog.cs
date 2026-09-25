@@ -18,6 +18,7 @@ namespace ImageViewer.Dialogs
         private readonly TextBox _caliperCountTextBox;
         private readonly TextBox _searchRangeTextBox;
         private readonly TextBox _samplingHalfWidthTextBox;
+        private readonly TextBox _edgeSigmaTextBox;
         private readonly TextBox _minimumGradientTextBox;
         private readonly TextBox _minimumValidCalipersTextBox;
         private readonly TextBox _outlierThresholdTextBox;
@@ -40,6 +41,7 @@ namespace ImageViewer.Dialogs
             _searchRangeTextBox = AddField(PrimaryPanel, UiText.Get("CaliperFieldSearchRange"), _model.CaliperSearchRange.ToString(CultureInfo.InvariantCulture));
 
             _samplingHalfWidthTextBox = AddField(AdvancedPanel, UiText.Get("CaliperFieldSamplingHalfWidth"), _model.CaliperSamplingHalfWidth.ToString(CultureInfo.InvariantCulture));
+            _edgeSigmaTextBox = AddField(AdvancedPanel, UiText.Get("CaliperFieldEdgeSigma"), _model.CaliperEdgeSigma.ToString(CultureInfo.InvariantCulture));
             _minimumGradientTextBox = AddField(AdvancedPanel, UiText.Get("CaliperFieldMinimumGradient"), _model.CaliperMinimumGradient.ToString(CultureInfo.InvariantCulture));
             _minimumValidCalipersTextBox = AddField(AdvancedPanel, UiText.Get("CaliperFieldMinimumValid"), _model.MinimumValidCalipers.ToString(CultureInfo.InvariantCulture));
             _outlierThresholdTextBox = AddField(AdvancedPanel, UiText.Get("CaliperFieldOutlierThreshold"), _model.CaliperOutlierThreshold.ToString(CultureInfo.InvariantCulture));
@@ -57,6 +59,7 @@ namespace ImageViewer.Dialogs
             EnableLivePreview(_caliperCountTextBox);
             EnableLivePreview(_searchRangeTextBox);
             EnableLivePreview(_samplingHalfWidthTextBox);
+            EnableLivePreview(_edgeSigmaTextBox);
             EnableLivePreview(_minimumGradientTextBox);
             EnableLivePreview(_minimumValidCalipersTextBox);
             EnableLivePreview(_outlierThresholdTextBox);
@@ -74,6 +77,7 @@ namespace ImageViewer.Dialogs
             if (!TryParsePositiveInt(_caliperCountTextBox.Text, out int caliperCount, minValue: 6) ||
                 !TryParsePositiveInt(_searchRangeTextBox.Text, out int searchRange, minValue: 1) ||
                 !TryParseNonNegativeInt(_samplingHalfWidthTextBox.Text, out int samplingHalfWidth) ||
+                !TryParseNonNegativeDouble(_edgeSigmaTextBox.Text, out double edgeSigma) || edgeSigma < 0.5 || edgeSigma > 5.0 ||
                 !TryParseNonNegativeDouble(_minimumGradientTextBox.Text, out double minimumGradient) ||
                 !TryParsePositiveInt(_minimumValidCalipersTextBox.Text, out int minimumValidCalipers, minValue: 3) ||
                 !TryParseNonNegativeDouble(_outlierThresholdTextBox.Text, out double outlierThreshold) ||
@@ -86,6 +90,7 @@ namespace ImageViewer.Dialogs
             _model.CaliperCount = caliperCount;
             _model.CaliperSearchRange = searchRange;
             _model.CaliperSamplingHalfWidth = samplingHalfWidth;
+            _model.CaliperEdgeSigma = edgeSigma;
             _model.CaliperMinimumGradient = minimumGradient;
             _model.MinimumValidCalipers = minimumValidCalipers;
             _model.CaliperOutlierThreshold = outlierThreshold;

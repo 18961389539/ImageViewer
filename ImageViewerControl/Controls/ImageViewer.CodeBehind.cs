@@ -178,6 +178,15 @@ namespace ImageViewer.Controls
                 return;
             }
 
+            if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.S)
+            {
+                e.Handled = true;
+                await RunUiOperationAsync(
+                    "保存会话快捷键",
+                    () => _fileMenuCommandController.ExecuteAsync(ImageViewerFileMenuCommand.SaveSession));
+                return;
+            }
+
             try
             {
                 _interactionController.HandleKeyDown(e);
@@ -565,6 +574,18 @@ namespace ImageViewer.Controls
         private void OnDismissDiagnosticErrorClick(object sender, RoutedEventArgs e)
         {
             DismissDiagnosticError();
+        }
+
+        private async void OnRecoverAutoSaveClick(object sender, RoutedEventArgs e)
+        {
+            await RunUiOperationAsync(
+                "恢复自动保存",
+                _controlComposition.SessionController.RecoverLatestAutoSaveAsync);
+        }
+
+        private void OnDismissRecoveryClick(object sender, RoutedEventArgs e)
+        {
+            _controlComposition.SessionController.DismissRecoveryPrompt();
         }
 
         public Task ShowOpenImageDialogAsync() => _imageSourceController.OpenImageAsync();

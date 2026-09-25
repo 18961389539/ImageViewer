@@ -58,10 +58,14 @@ namespace ImageViewer.Services
                 PolygonRoi polygon when polygon.Points.Count > 0 => GeometryUtils.GetBoundingBox(polygon.Points.ToWpfPoints()),
                 PolylineRoi polyline when polyline.Points.Count > 0 => GeometryUtils.GetBoundingBox(polyline.Points.ToWpfPoints()),
                 PointAnnotationRoi point => new Rect(point.Position.X, point.Position.Y, 1, 1),
+                PointCoordinateMeasureRoi pointCoordinate => new Rect(pointCoordinate.Position.X, pointCoordinate.Position.Y, 1, 1),
                 TextAnnotationRoi text => new Rect(text.Position.X, text.Position.Y, 1, 1),
                 LineMeasureRoi line => GeometryUtils.GetBoundingBox(new[] { line.P1.ToWpfPoint(), line.P2.ToWpfPoint() }),
                 AngleMeasureRoi angle => GeometryUtils.GetBoundingBox(new[] { angle.P1.ToWpfPoint(), angle.Vertex.ToWpfPoint(), angle.P2.ToWpfPoint() }),
                 ArcMeasureRoi arc => GeometryUtils.GetBoundingBox(new[] { arc.StartPoint.ToWpfPoint(), arc.EndPoint.ToWpfPoint(), arc.ArcPoint.ToWpfPoint() }),
+                CenterDistanceMeasureRoi centerDistance => GeometryUtils.GetBoundingBox(new[] { centerDistance.Center1.ToWpfPoint(), centerDistance.Center2.ToWpfPoint() }),
+                ThreePointCircleMeasureRoi threePointCircle when threePointCircle.IsValid => new Rect(threePointCircle.Center.X - threePointCircle.Radius, threePointCircle.Center.Y - threePointCircle.Radius, threePointCircle.Radius * 2, threePointCircle.Radius * 2),
+                ThreePointCircleMeasureRoi threePointCircle => GeometryUtils.GetBoundingBox(new[] { threePointCircle.P1.ToWpfPoint(), threePointCircle.P2.ToWpfPoint(), threePointCircle.P3.ToWpfPoint() }),
                 _ => Rect.Empty
             };
         }
@@ -79,10 +83,13 @@ namespace ImageViewer.Services
                 PolygonRoi polygon => polygon.Points.ToWpfPoints(),
                 PolylineRoi polyline => polyline.Points.ToWpfPoints(),
                 PointAnnotationRoi point => new[] { point.Position.ToWpfPoint() },
+                PointCoordinateMeasureRoi pointCoordinate => new[] { pointCoordinate.Position.ToWpfPoint() },
                 TextAnnotationRoi text => new[] { text.Position.ToWpfPoint() },
                 LineMeasureRoi line => new[] { line.P1.ToWpfPoint(), line.P2.ToWpfPoint() },
                 AngleMeasureRoi angle => new[] { angle.P1.ToWpfPoint(), angle.Vertex.ToWpfPoint(), angle.P2.ToWpfPoint() },
                 ArcMeasureRoi arc => new[] { arc.StartPoint.ToWpfPoint(), arc.EndPoint.ToWpfPoint(), arc.ArcPoint.ToWpfPoint() },
+                CenterDistanceMeasureRoi centerDistance => new[] { centerDistance.Center1.ToWpfPoint(), centerDistance.Center2.ToWpfPoint() },
+                ThreePointCircleMeasureRoi threePointCircle => new[] { threePointCircle.P1.ToWpfPoint(), threePointCircle.P2.ToWpfPoint(), threePointCircle.P3.ToWpfPoint() },
                 _ => Array.Empty<Point>()
             };
         }

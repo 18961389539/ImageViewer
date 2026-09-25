@@ -57,7 +57,14 @@ namespace ImageViewer.Controls
         public ImageViewerViewportState ViewportState
         {
             get => _viewportStateProvider();
-            set => _applyViewportState(value);
+            set
+            {
+                _applyViewportState(value);
+                if (_owner.IsLoaded)
+                {
+                    _owner.MarkDocumentDirty();
+                }
+            }
         }
 
         public void BeginViewportOverlayBatch() => _beginViewportOverlayBatch();

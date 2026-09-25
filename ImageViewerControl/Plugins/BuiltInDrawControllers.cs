@@ -108,6 +108,18 @@ namespace ImageViewer.Plugins
                 shouldCommit: static (host, roi) => roi.Radius > host.MinimumDrawableSize,
                 beforeCommit: static (host, roi) => host.TryApplyAnalysis(roi)));
 
+        public static IRoiDrawController AutomaticCircle { get; } = new RoiDrawController(
+            Cursors.Cross,
+            static () => new ClickPlaceDrawSession<CircularCaliperMeasureRoi>(
+                static (host, position) =>
+                {
+                    return host.TryCreateAutomaticCircle(position, out CircularCaliperMeasureRoi roi)
+                        ? roi
+                        : null;
+                },
+                useSnappedPosition: false,
+                handlesEvent: true));
+
         public static IRoiDrawController ArcCaliper { get; } = new RoiDrawController(
             Cursors.Cross,
             static () => new DragDrawSession<ArcCaliperMeasureRoi>(
@@ -251,6 +263,42 @@ namespace ImageViewer.Plugins
                     else if (step == 2)
                     {
                         roi.ArcPoint = position.ToPointD();
+                    }
+                }));
+
+        public static IRoiDrawController ThreePointCircle { get; } = new RoiDrawController(
+            Cursors.Pen,
+            static () => new StepClickDrawSession<ThreePointCircleMeasureRoi>(
+                finalStep: 2,
+                createInitial: static (_, position, _) => new ThreePointCircleMeasureRoi
+                {
+                    P1 = position.ToPointD(),
+                    P2 = position.ToPointD(),
+                    P3 = position.ToPointD()
+                },
+                tryComplete: static (roi, position, _) =>
+                {
+                    roi.P3 = position.ToPointD();
+                    return roi.IsValid;
+                },
+                updateStep: static (roi, step, position, _) =>
+                {
+                    if (step == 1)
+                    {
+                        roi.P2 = position.ToPointD();
+                        roi.P3 = position.ToPointD();
+                    }
+                },
+                updateActivePreview: static (_, roi, step, position, _) =>
+                {
+                    if (step == 1)
+                    {
+                        roi.P2 = position.ToPointD();
+                        roi.P3 = position.ToPointD();
+                    }
+                    else if (step == 2)
+                    {
+                        roi.P3 = position.ToPointD();
                     }
                 }));
 
@@ -402,6 +450,44 @@ namespace ImageViewer.Plugins
                 updateIdleCursor: static (host, hitRoi) => ApplySelectionCursor(host, TryResolveCircle(hitRoi, out _, out _)),
                 updateActivePreview: static (host, roi, step, _, hitRoi) => ApplyConcentricityPreview(host, roi, step, hitRoi)));
 
+        public static IRoiDrawController CenterDistance { get; } = new RoiDrawController(
+            Cursors.Pen,
+            static () => new StepClickDrawSession<CenterDistanceMeasureRoi>(
+                finalStep: 1,
+                createInitial: static (_, _, hitRoi) => TryResolveCircle(hitRoi, out Point center, out _)
+                    ? new CenterDistanceMeasureRoi { Center1 = center.ToPointD(), Center2 = center.ToPointD() }
+                    : null,
+                tryComplete: static (roi, _, hitRoi) =>
+                {
+                    if (!TryResolveCircle(hitRoi, out Point center, out double radius))
+                    {
+                        return false;
+                    }
+
+                    roi.Center2 = center.ToPointD();
+                    return true;
+                },
+                updateStep: static (roi, _, _, hitRoi) =>
+                {
+                    if (TryResolveCircle(hitRoi, out Point center, out double radius))
+                    {
+                        roi.Center2 = center.ToPointD();
+                    }
+                },
+                updateIdleCursor: static (host, hitRoi) => ApplySelectionCursor(host, TryResolveCircle(hitRoi, out _, out _)),
+                updateActivePreview: static (host, roi, _, _, hitRoi) =>
+                {
+                    if (TryResolveCircle(hitRoi, out Point center, out double radius))
+                    {
+                        roi.Center2 = center.ToPointD();
+                        ApplySelectionCursor(host, true);
+                    }
+                    else
+                    {
+                        ApplySelectionCursor(host, false);
+                    }
+                }));
+
         public static IRoiDrawController Polygon { get; } = new RoiDrawController(
             Cursors.Pen,
             static () => new PathDrawSession<PolygonRoi>(
@@ -456,6 +542,27 @@ namespace ImageViewer.Plugins
                     Label = $"P ({position.X:F0},{position.Y:F0})"
                 }));
 
+        public static IRoiDrawController PointCoordinate { get; } = new RoiDrawController(
+            Cursors.Cross,
+            static () => new ClickPlaceDrawSession<PointCoordinateMeasureRoi>(
+                static (_, position) => new PointCoordinateMeasureRoi
+                {
+                    Position = position.ToPointD()
+                },
+                useSnappedPosition: true,
+                handlesEvent: true));
+
+        public static IRoiDrawController AutomaticEdgePoint { get; } = new RoiDrawController(
+            Cursors.Cross,
+            static () => new EdgeSnapDrawSession(
+                static (position, score, confidence) => new PointCoordinateMeasureRoi
+                {
+                    Position = position.ToPointD(),
+                    EdgeScore = score,
+                    EdgeConfidence = confidence,
+                    IsEdgeSnapped = true
+                }));
+
         public static IRoiDrawController TextAnnotation { get; } = new RoiDrawController(
             Cursors.IBeam,
             static () => new ClickPlaceDrawSession<TextAnnotationRoi>(
@@ -477,18 +584,26 @@ namespace ImageViewer.Plugins
                 return null;
             }
 
-            if (!GeometryUtils.TryFitEllipse(points, out Point center, out double radiusX, out double radiusY, out double angleDegrees))
+            if (!GeometryUtils.TryFitEllipse(points, EllipseFitOptions.Default, out EllipseFitResult fit))
             {
                 return null;
             }
 
             return new FittedEllipseRoi
             {
-                Center = center.ToPointD(),
-                RadiusX = radiusX,
-                RadiusY = radiusY,
-                Angle = angleDegrees,
+                Center = fit.Center.ToPointD(),
+                RadiusX = fit.RadiusX,
+                RadiusY = fit.RadiusY,
+                Angle = fit.AngleDegrees,
                 SourcePointCount = points.Count,
+                FitResidualRms = fit.ResidualRms,
+                FitResidualMedian = fit.ResidualMedian,
+                FitResidualMax = fit.ResidualMax,
+                FitNoiseScale = fit.NoiseScale,
+                FitInlierCount = fit.InlierCount,
+                FitOutlierCount = fit.OutlierCount,
+                FitAspectRatio = fit.AspectRatio,
+                FitAlgorithm = fit.Algorithm,
                 Label = string.IsNullOrWhiteSpace(source.Label) ? "Fit" : $"Fit {source.Label}"
             };
         }
@@ -668,6 +783,20 @@ namespace ImageViewer.Plugins
             {
                 center = circle.Center.ToWpfPoint();
                 radius = circle.Radius;
+                return true;
+            }
+
+            if (hitRoi is ThreePointCircleMeasureRoi threePointCircle && threePointCircle.IsValid)
+            {
+                center = threePointCircle.Center.ToWpfPoint();
+                radius = threePointCircle.Radius;
+                return true;
+            }
+
+            if (hitRoi is ArcMeasureRoi arc && arc.IsValid)
+            {
+                center = arc.Center.ToWpfPoint();
+                radius = arc.Radius;
                 return true;
             }
 

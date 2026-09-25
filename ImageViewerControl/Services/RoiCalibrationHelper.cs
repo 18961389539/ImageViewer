@@ -45,6 +45,7 @@ namespace ImageViewer.Services
             EllipseRoi ellipse => ellipse.Center.ToWpfPoint(),
             CircleRoi circle => circle.Center.ToWpfPoint(),
             RingRoi ring => ring.Center.ToWpfPoint(),
+            PolygonRoi polygon when polygon.IsClosed && polygon.Points.Count >= 3 => GeometryUtils.GetPolygonMetrics(polygon.Points.ToWpfPointArray()).Centroid,
             PolygonRoi polygon => GeometryUtils.GetCentroid(polygon.Points.ToWpfPointArray()),
             PolylineRoi polyline => GeometryUtils.GetCentroid(polyline.Points.ToWpfPointArray()),
             AngleMeasureRoi angle => angle.Vertex.ToWpfPoint(),
@@ -52,7 +53,10 @@ namespace ImageViewer.Services
             PointToLineDistanceRoi pointToLine => pointToLine.Point.ToWpfPoint(),
             PointToCircleDistanceRoi pointToCircle => pointToCircle.Point.ToWpfPoint(),
             ConcentricityMeasureRoi concentricity => concentricity.MidCenter.ToWpfPoint(),
+            CenterDistanceMeasureRoi centerDistance => centerDistance.MidCenter.ToWpfPoint(),
+            ThreePointCircleMeasureRoi threePointCircle when threePointCircle.IsValid => threePointCircle.Center.ToWpfPoint(),
             PointAnnotationRoi point => point.Position.ToWpfPoint(),
+            PointCoordinateMeasureRoi pointCoordinate => pointCoordinate.Position.ToWpfPoint(),
             TextAnnotationRoi text => text.Position.ToWpfPoint(),
             _ => null
         };

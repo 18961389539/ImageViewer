@@ -37,6 +37,7 @@ namespace ImageViewer.Controls
         private VolumeQualityReport? _qualityReport;
         private int _coronalSliceIndex;
         private int _sagittalSliceIndex;
+        private bool _isUpdatingMprSlider;
 
         public AdaptiveImageViewer()
         {
@@ -75,6 +76,12 @@ namespace ImageViewer.Controls
                 _volume = value;
                 _volumeViewer.Volume = value;
                 _volume3DViewer.Volume = value;
+                _coronalSliceIndex = value == null ? 0 : value.Height / 2;
+                _sagittalSliceIndex = value == null ? 0 : value.Width / 2;
+                _pendingSegmentation = null;
+                _qualityReport = null;
+                anomalyList.Items.Clear();
+                segmentationText.Text = string.Empty;
                 _volume3DViewer.SetCurrentSlice(_volumeViewer.CurrentSliceIndex);
                 UpdateDisplayedView();
                 UpdateStatus();
@@ -233,8 +240,11 @@ namespace ImageViewer.Controls
 
             try
             {
-                BitmapSource slice = _volume.GetAxialSlice(Math.Max(0, _volumeViewer.CurrentSliceIndex));
-                _pendingSegmentation = SegmentationPipelineService.Segment(slice, new Rect(0, 0, slice.PixelWidth, slice.PixelHeight));
+                int sliceIndex = Math.Max(0, _volumeViewer.CurrentSliceIndex);
+                BitmapSource slice = _volume.GetAxialSlice(sliceIndex);
+                _pendingSegmentation = SegmentationPipelineService
+                    .Segment(slice, new Rect(0, 0, slice.PixelWidth, slice.PixelHeight))
+                    with { SliceIndex = sliceIndex };
                 segmentationText.Text = UiText.Format("StatusSegmentationCandidates", _pendingSegmentation.Blobs.Count);
                 statusText.Text = UiText.Get("StatusSegmentationComplete");
             }
@@ -280,8 +290,38 @@ namespace ImageViewer.Controls
             statusText.Text = UiText.Format("StatusAnomalyLocated", anomaly.SliceIndex + 1);
         }
 
-        private void OnAcceptSegmentationClick(object sender, RoutedEventArgs e) =>
-            statusText.Text = _pendingSegmentation == null ? UiText.Get("StatusNoSegmentationCandidate") : UiText.Get("StatusCandidateAccepted");
+        private void OnAcceptSegmentationClick(object sender, RoutedEventArgs e)
+        {
+            if (_pendingSegmentation is not SegmentationResult segmentation || _volume == null || segmentation.Blobs.Count == 0)
+            {
+                statusText.Text = UiText.Get("StatusSegmentationEmpty");
+                return;
+            }
+
+            BitmapSource slice = _volume.GetAxialSlice(segmentation.SliceIndex);
+            var roi = new BlobAnalysisRoi
+            {
+                Center = new PointD(slice.PixelWidth / 2d, slice.PixelHeight / 2d),
+                Width = slice.PixelWidth,
+                Height = slice.PixelHeight,
+                Label = UiText.Get("SegmentationRoiLabel"),
+                DetectedBlobs = segmentation.Blobs.ToList()
+            };
+
+            _imageViewer.ImageSource = slice;
+            if (!_imageViewer.AddRoi(roi))
+            {
+                statusText.Text = UiText.Get("StatusSegmentationFailed");
+                return;
+            }
+
+            _imageViewer.ShowRoiList = true;
+            DisplayMode = AdaptiveDisplayMode.TwoDimensional;
+            _pendingSegmentation = null;
+            segmentationText.Text = string.Empty;
+            statusText.Text = UiText.Format("StatusSegmentationAccepted", roi.DetectedBlobs.Count);
+            UpdateButtonStates();
+        }
 
         private void OnRejectSegmentationClick(object sender, RoutedEventArgs e)
         {
@@ -354,6 +394,8 @@ namespace ImageViewer.Controls
                 _volume3DViewer.SetSagittalSlice(sliceIndex);
                 statusText.Text = UiText.Format("StatusSagittalSlice", sliceIndex + 1, _volume.Width);
             }
+
+            UpdateMprSliceControl(mode);
         }
 
         private void ResetActiveView()
@@ -384,6 +426,33 @@ namespace ImageViewer.Controls
             UpdateButtonStates();
         }
 
+        private void OnPreviousMprSliceClick(object sender, RoutedEventArgs e) => StepMprSlice(-1);
+
+        private void OnNextMprSliceClick(object sender, RoutedEventArgs e) => StepMprSlice(1);
+
+        private void OnMprSliceValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_isUpdatingMprSlider || _volume == null || (_displayMode != AdaptiveDisplayMode.Coronal && _displayMode != AdaptiveDisplayMode.Sagittal))
+            {
+                return;
+            }
+
+            int sliceIndex = (int)Math.Round(e.NewValue);
+            VolumeSliceOrientation orientation = _displayMode == AdaptiveDisplayMode.Coronal
+                ? VolumeSliceOrientation.Coronal
+                : VolumeSliceOrientation.Sagittal;
+            UpdateMprSlice(_displayMode, orientation, sliceIndex);
+        }
+
+        private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (_volume != null && (_displayMode == AdaptiveDisplayMode.Coronal || _displayMode == AdaptiveDisplayMode.Sagittal))
+            {
+                StepMprSlice(e.Delta > 0 ? 1 : -1);
+                e.Handled = true;
+            }
+        }
+
         private void BeginOperation(string message)
         {
             _operationCancellation?.Cancel();
@@ -409,6 +478,34 @@ namespace ImageViewer.Controls
                 : UiText.Format("StatusVolumeSummary", _volume.Width, _volume.Height, _volume.Depth, _volume.SpacingX, _volume.SpacingY, _volume.SpacingZ);
             statusText.Text = data;
             stateBarText.Text = UiText.Format("StatusModeFormat", LocalizeMode(ResolveMode()), data);
+            UpdateMprSliceControl(ResolveMode());
+        }
+
+        private void UpdateMprSliceControl(AdaptiveDisplayMode mode)
+        {
+            bool isMpr = _volume != null && (mode == AdaptiveDisplayMode.Coronal || mode == AdaptiveDisplayMode.Sagittal);
+            mprSliceBar.Visibility = isMpr ? Visibility.Visible : Visibility.Collapsed;
+            if (!isMpr || _volume == null)
+            {
+                return;
+            }
+
+            int sliceIndex = GetMprSliceIndex(mode);
+            int maximum = mode == AdaptiveDisplayMode.Coronal ? _volume.Height - 1 : _volume.Width - 1;
+            _isUpdatingMprSlider = true;
+            try
+            {
+                mprSliceSlider.Maximum = Math.Max(0, maximum);
+                mprSliceSlider.Value = Math.Clamp(sliceIndex, 0, Math.Max(0, maximum));
+            }
+            finally
+            {
+                _isUpdatingMprSlider = false;
+            }
+
+            mprSliceStatusText.Text = UiText.Format("AdaptiveMprSliceStatus", LocalizeMode(mode), sliceIndex + 1, maximum + 1);
+            mprPreviousButton.IsEnabled = sliceIndex > 0;
+            mprNextButton.IsEnabled = sliceIndex < maximum;
         }
 
         private static string LocalizeMode(AdaptiveDisplayMode mode)
@@ -435,6 +532,10 @@ namespace ImageViewer.Controls
             qualityButton.IsEnabled = hasVolume && !operationActive;
             segmentButton.IsEnabled = hasVolume && !operationActive;
             cancelButton.IsEnabled = operationActive;
+            bool isMpr = hasVolume && (_displayMode == AdaptiveDisplayMode.Coronal || _displayMode == AdaptiveDisplayMode.Sagittal);
+            mprSliceSlider.IsEnabled = isMpr && !operationActive;
+            mprPreviousButton.IsEnabled = isMpr && !operationActive && mprSliceSlider.Value > mprSliceSlider.Minimum;
+            mprNextButton.IsEnabled = isMpr && !operationActive && mprSliceSlider.Value < mprSliceSlider.Maximum;
             acceptSegmentationButton.IsEnabled = _pendingSegmentation != null;
             rejectSegmentationButton.IsEnabled = _pendingSegmentation != null;
         }

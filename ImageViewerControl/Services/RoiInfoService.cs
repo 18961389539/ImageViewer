@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Windows;
 using ImageViewer.Models;
 using ImageViewer.Localization;
 using ImageViewer.Plugins;
@@ -108,6 +109,15 @@ namespace ImageViewer.Services
                 case FittedEllipseRoi fittedEllipse:
                     lines.Add(UiText.FormatInvariant("InfoLineFittedEllipse", FormatLength(fittedEllipse.RadiusX * correction, pixelSize, physicalUnit), FormatLength(fittedEllipse.RadiusY * correction, pixelSize, physicalUnit)));
                     lines.Add(UiText.FormatInvariant("InfoLineAnglePoints", fittedEllipse.Angle, fittedEllipse.SourcePointCount));
+                    if (fittedEllipse.FitInlierCount > 0)
+                    {
+                        lines.Add(UiText.FormatInvariant(
+                            "InfoLineFitQuality",
+                            FormatLength(fittedEllipse.FitResidualRms * correction, pixelSize, physicalUnit),
+                            fittedEllipse.FitInlierCount,
+                            fittedEllipse.FitOutlierCount,
+                            fittedEllipse.FitAspectRatio));
+                    }
                     break;
                 case EllipseRoi ellipse:
                     lines.Add(UiText.FormatInvariant("InfoLineEllipse", FormatLength(ellipse.RadiusX * correction, pixelSize, physicalUnit), FormatLength(ellipse.RadiusY * correction, pixelSize, physicalUnit)));
@@ -122,16 +132,25 @@ namespace ImageViewer.Services
                     lines.Add(UiText.FormatInvariant("InfoLineArea", FormatArea(ring.Area * areaCorrection, pixelSize, physicalUnit)));
                     break;
                 case PolygonRoi polygon:
-                    lines.Add(UiText.FormatInvariant("InfoLinePolygon", FormatLength(GeometryUtils.PolygonPerimeter(polygon.Points.ToWpfPointArray()) * correction, pixelSize, physicalUnit)));
-                    lines.Add(UiText.FormatInvariant("InfoLineArea", FormatArea(GeometryUtils.PolygonArea(polygon.Points.ToWpfPointArray()) * areaCorrection, pixelSize, physicalUnit)));
+                    Point[] polygonPoints = polygon.Points.ToWpfPointArray();
+                    if (polygon.IsClosed && polygonPoints.Length >= 3)
+                    {
+                        var polygonMetrics = GeometryUtils.GetPolygonMetrics(polygonPoints);
+                        lines.Add(UiText.FormatInvariant("InfoLinePolygon", FormatLength(polygonMetrics.Perimeter * correction, pixelSize, physicalUnit)));
+                        lines.Add(UiText.FormatInvariant("InfoLinePolygonArea", FormatArea(polygonMetrics.Area * areaCorrection, pixelSize, physicalUnit)));
+                        lines.Add(UiText.FormatInvariant("InfoLinePolygonDetail", polygonPoints.Length, polygonMetrics.Centroid.X, polygonMetrics.Centroid.Y));
+                    }
+                    else if (polygonPoints.Length > 1)
+                    {
+                        lines.Add(UiText.FormatInvariant("InfoLinePolygon", FormatLength(GeometryUtils.PolylineLength(polygonPoints) * correction, pixelSize, physicalUnit)));
+                        lines.Add(UiText.Get("InfoLinePolygonOpen"));
+                    }
                     break;
                 case PolylineRoi polyline when polyline.Points.Count > 1:
-                    double length = 0;
-                    for (int i = 1; i < polyline.Points.Count; i++)
-                    {
-                        length += GeometryUtils.Distance(polyline.Points[i - 1].ToWpfPoint(), polyline.Points[i].ToWpfPoint());
-                    }
-                    lines.Add(UiText.FormatInvariant("InfoLinePolyline", FormatLength(length * correction, pixelSize, physicalUnit)));
+                    Point[] polylinePoints = polyline.Points.ToWpfPointArray();
+                    IReadOnlyList<double> segmentLengths = GeometryUtils.GetPolylineSegmentLengths(polylinePoints);
+                    lines.Add(UiText.FormatInvariant("InfoLinePolyline", FormatLength(GeometryUtils.PolylineLength(polylinePoints) * correction, pixelSize, physicalUnit)));
+                    lines.Add(UiText.FormatInvariant("InfoLinePolylineDetail", polylinePoints.Length, segmentLengths.Count, FormatLength(segmentLengths.Min() * correction, pixelSize, physicalUnit), FormatLength(segmentLengths.Max() * correction, pixelSize, physicalUnit)));
                     break;
                 case ArrowAnnotationRoi arrow:
                     lines.Add(UiText.FormatInvariant("InfoLineArrow", FormatLength(GeometryUtils.Distance(arrow.P1.ToWpfPoint(), arrow.P2.ToWpfPoint()) * correction, pixelSize, physicalUnit)));
@@ -156,6 +175,17 @@ namespace ImageViewer.Services
                         lines.Add(UiText.Get("InfoLineInvalidArc"));
                     }
                     break;
+                case ThreePointCircleMeasureRoi threePointCircle:
+                    if (threePointCircle.IsValid)
+                    {
+                        lines.Add(UiText.FormatInvariant("InfoLineThreePointCircle", FormatLength(threePointCircle.Radius * correction, pixelSize, physicalUnit)));
+                        lines.Add(UiText.FormatInvariant("InfoLineThreePointCircleDetail", threePointCircle.Center.X, threePointCircle.Center.Y));
+                    }
+                    else
+                    {
+                        lines.Add(UiText.Get("InfoLineInvalidThreePointCircle"));
+                    }
+                    break;
                 case PointToLineDistanceRoi pointToLine:
                     lines.Add(UiText.FormatInvariant("InfoLinePointToLine", FormatLength(pointToLine.Distance * correction, pixelSize, physicalUnit)));
                     lines.Add(UiText.FormatInvariant("InfoLinePointFoot", pointToLine.Point.X, pointToLine.Point.Y, pointToLine.FootPoint.X, pointToLine.FootPoint.Y));
@@ -177,8 +207,19 @@ namespace ImageViewer.Services
                     lines.Add(UiText.FormatInvariant("InfoLineConcentricity", FormatLength(concentricity.CenterDistance * correction, pixelSize, physicalUnit)));
                     lines.Add(UiText.FormatInvariant("InfoLineConcentricityDetail", FormatLength(concentricity.Radius1 * correction, pixelSize, physicalUnit), FormatLength(concentricity.Radius2 * correction, pixelSize, physicalUnit)));
                     break;
+                case CenterDistanceMeasureRoi centerDistance:
+                    lines.Add(UiText.FormatInvariant("InfoLineCenterDistance", FormatLength(centerDistance.CenterDistance * correction, pixelSize, physicalUnit)));
+                    lines.Add(UiText.FormatInvariant("InfoLineCenterDistanceDetail", centerDistance.Center1.X, centerDistance.Center1.Y, centerDistance.Center2.X, centerDistance.Center2.Y));
+                    break;
                 case PointAnnotationRoi point:
                     lines.Add(UiText.FormatInvariant("InfoLinePointAnnotation", point.Position.X, point.Position.Y));
+                    break;
+                case PointCoordinateMeasureRoi pointCoordinate:
+                    lines.Add(UiText.FormatInvariant("InfoLinePointCoordinate", pointCoordinate.Position.X, pointCoordinate.Position.Y));
+                    if (pointCoordinate.IsEdgeSnapped)
+                    {
+                        lines.Add(UiText.FormatInvariant("InfoLinePointEdgeQuality", pointCoordinate.EdgeConfidence * 100, pointCoordinate.EdgeScore));
+                    }
                     break;
                 case TextAnnotationRoi text:
                     lines.Add(UiText.FormatInvariant("InfoLineTextAnnotation", text.Position.X, text.Position.Y));
@@ -225,6 +266,8 @@ namespace ImageViewer.Services
                 LineMeasureRoi line => GeometryUtils.Distance(line.P1.ToWpfPoint(), line.P2.ToWpfPoint()) * correction * pixelSize,
                 CircularCaliperMeasureRoi circular => circular.Radius * correction * pixelSize,
                 ArcMeasureRoi arc => arc.Radius * correction * pixelSize,
+                ThreePointCircleMeasureRoi threePointCircle when threePointCircle.IsValid => threePointCircle.Radius * correction * pixelSize,
+                CenterDistanceMeasureRoi centerDistance => centerDistance.CenterDistance * correction * pixelSize,
                 _ => null
             };
         }

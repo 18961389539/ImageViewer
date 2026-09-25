@@ -90,8 +90,19 @@ namespace ImageViewer.Controls
 
             try
             {
-                await RoiAnalysisExportService.SaveCsvAsync(filePath, _dependencies.GetAllRois(), _dependencies.GetAnalysisBitmapSource(), _dependencies.GetPixelSize(), _dependencies.GetPhysicalUnit(), _dependencies.GetCalibration());
-                _dependencies.ShowStatusHint(UiText.Get("StatusExportCsvSuccess"), StatusHintKind.Success);
+                var exportContext = new RoiAnalysisExportContext(
+                    _dependencies.GetCurrentImagePath(),
+                    _dependencies.GetPluginRegistry(),
+                    _dependencies.GetRenderSettings());
+                await RoiAnalysisExportService.SaveCsvAsync(
+                    filePath,
+                    _dependencies.GetAllRois(),
+                    _dependencies.GetAnalysisBitmapSource(),
+                    _dependencies.GetPixelSize(),
+                    _dependencies.GetPhysicalUnit(),
+                    _dependencies.GetCalibration(),
+                    exportContext: exportContext);
+                _dependencies.ShowStatusHint(UiText.Get("StatusExportCsvWithMetadataSuccess"), StatusHintKind.Success);
             }
             catch (Exception ex)
             {

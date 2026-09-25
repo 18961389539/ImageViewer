@@ -161,7 +161,13 @@ namespace ImageViewer.Controls
         private readonly ImageViewerAutoSaveWorkflow _autoSave;
         private readonly ImageViewerRecentProjectCatalog _recentProjectCatalog;
         private readonly ImageViewerAutoSaveController _autoSaveController;
+        private readonly string _autoSaveDirectory;
         private string? _currentProjectPath;
+        private string? _recoveryFilePath;
+        private bool _recoveryPromptDismissed;
+        private bool _isDirty;
+
+        public event EventHandler? StateChanged;
 
         public ImageViewerSessionController(
             ImageViewerSessionControllerDependencies dependencies,
@@ -174,11 +180,50 @@ namespace ImageViewer.Controls
 
             _persistence = dependencies.Persistence ?? throw new ArgumentNullException(nameof(dependencies));
             _autoSave = dependencies.AutoSave;
+            _autoSaveDirectory = sessionStoragePolicy.AutoSaveDirectory;
             _recentProjectCatalog = new ImageViewerRecentProjectCatalog(_persistence.RecentProjectService, sessionStoragePolicy.RecentProjectsFilePath);
             _autoSaveController = new ImageViewerAutoSaveController(dependencies.AutoSave, periodicTaskSchedulerFactory, sessionStoragePolicy);
+            RefreshRecoverySnapshot();
         }
 
         public bool IsAutoSaveEnabled => _autoSaveController.IsEnabled;
+
+        public bool IsDirty => _isDirty;
+
+        public bool HasRecoverySnapshot => !_recoveryPromptDismissed && _recoveryFilePath != null;
+
+        public void MarkDirty()
+        {
+            if (_isDirty)
+            {
+                return;
+            }
+
+            _isDirty = true;
+            StateChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        public void MarkClean()
+        {
+            if (!_isDirty)
+            {
+                return;
+            }
+
+            _isDirty = false;
+            StateChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        public void DismissRecoveryPrompt()
+        {
+            if (_recoveryPromptDismissed || _recoveryFilePath == null)
+            {
+                return;
+            }
+
+            _recoveryPromptDismissed = true;
+            StateChanged?.Invoke(this, EventArgs.Empty);
+        }
 
         public async Task SaveSessionAsync()
         {
@@ -195,6 +240,7 @@ namespace ImageViewer.Controls
                     _persistence.CaptureSnapshot(),
                     _persistence.GetPluginRegistry());
                 SetCurrentProject(filePath, SessionProjectKind);
+                CompleteSuccessfulSave();
                 _persistence.ShowStatusHint(UiText.Get("StatusSaveSessionSuccess"), StatusHintKind.Success);
             }
             catch (Exception ex)
@@ -229,6 +275,7 @@ namespace ImageViewer.Controls
                     _persistence.CaptureSnapshot(),
                     _persistence.GetPluginRegistry());
                 SetCurrentProject(filePath, PackageProjectKind);
+                CompleteSuccessfulSave();
                 _persistence.ShowStatusHint(UiText.Get("StatusExportPackageSuccess"), StatusHintKind.Success);
             }
             catch (Exception ex)
@@ -245,6 +292,36 @@ namespace ImageViewer.Controls
         public Task OpenRecentProjectAsync(string filePath)
         {
             return OpenProjectAsync(filePath);
+        }
+
+        public async Task RecoverLatestAutoSaveAsync()
+        {
+            RefreshRecoverySnapshot();
+            string? recoveryFilePath = _recoveryFilePath;
+            if (recoveryFilePath == null)
+            {
+                _persistence.ShowStatusHint(UiText.Get("StatusNoRecoverySnapshot"), StatusHintKind.Info);
+                return;
+            }
+
+            try
+            {
+                ImageViewerSessionData session = await _persistence.SessionService.LoadFromFileAsync(
+                    recoveryFilePath,
+                    _persistence.GetPluginRegistry());
+
+                ApplySession(session);
+                _persistence.ClearUndoHistory();
+                ReportUnresolvedRois(session.UnresolvedRois);
+                _recoveryPromptDismissed = true;
+                StateChanged?.Invoke(this, EventArgs.Empty);
+                MarkDirty();
+                _persistence.ShowStatusHint(UiText.Get("StatusRecoveryLoaded"), StatusHintKind.Success);
+            }
+            catch (Exception ex)
+            {
+                _persistence.ShowNonCriticalError(UiText.Get("ErrorRecoveryTitle"), UiText.Get("ErrorRecoveryMessage"), ex);
+            }
         }
 
         public void ToggleAutoSave()
@@ -291,6 +368,7 @@ namespace ImageViewer.Controls
                 ApplySession(session);
                 SetCurrentProject(filePath, string.Equals(Path.GetExtension(filePath), ".ivpkg", StringComparison.OrdinalIgnoreCase) ? PackageProjectKind : SessionProjectKind);
                 _persistence.ClearUndoHistory();
+                MarkClean();
                 _persistence.ShowStatusHint(UiText.Get("StatusLoadSessionSuccess"), StatusHintKind.Success);
                 ReportUnresolvedRois(session.UnresolvedRois);
             }
@@ -329,6 +407,60 @@ namespace ImageViewer.Controls
             _autoSaveController.SetCurrentProject(_currentProjectPath);
             _recentProjectCatalog.Remember(_currentProjectPath, projectKind);
             _persistence.UpdateContextMenuState();
+        }
+
+        private void CompleteSuccessfulSave()
+        {
+            MarkClean();
+            string defaultRecoveryPath = Path.Combine(_autoSaveDirectory, "autosave.ivsession");
+            string[] recoveryPaths = new[] { _recoveryFilePath, defaultRecoveryPath }
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Select(path => path!)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (recoveryPaths.Length == 0)
+            {
+                return;
+            }
+
+            try
+            {
+                foreach (string recoveryPath in recoveryPaths)
+                {
+                    if (File.Exists(recoveryPath))
+                    {
+                        File.Delete(recoveryPath);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _persistence.ShowStatusHint(UiText.Get("StatusRecoveryCleanupFailed"), StatusHintKind.Info);
+                _autoSave.LogNonCriticalError("Clean up recovered autosave", ex);
+                return;
+            }
+
+            _recoveryFilePath = null;
+            _recoveryPromptDismissed = false;
+            StateChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void RefreshRecoverySnapshot()
+        {
+            try
+            {
+                _recoveryFilePath = Directory.Exists(_autoSaveDirectory)
+                    ? Directory
+                        .EnumerateFiles(_autoSaveDirectory, "*.ivsession", SearchOption.TopDirectoryOnly)
+                        .Where(path => new FileInfo(path).Length > 0)
+                        .OrderByDescending(File.GetLastWriteTimeUtc)
+                        .FirstOrDefault()
+                    : null;
+            }
+            catch
+            {
+                _recoveryFilePath = null;
+            }
         }
 
         /// <summary>

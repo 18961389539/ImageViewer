@@ -1,3 +1,4 @@
+using System;
 using System.Windows;
 using System.Windows.Media;
 using ImageViewer.Controls;
@@ -24,6 +25,29 @@ namespace ImageViewer.Rendering
                 {
                     context.DrawInfoText(StandardRoiInfoTextFormatter.BuildPointAnnotationText(annotation), StandardRoiLayoutHelper.GetAnnotationInfoAnchor(annotation.Position.ToWpfPoint(), context), brush);
                 }
+            }
+        }
+
+        private sealed class PointCoordinateMeasureRenderer : IRoiRenderer
+        {
+            public bool CanRender(RoiBase roi) => roi is PointCoordinateMeasureRoi;
+
+            public void Render(RoiBase roi, RoiRenderContext context, Brush? strokeOverride, bool isSelected)
+            {
+                var point = (PointCoordinateMeasureRoi)roi;
+                if (!point.IsVisible) return;
+
+                Brush brush = RoiRenderContext.ResolveStroke(strokeOverride, point.StrokeColor);
+                Point position = point.Position.ToWpfPoint();
+                double arm = (isSelected ? context.PointAnnotationSize + 4 : context.PointAnnotationSize + 2) / context.Scale;
+                double thickness = Math.Max(1, point.StrokeThickness) / context.Scale;
+                context.DrawLineSegment(new Point(position.X - arm, position.Y), new Point(position.X + arm, position.Y), brush, thickness);
+                context.DrawLineSegment(new Point(position.X, position.Y - arm), new Point(position.X, position.Y + arm), brush, thickness);
+                context.DrawHandle(position, ResizeHandle.None, (context.PointAnnotationSize + 1) / context.Scale, false, brush);
+                context.DrawInfoText(
+                    StandardRoiInfoTextFormatter.BuildPointCoordinateText(point),
+                    StandardRoiLayoutHelper.GetAnnotationInfoAnchor(position, context),
+                    brush);
             }
         }
 

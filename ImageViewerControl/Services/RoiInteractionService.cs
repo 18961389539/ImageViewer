@@ -35,6 +35,7 @@ namespace ImageViewer.Services
                 [typeof(PolygonRoi)] = new PolygonRoiBehavior(),
                 [typeof(PolylineRoi)] = new PolylineRoiBehavior(),
                 [typeof(PointAnnotationRoi)] = new PointAnnotationBehavior(),
+                [typeof(PointCoordinateMeasureRoi)] = new PointCoordinateMeasureBehavior(),
                 [typeof(TextAnnotationRoi)] = new TextAnnotationBehavior(),
                 [typeof(ArrowAnnotationRoi)] = new LineMeasureBehavior(),
                 [typeof(LineMeasureRoi)] = new LineMeasureBehavior(),
@@ -47,6 +48,8 @@ namespace ImageViewer.Services
                 [typeof(ParallelismMeasureRoi)] = new ParallelismMeasureBehavior(),
                 [typeof(PerpendicularityMeasureRoi)] = new PerpendicularityMeasureBehavior(),
                 [typeof(ConcentricityMeasureRoi)] = new ConcentricityMeasureBehavior(),
+                [typeof(CenterDistanceMeasureRoi)] = new CenterDistanceMeasureBehavior(),
+                [typeof(ThreePointCircleMeasureRoi)] = new ThreePointCircleMeasureBehavior(),
                 [typeof(BlobAnalysisRoi)] = new BlobAnalysisBehavior()
             };
         }

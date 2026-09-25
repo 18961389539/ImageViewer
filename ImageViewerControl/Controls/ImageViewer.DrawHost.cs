@@ -51,6 +51,12 @@ namespace ImageViewer.Controls
 
             public bool TryApplyAnalysis(RoiBase roi) => _owner.TryRefreshCaliperDetection(roi);
 
+            public bool TryCreateAutomaticCircle(Point seed, out CircularCaliperMeasureRoi roi)
+                => _owner.TryCreateAutomaticCircle(seed, out roi);
+
+            public bool TrySnapPointToEdge(Point seed, out Point snapped, out double score, out double confidence)
+                => _owner.TrySnapPointToEdge(seed, out snapped, out score, out confidence);
+
             public void Commit(RoiBase roi) => _owner.CommitRoi(roi);
 
             public void EndDraw()

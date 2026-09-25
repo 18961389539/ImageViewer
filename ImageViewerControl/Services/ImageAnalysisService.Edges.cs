@@ -41,7 +41,7 @@ namespace ImageViewer.Services
         /// <summary>
         /// 单边缘选择完毕后的亚像素定位（锐利/渐变自适应）。
         /// </summary>
-        private static bool TryFindStrongestCircularGradient(byte[] pixels, int pixelWidth, int pixelHeight, int stride, int bytesPerPixel, PixelFormat format, Point center, Vector measurementDirection, Vector averagingDirection, int searchRange, int averagingHalfWidth, double minimumGradient, CaliperEdgePolarity polarity, int edgeSelection, out CaliperEdgeSample edgeSample)
+        private static bool TryFindStrongestCircularGradient(byte[] pixels, int pixelWidth, int pixelHeight, int stride, int bytesPerPixel, PixelFormat format, Point center, Vector measurementDirection, Vector averagingDirection, int searchRange, int averagingHalfWidth, double edgeSigma, double minimumGradient, CaliperEdgePolarity polarity, int edgeSelection, out CaliperEdgeSample edgeSample)
         {
             edgeSample = default;
             int sampleCount = searchRange * 2 + 1;
@@ -54,7 +54,7 @@ namespace ImageViewer.Services
                 profile[i] = SampleAveragedIntensity(pixels, pixelWidth, pixelHeight, stride, bytesPerPixel, format, sampleCenter, averagingDirection, averagingHalfWidth);
             }
 
-            double[] score = BuildGradientScoreProfile(profile, polarity);
+            double[] score = BuildGradientScoreProfile(profile, polarity, edgeSigma);
 
             if (!TrySelectPeak(score, edgeSelection, out int bestIndex, out double strongestGradient))
             {
@@ -128,12 +128,35 @@ namespace ImageViewer.Services
         /// Chinese: 中心差分梯度 + 极性方向得分；序列端点梯度置零以支持亚像素抛物线插值。
         /// English: Builds a gradient score profile aligned to the sample indices 0..n-1.
         /// </summary>
-        private static double[] BuildGradientScoreProfile(double[] profile, CaliperEdgePolarity polarity)
+        private static double[] BuildGradientScoreProfile(double[] profile, CaliperEdgePolarity polarity, double edgeSigma = 1.0)
         {
             var score = new double[profile.Length];
-            for (int i = 1; i < profile.Length - 1; i++)
+            double sigma = Math.Clamp(edgeSigma, 0.5, 5.0);
+            int radius = Math.Max(1, (int)Math.Ceiling(3 * sigma));
+            radius = Math.Min(radius, Math.Max(1, (profile.Length - 1) / 2));
+            double[] derivativeKernel = new double[radius * 2 + 1];
+            double normalization = 0;
+            for (int offset = -radius; offset <= radius; offset++)
             {
-                double gradient = profile[i + 1] - profile[i - 1];
+                double value = offset * Math.Exp(-(offset * offset) / (2 * sigma * sigma));
+                derivativeKernel[offset + radius] = value;
+                normalization += Math.Abs(value);
+            }
+
+            if (normalization < 1e-9)
+            {
+                normalization = 1;
+            }
+
+            for (int i = radius; i < profile.Length - radius; i++)
+            {
+                double gradient = 0;
+                for (int offset = -radius; offset <= radius; offset++)
+                {
+                    gradient += profile[i + offset] * derivativeKernel[offset + radius];
+                }
+
+                gradient = gradient * 2 / normalization;
                 score[i] = polarity switch
                 {
                     CaliperEdgePolarity.DarkToLight => Math.Max(gradient, 0),
@@ -250,7 +273,7 @@ namespace ImageViewer.Services
             return lo - 0.5 + edgeFromLeft * count;
         }
 
-        private static bool TryFindStrongestGradientPair(byte[] pixels, int pixelWidth, int pixelHeight, int stride, int bytesPerPixel, PixelFormat format, Point center, Vector measurementDirection, Vector averagingDirection, int searchRange, int averagingHalfWidth, double minimumGradient, CaliperEdgePolarity polarity, double minimumEdgeGapPx, double nominalEdgeGapPx, double nominalEdgeGapTolerancePx, out CaliperEdgeSample edge1Sample, out CaliperEdgeSample edge2Sample)
+        private static bool TryFindStrongestGradientPair(byte[] pixels, int pixelWidth, int pixelHeight, int stride, int bytesPerPixel, PixelFormat format, Point center, Vector measurementDirection, Vector averagingDirection, int searchRange, int averagingHalfWidth, double edgeSigma, double minimumGradient, CaliperEdgePolarity polarity, double minimumEdgeGapPx, double nominalEdgeGapPx, double nominalEdgeGapTolerancePx, out CaliperEdgeSample edge1Sample, out CaliperEdgeSample edge2Sample)
         {
             edge1Sample = default;
             edge2Sample = default;
@@ -264,7 +287,7 @@ namespace ImageViewer.Services
                 profile[i] = SampleAveragedIntensity(pixels, pixelWidth, pixelHeight, stride, bytesPerPixel, format, sampleCenter, averagingDirection, averagingHalfWidth);
             }
 
-            double[] score = BuildGradientScoreProfile(profile, polarity);
+            double[] score = BuildGradientScoreProfile(profile, polarity, edgeSigma);
             int middleIndex = searchRange;
             double strongestGradient1 = 0;
             double strongestGradient2 = 0;

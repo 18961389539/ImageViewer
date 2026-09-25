@@ -11,6 +11,13 @@ namespace ImageViewer.Controls
 
             var registrations = new ImageViewerLifetimeRegistrationCollection();
             registrations.AddAttachment(
+                () =>
+                {
+                    controlComposition.SessionController.StateChanged += OnSessionStateChanged;
+                    OnSessionStateChanged(controlComposition.SessionController, EventArgs.Empty);
+                },
+                () => controlComposition.SessionController.StateChanged -= OnSessionStateChanged);
+            registrations.AddAttachment(
                 () => RuntimeOptions.PropertyChanged += OnRuntimeOptionsPropertyChanged,
                 () => RuntimeOptions.PropertyChanged -= OnRuntimeOptionsPropertyChanged);
             registrations.AddAttachment(controlComposition.Attach, controlComposition.Detach);

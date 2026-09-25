@@ -18,6 +18,7 @@ namespace ImageViewer.ViewModels
         public ObservableCollection<PolygonRoi> PolygonRois => GetRoiCollection<PolygonRoi>();
         public ObservableCollection<PolylineRoi> PolylineRois => GetRoiCollection<PolylineRoi>();
         public ObservableCollection<PointAnnotationRoi> PointAnnotationRois => GetRoiCollection<PointAnnotationRoi>();
+        public ObservableCollection<PointCoordinateMeasureRoi> PointCoordinateMeasureRois => GetRoiCollection<PointCoordinateMeasureRoi>();
         public ObservableCollection<TextAnnotationRoi> TextAnnotationRois => GetRoiCollection<TextAnnotationRoi>();
         public ObservableCollection<ArrowAnnotationRoi> ArrowAnnotationRois => GetRoiCollection<ArrowAnnotationRoi>();
         public ObservableCollection<LineMeasureRoi> LineMeasureRois => GetRoiCollection<LineMeasureRoi>();

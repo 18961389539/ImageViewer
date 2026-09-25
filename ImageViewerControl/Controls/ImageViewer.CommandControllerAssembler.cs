@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using ImageViewer.Localization;
 
 namespace ImageViewer.Controls
@@ -35,6 +36,21 @@ namespace ImageViewer.Controls
                             GetPixelSize = () => _owner.PixelSize,
                             GetPhysicalUnit = () => _owner.PhysicalUnit,
                             GetCalibration = () => _owner.Calibration,
+                            GetCurrentImagePath = () => _owner._controlComposition.ViewportController.TryGetCurrentImagePath(),
+                            GetPluginRegistry = () => _owner.PluginRegistry,
+                            GetRenderSettings = () => new Dictionary<string, string>(StringComparer.Ordinal)
+                            {
+                                ["enableImagePyramid"] = _owner.RuntimeOptions.EnableImagePyramid.ToString(),
+                                ["autoSelectPyramidLevel"] = _owner.RuntimeOptions.AutoSelectPyramidLevel.ToString(),
+                                ["enableTiledRendering"] = _owner.RuntimeOptions.EnableTiledRendering.ToString(),
+                                ["prefetchAdjacentTiles"] = _owner.RuntimeOptions.PrefetchAdjacentTiles.ToString(),
+                                ["autoTuneLargeImageRendering"] = _owner.RuntimeOptions.AutoTuneLargeImageRendering.ToString(),
+                                ["tileCacheMaximumMegabytes"] = _owner.RuntimeOptions.TileCacheMaximumMegabytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                                ["tilePrefetchRadius"] = _owner.RuntimeOptions.TilePrefetchRadius.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                                ["enableGpuRendering"] = _owner.EnableGpuRendering.ToString(),
+                                ["pseudoColorPalette"] = _owner.PseudoColorPalette.ToString(),
+                                ["enableAsyncAnalysis"] = _owner.RuntimeOptions.EnableAsyncAnalysis.ToString()
+                            },
                             ShowNonCriticalError = _owner.ShowNonCriticalError,
                             ShowStatusHint = (message, kind) => _owner.ShowStatusHint(message, kind),
                             UpdateContextMenuState = _owner.UpdateContextMenuState

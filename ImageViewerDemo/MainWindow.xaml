@@ -35,14 +35,23 @@
                     FontSize="14"
                     Text="{localization:DemoText ToolbarHint}" />
 
-                <Button
-                    Grid.Column="1"
-                    Padding="12,6"
-                    Click="OnOpenImageClick"
-                    Background="#69AFFF"
-                    BorderThickness="0"
-                    Content="{localization:DemoText OpenImageButton}"
-                    Foreground="#11151C" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button
+                        Padding="12,6"
+                        Click="OnOpenImageClick"
+                        Background="#69AFFF"
+                        BorderThickness="0"
+                        Content="{localization:DemoText OpenImageButton}"
+                        Foreground="#11151C" />
+                    <Button
+                        Margin="8,0,0,0"
+                        Padding="12,6"
+                        Click="OnOpenVolumeClick"
+                        Background="#243B57"
+                        BorderBrush="#69AFFF"
+                        Content="{localization:DemoText OpenVolumeButton}"
+                        Foreground="#F5F8FC" />
+                </StackPanel>
             </Grid>
         </Border>
 

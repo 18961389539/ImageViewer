@@ -69,6 +69,29 @@ namespace ImageViewer.Drawing
         bool TryApplyAnalysis(RoiBase roi);
 
         /// <summary>
+        /// 在指定位置自动搜索并拟合圆。
+        /// Chinese: 使用当前分析图像完成一次单击式自动圆测量；失败时返回 false。
+        /// English: Performs a one-click automatic circle search on the current analysis image.
+        /// Returns false when no reliable circle can be found.
+        /// </summary>
+        bool TryCreateAutomaticCircle(Point seed, out CircularCaliperMeasureRoi roi)
+        {
+            roi = null!;
+            return false;
+        }
+
+        /// <summary>
+        /// 在点击点附近搜索最强图像边缘，并返回亚像素位置及质量指标。
+        /// </summary>
+        bool TrySnapPointToEdge(Point seed, out Point snapped, out double score, out double confidence)
+        {
+            snapped = default;
+            score = 0;
+            confidence = 0;
+            return false;
+        }
+
+        /// <summary>
         /// 把 ROI 提交进集合（经撤销栈）。
         /// Chinese: 对应控件的 CommitRoi()。
         /// English: Commits the ROI into its collection through the undo stack.
