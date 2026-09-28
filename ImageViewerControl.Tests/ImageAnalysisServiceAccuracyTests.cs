@@ -11,181 +11,10 @@ using Xunit;
 namespace ImageViewerControl.Tests
 {
     /// <summary>
-    /// 测量算法精度测试：亚像素插值、圆拟合几何精化、低质量判失败。
-    /// Chinese: 验证 ImageAnalysisService 的三项精度改进行为。
-    /// English: Accuracy tests for the measurement pipeline (subpixel interpolation, geometric circle refinement, low-confidence rejection).
+    /// JLVision-backed geometry and measurement accuracy tests.
     /// </summary>
     public class ImageAnalysisServiceAccuracyTests
     {
-        [Fact]
-        public void RefinePeakOffset_SymmetricPeak_StaysAtCenter()
-        {
-            double[] score = [0, 1, 2, 1, 0];
-
-            double refined = ImageAnalysisService.RefinePeakOffset(2, score);
-
-            Assert.Equal(2.0, refined, precision: 6);
-        }
-
-        [Fact]
-        public void RefinePeakOffset_AsymmetricPeak_ShiftsTowardSteeperSide()
-        {
-            // 抛物线峰值偏右：三点采样 (10, 60, 30) 的顶点位于 +0.125 处 → 峰值索引 6.125。
-            double[] score = [0, 0, 0, 0, 0, 10, 60, 30, 0, 0];
-
-            double refined = ImageAnalysisService.RefinePeakOffset(6, score);
-
-            Assert.Equal(6.125, refined, precision: 4);
-            Assert.True(refined > 6.0, "峰值应偏向较陡的一侧（索引增大）。");
-        }
-
-        [Fact]
-        public void RefinePeakOffset_FlatPeak_ReturnsBestIndex()
-        {
-            double[] score = [0, 5, 5, 5, 0];
-
-            double refined = ImageAnalysisService.RefinePeakOffset(2, score);
-
-            Assert.Equal(2.0, refined, precision: 6);
-        }
-
-        [Fact]
-        public void RefinePeakOffset_EdgeIndex_ReturnsSameIndex()
-        {
-            double[] score = [9, 3, 1, 0, 0];
-
-            // bestIndex=0 位于端部，无法插值，应原样返回。
-            double refined = ImageAnalysisService.RefinePeakOffset(0, score);
-
-            Assert.Equal(0.0, refined, precision: 6);
-        }
-
-        [Fact]
-        public void RefineCircleGeometric_ConvergesTowardTrueCircle()
-        {
-            const double trueCenterX = 10.0;
-            const double trueCenterY = 12.0;
-            const double trueRadius = 20.0;
-            Point[] points = CreateCirclePoints(new Point(trueCenterX, trueCenterY), trueRadius, count: 36);
-
-            Point center = new(trueCenterX + 0.6, trueCenterY - 0.4);
-            double radius = trueRadius + 0.5;
-
-            ImageAnalysisService.RefineCircleGeometric(points, ref center, ref radius);
-
-            Assert.True(Math.Abs(center.X - trueCenterX) < 0.15, $"Center-X error too large: {Math.Abs(center.X - trueCenterX)}");
-            Assert.True(Math.Abs(center.Y - trueCenterY) < 0.15, $"Center-Y error too large: {Math.Abs(center.Y - trueCenterY)}");
-            Assert.True(Math.Abs(radius - trueRadius) < 0.15, $"Radius error too large: {Math.Abs(radius - trueRadius)}");
-        }
-
-        [Fact]
-        public void SelectRansacLineInliers_WithHalfOutliers_KeepsConsistentSubset()
-        {
-            // 10 个共线内点（y=0）混入 10 个大偏移离群点，RANSAC 应保留内点一致性子集。
-            var points = new List<Point>();
-            for (int i = 0; i < 10; i++)
-            {
-                points.Add(new Point(i * 2.0, 0));
-            }
-
-            var random = new Random(7);
-            for (int i = 0; i < 10; i++)
-            {
-                points.Add(new Point(random.Next(0, 60), 15 + random.Next(0, 20)));
-            }
-
-            Point[] all = [.. points];
-            (Point[] inliers, _) = ImageAnalysisService.SelectRansacLineInliers(all, null, threshold: 1.0);
-
-            Assert.True(inliers.Length >= 9, $"Expected >=9 inliers, got {inliers.Length}.");
-            Assert.All(inliers, point => Assert.True(Math.Abs(point.Y) < 1.0, $"Non-inlier point kept: {point}"));
-        }
-
-        [Fact]
-        public void SelectRansacCircleInliers_WithHalfOutliers_KeepsConsistentSubset()
-        {
-            var points = new List<Point>(CreateCirclePoints(new Point(20, 20), 10, count: 18));
-            var random = new Random(11);
-            for (int i = 0; i < 18; i++)
-            {
-                points.Add(new Point(random.Next(0, 80), random.Next(0, 80)));
-            }
-
-            (Point[] inliers, _) = ImageAnalysisService.SelectRansacCircleInliers([.. points], null, threshold: 1.0);
-
-            Assert.True(inliers.Length >= 15, $"Expected >=15 inliers, got {inliers.Length}.");
-        }
-
-        [Fact]
-        public void RefineGrayMomentOffset_SymmetricStep_ReturnsCenter()
-        {
-            // 窗口内容沿中心对称 → 第三中心矩为零，退化返回峰索引（窗口中心）。
-            double[] profile = [0, 0, 100, 100];
-
-            double offset = ImageAnalysisService.RefineGrayMomentOffset(2, profile);
-
-            Assert.Equal(2.0, offset, precision: 4);
-        }
-
-        [Fact]
-        public void RefineGrayMomentOffset_OffCenterStep_LocatesSubpixelEdge()
-        {
-            // 长剖面中的阶跃（低 4 / 高 4，真实边缘位于 3.5），窗口取峰索引 3 的邻域。
-            double[] profile = [0, 0, 0, 0, 100, 100, 100, 100];
-
-            double offset = ImageAnalysisService.RefineGrayMomentOffset(3, profile);
-
-            Assert.Equal(3.5, offset, precision: 3);
-        }
-
-        [Fact]
-        public void RefineGrayMomentOffset_FallingStep_MirrorsRisingStep()
-        {
-            // 与上升阶跃镜像的下降阶跃，同一几何边缘（3.5），暗侧位于窗口右端。
-            double[] profile = [100, 100, 100, 100, 0, 0, 0, 0];
-
-            double offset = ImageAnalysisService.RefineGrayMomentOffset(3, profile);
-
-            Assert.Equal(3.5, offset, precision: 3);
-        }
-
-        [Theory]
-        [InlineData(0.16)]
-        [InlineData(1.0)]
-        [InlineData(2.55)]
-        public void RefineGrayMomentOffset_SameGeometry_IndependentOfContrast(double contrastScale)
-        {
-            // 同一几何边缘（真实边缘位于 3.5）在不同灰度幅值下必须给出同一亚像素位置：
-            // 闭式解需使用无量纲偏度；用 σ/√|μ3| 逐项作比例时量纲为灰度^-0.5，结果会随对比度漂移。
-            double high = 100 * contrastScale;
-            double[] profile = [0, 0, 0, 0, high, high, high, high];
-
-            double offset = ImageAnalysisService.RefineGrayMomentOffset(3, profile);
-
-            Assert.Equal(3.5, offset, precision: 3);
-        }
-
-        [Fact]
-        public void RefineGrayMomentOffset_LinearRamp_ReturnsMidpoint()
-        {
-            double[] profile = [0, 25, 50, 75, 100];
-
-            double offset = ImageAnalysisService.RefineGrayMomentOffset(2, profile);
-
-            Assert.Equal(2.0, offset, precision: 4);
-        }
-
-        private static Point[] CreateCirclePoints(Point center, double radius, int count)
-        {
-            var points = new Point[count];
-            for (int i = 0; i < count; i++)
-            {
-                double angle = i * Math.PI * 2 / count;
-                points[i] = new Point(center.X + radius * Math.Cos(angle), center.Y + radius * Math.Sin(angle));
-            }
-
-            return points;
-        }
     }
 
     /// <summary>
@@ -257,56 +86,6 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
-        public void TryDetectLineMeasureEdges_DefaultExtractionMatchesExplicitGaussianDerivative()
-        {
-            const int size = 40;
-            BitmapSource bitmap = CreateBgraBitmap(
-                size,
-                BuildBandPixels(size, leftStart: 13, bandWidthPixels: 4, boundaryGreyPixel: 16, greyLevel: 127));
-            CaliperMeasureRoi defaultRoi = CreateComparisonLineRoi();
-            CaliperMeasureRoi explicitRoi = CreateComparisonLineRoi();
-            explicitRoi.CaliperEdgeExtractionMode = HalconEdgeExtractionMode.GaussianDerivative;
-
-            Assert.Equal(HalconEdgeExtractionMode.GaussianDerivative, defaultRoi.CaliperEdgeExtractionMode);
-            Assert.True(ImageAnalysisService.TryDetectLineMeasureEdges(bitmap, defaultRoi, out LineMeasureGradientDetectionResult defaultResult));
-            Assert.True(ImageAnalysisService.TryDetectLineMeasureEdges(bitmap, explicitRoi, out LineMeasureGradientDetectionResult explicitResult));
-
-            Assert.Equal(defaultResult.DetectedP1, explicitResult.DetectedP1);
-            Assert.Equal(defaultResult.DetectedP2, explicitResult.DetectedP2);
-            Assert.Equal(defaultResult.FittedEdge1, explicitResult.FittedEdge1);
-            Assert.Equal(defaultResult.FittedEdge2, explicitResult.FittedEdge2);
-            Assert.Equal(defaultResult.WidthSamples, explicitResult.WidthSamples);
-        }
-
-        [Fact]
-        public void TryDetectLineMeasureEdges_EdgeExtractionModesRemainComparableOnSyntheticBand()
-        {
-            const int size = 40;
-            BitmapSource bitmap = CreateBgraBitmap(
-                size,
-                BuildBandPixels(size, leftStart: 13, bandWidthPixels: 4, boundaryGreyPixel: 16, greyLevel: 127));
-            CaliperMeasureRoi baselineRoi = CreateComparisonLineRoi();
-            Assert.True(ImageAnalysisService.TryDetectLineMeasureEdges(bitmap, baselineRoi, out LineMeasureGradientDetectionResult baseline));
-            double baselineWidth = baseline.WidthSamples.Average();
-
-            foreach (HalconEdgeExtractionMode mode in Enum.GetValues<HalconEdgeExtractionMode>())
-            {
-                CaliperMeasureRoi roi = CreateComparisonLineRoi();
-                roi.CaliperEdgeExtractionMode = mode;
-                roi.CaliperMinimumGradient = 0.1;
-
-                bool success = ImageAnalysisService.TryDetectLineMeasureEdges(bitmap, roi, out LineMeasureGradientDetectionResult result);
-
-                Assert.True(success, $"{mode} should detect both boundaries in the synthetic band.");
-                Assert.True(double.IsFinite(result.WidthSamples.Average()), $"{mode} returned a non-finite width.");
-                Assert.InRange(
-                    Math.Abs(result.WidthSamples.Average() - baselineWidth),
-                    0,
-                    0.8);
-            }
-        }
-
-        [Fact]
         public void FitLine_ClippingChangesFitButProjectsOriginalContourEndpoints()
         {
             Point[] contour =
@@ -321,12 +100,12 @@ namespace ImageViewerControl.Tests
                 contour,
                 new Vector(1, 0),
                 fallbackHalfLength: 15,
-                fitMode: HalconLineFitMode.Regression);
+                fitMode: JLVisionLineFitMode.Regression);
             LineSegmentOverlay clipped = ImageAnalysisService.FitLine(
                 contour,
                 new Vector(1, 0),
                 fallbackHalfLength: 15,
-                fitMode: HalconLineFitMode.Regression,
+                fitMode: JLVisionLineFitMode.Regression,
                 clippingEndPoints: 1);
 
             Assert.True(Math.Abs(untrimmed.Start.Y - clipped.Start.Y) > 0.05, "Clipping the first contour point should alter the fitted line.");
@@ -345,9 +124,9 @@ namespace ImageViewerControl.Tests
                 new Point(10, 1),
                 new Point(20, 8)
             ];
-            var results = new Dictionary<HalconLineFitMode, LineSegmentOverlay>();
+            var results = new Dictionary<JLVisionLineFitMode, LineSegmentOverlay>();
 
-            foreach (HalconLineFitMode mode in Enum.GetValues<HalconLineFitMode>())
+            foreach (JLVisionLineFitMode mode in Enum.GetValues<JLVisionLineFitMode>())
             {
                 LineSegmentOverlay fit = ImageAnalysisService.FitLine(
                     contour,
@@ -359,7 +138,7 @@ namespace ImageViewerControl.Tests
             }
 
             Assert.True(
-                Math.Abs(GetSegmentAngleDegrees(results[HalconLineFitMode.Gauss]) - GetSegmentAngleDegrees(results[HalconLineFitMode.Regression])) > 0.01,
+                Math.Abs(GetSegmentAngleDegrees(results[JLVisionLineFitMode.Gauss]) - GetSegmentAngleDegrees(results[JLVisionLineFitMode.Regression])) > 0.01,
                 "The robust Gauss fit should differ from unweighted regression on the asymmetric outlier contour.");
         }
 

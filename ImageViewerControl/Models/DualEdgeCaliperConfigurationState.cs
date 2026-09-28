@@ -13,8 +13,7 @@ namespace ImageViewer.Models
         int MinimumValidCalipers,
         double CaliperOutlierThreshold,
         CaliperEdgePolarity CaliperEdgePolarity,
-        HalconEdgeExtractionMode CaliperEdgeExtractionMode,
-        HalconLineFitMode CaliperLineFitMode,
+        JLVisionLineFitMode CaliperLineFitMode,
         int CaliperFitClippingEndPoints)
     {
         public static DualEdgeCaliperConfigurationState Capture(CaliperMeasureRoi roi)
@@ -32,7 +31,6 @@ namespace ImageViewer.Models
                 roi.MinimumValidCalipers,
                 roi.CaliperOutlierThreshold,
                 roi.CaliperEdgePolarity,
-                roi.CaliperEdgeExtractionMode,
                 roi.CaliperLineFitMode,
                 roi.CaliperFitClippingEndPoints);
         }
@@ -51,7 +49,6 @@ namespace ImageViewer.Models
             roi.MinimumValidCalipers = MinimumValidCalipers;
             roi.CaliperOutlierThreshold = CaliperOutlierThreshold;
             roi.CaliperEdgePolarity = CaliperEdgePolarity;
-            roi.CaliperEdgeExtractionMode = CaliperEdgeExtractionMode;
             roi.CaliperLineFitMode = CaliperLineFitMode;
             roi.CaliperFitClippingEndPoints = CaliperFitClippingEndPoints;
         }

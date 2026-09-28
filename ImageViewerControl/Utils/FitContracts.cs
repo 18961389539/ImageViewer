@@ -66,9 +66,8 @@ namespace ImageViewer.Utils
     {
         public const string Version = "ImageAnalysisService.v2";
         public const string Ellipse = "ellipse.geometric.robust.v2";
-        public const string CaliperEdge = "caliper.gradient.subpixel.v2";
-        public const string CaliperEdgeExtraction = "halcon.edges_sub_pix.profile.v1";
-        public const string LineFit = "halcon.fit_line_contour_xld.compat.v1";
+        public const string CaliperEdge = "jlvvision.measure.subpixel.v1";
+        public const string LineFit = "jlvvision.fit_line_contour_xld.v1";
         public const string LineGeometry = "line.source-pixel.normal-form.v1";
     }
 }

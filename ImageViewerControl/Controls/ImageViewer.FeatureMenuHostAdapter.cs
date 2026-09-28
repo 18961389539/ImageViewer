@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media.Imaging;
@@ -13,6 +14,7 @@ namespace ImageViewer.Controls
     internal sealed class ImageViewerFeatureMenuCommandHostAdapter : IImageViewerFeatureMenuCommandHost
     {
         private readonly ImageViewerFeatureMenuCommandDependencies _dependencies;
+        private CancellationTokenSource? _batchExportCancellation;
 
         public ImageViewerFeatureMenuCommandHostAdapter(ImageViewerFeatureMenuCommandDependencies dependencies)
         {
@@ -154,8 +156,19 @@ namespace ImageViewer.Controls
                 return;
             }
 
+            using var cancellation = new CancellationTokenSource();
+            _batchExportCancellation = cancellation;
             try
             {
+                var progress = new Progress<BatchRoiAnalysisExportProgress>(update =>
+                {
+                    string current = string.IsNullOrWhiteSpace(update.CurrentPath)
+                        ? string.Empty
+                        : $"：{Path.GetFileName(update.CurrentPath)}";
+                    _dependencies.ShowStatusHint(
+                        $"{update.Phase}{current}（{update.CompletedFileCount}/{update.RequestedFileCount}，已生成 {update.ExportedRowCount} 条）",
+                        StatusHintKind.Info);
+                });
                 BatchRoiAnalysisExportSummary summary = await BatchRoiAnalysisExportService.ExportAsync(
                     outputPath,
                     imagePaths,
@@ -165,7 +178,9 @@ namespace ImageViewer.Controls
                     _dependencies.GetCalibration(),
                     _dependencies.GetPluginRegistry(),
                     _dependencies.GetRenderSettings(),
-                    qualityProfile: _dependencies.GetQualityProfile());
+                    qualityProfile: _dependencies.GetQualityProfile(),
+                    cancellationToken: cancellation.Token,
+                    progress: progress);
                 _dependencies.ShowStatusHint(
                     UiText.Format(
                         "StatusExportBatchCsvSuccess",
@@ -180,10 +195,35 @@ namespace ImageViewer.Controls
                         ? StatusHintKind.Success
                         : StatusHintKind.Info);
             }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+                _dependencies.ShowStatusHint(
+                    $"批量导出已取消，已完成结果已保存到 {Path.GetFileName(outputPath)} 及其摘要文件。",
+                    StatusHintKind.Info);
+            }
             catch (Exception ex)
             {
                 _dependencies.ShowNonCriticalError(UiText.Get("ErrorExportAnalysisTitle"), UiText.Get("ErrorExportBatchCsvMessage"), ex);
             }
+            finally
+            {
+                if (ReferenceEquals(_batchExportCancellation, cancellation))
+                {
+                    _batchExportCancellation = null;
+                }
+            }
+        }
+
+        public bool CancelBatchAnalysisExport()
+        {
+            if (_batchExportCancellation is not { IsCancellationRequested: false } cancellation)
+            {
+                return false;
+            }
+
+            cancellation.Cancel();
+            _dependencies.ShowStatusHint("正在取消批量导出，当前文件完成后会保存已有结果。", StatusHintKind.Info);
+            return true;
         }
 
         public void ShowAnalysisSummary()

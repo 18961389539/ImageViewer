@@ -13,6 +13,14 @@ using ImageViewer.Plugins;
 
 namespace ImageViewer.Services
 {
+    /// <summary>进度通知。CompletedFileCount 只统计已经落入结果摘要的输入文件。</summary>
+    public sealed record BatchRoiAnalysisExportProgress(
+        int RequestedFileCount,
+        int CompletedFileCount,
+        string CurrentPath,
+        string Phase,
+        int ExportedRowCount);
+
     /// <summary>
     /// 多图复用当前 ROI 模板执行测量并合并导出。
     /// Chinese: 几何 ROI 直接复用；卡尺 ROI 会在每张图上重新检测，单张失败不会中断整个批次，
@@ -34,9 +42,21 @@ namespace ImageViewer.Services
             CameraCalibration? calibration = null,
             RoiPluginRegistry? pluginRegistry = null,
             IReadOnlyDictionary<string, string>? renderSettings = null,
+            IProgress<BatchRoiAnalysisExportProgress>? progress = null,
             CancellationToken cancellationToken = default)
         {
-            return ExportAsync(outputPath, imagePaths, roiTemplates, pixelSize, physicalUnit, calibration, pluginRegistry, renderSettings, qualityProfile: null, cancellationToken);
+            return ExportAsync(
+                outputPath,
+                imagePaths,
+                roiTemplates,
+                pixelSize,
+                physicalUnit,
+                calibration,
+                pluginRegistry,
+                renderSettings,
+                qualityProfile: null,
+                progress: progress,
+                cancellationToken: cancellationToken);
         }
 
         public static async Task<BatchRoiAnalysisExportSummary> ExportAsync(
@@ -49,6 +69,7 @@ namespace ImageViewer.Services
             RoiPluginRegistry? pluginRegistry,
             IReadOnlyDictionary<string, string>? renderSettings,
             ImageAnalysisQualityProfile? qualityProfile,
+            IProgress<BatchRoiAnalysisExportProgress>? progress = null,
             CancellationToken cancellationToken = default)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
@@ -77,16 +98,18 @@ namespace ImageViewer.Services
             int partiallySuccessfulFileCount = 0;
             int allRoiFailedFileCount = 0;
             int inputFailedFileCount = 0;
+            bool canceled = false;
 
             for (int sourceIndex = 0; sourceIndex < sources.Length; sourceIndex++)
             {
                 string sourcePath = sources[sourceIndex];
-                cancellationToken.ThrowIfCancellationRequested();
-                BatchInputTrace inputTrace = await CaptureInputTraceAsync(sourceIndex, sourcePath, cancellationToken).ConfigureAwait(false);
-                inputTraces.Add(inputTrace);
                 bool bitmapLoaded = false;
                 try
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    progress?.Report(new BatchRoiAnalysisExportProgress(sources.Length, sourceIndex, sourcePath, "Preparing", rows.Count));
+                    BatchInputTrace inputTrace = await CaptureInputTraceAsync(sourceIndex, sourcePath, cancellationToken).ConfigureAwait(false);
+                    inputTraces.Add(inputTrace);
                     if (!inputTrace.Exists)
                     {
                         throw new FileNotFoundException("找不到输入图像。", sourcePath);
@@ -125,13 +148,21 @@ namespace ImageViewer.Services
                         inputTrace.Status = "AnalysisFailed";
                         inputTrace.Error = "所有 ROI 分析失败。";
                     }
+                    progress?.Report(new BatchRoiAnalysisExportProgress(sources.Length, sourceIndex + 1, sourcePath, "Completed", rows.Count));
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
-                    throw;
+                    canceled = true;
+                    break;
                 }
                 catch (Exception ex)
                 {
+                    BatchInputTrace? inputTrace = inputTraces.LastOrDefault(trace => trace.InputIndex == sourceIndex);
+                    if (inputTrace is null)
+                    {
+                        inputTrace = new BatchInputTrace(sourceIndex, sourcePath);
+                        inputTraces.Add(inputTrace);
+                    }
                     string status = bitmapLoaded ? "AnalysisFailed" : File.Exists(sourcePath) ? "DecodeFailed" : "InputMissing";
                     string error = ex.Message;
                     inputTrace.Status = status;
@@ -147,17 +178,24 @@ namespace ImageViewer.Services
                     {
                         inputFailedFileCount++;
                     }
+                    progress?.Report(new BatchRoiAnalysisExportProgress(sources.Length, sourceIndex + 1, sourcePath, "Completed", rows.Count));
                 }
             }
 
             string csv = RoiAnalysisExportService.BuildBatchCsv(rows);
-            await ImageViewerAtomicFile.WriteAllTextAsync(outputPath, csv, Encoding.UTF8, cancellationToken).ConfigureAwait(false);
+            // Persist completed work even when the user cancels. The summary is useful
+            // for resuming or auditing a long batch and must not be blocked by the
+            // canceled token that triggered the partial export.
+            await ImageViewerAtomicFile.WriteAllTextAsync(outputPath, csv, Encoding.UTF8, CancellationToken.None).ConfigureAwait(false);
             string metadataPath = Path.ChangeExtension(outputPath, ".metadata.json");
+            string summaryPath = Path.ChangeExtension(outputPath, ".summary.json");
             string csvHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(csv))).ToLowerInvariant();
             var metadata = new Dictionary<string, object?>
             {
                 ["exportFormatVersion"] = 2,
                 ["batch"] = true,
+                ["status"] = canceled ? "Canceled" : "Completed",
+                ["canceled"] = canceled,
                 ["exportedAtUtc"] = DateTimeOffset.UtcNow,
                 ["result"] = new Dictionary<string, object?>
                 {
@@ -193,8 +231,8 @@ namespace ImageViewer.Services
                 ["renderSettings"] = renderSettings,
                 ["hasRoiPersistenceRegistry"] = pluginRegistry != null
             };
-            await ImageViewerAtomicFile.WriteAllTextAsync(metadataPath, JsonSerializer.Serialize(metadata, MetadataJsonOptions), Encoding.UTF8, cancellationToken).ConfigureAwait(false);
-            return new BatchRoiAnalysisExportSummary(
+            await ImageViewerAtomicFile.WriteAllTextAsync(metadataPath, JsonSerializer.Serialize(metadata, MetadataJsonOptions), Encoding.UTF8, CancellationToken.None).ConfigureAwait(false);
+            BatchRoiAnalysisExportSummary summary = new(
                 sources.Length,
                 processedFileCount,
                 sources.Length - processedFileCount,
@@ -205,8 +243,23 @@ namespace ImageViewer.Services
                 FullySuccessfulFileCount = fullySuccessfulFileCount,
                 PartiallySuccessfulFileCount = partiallySuccessfulFileCount,
                 AllRoiFailedFileCount = allRoiFailedFileCount,
-                InputFailedFileCount = inputFailedFileCount
+                InputFailedFileCount = inputFailedFileCount,
+                IsCanceled = canceled,
+                MetadataPath = metadataPath,
+                SummaryPath = summaryPath
             };
+            await ImageViewerAtomicFile.WriteAllTextAsync(
+                summaryPath,
+                JsonSerializer.Serialize(summary, MetadataJsonOptions),
+                Encoding.UTF8,
+                CancellationToken.None).ConfigureAwait(false);
+            progress?.Report(new BatchRoiAnalysisExportProgress(sources.Length, inputTraces.Count, string.Empty, canceled ? "Canceled" : "Exported", rows.Count));
+            if (canceled)
+            {
+                throw new OperationCanceledException(cancellationToken);
+            }
+
+            return summary;
         }
 
         private static string NormalizePath(string path)
@@ -469,5 +522,12 @@ namespace ImageViewer.Services
         /// Number of inputs that could not be read or decoded.
         /// </summary>
         public int InputFailedFileCount { get; init; }
+
+        /// <summary>用户在导出完成前取消了批次；已完成输入仍会保存到输出与摘要文件。</summary>
+        public bool IsCanceled { get; init; }
+
+        public string? MetadataPath { get; init; }
+
+        public string? SummaryPath { get; init; }
     }
 }

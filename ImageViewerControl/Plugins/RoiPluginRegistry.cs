@@ -497,8 +497,7 @@ namespace ImageViewer.Plugins
             double caliperMinimumGradient,
             double caliperOutlierThreshold,
             CaliperEdgePolarity caliperEdgePolarity,
-            HalconEdgeExtractionMode caliperEdgeExtractionMode,
-            HalconLineFitMode caliperLineFitMode,
+            JLVisionLineFitMode caliperLineFitMode,
             int caliperFitClippingEndPoints)
         {
             data.Measurement.CaliperCount = caliperCount;
@@ -509,7 +508,6 @@ namespace ImageViewer.Plugins
             data.Measurement.CaliperMinimumGradient = caliperMinimumGradient;
             data.Measurement.CaliperOutlierThreshold = caliperOutlierThreshold;
             data.Measurement.CaliperEdgePolarity = caliperEdgePolarity.ToString();
-            data.Measurement.CaliperEdgeExtractionMode = caliperEdgeExtractionMode.ToString();
             data.Measurement.CaliperLineFitMode = caliperLineFitMode.ToString();
             data.Measurement.CaliperFitClippingEndPoints = Math.Max(0, caliperFitClippingEndPoints);
         }
@@ -521,18 +519,11 @@ namespace ImageViewer.Plugins
                 : CaliperEdgePolarity.Any;
         }
 
-        private static HalconEdgeExtractionMode ParseCaliperEdgeExtractionMode(string? value)
+        private static JLVisionLineFitMode ParseCaliperLineFitMode(string? value)
         {
-            return Enum.TryParse<HalconEdgeExtractionMode>(value, true, out var mode)
+            return Enum.TryParse<JLVisionLineFitMode>(value, true, out var mode)
                 ? mode
-                : HalconEdgeExtractionMode.GaussianDerivative;
-        }
-
-        private static HalconLineFitMode ParseCaliperLineFitMode(string? value)
-        {
-            return Enum.TryParse<HalconLineFitMode>(value, true, out var mode)
-                ? mode
-                : HalconLineFitMode.Tukey;
+                : JLVisionLineFitMode.Tukey;
         }
 
         private static List<IBuiltInPluginRegistration> GetBuiltInRegistrations()

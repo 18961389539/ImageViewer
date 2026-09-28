@@ -44,6 +44,8 @@ namespace ImageViewer.Controls
 
         Task ExportBatchAnalysisCsvAsync();
 
+        bool CancelBatchAnalysisExport() => false;
+
         void ShowAnalysisSummary();
 
         void UpdateContextMenuState();
@@ -81,5 +83,7 @@ namespace ImageViewer.Controls
 
             RefreshMenuState();
         }
+
+        public bool CancelBatchAnalysisExport() => Host.CancelBatchAnalysisExport();
     }
 }

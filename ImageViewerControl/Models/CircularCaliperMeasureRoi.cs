@@ -14,8 +14,7 @@ namespace ImageViewer.Models
         private int _minimumValidCalipers = 8;
         private double _caliperOutlierThreshold = 2.5;
         private CaliperEdgePolarity _caliperEdgePolarity = CaliperEdgePolarity.Any;
-        private HalconEdgeExtractionMode _caliperEdgeExtractionMode = HalconEdgeExtractionMode.GaussianDerivative;
-        private HalconLineFitMode _caliperLineFitMode = HalconLineFitMode.Tukey;
+        private JLVisionLineFitMode _caliperLineFitMode = JLVisionLineFitMode.Tukey;
         private int _caliperFitClippingEndPoints;
         private CircularCaliperQualityStatus _qualityStatus = CircularCaliperQualityStatus.NotMeasured;
         private CircularCaliperQualityReason _qualityReason = CircularCaliperQualityReason.NotMeasured;
@@ -159,15 +158,8 @@ namespace ImageViewer.Models
             set => SetProperty(ref _caliperEdgePolarity, value);
         }
 
-        /// <summary>卡尺剖面的 HALCON 风格边缘提取模式。</summary>
-        public HalconEdgeExtractionMode CaliperEdgeExtractionMode
-        {
-            get => _caliperEdgeExtractionMode;
-            set => SetProperty(ref _caliperEdgeExtractionMode, value);
-        }
-
         /// <summary>共享卡尺配置槽；当前圆拟合路径不使用直线拟合模式。</summary>
-        public HalconLineFitMode CaliperLineFitMode
+        public JLVisionLineFitMode CaliperLineFitMode
         {
             get => _caliperLineFitMode;
             set => SetProperty(ref _caliperLineFitMode, value);

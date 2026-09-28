@@ -255,6 +255,12 @@ namespace ImageViewer.Controls
 
         private async void OnKeyDown(object sender, KeyEventArgs e)
         {
+            if (e.Key == Key.Escape && _featureMenuCommandController.CancelBatchAnalysisExport())
+            {
+                e.Handled = true;
+                return;
+            }
+
             if (e.Key == Key.Escape && IsToolInteractionActive)
             {
                 e.Handled = true;

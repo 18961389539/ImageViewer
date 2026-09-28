@@ -165,28 +165,6 @@ namespace ImageViewer.Services
             return ImageViewerPixelAccess.ReadIntensity(pixels, index, bytesPerPixel, format);
         }
 
-        private static double SampleAveragedIntensity(byte[] pixels, int pixelWidth, int pixelHeight, int stride, int bytesPerPixel, PixelFormat format, Point center, Vector normal, int averagingHalfWidth)
-        {
-            double sum = 0;
-            int count = 0;
-            for (int offset = -averagingHalfWidth; offset <= averagingHalfWidth; offset++)
-            {
-                Point samplePoint = center + normal * offset;
-                int x = (int)Math.Round(samplePoint.X);
-                int y = (int)Math.Round(samplePoint.Y);
-                if (x < 0 || x >= pixelWidth || y < 0 || y >= pixelHeight)
-                {
-                    continue;
-                }
-
-                int index = y * stride + x * bytesPerPixel;
-                sum += GetPixelIntensity(pixels, index, bytesPerPixel, format);
-                count++;
-            }
-
-            return count == 0 ? 0 : sum / count;
-        }
-
         private static BitmapSource NormalizeBitmap(BitmapSource bitmap)
         {
             return ImageViewerPixelAccess.NormalizeForIntensity(bitmap);

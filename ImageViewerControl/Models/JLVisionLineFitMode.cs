@@ -1,12 +1,12 @@
 namespace ImageViewer.Models
 {
     /// <summary>
-    /// HALCON fit_line_contour_xld 风格的直线拟合模式。
+    /// JLVision fit_line_contour_xld 风格的直线拟合模式。
     /// Chinese: 这些模式控制边缘点到直线的稳健权重；默认 Tukey 保持现有行为。
-    /// English: HALCON fit_line_contour_xld-inspired robust weighting modes for line fits.
-    /// Tukey is the compatibility default and preserves the current behavior.
+    /// English: JLVision fit_line_contour_xld-inspired robust weighting modes for line fits.
+    /// Tukey is the default robust weighting mode.
     /// </summary>
-    public enum HalconLineFitMode
+    public enum JLVisionLineFitMode
     {
         /// <summary>加权回归，不做残差重加权。</summary>
         Regression,

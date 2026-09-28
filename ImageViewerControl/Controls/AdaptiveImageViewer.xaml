@@ -6,7 +6,7 @@
     xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
     automation:AutomationProperties.Name="{localization:UiText AdaptiveViewerName}"
     >
-    <Grid Background="#0A0F16" Focusable="True" PreviewKeyDown="OnPreviewKeyDown">
+    <Grid Background="#0A0F16" Focusable="True" KeyDown="OnKeyDown">
         <Grid.Resources>
             <SolidColorBrush x:Key="AdaptiveModeSelectedBrush" Color="#2869AFFF" />
             <SolidColorBrush x:Key="AdaptiveModeSelectedBorderBrush" Color="#69AFFF" />

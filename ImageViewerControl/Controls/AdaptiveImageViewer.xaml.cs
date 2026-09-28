@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Input;
@@ -389,32 +390,77 @@ namespace ImageViewer.Controls
             UpdateButtonStates();
         }
 
-        private async void OnPreviewKeyDown(object sender, KeyEventArgs e)
+        private async void OnKeyDown(object sender, KeyEventArgs e)
         {
+            // 让嵌套 ImageViewer 先处理 ROI 的方向键和 Esc；文本框、下拉框、列表和滑块
+            // 也必须保留自己的键盘行为，避免外层查看器抢走输入。
+            if (e.Handled || IsKeyboardInputControlFocused())
+            {
+                return;
+            }
+
             switch (e.Key)
             {
-                case Key.D1: DisplayMode = AdaptiveDisplayMode.AxialSlice; break;
-                case Key.D2: await SetMprModeAsync(AdaptiveDisplayMode.Coronal); break;
-                case Key.D3: await SetMprModeAsync(AdaptiveDisplayMode.Sagittal); break;
-                case Key.D4: DisplayMode = AdaptiveDisplayMode.ThreeDimensional; break;
-                case Key.Home: ResetActiveView(); break;
-                case Key.F:
-                    if (_volume != null)
-                    {
-                        _volume3DViewer.FitVolume();
-                        statusText.Text = UiText.Get("StatusVolumeFitted");
-                    }
+                case Key.D1 when _volume != null:
+                    DisplayMode = AdaptiveDisplayMode.AxialSlice;
                     break;
-                case Key.Up: await StepMprSliceAsync(1); break;
-                case Key.Down: await StepMprSliceAsync(-1); break;
+                case Key.D2 when _volume != null:
+                    await SetMprModeAsync(AdaptiveDisplayMode.Coronal);
+                    break;
+                case Key.D3 when _volume != null:
+                    await SetMprModeAsync(AdaptiveDisplayMode.Sagittal);
+                    break;
+                case Key.D4 when _volume != null:
+                    DisplayMode = AdaptiveDisplayMode.ThreeDimensional;
+                    break;
+                case Key.Home: ResetActiveView(); break;
+                case Key.F when _volume != null && ResolveMode() == AdaptiveDisplayMode.ThreeDimensional:
+                    _volume3DViewer.FitVolume();
+                    statusText.Text = UiText.Get("StatusVolumeFitted");
+                    break;
+                case Key.Up when IsMprModeActive:
+                    await StepMprSliceAsync(1);
+                    break;
+                case Key.Down when IsMprModeActive:
+                    await StepMprSliceAsync(-1);
+                    break;
                 case Key.Escape:
-                    _operationCancellation?.Cancel();
-                    _mprCancellation?.Cancel();
+                    bool cancelled = false;
+                    if (_operationCancellation is not null)
+                    {
+                        _operationCancellation.Cancel();
+                        cancelled = true;
+                    }
+
+                    if (_mprCancellation is not null)
+                    {
+                        _mprCancellation.Cancel();
+                        cancelled = true;
+                    }
+
+                    if (!cancelled)
+                    {
+                        return;
+                    }
+
                     break;
                 default: return;
             }
 
             e.Handled = true;
+        }
+
+        private bool IsMprModeActive => _volume != null &&
+            (_displayMode == AdaptiveDisplayMode.Coronal || _displayMode == AdaptiveDisplayMode.Sagittal);
+
+        private static bool IsKeyboardInputControlFocused()
+        {
+            IInputElement? focusedElement = Keyboard.FocusedElement;
+            return focusedElement is TextBoxBase
+                or PasswordBox
+                or ComboBox
+                or Selector
+                or Slider;
         }
 
         internal void StepMprSlice(int offset)

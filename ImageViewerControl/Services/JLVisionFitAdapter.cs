@@ -9,36 +9,30 @@ namespace ImageViewer.Services
     /// <summary>
     /// JLVision native fitting adapter.
     /// Chinese: 把 ImageViewer 的点序列转换为 JLVision XLD 轮廓，使用原生
-    /// fit_line_contour_xld / fit_circle_contour_xld，并把 HALCON 的 row/column
+    /// fit_line_contour_xld / fit_circle_contour_xld，并把 JLVision 的 row/column
     /// 坐标转换回 ImageViewer 的 x/y 坐标。
     /// English: Bridges ImageViewer point sequences to JLVision XLD fitting operators.
     /// </summary>
     internal static class JLVisionFitAdapter
     {
-        private static readonly object AvailabilityGate = new();
-        private static bool _availabilityChecked;
-        private static bool _available;
-
-        public static bool IsAvailable
-        {
-            get
-            {
-                EnsureAvailability();
-                return _available;
-            }
-        }
-
+        /// <summary>
+        /// Runs <c>fit_line_contour_xld</c> through JLVision.
+        /// </summary>
+        /// <param name="fitMode">Regression maps to <c>regression</c>; Huber, Tukey, Drop and Gauss map to the corresponding native robust algorithms.</param>
+        /// <param name="clippingEndPoints">Number of points removed from each contour end before fitting. It does not change the returned fitted segment.</param>
         public static bool TryFitLine(
             Point[] points,
-            HalconLineFitMode fitMode,
+            JLVisionLineFitMode fitMode,
             int clippingEndPoints,
             out LineSegmentOverlay segment)
         {
             segment = default;
-            if (points.Length < 2 || !IsAvailable)
+            if (points.Length < 2)
             {
                 return false;
             }
+
+            EnsureNativeLibrary();
 
             try
             {
@@ -84,6 +78,12 @@ namespace ImageViewer.Services
             }
         }
 
+        /// <summary>
+        /// Runs <c>fit_circle_contour_xld</c> through JLVision's geometric fit.
+        /// </summary>
+        /// <param name="points">Ordered XLD contour samples in ImageViewer x/y coordinates.</param>
+        /// <param name="center">Fitted center in ImageViewer x/y coordinates.</param>
+        /// <param name="radius">Fitted radius in pixels.</param>
         public static bool TryFitCircle(
             Point[] points,
             out Point center,
@@ -91,10 +91,12 @@ namespace ImageViewer.Services
         {
             center = default;
             radius = 0;
-            if (points.Length < 3 || !IsAvailable)
+            if (points.Length < 3)
             {
                 return false;
             }
+
+            EnsureNativeLibrary();
 
             try
             {
@@ -134,46 +136,40 @@ namespace ImageViewer.Services
             }
             catch (Exception exception) when (IsNativeFailure(exception))
             {
+                if (IsRuntimeLoadFailure(exception))
+                {
+                    throw new InvalidOperationException(
+                        JLVisionRuntimeDiagnostics.BuildLoadFailureMessage(exception),
+                        exception);
+                }
                 return false;
             }
         }
 
-        private static string GetLineAlgorithm(HalconLineFitMode fitMode) => fitMode switch
+        private static string GetLineAlgorithm(JLVisionLineFitMode fitMode) => fitMode switch
         {
-            HalconLineFitMode.Huber => "huber",
-            HalconLineFitMode.Tukey => "tukey",
-            HalconLineFitMode.Drop => "drop",
-            HalconLineFitMode.Gauss => "gauss",
+            JLVisionLineFitMode.Huber => "huber",
+            JLVisionLineFitMode.Tukey => "tukey",
+            JLVisionLineFitMode.Drop => "drop",
+            JLVisionLineFitMode.Gauss => "gauss",
             _ => "regression"
         };
 
-        private static int GetIterations(HalconLineFitMode fitMode) =>
-            fitMode == HalconLineFitMode.Regression ? 0 : 3;
+        private static int GetIterations(JLVisionLineFitMode fitMode) =>
+            fitMode == JLVisionLineFitMode.Regression ? 0 : 3;
 
-        private static double GetClippingFactor(HalconLineFitMode fitMode) => fitMode switch
+        private static double GetClippingFactor(JLVisionLineFitMode fitMode) => fitMode switch
         {
-            HalconLineFitMode.Huber => 1.0,
-            HalconLineFitMode.Tukey => 2.0,
+            JLVisionLineFitMode.Huber => 1.0,
+            JLVisionLineFitMode.Tukey => 2.0,
             _ => 2.0
         };
 
-        private static void EnsureAvailability()
+        private static void EnsureNativeLibrary()
         {
-            if (_availabilityChecked)
+            if (!File.Exists(JLVisionRuntimeDiagnostics.RuntimePath))
             {
-                return;
-            }
-
-            lock (AvailabilityGate)
-            {
-                if (_availabilityChecked)
-                {
-                    return;
-                }
-
-                string nativePath = Path.Combine(AppContext.BaseDirectory, "JLVisionCore.dll");
-                _available = File.Exists(nativePath);
-                _availabilityChecked = true;
+                throw new DllNotFoundException(JLVisionRuntimeDiagnostics.BuildMissingRuntimeMessage());
             }
         }
 
@@ -181,6 +177,10 @@ namespace ImageViewer.Services
             exception is DllNotFoundException or BadImageFormatException or
             EntryPointNotFoundException or JlException or JlOperatorException or
             TypeInitializationException;
+
+        private static bool IsRuntimeLoadFailure(Exception exception) =>
+            exception is DllNotFoundException or BadImageFormatException or
+            EntryPointNotFoundException or TypeInitializationException;
 
         private static bool IsFinite(PointD point) => IsFinite(point.X) && IsFinite(point.Y);
 
@@ -192,5 +192,6 @@ namespace ImageViewer.Services
             double dy = first.Y - second.Y;
             return dx * dx + dy * dy;
         }
+
     }
 }

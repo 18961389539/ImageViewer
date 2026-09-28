@@ -186,7 +186,6 @@
   <data name="CaliperFieldMinimumValid" xml:space="preserve"><value>最少有效卡尺</value></data>
   <data name="CaliperFieldOutlierThreshold" xml:space="preserve"><value>离群阈值 (px, 0=自动)</value></data>
   <data name="CaliperFieldPolarity" xml:space="preserve"><value>边缘极性</value></data>
-  <data name="CaliperFieldEdgeExtractionMode" xml:space="preserve"><value>边缘提取模式</value></data>
   <data name="CaliperFieldLineFitMode" xml:space="preserve"><value>直线拟合模式</value></data>
   <data name="CaliperFieldFitClippingEndPoints" xml:space="preserve"><value>拟合首尾裁剪点数</value></data>
   <data name="CaliperFieldEdgeSelection" xml:space="preserve"><value>边缘序号 (1=最强)</value></data>

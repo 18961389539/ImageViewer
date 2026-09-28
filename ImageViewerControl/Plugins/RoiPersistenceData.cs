@@ -355,7 +355,6 @@ namespace ImageViewer.Plugins
         public double CaliperMinimumGradient { get; set; }
         public double CaliperOutlierThreshold { get; set; }
         public string? CaliperEdgePolarity { get; set; }
-        public string? CaliperEdgeExtractionMode { get; set; }
         public string? CaliperLineFitMode { get; set; }
         public int CaliperFitClippingEndPoints { get; set; }
         public double MinimumEdgeGap { get; set; }

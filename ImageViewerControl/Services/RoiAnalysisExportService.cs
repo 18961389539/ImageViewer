@@ -152,7 +152,6 @@ namespace ImageViewer.Services
                 {
                     ["ellipseAlgorithm"] = FittingAlgorithmMetadata.Ellipse,
                     ["caliperEdgeAlgorithm"] = FittingAlgorithmMetadata.CaliperEdge,
-                    ["caliperEdgeExtraction"] = FittingAlgorithmMetadata.CaliperEdgeExtraction,
                     ["lineFit"] = FittingAlgorithmMetadata.LineFit,
                     ["lineGeometry"] = FittingAlgorithmMetadata.LineGeometry,
                     ["ellipseLoss"] = RobustFitLoss.Tukey.ToString(),
