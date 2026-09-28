@@ -192,6 +192,14 @@ namespace ImageViewerControl.Tests
                 Assert.False(viewer.ShowToolbar);
                 Assert.Equal(Visibility.Collapsed, toolbarPanel.Visibility);
                 Assert.False(toolbarMenuItem.IsChecked);
+                Assert.Equal(Visibility.Visible, viewer.toolbarCompactButton.Visibility);
+                Assert.Equal(UiText.Get("ToolbarRestoreHint"), viewer.toolbarCompactButton.ToolTip);
+
+                viewer.toolbarCompactButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                WpfTestRunner.DrainDispatcher();
+
+                Assert.True(viewer.ShowToolbar);
+                Assert.Equal(Visibility.Visible, toolbarPanel.Visibility);
             });
         }
 

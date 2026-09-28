@@ -710,6 +710,7 @@
 在右上角列出当前所有标注，可快速选中、切换显隐或锁定。
 再次点击可隐藏。</value></data>
   <data name="ToolbarCompactHint" xml:space="preserve"><value>窗口较窄，工具栏已收起；点击打开命令菜单</value></data>
+  <data name="ToolbarRestoreHint" xml:space="preserve"><value>工具栏已隐藏；点击此处恢复工具栏</value></data>
   <data name="ToolbarHideButton" xml:space="preserve"><value>隐藏工具栏</value></data>
   <data name="ToolbarHideHint" xml:space="preserve"><value>隐藏当前工具栏；可从右键菜单“显示工具栏”重新打开</value></data>
   <data name="StatusSessionImageMissing" xml:space="preserve"><value>会话中的图像文件不存在：{0}。已加载标注和视口状态，但缺少底图。</value></data>

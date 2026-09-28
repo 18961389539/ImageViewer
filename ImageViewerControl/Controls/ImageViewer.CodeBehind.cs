@@ -63,11 +63,24 @@ namespace ImageViewer.Controls
             bool isCompactViewport = width > 0 && (width < ToolbarCompactWidthThreshold || height > 0 && height < ToolbarCompactHeightThreshold);
 
             toolbarPanel.Visibility = ShowToolbar && !isCompactViewport ? Visibility.Visible : Visibility.Collapsed;
-            toolbarCompactButton.Visibility = ShowToolbar && isCompactViewport ? Visibility.Visible : Visibility.Collapsed;
+            // 工具栏被用户隐藏后仍保留一个固定入口，避免只能依赖右键菜单才能恢复。
+            toolbarCompactButton.Visibility = !ShowToolbar || isCompactViewport ? Visibility.Visible : Visibility.Collapsed;
+
+            string launcherHint = ShowToolbar
+                ? UiText.Get("ToolbarCompactHint")
+                : UiText.Get("ToolbarRestoreHint");
+            toolbarCompactButton.ToolTip = launcherHint;
+            toolbarCompactButton.SetValue(System.Windows.Automation.AutomationProperties.HelpTextProperty, launcherHint);
         }
 
         private void OnCompactToolbarClick(object sender, RoutedEventArgs e)
         {
+            if (!ShowToolbar)
+            {
+                ShowToolbar = true;
+                return;
+            }
+
             mainContextMenu.PlacementTarget = toolbarCompactButton;
             mainContextMenu.IsOpen = true;
         }
