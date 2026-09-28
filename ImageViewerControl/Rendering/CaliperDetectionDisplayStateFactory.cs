@@ -15,14 +15,16 @@ namespace ImageViewer.Rendering
             Vector measurementDirection = roi.GetCaliperMeasurementDirection().ToWpfVector();
             Vector markerDirection = new(-measurementDirection.Y, measurementDirection.X);
             double markerHalfLength = Math.Max(roi.CaliperSamplingHalfWidth + 1, 3);
+            LineFitGeometry edge1Geometry = detectionResult.FittedEdge1Geometry;
+            LineFitGeometry edge2Geometry = detectionResult.FittedEdge2Geometry;
 
             return new DualEdgeCaliperDetectionDisplayState
             {
                 HasDetection = true,
-                Edge1Start = detectionResult.FittedEdge1.Start,
-                Edge1End = detectionResult.FittedEdge1.End,
-                Edge2Start = detectionResult.FittedEdge2.Start,
-                Edge2End = detectionResult.FittedEdge2.End,
+                Edge1Start = edge1Geometry.SegmentStart,
+                Edge1End = edge1Geometry.SegmentEnd,
+                Edge2Start = edge2Geometry.SegmentStart,
+                Edge2End = edge2Geometry.SegmentEnd,
                 RegionSegments = CaliperOverlayGeometryHelper.BuildDualEdgeCaliperRegionSegments(roi),
                 CaliperBars = CaliperOverlayGeometryHelper.BuildDualEdgeCaliperBars(roi),
                 InvalidCaliperMarkers = CaliperOverlayGeometryHelper.BuildLinearMarkers(detectionResult.InvalidCaliperCenters, markerDirection, markerHalfLength),

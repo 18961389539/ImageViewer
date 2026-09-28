@@ -17,7 +17,7 @@ namespace ImageViewer.Services
     internal static partial class ImageAnalysisService
     {
 
-        private static List<CaliperEdgeSample> FilterInlierSamples(List<CaliperEdgeSample> samples, Vector preferredDirection, double fallbackHalfLength, double configuredThreshold, int minimumRequired)
+        private static List<CaliperEdgeSample> FilterInlierSamples(List<CaliperEdgeSample> samples, Vector preferredDirection, double fallbackHalfLength, double configuredThreshold, int minimumRequired, HalconLineFitMode fitMode = HalconLineFitMode.Tukey, int clippingEndPoints = 0)
         {
             if (samples.Count <= minimumRequired)
             {
@@ -26,7 +26,7 @@ namespace ImageViewer.Services
 
             Point[] points = [..samples.Select(sample => sample.Point)];
 
-            LineSegmentOverlay provisionalFit = FitLine(points, preferredDirection, fallbackHalfLength);
+            LineSegmentOverlay provisionalFit = FitLine(points, preferredDirection, fallbackHalfLength, fitMode: fitMode, clippingEndPoints: clippingEndPoints);
             Vector fitDirection = (provisionalFit.End - provisionalFit.Start).ToWpfVector();
             if (fitDirection.LengthSquared < 1e-6)
             {
@@ -417,9 +417,26 @@ namespace ImageViewer.Services
             return linePoint + lineDirection * t;
         }
 
-        private static LineSegmentOverlay FitLine(Point[] points, Vector preferredDirection, double fallbackHalfLength, double[]? weights = null)
+        internal static LineSegmentOverlay FitLine(Point[] points, Vector preferredDirection, double fallbackHalfLength, double[]? weights = null, HalconLineFitMode fitMode = HalconLineFitMode.Tukey, int clippingEndPoints = 0)
         {
-            Point centroid = GeometryUtils.GetCentroid(points);
+            ArgumentNullException.ThrowIfNull(points);
+            if (points.Length == 0)
+            {
+                Point origin = new(0, 0);
+                Vector fallback = preferredDirection.LengthSquared < 1e-6 ? new Vector(1, 0) : preferredDirection;
+                fallback.Normalize();
+                return new LineSegmentOverlay((origin - fallback * fallbackHalfLength).ToPointD(), (origin + fallback * fallbackHalfLength).ToPointD());
+            }
+
+            int clipped = Math.Clamp(clippingEndPoints, 0, Math.Max(0, (points.Length - 2) / 2));
+            Point[] fitPoints = clipped == 0
+                ? points
+                : points[clipped..(points.Length - clipped)];
+            double[]? fitWeights = weights == null || clipped == 0
+                ? weights
+                : weights[clipped..(weights.Length - clipped)];
+
+            Point centroid = ComputeWeightedCentroid(fitPoints, fitWeights);
             if (points.Length == 1)
             {
                 Vector direction = preferredDirection;
@@ -434,12 +451,13 @@ namespace ImageViewer.Services
 
             // RANSAC 预处理：压制强离群（遮挡/飞溅），输出一致性子集后再进入加权稳健拟合。
             double ransacInlierThreshold = ComputeAdaptiveLineThreshold(points);
-            (Point[] ransacPoints, double[]? ransacWeights) = SelectRansacLineInliers(points, weights, ransacInlierThreshold);
-            points = ransacPoints;
-            weights = ransacWeights;
+            (Point[] ransacPoints, double[]? ransacWeights) = SelectRansacLineInliers(fitPoints, fitWeights, ransacInlierThreshold);
+            fitPoints = ransacPoints;
+            fitWeights = ransacWeights;
+            centroid = ComputeWeightedCentroid(fitPoints, fitWeights);
 
             // 初始方向：加权协方差主轴（无权重时等价于等权）。
-            Vector directionVector = ComputeWeightedPrincipalDirection(points, centroid, weights);
+            Vector directionVector = ComputeWeightedPrincipalDirection(fitPoints, centroid, fitWeights);
             if (directionVector.LengthSquared < 1e-6)
             {
                 directionVector = preferredDirection;
@@ -452,15 +470,16 @@ namespace ImageViewer.Services
 
             directionVector.Normalize();
 
-            // Tukey 稳健迭代：用正交残差的 MAD 尺度重估权重，弱化残余离群点对各点方向的影响。
-            double[]? workingWeights = weights;
-            for (int iteration = 0; iteration < 2; iteration++)
+            // 按 HALCON fit_line_contour_xld 的模式做正交残差重加权。
+            double[]? workingWeights = fitWeights;
+            int iterations = fitMode == HalconLineFitMode.Regression ? 0 : 2;
+            for (int iteration = 0; iteration < iterations; iteration++)
             {
-                double[] residuals = new double[points.Length];
+                double[] residuals = new double[fitPoints.Length];
                 double median;
-                for (int i = 0; i < points.Length; i++)
+                for (int i = 0; i < fitPoints.Length; i++)
                 {
-                    residuals[i] = DistanceToLine(points[i], centroid, directionVector);
+                    residuals[i] = DistanceToLine(fitPoints[i], centroid, directionVector);
                 }
 
                 median = MedianOf(residuals);
@@ -470,50 +489,63 @@ namespace ImageViewer.Services
                 }
 
                 double scale = 1.4826 * median;
-                workingWeights = ComputeTukeyWeights(residuals, weights, scale);
-                Point weightedCentroid = ComputeWeightedCentroid(points, workingWeights);
-                Vector updated = ComputeWeightedPrincipalDirection(points, weightedCentroid, workingWeights);
-                updated.Normalize();
+                workingWeights = ComputeLineRobustWeights(residuals, fitWeights, scale, fitMode);
+                Point weightedCentroid = ComputeWeightedCentroid(fitPoints, workingWeights);
+                Vector updated = ComputeWeightedPrincipalDirection(fitPoints, weightedCentroid, workingWeights);
                 if (updated.LengthSquared < 1e-6)
                 {
                     break;
                 }
 
+                updated.Normalize();
                 directionVector = updated;
                 centroid = weightedCentroid;
             }
 
-            // 端点：取权重有效（内点）集合的投影 min/max，避免被残余离群点拉长。
-            double minProjection = double.PositiveInfinity;
-            double maxProjection = double.NegativeInfinity;
-            double effectiveWeightSum = 0;
-            for (int i = 0; i < points.Length; i++)
+            // HALCON 规则：拟合可忽略首尾点，但输出端点仍是原始轮廓首点和末点在拟合线上的投影。
+            double startProjection = (points[0].X - centroid.X) * directionVector.X + (points[0].Y - centroid.Y) * directionVector.Y;
+            double endProjection = (points[^1].X - centroid.X) * directionVector.X + (points[^1].Y - centroid.Y) * directionVector.Y;
+            if (!double.IsFinite(startProjection) || !double.IsFinite(endProjection) || Math.Abs(endProjection - startProjection) < 1e-6)
             {
-                double weight = workingWeights?[i] ?? 1.0;
-                if (weight <= 1e-6)
+                startProjection = -fallbackHalfLength;
+                endProjection = fallbackHalfLength;
+            }
+
+            return new LineSegmentOverlay((centroid + directionVector * startProjection).ToPointD(), (centroid + directionVector * endProjection).ToPointD());
+        }
+
+        private static double[] ComputeLineRobustWeights(double[] residuals, double[]? baseWeights, double scale, HalconLineFitMode fitMode)
+        {
+            var weights = new double[residuals.Length];
+            double safeScale = Math.Max(1e-9, scale);
+            for (int i = 0; i < residuals.Length; i++)
+            {
+                double baseWeight = baseWeights?[i] ?? 1.0;
+                double absolute = Math.Abs(residuals[i]);
+                double robust = fitMode switch
                 {
-                    continue;
-                }
-
-                effectiveWeightSum += weight;
-                double projection = (points[i].X - centroid.X) * directionVector.X + (points[i].Y - centroid.Y) * directionVector.Y;
-                minProjection = Math.Min(minProjection, projection);
-                maxProjection = Math.Max(maxProjection, projection);
+                    HalconLineFitMode.Huber => absolute <= 1.345 * safeScale ? 1.0 : 1.345 * safeScale / Math.Max(absolute, 1e-12),
+                    HalconLineFitMode.Tukey => ComputeTukeyWeight(absolute, 4.685 * safeScale),
+                    HalconLineFitMode.Drop => absolute <= 3.0 * safeScale ? 1.0 : 0.0,
+                    HalconLineFitMode.Gauss => Math.Exp(-0.5 * Math.Pow(absolute / safeScale, 2)),
+                    _ => 1.0
+                };
+                weights[i] = baseWeight * robust;
             }
 
-            if (effectiveWeightSum < 1e-6)
+            return weights;
+        }
+
+        private static double ComputeTukeyWeight(double absoluteResidual, double cutoff)
+        {
+            if (cutoff <= 1e-12 || absoluteResidual >= cutoff)
             {
-                minProjection = -fallbackHalfLength;
-                maxProjection = fallbackHalfLength;
+                return 0;
             }
 
-            if (maxProjection - minProjection < 1)
-            {
-                minProjection = -fallbackHalfLength;
-                maxProjection = fallbackHalfLength;
-            }
-
-            return new LineSegmentOverlay((centroid + directionVector * minProjection).ToPointD(), (centroid + directionVector * maxProjection).ToPointD());
+            double u = absoluteResidual / cutoff;
+            double factor = 1 - u * u;
+            return factor * factor;
         }
 
         /// <summary>
@@ -832,19 +864,5 @@ namespace ImageViewer.Services
             return (inliers, inlierWeights);
         }
 
-        private static bool TryIntersectLines(Point p1, Vector d1, Point p2, Vector d2, out Point intersection)
-        {
-            intersection = default;
-            double determinant = d1.X * d2.Y - d1.Y * d2.X;
-            if (Math.Abs(determinant) < 1e-6)
-            {
-                return false;
-            }
-
-            Vector delta = p2 - p1;
-            double t = (delta.X * d2.Y - delta.Y * d2.X) / determinant;
-            intersection = p1 + d1 * t;
-            return true;
-        }
     }
 }

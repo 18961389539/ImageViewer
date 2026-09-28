@@ -28,6 +28,7 @@ namespace ImageViewer.Controls
         private int _imageRotation;
         private bool _flipImageHorizontally;
         private bool _flipImageVertically;
+        private ImageAnalysisQualityProfile _qualityProfile = ImageAnalysisQualityProfile.Default;
 
         public ImageViewer()
             : this(ImageViewerHost.CreateDefault())
@@ -45,12 +46,31 @@ namespace ImageViewer.Controls
             ArgumentNullException.ThrowIfNull(dependencies);
             ImageViewerBootstrapState bootstrapState = CreateBootstrapState(dependencies);
             _hostState = bootstrapState.HostState;
+            _hostState.ViewModel.QualityProfile = _qualityProfile;
             _viewportOverlayRefreshScheduler = bootstrapState.ViewportOverlayRefreshScheduler;
             _analysisRefreshScheduler = bootstrapState.AnalysisRefreshScheduler;
             _infoPanelStatisticsScheduler = bootstrapState.InfoPanelStatisticsScheduler;
             _controlComposition = dependencies.CreateControlComposition(this);
             _lifetime = new ImageViewerLifetime(CreateLifetimeRegistrations(_controlComposition));
             CompleteBootstrap();
+        }
+
+        /// <summary>
+        /// Quality thresholds owned by this viewer instance.
+        /// </summary>
+        public ImageAnalysisQualityProfile QualityProfile
+        {
+            get => _qualityProfile;
+            set
+            {
+                ArgumentNullException.ThrowIfNull(value);
+                value.Validate();
+                _qualityProfile = value;
+                if (_hostState is not null)
+                {
+                    _hostState.ViewModel.QualityProfile = value;
+                }
+            }
         }
 
         private void ResetView() => _viewCommandController.Execute(ImageViewerViewCommand.ResetView);

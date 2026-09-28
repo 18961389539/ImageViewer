@@ -12,11 +12,15 @@ namespace ImageViewer.Services
 {
     internal static partial class ImageAnalysisService
     {
-        internal const double MaxCaliperScore = 255.0;
-
-        private sealed class EdgeSnapPixelBuffer
+        /// <summary>
+        /// 分析用像素缓冲：归一化格式后的整幅像素副本。
+        /// Chinese: 卡尺与吸附都按"像素数组 + 宽高 + 步长"取值，这里统一复制一次供各检测路径复用。
+        /// English: Full-image pixel copy in a normalized format, shared by the caliper and snap paths
+        /// so they all read the same "pixels + size + stride" shape.
+        /// </summary>
+        private sealed class AnalysisPixelBuffer
         {
-            public EdgeSnapPixelBuffer(BitmapSource bitmap)
+            public AnalysisPixelBuffer(BitmapSource bitmap)
             {
                 PixelWidth = bitmap.PixelWidth;
                 PixelHeight = bitmap.PixelHeight;
@@ -35,23 +39,38 @@ namespace ImageViewer.Services
             public byte[] Pixels { get; }
         }
 
-        private static readonly ConditionalWeakTable<BitmapSource, EdgeSnapPixelBuffer> EdgeSnapBuffers = new();
+        private static readonly ConditionalWeakTable<BitmapSource, AnalysisPixelBuffer> AnalysisPixelBuffers = new();
+
+        /// <summary>
+        /// 取归一化后的像素缓冲。
+        /// Chinese: 冻结位图不可变，按位图缓存复用，避免拖拽/连续检测时每次重拷整幅像素；
+        /// 可变位图每次调用重新复制，防止读到过期像素。
+        /// English: Acquires the normalized pixel buffer. Frozen bitmaps are immutable and cached per
+        /// instance so repeated detections do not re-copy the whole image; mutable bitmaps are copied
+        /// per call so a live update cannot leave the detection working on stale pixels.
+        /// </summary>
+        private static AnalysisPixelBuffer AcquirePixelBuffer(BitmapSource bitmap)
+        {
+            return bitmap.IsFrozen
+                ? AnalysisPixelBuffers.GetValue(bitmap, static source => new AnalysisPixelBuffer(NormalizeBitmap(source)))
+                : new AnalysisPixelBuffer(NormalizeBitmap(bitmap));
+        }
 
         /// <summary>
         /// 检测结果置信度低于该值时判定检测失败，避免把几近无意义的结果作为有效测量返回。
         /// Chinese: 对应"分数极低/残差过大/有效卡尺数过少"的综合结果拦截。
         /// English: Minimum confidence required for a detection to be considered valid.
         /// </summary>
-        internal const double MinimumDetectionConfidence = 0.05;
-
         private readonly record struct CaliperEdgeSample(Point Point, double Score);
 
-        internal static double NormalizeCaliperScore(double score)
+        internal static double NormalizeCaliperScore(double score, ImageAnalysisQualityProfile? profile = null)
         {
-            return Math.Clamp(score / MaxCaliperScore * 100.0, 0, 100);
+            ImageAnalysisQualityProfile quality = profile ?? ImageAnalysisQualityProfile.Default;
+            quality.Validate();
+            return Math.Clamp(score / quality.MaxCaliperScore * 100.0, 0, 100);
         }
 
-        public static bool TryDetectLineMeasureEdges(BitmapSource bitmap, CaliperMeasureRoi line, out LineMeasureGradientDetectionResult result)
+        public static bool TryDetectLineMeasureEdges(BitmapSource bitmap, CaliperMeasureRoi line, out LineMeasureGradientDetectionResult result, ImageAnalysisQualityProfile? profile = null)
         {
             ArgumentNullException.ThrowIfNull(bitmap);
             ArgumentNullException.ThrowIfNull(line);
@@ -66,15 +85,13 @@ namespace ImageViewer.Services
                 throw new ArgumentOutOfRangeException(nameof(line), line.CaliperSamplingHalfWidth, "CaliperSamplingHalfWidth must be non-negative.");
             }
             result = default;
+            ImageAnalysisQualityProfile quality = profile ?? ImageAnalysisQualityProfile.Default;
+            quality.Validate();
 
             Vector measurementDirection = line.GetCaliperMeasurementDirection().ToWpfVector();
             double estimatedDistance = GeometryUtils.Distance(line.P1.ToWpfPoint(), line.P2.ToWpfPoint());
 
-            bitmap = NormalizeBitmap(bitmap);
-            int bytesPerPixel = Math.Max(1, (bitmap.Format.BitsPerPixel + 7) / 8);
-            int stride = bitmap.PixelWidth * bytesPerPixel;
-            byte[] pixels = new byte[bitmap.PixelHeight * stride];
-            bitmap.CopyPixels(pixels, stride, 0);
+            AnalysisPixelBuffer buffer = AcquirePixelBuffer(bitmap);
 
             Vector caliperDirection = new(-measurementDirection.Y, measurementDirection.X);
             Point measurementCenter = line.CaliperCenter.ToWpfPoint();
@@ -92,7 +109,7 @@ namespace ImageViewer.Services
                 double lerp = caliperCount == 1 ? 0.5 : (double)i / (caliperCount - 1);
                 double tangentOffset = -regionHalfLength + regionHalfLength * 2 * lerp;
                 Point caliperCenter = measurementCenter + caliperDirection * tangentOffset;
-                if (!TryFindStrongestGradientPair(pixels, bitmap.PixelWidth, bitmap.PixelHeight, stride, bytesPerPixel, bitmap.Format, caliperCenter, measurementDirection, caliperDirection, halfSearchRange, line.CaliperSamplingHalfWidth, line.CaliperEdgeSigma, line.CaliperMinimumGradient, line.CaliperEdgePolarity, line.MinimumEdgeGap, line.NominalEdgeGap, line.NominalEdgeGapTolerance, out CaliperEdgeSample edge1Sample, out CaliperEdgeSample edge2Sample))
+                if (!TryFindStrongestGradientPair(buffer.Pixels, buffer.PixelWidth, buffer.PixelHeight, buffer.Stride, buffer.BytesPerPixel, buffer.Format, caliperCenter, measurementDirection, caliperDirection, halfSearchRange, line.CaliperSamplingHalfWidth, line.CaliperEdgeSigma, line.CaliperMinimumGradient, line.CaliperEdgePolarity, line.MinimumEdgeGap, line.NominalEdgeGap, line.NominalEdgeGapTolerance, out CaliperEdgeSample edge1Sample, out CaliperEdgeSample edge2Sample, line.CaliperEdgeExtractionMode))
                 {
                     invalidCaliperCenters.Add(caliperCenter);
                     continue;
@@ -107,8 +124,8 @@ namespace ImageViewer.Services
                 return false;
             }
 
-            List<CaliperEdgeSample> filteredEdge1Samples = FilterInlierSamples(edge1Samples, caliperDirection, regionHalfLength, line.CaliperOutlierThreshold, minimumValidCalipers);
-            List<CaliperEdgeSample> filteredEdge2Samples = FilterInlierSamples(edge2Samples, caliperDirection, regionHalfLength, line.CaliperOutlierThreshold, minimumValidCalipers);
+            List<CaliperEdgeSample> filteredEdge1Samples = FilterInlierSamples(edge1Samples, caliperDirection, regionHalfLength, line.CaliperOutlierThreshold, minimumValidCalipers, line.CaliperLineFitMode, line.CaliperFitClippingEndPoints);
+            List<CaliperEdgeSample> filteredEdge2Samples = FilterInlierSamples(edge2Samples, caliperDirection, regionHalfLength, line.CaliperOutlierThreshold, minimumValidCalipers, line.CaliperLineFitMode, line.CaliperFitClippingEndPoints);
             if (filteredEdge1Samples.Count < minimumValidCalipers || filteredEdge2Samples.Count < minimumValidCalipers)
             {
                 return false;
@@ -118,13 +135,18 @@ namespace ImageViewer.Services
             Point[] filteredEdge2Points = [..filteredEdge2Samples.Select(sample => sample.Point)];
             Point[] rejectedEdge1Points = [..edge1Samples.Where(sample => !filteredEdge1Samples.Contains(sample)).Select(sample => sample.Point)];
             Point[] rejectedEdge2Points = [..edge2Samples.Where(sample => !filteredEdge2Samples.Contains(sample)).Select(sample => sample.Point)];
-            LineSegmentOverlay fittedEdge1 = FitLine(filteredEdge1Points, caliperDirection, regionHalfLength, BuildScoreWeights(filteredEdge1Samples));
-            LineSegmentOverlay fittedEdge2 = FitLine(filteredEdge2Points, caliperDirection, regionHalfLength, BuildScoreWeights(filteredEdge2Samples));
-            if (!TryIntersectLines(measurementCenter, measurementDirection, fittedEdge1.Start.ToWpfPoint(), (fittedEdge1.End - fittedEdge1.Start).ToWpfVector(), out Point detectedP1) ||
-                !TryIntersectLines(measurementCenter, measurementDirection, fittedEdge2.Start.ToWpfPoint(), (fittedEdge2.End - fittedEdge2.Start).ToWpfVector(), out Point detectedP2))
+            LineSegmentOverlay fittedEdge1 = FitLine(filteredEdge1Points, caliperDirection, regionHalfLength, BuildScoreWeights(filteredEdge1Samples, quality), line.CaliperLineFitMode, line.CaliperFitClippingEndPoints);
+            LineSegmentOverlay fittedEdge2 = FitLine(filteredEdge2Points, caliperDirection, regionHalfLength, BuildScoreWeights(filteredEdge2Samples, quality), line.CaliperLineFitMode, line.CaliperFitClippingEndPoints);
+            LineFitGeometry fittedEdge1Geometry = LineFitGeometry.FromSegment(new DetectedLineSegment(fittedEdge1.Start, fittedEdge1.End));
+            LineFitGeometry fittedEdge2Geometry = LineFitGeometry.FromSegment(new DetectedLineSegment(fittedEdge2.Start, fittedEdge2.End));
+            if (!fittedEdge1Geometry.TryIntersect(measurementCenter.ToPointD(), measurementDirection.ToVectorD(), out PointD detectedP1D) ||
+                !fittedEdge2Geometry.TryIntersect(measurementCenter.ToPointD(), measurementDirection.ToVectorD(), out PointD detectedP2D))
             {
                 return false;
             }
+
+            Point detectedP1 = detectedP1D.ToWpfPoint();
+            Point detectedP2 = detectedP2D.ToWpfPoint();
 
             if (GeometryUtils.Distance(detectedP1, detectedP2) <= 0.5)
             {
@@ -135,12 +157,12 @@ namespace ImageViewer.Services
             double edge2AverageScore = filteredEdge2Samples.Average(sample => sample.Score);
             (double edge1ResidualRms, double edge1ResidualMax) = ComputeResidualMetrics(filteredEdge1Points, fittedEdge1);
             (double edge2ResidualRms, double edge2ResidualMax) = ComputeResidualMetrics(filteredEdge2Points, fittedEdge2);
-            double edge1AngleDegrees = NormalizeLineAngleDegrees((fittedEdge1.End - fittedEdge1.Start).ToWpfVector());
-            double edge2AngleDegrees = NormalizeLineAngleDegrees((fittedEdge2.End - fittedEdge2.Start).ToWpfVector());
+            double edge1AngleDegrees = fittedEdge1Geometry.AngleDegrees;
+            double edge2AngleDegrees = fittedEdge2Geometry.AngleDegrees;
             double parallelismErrorDegrees = Math.Abs(edge1AngleDegrees - edge2AngleDegrees);
             parallelismErrorDegrees = parallelismErrorDegrees > 90 ? 180 - parallelismErrorDegrees : parallelismErrorDegrees;
             double confidence = ComputeConfidence(edge1AverageScore, edge2AverageScore, edge1ResidualRms, edge2ResidualRms, parallelismErrorDegrees, Math.Min(filteredEdge1Points.Length, filteredEdge2Points.Length), caliperCount);
-            if (confidence < MinimumDetectionConfidence)
+            if (confidence < quality.MinimumDetectionConfidence)
             {
                 return false;
             }
@@ -167,16 +189,19 @@ namespace ImageViewer.Services
                 edge1AngleDegrees,
                 edge2AngleDegrees,
                 parallelismErrorDegrees,
-                confidence);
+                confidence,
+                BuildCaliperWidthSamples(filteredEdge1Samples, filteredEdge2Samples, measurementCenter, measurementDirection, caliperDirection));
 
             return true;
         }
 
-        public static bool TryDetectLineCaliperEdges(BitmapSource bitmap, LineCaliperMeasureRoi line, out LineCaliperDetectionResult result)
+        public static bool TryDetectLineCaliperEdges(BitmapSource bitmap, LineCaliperMeasureRoi line, out LineCaliperDetectionResult result, ImageAnalysisQualityProfile? profile = null)
         {
             ArgumentNullException.ThrowIfNull(bitmap);
             ArgumentNullException.ThrowIfNull(line);
             result = default;
+            ImageAnalysisQualityProfile quality = profile ?? ImageAnalysisQualityProfile.Default;
+            quality.Validate();
 
             Vector lineDirection = (line.P2 - line.P1).ToWpfVector();
             double lineLength = lineDirection.Length;
@@ -188,11 +213,7 @@ namespace ImageViewer.Services
             lineDirection.Normalize();
             Vector measurementDirection = new(-lineDirection.Y, lineDirection.X);
 
-            bitmap = NormalizeBitmap(bitmap);
-            int bytesPerPixel = Math.Max(1, (bitmap.Format.BitsPerPixel + 7) / 8);
-            int stride = bitmap.PixelWidth * bytesPerPixel;
-            byte[] pixels = new byte[bitmap.PixelHeight * stride];
-            bitmap.CopyPixels(pixels, stride, 0);
+            AnalysisPixelBuffer buffer = AcquirePixelBuffer(bitmap);
 
             int caliperCount = Math.Clamp(line.CaliperCount, 6, 180);
             int minimumValidCalipers = Math.Min(Math.Max(3, line.MinimumValidCalipers), caliperCount);
@@ -206,12 +227,12 @@ namespace ImageViewer.Services
                     line.P1.X + (line.P2.X - line.P1.X) * lerp,
                     line.P1.Y + (line.P2.Y - line.P1.Y) * lerp);
                 if (!TryFindStrongestCircularGradient(
-                        pixels,
-                        bitmap.PixelWidth,
-                        bitmap.PixelHeight,
-                        stride,
-                        bytesPerPixel,
-                        bitmap.Format,
+                        buffer.Pixels,
+                        buffer.PixelWidth,
+                        buffer.PixelHeight,
+                        buffer.Stride,
+                        buffer.BytesPerPixel,
+                        buffer.Format,
                         sampleCenter,
                         measurementDirection,
                         lineDirection,
@@ -221,7 +242,8 @@ namespace ImageViewer.Services
                         line.CaliperMinimumGradient,
                         line.CaliperEdgePolarity,
                         line.EdgeSelection,
-                        out CaliperEdgeSample edgeSample))
+                        out CaliperEdgeSample edgeSample,
+                        line.CaliperEdgeExtractionMode))
                 {
                     invalidCaliperCenters.Add(sampleCenter);
                     continue;
@@ -235,7 +257,7 @@ namespace ImageViewer.Services
                 return false;
             }
 
-            List<CaliperEdgeSample> filteredSamples = FilterInlierSamples(edgeSamples, lineDirection, lineLength / 2, line.CaliperOutlierThreshold, minimumValidCalipers);
+            List<CaliperEdgeSample> filteredSamples = FilterInlierSamples(edgeSamples, lineDirection, lineLength / 2, line.CaliperOutlierThreshold, minimumValidCalipers, line.CaliperLineFitMode, line.CaliperFitClippingEndPoints);
             if (filteredSamples.Count < minimumValidCalipers)
             {
                 return false;
@@ -243,15 +265,15 @@ namespace ImageViewer.Services
 
             Point[] filteredPoints = [..filteredSamples.Select(sample => sample.Point)];
             Point[] rejectedPoints = [..edgeSamples.Where(sample => !filteredSamples.Contains(sample)).Select(sample => sample.Point)];
-            LineSegmentOverlay fittedLine = FitLine(filteredPoints, lineDirection, lineLength / 2, BuildScoreWeights(filteredSamples));
-            Vector fittedDirection = (fittedLine.End - fittedLine.Start).ToWpfVector();
-            if (fittedDirection.LengthSquared < 1e-6)
+            LineSegmentOverlay fittedLine = FitLine(filteredPoints, lineDirection, lineLength / 2, BuildScoreWeights(filteredSamples, quality), line.CaliperLineFitMode, line.CaliperFitClippingEndPoints);
+            LineFitGeometry fittedGeometry = LineFitGeometry.FromSegment(new DetectedLineSegment(fittedLine.Start, fittedLine.End));
+            if (!fittedGeometry.IsValid)
             {
                 return false;
             }
 
-            Point detectedP1 = ProjectPointOntoLine(line.P1.ToWpfPoint(), fittedLine.Start.ToWpfPoint(), fittedDirection);
-            Point detectedP2 = ProjectPointOntoLine(line.P2.ToWpfPoint(), fittedLine.Start.ToWpfPoint(), fittedDirection);
+            Point detectedP1 = fittedGeometry.Project(line.P1).ToWpfPoint();
+            Point detectedP2 = fittedGeometry.Project(line.P2).ToWpfPoint();
             if (GeometryUtils.Distance(detectedP1, detectedP2) <= 0.5)
             {
                 return false;
@@ -259,9 +281,9 @@ namespace ImageViewer.Services
 
             double averageScore = filteredSamples.Average(sample => sample.Score);
             (double residualRms, double residualMax) = ComputeResidualMetrics(filteredPoints, fittedLine);
-            double angleDegrees = NormalizeLineAngleDegrees(fittedDirection);
+            double angleDegrees = fittedGeometry.AngleDegrees;
             double confidence = ComputeCircularConfidence(averageScore, residualRms, filteredPoints.Length, caliperCount);
-            if (confidence < MinimumDetectionConfidence)
+            if (confidence < quality.MinimumDetectionConfidence)
             {
                 return false;
             }
@@ -286,15 +308,17 @@ namespace ImageViewer.Services
             return true;
         }
 
-        public static bool TryDetectCircularCaliperEdges(BitmapSource bitmap, CircularCaliperMeasureRoi caliper, out CircularCaliperDetectionResult result)
+        public static bool TryDetectCircularCaliperEdges(BitmapSource bitmap, CircularCaliperMeasureRoi caliper, out CircularCaliperDetectionResult result, ImageAnalysisQualityProfile? profile = null)
         {
             ArgumentNullException.ThrowIfNull(bitmap);
             ArgumentNullException.ThrowIfNull(caliper);
             result = default;
+            ImageAnalysisQualityProfile quality = profile ?? ImageAnalysisQualityProfile.Default;
+            quality.Validate();
 
             if (caliper is ArcCaliperMeasureRoi arcCaliper)
             {
-                return TryDetectArcCaliperEdges(bitmap, arcCaliper, out result);
+                return TryDetectArcCaliperEdges(bitmap, arcCaliper, out result, quality);
             }
 
             if (caliper.Radius <= 0 || caliper.CaliperSearchRange <= 0)
@@ -302,12 +326,18 @@ namespace ImageViewer.Services
                 return false;
             }
 
-            bitmap = NormalizeBitmap(bitmap);
-            int bytesPerPixel = Math.Max(1, (bitmap.Format.BitsPerPixel + 7) / 8);
-            int stride = bitmap.PixelWidth * bytesPerPixel;
-            byte[] pixels = new byte[bitmap.PixelHeight * stride];
-            bitmap.CopyPixels(pixels, stride, 0);
+            return TryDetectCircularCaliperEdgesCore(AcquirePixelBuffer(bitmap), caliper, out result, quality);
+        }
 
+        /// <summary>
+        /// 圆卡尺检测核心：在已归一化的像素缓冲上做径向边缘采样、鲁棒拟合与质量评估。
+        /// Chinese: 与位图获取解耦，自动圆的分级搜索可把同一次缓冲区复用给精定位阶段。
+        /// English: Core circular caliper detection over a normalized pixel buffer, decoupled from
+        /// bitmap acquisition so the automatic-circle search can reuse one buffer for both stages.
+        /// </summary>
+        private static bool TryDetectCircularCaliperEdgesCore(AnalysisPixelBuffer buffer, CircularCaliperMeasureRoi caliper, out CircularCaliperDetectionResult result, ImageAnalysisQualityProfile quality)
+        {
+            result = default;
             int caliperCount = Math.Clamp(caliper.CaliperCount, 6, 180);
             int minimumValidCalipers = Math.Min(Math.Max(3, caliper.MinimumValidCalipers), caliperCount);
             List<Point> invalidSamplePoints = new(caliperCount);
@@ -320,12 +350,12 @@ namespace ImageViewer.Services
                 Vector tangentDirection = new(-radialDirection.Y, radialDirection.X);
                 Point sampleCenter = caliper.Center.ToWpfPoint() + radialDirection * caliper.Radius;
                 if (!TryFindStrongestCircularGradient(
-                        pixels,
-                        bitmap.PixelWidth,
-                        bitmap.PixelHeight,
-                        stride,
-                        bytesPerPixel,
-                        bitmap.Format,
+                        buffer.Pixels,
+                        buffer.PixelWidth,
+                        buffer.PixelHeight,
+                        buffer.Stride,
+                        buffer.BytesPerPixel,
+                        buffer.Format,
                         sampleCenter,
                         radialDirection,
                         tangentDirection,
@@ -335,7 +365,8 @@ namespace ImageViewer.Services
                         caliper.CaliperMinimumGradient,
                         caliper.CaliperEdgePolarity,
                         caliper.EdgeSelection,
-                        out CaliperEdgeSample edgeSample))
+                        out CaliperEdgeSample edgeSample,
+                        caliper.CaliperEdgeExtractionMode))
                 {
                     invalidSamplePoints.Add(sampleCenter);
                     continue;
@@ -358,7 +389,7 @@ namespace ImageViewer.Services
             Point[] filteredPoints = [..filteredSamples.Select(sample => sample.Point)];
             Point[] rejectedPoints = [..edgeSamples.Where(sample => !filteredSamples.Contains(sample)).Select(sample => sample.Point)];
 
-            if (!TryFitCircle(filteredPoints, out Point detectedCenter, out double detectedRadius, BuildScoreWeights(filteredSamples)) || detectedRadius <= 0)
+            if (!TryFitCircle(filteredPoints, out Point detectedCenter, out double detectedRadius, BuildScoreWeights(filteredSamples, quality)) || detectedRadius <= 0)
             {
                 return false;
             }
@@ -366,7 +397,7 @@ namespace ImageViewer.Services
             (double residualRms, double residualMax) = ComputeCircularResidualMetrics(filteredPoints, detectedCenter, detectedRadius);
             double averageScore = filteredSamples.Average(sample => sample.Score);
             double confidence = ComputeCircularConfidence(averageScore, residualRms, filteredPoints.Length, caliperCount);
-            if (confidence < MinimumDetectionConfidence)
+            if (confidence < quality.MinimumDetectionConfidence)
             {
                 return false;
             }
@@ -389,13 +420,79 @@ namespace ImageViewer.Services
             return true;
         }
 
+        private static double[] BuildCaliperWidthSamples(
+            IReadOnlyList<CaliperEdgeSample> edge1Samples,
+            IReadOnlyList<CaliperEdgeSample> edge2Samples,
+            Point measurementCenter,
+            Vector measurementDirection,
+            Vector caliperDirection)
+        {
+            var edge1ByOffset = edge1Samples
+                .Select(sample => (sample, offset: ProjectAlong(sample.Point, measurementCenter, caliperDirection)))
+                .OrderBy(item => item.offset)
+                .ToArray();
+            var edge2ByOffset = edge2Samples
+                .Select(sample => (sample, offset: ProjectAlong(sample.Point, measurementCenter, caliperDirection)))
+                .OrderBy(item => item.offset)
+                .ToArray();
+            bool[] usedEdge2 = new bool[edge2ByOffset.Length];
+            var widths = new List<(double offset, double width)>(Math.Min(edge1ByOffset.Length, edge2ByOffset.Length));
+
+            foreach (var edge1 in edge1ByOffset)
+            {
+                int bestIndex = -1;
+                double bestOffsetDifference = double.PositiveInfinity;
+                for (int i = 0; i < edge2ByOffset.Length; i++)
+                {
+                    if (usedEdge2[i])
+                    {
+                        continue;
+                    }
+
+                    double offsetDifference = Math.Abs(edge1.offset - edge2ByOffset[i].offset);
+                    if (offsetDifference < bestOffsetDifference)
+                    {
+                        bestIndex = i;
+                        bestOffsetDifference = offsetDifference;
+                    }
+                }
+
+                if (bestIndex < 0)
+                {
+                    continue;
+                }
+
+                usedEdge2[bestIndex] = true;
+                CaliperEdgeSample edge2 = edge2ByOffset[bestIndex].sample;
+                double width = Math.Abs(
+                    (edge2.Point.X - edge1.sample.Point.X) * measurementDirection.X +
+                    (edge2.Point.Y - edge1.sample.Point.Y) * measurementDirection.Y);
+                if (double.IsFinite(width) && width > 0.5)
+                {
+                    widths.Add(((edge1.offset + edge2ByOffset[bestIndex].offset) / 2, width));
+                }
+            }
+
+            return widths
+                .OrderBy(item => item.offset)
+                .Select(item => item.width)
+                .ToArray();
+        }
+
+        private static double ProjectAlong(Point point, Point origin, Vector direction)
+        {
+            return (point.X - origin.X) * direction.X + (point.Y - origin.Y) * direction.Y;
+        }
+
         /// <summary>
         /// 从一个近似落点自动搜索整幅图像范围内的圆边缘。
-        /// Chinese: 自动圆工具只需要一个落点；以落点为参考中心建立宽搜索卡尺，再复用圆形卡尺的鲁棒拟合与质量评估。
-        /// English: Finds a circle from a single approximate click by using a wide radial search and
-        /// the same robust fitting and quality checks as the circular caliper.
+        /// Chinese: 自动圆工具只需要一个落点；先用粗步长径向扫描确定候选半径，再只在该半径附近的窄带内做完整精度检测，
+        /// 复用圆形卡尺的鲁棒拟合与质量评估，避免为一次点击逐像素扫过整幅图像。
+        /// English: Finds a circle from a single approximate click: a coarse radial scan proposes the candidate
+        /// radius, then the full-precision circular caliper pipeline runs on a narrow band around it, so one click
+        /// never has to sample every pixel of a full-image search.
         /// </summary>
-        internal static bool TryDetectAutomaticCircle(BitmapSource bitmap, Point seed, out CircularCaliperMeasureRoi roi)
+        internal static bool TryDetectAutomaticCircle(BitmapSource bitmap, Point seed, out CircularCaliperMeasureRoi roi, ImageAnalysisQualityProfile? profile = null)
         {
             ArgumentNullException.ThrowIfNull(bitmap);
             roi = null!;
@@ -419,8 +516,11 @@ namespace ImageViewer.Services
                 maxDistance = Math.Max(maxDistance, GeometryUtils.Distance(seed, corner));
             }
 
-            // A bounded search keeps a click responsive on very large images while still covering
-            // ordinary inspection targets. The actual image boundary remains the final limiter.
+            // The click is only a seed. Run the established full radial consensus pass
+            // around it so missing arcs and moderate noise are rejected by the inlier filter
+            // instead of becoming a biased coarse fit.
+            ImageAnalysisQualityProfile quality = profile ?? ImageAnalysisQualityProfile.Default;
+            quality.Validate();
             double searchExtent = Math.Clamp(maxDistance, 18, 4096);
             int searchRange = Math.Max(9, (int)Math.Ceiling(searchExtent / 2));
             var candidate = new CircularCaliperMeasureRoi
@@ -431,22 +531,34 @@ namespace ImageViewer.Services
                 CaliperSearchRange = searchRange,
                 CaliperSamplingHalfWidth = 1,
                 CaliperEdgeSigma = 1.0,
-                MinimumValidCalipers = 24,
-                CaliperMinimumGradient = 8,
+                MinimumValidCalipers = quality.AutomaticCircleMinimumValidCalipers,
+                CaliperMinimumGradient = quality.AutomaticCircleCaliperMinimumGradient,
                 CaliperOutlierThreshold = 0,
                 CaliperEdgePolarity = CaliperEdgePolarity.Any,
                 EdgeSelection = 1
             };
 
-            if (!TryDetectCircularCaliperEdges(bitmap, candidate, out CircularCaliperDetectionResult detection))
+            if (!TryDetectCircularCaliperEdges(bitmap, candidate, out CircularCaliperDetectionResult detection, quality))
             {
                 return false;
             }
 
+            double angularCoverage = ComputeCircularAngularCoverageDegrees(detection.EdgePoints, detection.DetectedCenter);
+            int imageBoundaryPointCount = detection.EdgePoints.Count(point =>
+                point.X <= 1.5 ||
+                point.Y <= 1.5 ||
+                point.X >= bitmap.PixelWidth - 2.5 ||
+                point.Y >= bitmap.PixelHeight - 2.5);
+            bool mostlyImageBoundaryEvidence = imageBoundaryPointCount >= Math.Max(
+                candidate.MinimumValidCalipers,
+                (int)Math.Ceiling(detection.EdgePoints.Length * quality.AutomaticCircleBoundaryEvidenceRatio));
             if (detection.ValidCaliperCount < candidate.MinimumValidCalipers ||
                 detection.DetectedRadius < 2 ||
                 detection.DetectedRadius > searchExtent * 1.15 ||
-                detection.ResidualRms > Math.Max(3.0, detection.DetectedRadius * 0.08))
+                detection.ResidualRms > Math.Max(quality.AutomaticCircleMinimumResidualPixels, detection.DetectedRadius * quality.AutomaticCircleResidualFraction) ||
+                detection.Confidence < quality.AutomaticCircleMinimumConfidence ||
+                angularCoverage < quality.AutomaticCircleMinimumAngularCoverageDegrees ||
+                mostlyImageBoundaryEvidence)
             {
                 return false;
             }
@@ -466,14 +578,170 @@ namespace ImageViewer.Services
         }
 
         /// <summary>
+        /// 自动圆的粗定位：用少量方向 + 粗采样步长收集每条射线遇到的第一条可靠边缘，直接拟合候选圆。
+        /// Chinese: 只投票半径会把偏心点击和远处强轮廓混在一起；先取最近边缘点，再用圆拟合恢复中心与半径。
+        /// English: Collects the first reliable edge on each coarse ray and fits a circle directly. Radius-only
+        /// voting confuses off-center clicks with distant strong contours, while point fitting recovers both center and radius.
+        /// </summary>
+        private static bool TryEstimateAutomaticCircle(AnalysisPixelBuffer buffer, Point seed, double searchExtent, int coarseStep, out Point estimatedCenter, out double estimatedRadius)
+        {
+            const int directionCount = 24;
+            const int minimumCoarseSamples = 6;
+            const double coarseMinimumGradient = 4;
+
+            estimatedCenter = default;
+            estimatedRadius = 0;
+            int coarseSearchRange = Math.Max(2, (int)Math.Ceiling(searchExtent / (2.0 * coarseStep)));
+            int averagingHalfWidth = Math.Max(1, coarseStep / 2);
+            var samples = new List<CaliperEdgeSample>(directionCount);
+
+            for (int i = 0; i < directionCount; i++)
+            {
+                double angleRadians = i * Math.PI * 2 / directionCount;
+                Vector radialDirection = new(Math.Cos(angleRadians), Math.Sin(angleRadians));
+                Vector tangentDirection = new(-radialDirection.Y, radialDirection.X);
+                // 各方向按 (i % coarseStep) 错开径向网格，避免细轮廓恰好落在所有方向的采样空隙里。
+                Point sampleCenter = seed + radialDirection * (coarseSearchRange * coarseStep + i % coarseStep);
+                if (!TryFindNearestCircularGradient(
+                        buffer.Pixels,
+                        buffer.PixelWidth,
+                        buffer.PixelHeight,
+                        buffer.Stride,
+                        buffer.BytesPerPixel,
+                        buffer.Format,
+                        sampleCenter,
+                        radialDirection,
+                        tangentDirection,
+                        coarseSearchRange,
+                        averagingHalfWidth,
+                        1.0,
+                        coarseMinimumGradient,
+                        CaliperEdgePolarity.Any,
+                        out CaliperEdgeSample sample,
+                        sampleStep: coarseStep))
+                {
+                    continue;
+                }
+
+                double radius = GeometryUtils.Distance(seed, sample.Point);
+                if (radius < 3 || radius > searchExtent * 1.15)
+                {
+                    continue;
+                }
+
+                // 采样窗口完全落到图像外时平均强度会突降为 0，形成"图像边界假边缘"。
+                // 它与射线出图距离几乎重合，必须剔除，否则在空白处单击也会拟合出一个边界圆。
+                double exitDistance = ComputeRayExitDistance(seed, radialDirection, buffer.PixelWidth, buffer.PixelHeight);
+                if (radius > exitDistance - (coarseStep + 1))
+                {
+                    continue;
+                }
+
+                samples.Add(sample);
+            }
+
+            if (samples.Count < minimumCoarseSamples)
+            {
+                return false;
+            }
+
+            double fallbackRadius = samples
+                .Select(sample => GeometryUtils.Distance(seed, sample.Point))
+                .OrderBy(radius => radius)
+                .ElementAt(samples.Count / 2);
+            List<CaliperEdgeSample> filteredSamples = FilterCircularInlierSamples(
+                samples,
+                seed,
+                fallbackRadius,
+                configuredThreshold: 0,
+                minimumRequired: minimumCoarseSamples);
+
+            Point[] filteredPoints = [..filteredSamples.Select(sample => sample.Point)];
+            if (filteredSamples.Count < minimumCoarseSamples ||
+                !TryFitCircle(filteredPoints, out estimatedCenter, out estimatedRadius, BuildScoreWeights(filteredSamples, ImageAnalysisQualityProfile.Default)) ||
+                estimatedRadius < 3 ||
+                ComputeCircularAngularCoverageDegrees(filteredPoints, estimatedCenter) < 120)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// 计算射线（起点 + 方向）离开图像的距离，用于识别贴边的假边缘。
+        /// </summary>
+        private static double ComputeRayExitDistance(Point origin, Vector direction, int pixelWidth, int pixelHeight)
+        {
+            double exitDistance = double.PositiveInfinity;
+            if (direction.X > 1e-9)
+            {
+                exitDistance = Math.Min(exitDistance, (pixelWidth - 1 - origin.X) / direction.X);
+            }
+            else if (direction.X < -1e-9)
+            {
+                exitDistance = Math.Min(exitDistance, (0 - origin.X) / direction.X);
+            }
+
+            if (direction.Y > 1e-9)
+            {
+                exitDistance = Math.Min(exitDistance, (pixelHeight - 1 - origin.Y) / direction.Y);
+            }
+            else if (direction.Y < -1e-9)
+            {
+                exitDistance = Math.Min(exitDistance, (0 - origin.Y) / direction.Y);
+            }
+
+            return exitDistance;
+        }
+
+        /// <summary>
+        /// 计算边缘点覆盖的最大圆周角度。
+        /// Chinese: 仅有一小段弧线也可能得到很小的拟合残差，因此用最大角间隙衡量边缘是否覆盖了足够的圆周。
+        /// English: Measures the largest angular span covered by edge points. A short arc can have a small fit residual,
+        /// so the maximum angular gap is used to ensure the evidence covers enough of the circumference.
+        /// </summary>
+        private static double ComputeCircularAngularCoverageDegrees(IReadOnlyList<Point> points, Point center)
+        {
+            if (points.Count < 3)
+            {
+                return 0;
+            }
+
+            List<double> angles = new(points.Count);
+            foreach (Point point in points)
+            {
+                double angle = Math.Atan2(point.Y - center.Y, point.X - center.X);
+                if (angle < 0)
+                {
+                    angle += Math.PI * 2;
+                }
+
+                angles.Add(angle);
+            }
+
+            angles.Sort();
+            double largestGap = 0;
+            for (int i = 1; i < angles.Count; i++)
+            {
+                largestGap = Math.Max(largestGap, angles[i] - angles[i - 1]);
+            }
+
+            largestGap = Math.Max(largestGap, angles[0] + Math.PI * 2 - angles[^1]);
+            return Math.Max(0, (Math.PI * 2 - largestGap) * 180 / Math.PI);
+        }
+
+        /// <summary>
         /// 在点击点周围沿多方向搜索局部梯度峰，并用既有的亚像素边缘定位器返回最佳点。
         /// </summary>
-        internal static bool TrySnapPointToEdge(BitmapSource bitmap, Point seed, out Point snapped, out double score, out double confidence)
+        internal static bool TrySnapPointToEdge(BitmapSource bitmap, Point seed, out Point snapped, out double score, out double confidence, ImageAnalysisQualityProfile? profile = null)
         {
             ArgumentNullException.ThrowIfNull(bitmap);
             snapped = default;
             score = 0;
             confidence = 0;
+            ImageAnalysisQualityProfile quality = profile ?? ImageAnalysisQualityProfile.Default;
+            quality.Validate();
 
             if (bitmap.PixelWidth < 5 || bitmap.PixelHeight < 5 ||
                 double.IsNaN(seed.X) || double.IsNaN(seed.Y) ||
@@ -485,9 +753,7 @@ namespace ImageViewer.Services
             // Immutable sources can safely reuse their byte buffer while the pointer moves.
             // Mutable sources (for example WriteableBitmap) must be copied per request so a
             // live image update cannot leave the snapper working on stale pixels.
-            EdgeSnapPixelBuffer buffer = bitmap.IsFrozen
-                ? EdgeSnapBuffers.GetValue(bitmap, static source => new EdgeSnapPixelBuffer(NormalizeBitmap(source)))
-                : new EdgeSnapPixelBuffer(NormalizeBitmap(bitmap));
+            AnalysisPixelBuffer buffer = AcquirePixelBuffer(bitmap);
 
             const int searchRange = 12;
             const int directionCount = 16;
@@ -539,15 +805,15 @@ namespace ImageViewer.Services
             int consensusCount = candidates.Count(candidate => GeometryUtils.Distance(candidate.Point, best.Point) <= 3.0);
             double consensus = Math.Clamp((double)consensusCount / Math.Max(2, directionCount * 0.35), 0, 1);
             confidence = Math.Clamp(
-                0.7 * best.Score / MaxCaliperScore +
+                0.7 * best.Score / quality.MaxCaliperScore +
                 0.3 * (1 - Math.Min(distance / searchRange, 1)),
                 0,
                 1);
             confidence *= 0.65 + 0.35 * consensus;
-            return confidence >= MinimumDetectionConfidence;
+            return confidence >= quality.MinimumDetectionConfidence;
         }
 
-        private static bool TryDetectArcCaliperEdges(BitmapSource bitmap, ArcCaliperMeasureRoi caliper, out CircularCaliperDetectionResult result)
+        private static bool TryDetectArcCaliperEdges(BitmapSource bitmap, ArcCaliperMeasureRoi caliper, out CircularCaliperDetectionResult result, ImageAnalysisQualityProfile quality)
         {
             result = default;
             if (caliper.Radius <= 0 || caliper.CaliperSearchRange <= 0 || Math.Abs(caliper.SweepAngle) < 1)
@@ -555,11 +821,7 @@ namespace ImageViewer.Services
                 return false;
             }
 
-            bitmap = NormalizeBitmap(bitmap);
-            int bytesPerPixel = Math.Max(1, (bitmap.Format.BitsPerPixel + 7) / 8);
-            int stride = bitmap.PixelWidth * bytesPerPixel;
-            byte[] pixels = new byte[bitmap.PixelHeight * stride];
-            bitmap.CopyPixels(pixels, stride, 0);
+            AnalysisPixelBuffer buffer = AcquirePixelBuffer(bitmap);
 
             int caliperCount = Math.Clamp(caliper.CaliperCount, 4, 180);
             int minimumValidCalipers = Math.Min(Math.Max(3, caliper.MinimumValidCalipers), caliperCount);
@@ -574,12 +836,12 @@ namespace ImageViewer.Services
                 Vector tangentDirection = new(-radialDirection.Y, radialDirection.X);
                 Point sampleCenter = caliper.Center.ToWpfPoint() + radialDirection * caliper.Radius;
                 if (!TryFindStrongestCircularGradient(
-                        pixels,
-                        bitmap.PixelWidth,
-                        bitmap.PixelHeight,
-                        stride,
-                        bytesPerPixel,
-                        bitmap.Format,
+                        buffer.Pixels,
+                        buffer.PixelWidth,
+                        buffer.PixelHeight,
+                        buffer.Stride,
+                        buffer.BytesPerPixel,
+                        buffer.Format,
                         sampleCenter,
                         radialDirection,
                         tangentDirection,
@@ -589,7 +851,8 @@ namespace ImageViewer.Services
                         caliper.CaliperMinimumGradient,
                         caliper.CaliperEdgePolarity,
                         caliper.EdgeSelection,
-                        out CaliperEdgeSample edgeSample))
+                        out CaliperEdgeSample edgeSample,
+                        caliper.CaliperEdgeExtractionMode))
                 {
                     invalidSamplePoints.Add(sampleCenter);
                     continue;
@@ -611,7 +874,7 @@ namespace ImageViewer.Services
 
             Point[] filteredPoints = [..filteredSamples.Select(sample => sample.Point)];
             Point[] rejectedPoints = [..edgeSamples.Where(sample => !filteredSamples.Contains(sample)).Select(sample => sample.Point)];
-            if (!TryFitCircle(filteredPoints, out Point detectedCenter, out double detectedRadius, BuildScoreWeights(filteredSamples)) || detectedRadius <= 0)
+            if (!TryFitCircle(filteredPoints, out Point detectedCenter, out double detectedRadius, BuildScoreWeights(filteredSamples, quality)) || detectedRadius <= 0)
             {
                 return false;
             }
@@ -619,7 +882,7 @@ namespace ImageViewer.Services
             (double residualRms, double residualMax) = ComputeCircularResidualMetrics(filteredPoints, detectedCenter, detectedRadius);
             double averageScore = filteredSamples.Average(sample => sample.Score);
             double confidence = ComputeCircularConfidence(averageScore, residualRms, filteredPoints.Length, caliperCount);
-            if (confidence < MinimumDetectionConfidence)
+            if (confidence < quality.MinimumDetectionConfidence)
             {
                 return false;
             }

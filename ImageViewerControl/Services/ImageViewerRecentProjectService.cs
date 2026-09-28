@@ -18,9 +18,28 @@ namespace ImageViewer.Services
                 return [];
             }
 
-            var items = JsonSerializer.Deserialize(File.ReadAllText(filePath), ImageViewerJsonSerializationContext.Default.ListRecentImageViewerProject) ?? [];
+            List<RecentImageViewerProject> items;
+            try
+            {
+                items = JsonSerializer.Deserialize(
+                    File.ReadAllText(filePath),
+                    ImageViewerJsonSerializationContext.Default.ListRecentImageViewerProject) ?? [];
+            }
+            catch (JsonException)
+            {
+                return [];
+            }
+            catch (IOException)
+            {
+                return [];
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return [];
+            }
+
             return items
-                .Where(item => !string.IsNullOrWhiteSpace(item.Path))
+                .Where(item => item is not null && !string.IsNullOrWhiteSpace(item.Path))
                 .OrderByDescending(item => item.LastOpenedUtc)
                 .Take(Math.Max(1, maxCount))
                 .ToArray();
@@ -31,13 +50,9 @@ namespace ImageViewer.Services
             ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
             ArgumentNullException.ThrowIfNull(items);
 
-            string? directory = Path.GetDirectoryName(Path.GetFullPath(filePath));
-            if (!string.IsNullOrWhiteSpace(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            File.WriteAllText(filePath, JsonSerializer.Serialize(items, ImageViewerJsonSerializationContext.Default.ListRecentImageViewerProject));
+            ImageViewerAtomicFile.WriteAllText(
+                filePath,
+                JsonSerializer.Serialize(items, ImageViewerJsonSerializationContext.Default.ListRecentImageViewerProject));
         }
 
         public IReadOnlyList<RecentImageViewerProject> Touch(IEnumerable<RecentImageViewerProject> items, string filePath, string projectKind, int maxCount = 10)
@@ -46,15 +61,36 @@ namespace ImageViewer.Services
             ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
             ArgumentException.ThrowIfNullOrWhiteSpace(projectKind);
 
-            var normalizedPath = Path.GetFullPath(filePath);
             var updated = items
-                .Where(item => !string.Equals(Path.GetFullPath(item.Path), normalizedPath, StringComparison.OrdinalIgnoreCase))
-                .Prepend(new RecentImageViewerProject(Path.GetFileNameWithoutExtension(normalizedPath), normalizedPath, projectKind, DateTimeOffset.UtcNow))
+                .Where(item => !PathsEqual(item.Path, filePath))
+                .Prepend(CreateRecentProject(filePath, projectKind))
                 .OrderByDescending(item => item.LastOpenedUtc)
                 .Take(Math.Max(1, maxCount))
                 .ToArray();
 
             return updated;
+        }
+
+        private static RecentImageViewerProject CreateRecentProject(string filePath, string projectKind)
+        {
+            string normalizedPath = Path.GetFullPath(filePath);
+            return new RecentImageViewerProject(
+                Path.GetFileNameWithoutExtension(normalizedPath),
+                normalizedPath,
+                projectKind,
+                DateTimeOffset.UtcNow);
+        }
+
+        private static bool PathsEqual(string left, string right)
+        {
+            try
+            {
+                return string.Equals(Path.GetFullPath(left), Path.GetFullPath(right), StringComparison.OrdinalIgnoreCase);
+            }
+            catch (Exception exception) when (exception is ArgumentException or NotSupportedException)
+            {
+                return string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
+            }
         }
     }
 

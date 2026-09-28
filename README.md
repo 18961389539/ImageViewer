@@ -13,6 +13,7 @@ ImageViewer 是一个面向 Windows 桌面应用的 WPF 图像查看、ROI 标�
 - 提供长度、折线、面积、角度、卡尺、点坐标、自动边缘吸附点、自动圆测量、圆心距、三点圆、拟合椭圆与梯度检测对齐等测量和分析辅助工具。
 - 显示像素信息、统计摘要、剖面图、直方图、比例尺和属性面板。
 - 基于图像分位数给出对比度、亮度与伪彩显示建议；建议不会自动修改当前显示参数。
+- 检测质量与尺寸公差判定分开记录；批量失败逐图逐 ROI 留痕，质量门限可按项目保存并随元数据导出。
 - 大图会按像素规模自动启用多分辨率金字塔、分块渲染和自适应缓存，缩放平移时只处理当前视口。
 
 ### 体数据与 3D 浏览
@@ -21,6 +22,7 @@ ImageViewer 是一个面向 Windows 桌面应用的 WPF 图像查看、ROI 标�
 - 提供轴位、冠状、矢状 MPR 视图，并在 2D MPR 与 3D 交叉切面之间同步位置。
 - 在冠状或矢状视图中按 `↑` / `↓` 切换切片；轴位视图支持滑块和鼠标滚轮切换。
 - demo 支持多选图像切片导入体数据；冠状和矢状视图提供切片滑块、上一层/下一层按钮和鼠标滚轮切层，并与 3D 交叉切面保持同步。
+- 体数据排序优先使用切片空间位置、实例号或采集时间元数据；缺少元数据时才使用文件名自然排序，并要求人工确认。MPR 复用灰度缓存，Gray16 切片保持 16 位一致性。
 - 支持 3D 相机预设、重置、适配体数据、切面显示和透明度控制。
 
 ### 导出、会话与项目交付
@@ -50,12 +52,30 @@ dotnet run --project ImageViewerDemo/ImageViewerDemo.csproj
 
 演示程序启动后，可点击“打开图像”或按 `Ctrl+O` 选择图像文件。右键菜单支持直接键入命令搜索；按 `Ctrl+F` 可将图像适应窗口。
 
+### NuGet 包
+
+控件库和无 WPF 的 Core 层分别发布为 `ImageViewerControl` 与 `ImageViewer.Core`。在 `net10.0-windows` WPF 宿主中安装控件包即可，Core 包会作为项目依赖自动安装：
+
+```powershell
+dotnet add package ImageViewerControl --version 0.1.0
+```
+
+本地生成包和符号包：
+
+```powershell
+./build/pack.ps1 -Version 0.1.0-rc.1
+```
+
+包输出到 `artifacts/packages`，同时生成 `.nupkg` 和 `.snupkg`。`.github/workflows/nuget-publish.yml` 支持两种发布方式：创建 `v0.1.0` 形式的 Git 标签自动打包并发布；手动运行工作流时可先将 `publish` 设为 `false` 只验证包，确认后再用 `publish=true` 推送。推送前需要在 GitHub 的 `nuget` environment 中配置 `NUGET_API_KEY`。
+
 ## 仓库结构
 
 | 目录 | 用途 |
 | --- | --- |
+| [ImageViewer.Core](ImageViewer.Core/) | 不依赖 WPF 的测量统计与可复用核心契约。 |
 | [ImageViewerControl](ImageViewerControl/) | WPF 控件、ROI 模型、渲染、菜单、对话框、分析、导出和宿主服务。 |
 | [ImageViewerDemo](ImageViewerDemo/) | 演示应用，用于手动验证与集成参考。 |
+| [ImageViewer.Core.Tests](ImageViewer.Core.Tests/) | Core 层的跨平台单元测试与覆盖率门槛。 |
 | [ImageViewerControl.Tests](ImageViewerControl.Tests/) | xUnit 测试，覆盖命令、交互、持久化、体数据和 WPF smoke 场景。 |
 | [docs](docs/) | 用户操作、文件格式、导入导出规则、术语与架构边界文档。 |
 
@@ -108,10 +128,27 @@ dotnet test ImageViewerControl.Tests/ImageViewerControl.Tests.csproj --configura
 
 所有新增用户可见文本应放在 `ImageViewerControl/Resources/UiText.resx` 或 `ImageViewerDemo/Resources/DemoText.resx` 中。WPF 相关实现保留在控件工程；新建可跨平台算法、数据契约和序列化逻辑应遵循 [docs/architecture-boundaries.md](docs/architecture-boundaries.md) 的依赖边界。
 
+### CI 与覆盖率
+
+GitHub Actions 工作流位于 [.github/workflows/ci.yml](.github/workflows/ci.yml)，在 Windows runner 上执行锁定依赖还原、Release 构建、Core 单测、导出/批量专项、Smoke 测试和完整回归。完整回归作为合并门禁运行；失败时仍会上传测试与覆盖率产物，便于定位问题。
+
+本地生成 Core 覆盖率：
+
+```powershell
+dotnet test ImageViewer.Core.Tests/ImageViewer.Core.Tests.csproj `
+  --configuration Release --settings coverage.runsettings `
+  --collect:"XPlat Code Coverage" --results-directory artifacts/coverage/core
+./build/coverage-summary.ps1 -CoverageRoot artifacts/coverage/core `
+  -AssemblyPattern 'ImageViewer.Core' -MinimumLineRate 0.80
+```
+
+覆盖率使用 Cobertura 和 OpenCover 两种格式输出，CI 会上传原始报告；Core 行覆盖率低于 80% 时构建失败。
+
 ## 文档索引
 
 - [使用说明](docs/usage.md)
 - [项目文件格式](docs/project-file-format.md)
 - [导入导出约定](docs/import-export-conventions.md)
+- [NuGet 发布](docs/nuget-publishing.md)
 - [术语与本地化边界](docs/terminology.md)
 - [架构边界](docs/architecture-boundaries.md)

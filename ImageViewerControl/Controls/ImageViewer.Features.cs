@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Media.Imaging;
+using ImageViewer.Localization;
 using ImageViewer.Models;
 using ImageViewer.Services;
 using ImageViewer.Utils;
@@ -26,7 +27,7 @@ namespace ImageViewer.Controls
                 line,
                 static roi => roi.EnsureCaliperRegion(),
                 static roi => roi.ClearDetectedEdges(),
-                ImageAnalysisService.TryDetectLineMeasureEdges,
+                (BitmapSource bitmap, CaliperMeasureRoi roi, out LineMeasureGradientDetectionResult result) => ImageAnalysisService.TryDetectLineMeasureEdges(bitmap, roi, out result, QualityProfile),
                 RoiDetectionResultMapper.Apply);
         }
 
@@ -36,28 +37,36 @@ namespace ImageViewer.Controls
                 line,
                 prepare: null,
                 static roi => roi.ClearDetectedLine(),
-                ImageAnalysisService.TryDetectLineCaliperEdges,
+                (BitmapSource bitmap, LineCaliperMeasureRoi roi, out LineCaliperDetectionResult result) => ImageAnalysisService.TryDetectLineCaliperEdges(bitmap, roi, out result, QualityProfile),
                 RoiDetectionResultMapper.Apply);
         }
 
         private bool TryApplyCircularCaliperDetection(CircularCaliperMeasureRoi caliper)
         {
-            return TryApplyBitmapAnalysisCore<CircularCaliperMeasureRoi, CircularCaliperDetectionResult>(
+            bool success = TryApplyBitmapAnalysisCore<CircularCaliperMeasureRoi, CircularCaliperDetectionResult>(
                 caliper,
                 prepare: null,
                 static roi => roi.ClearDetectedEdges(),
-                ImageAnalysisService.TryDetectCircularCaliperEdges,
-                RoiDetectionResultMapper.Apply);
+                (BitmapSource bitmap, CircularCaliperMeasureRoi roi, out CircularCaliperDetectionResult result) => ImageAnalysisService.TryDetectCircularCaliperEdges(bitmap, roi, out result, QualityProfile),
+                (roi, result) => RoiDetectionResultMapper.Apply(roi, result, QualityProfile));
+            if (!success && caliper is not ArcCaliperMeasureRoi)
+            {
+                caliper.MarkQualityFailure();
+            }
+
+            return success;
         }
 
         private bool TryCreateAutomaticCircle(Point seed, out CircularCaliperMeasureRoi roi)
         {
             if (GetAnalysisBitmapSource() is BitmapSource bitmap &&
-                ImageAnalysisService.TryDetectAutomaticCircle(bitmap, seed, out roi))
+                ImageAnalysisService.TryDetectAutomaticCircle(bitmap, seed, out roi, QualityProfile))
             {
                 return true;
             }
 
+            // 静默失败会让操作员分不清"没点中"和"这里确实没有圆"，给出可重试的明确提示。
+            ShowStatusHint(UiText.Get("StatusAutomaticCircleNotFound"), StatusHintKind.Error);
             roi = null!;
             return false;
         }
@@ -65,7 +74,7 @@ namespace ImageViewer.Controls
         private bool TrySnapPointToEdge(Point seed, out Point snapped, out double score, out double confidence)
         {
             if (GetAnalysisBitmapSource() is BitmapSource bitmap &&
-                ImageAnalysisService.TrySnapPointToEdge(bitmap, seed, out snapped, out score, out confidence))
+                ImageAnalysisService.TrySnapPointToEdge(bitmap, seed, out snapped, out score, out confidence, QualityProfile))
             {
                 return true;
             }

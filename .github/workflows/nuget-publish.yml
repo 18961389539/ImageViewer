@@ -1,0 +1,102 @@
+name: Publish NuGet packages
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'SemVer package version, for example 0.1.0 or 0.1.0-rc.1'
+        required: true
+        type: string
+      publish:
+        description: 'Push packages to NuGet.org after packing'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  NUGET_SOURCE: https://api.nuget.org/v3/index.json
+
+jobs:
+  pack:
+    name: Pack NuGet artifacts
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.302
+
+      - name: Resolve package version
+        id: version
+        shell: pwsh
+        env:
+          MANUAL_VERSION: ${{ inputs.version }}
+        run: |
+          if ($env:GITHUB_REF -like 'refs/tags/v*') {
+            $version = $env:GITHUB_REF_NAME.Substring(1)
+          } else {
+            $version = $env:MANUAL_VERSION
+          }
+          if ($version -notmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$') {
+            throw "Invalid SemVer version: $version"
+          }
+          "value=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Pack and validate artifacts
+        shell: pwsh
+        run: .\build\pack.ps1 -Version '${{ steps.version.outputs.value }}'
+
+      - name: Upload NuGet artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: imageviewer-nuget-${{ steps.version.outputs.value }}
+          path: artifacts/packages/*
+          if-no-files-found: error
+
+  publish:
+    name: Push packages to NuGet.org
+    runs-on: windows-latest
+    needs: pack
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.publish == true
+    environment: nuget
+    steps:
+      - name: Download NuGet artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: imageviewer-nuget-${{ needs.pack.outputs.version }}
+          path: artifacts/packages
+
+      - name: Require NuGet API key
+        shell: pwsh
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:NUGET_API_KEY)) {
+            throw 'NUGET_API_KEY is not configured for the nuget environment.'
+          }
+
+      - name: Push packages
+        shell: pwsh
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          Get-ChildItem artifacts/packages -Filter *.nupkg |
+            Where-Object { $_.Name -notlike '*.symbols.nupkg' } |
+            Sort-Object Name |
+            ForEach-Object {
+              dotnet nuget push $_.FullName --api-key $env:NUGET_API_KEY --source $env:NUGET_SOURCE --skip-duplicate
+              if ($LASTEXITCODE -ne 0) { throw "Failed to push $($_.Name)." }
+            }

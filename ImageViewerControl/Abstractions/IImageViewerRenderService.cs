@@ -36,6 +36,11 @@ namespace ImageViewer.Abstractions
         Task<byte[]?> CreateProfileAsync(ImageViewerAnalysisRequest request, CancellationToken cancellationToken);
     }
 
+    public interface IImageViewerHighBitDepthAnalysisRenderService
+    {
+        Task<ushort[]?> CreateProfile16Async(ImageViewerAnalysisRequest request, CancellationToken cancellationToken);
+    }
+
     public interface IImageViewerRenderService :
         IImageViewerDisplayRenderService,
         IImageViewerFrameRenderService,

@@ -29,13 +29,24 @@ namespace ImageViewer.Controls
             RoiBase oldState = selectedRoi.Clone();
             RoiBase? detectedRoi = selectedRoi switch
             {
-                CaliperMeasureRoi line when ImageAnalysisService.TryDetectLineMeasureEdges(bitmap, line, out LineMeasureGradientDetectionResult lineDetectionResult) => CreateDetectedLineMeasureRoi(line, lineDetectionResult),
-                CircularCaliperMeasureRoi circular when ImageAnalysisService.TryDetectCircularCaliperEdges(bitmap, circular, out CircularCaliperDetectionResult circularDetectionResult) => CreateDetectedCircularCaliperRoi(circular, circularDetectionResult),
+                CaliperMeasureRoi line when ImageAnalysisService.TryDetectLineMeasureEdges(bitmap, line, out LineMeasureGradientDetectionResult lineDetectionResult, _dependencies.GetQualityProfile()) => CreateDetectedLineMeasureRoi(line, lineDetectionResult),
+                CircularCaliperMeasureRoi circular when ImageAnalysisService.TryDetectCircularCaliperEdges(bitmap, circular, out CircularCaliperDetectionResult circularDetectionResult, _dependencies.GetQualityProfile()) => CreateDetectedCircularCaliperRoi(circular, circularDetectionResult, _dependencies.GetQualityProfile()),
                 _ => null
             };
 
             if (detectedRoi == null)
             {
+                RoiBase? clearedRoi = CreateClearedDetectionRoi(selectedRoi);
+                if (clearedRoi != null)
+                {
+                    IUndoRedoCommand? clearCommand = _dependencies.CreateStateCommand(selectedRoi, oldState, clearedRoi);
+                    if (clearCommand != null)
+                    {
+                        _dependencies.ExecuteUndoRedoCommand(clearCommand);
+                        _dependencies.DrawRois();
+                    }
+                }
+
                 return;
             }
 
@@ -47,6 +58,24 @@ namespace ImageViewer.Controls
 
             _dependencies.ExecuteUndoRedoCommand(command);
             _dependencies.DrawRois();
+        }
+
+        private static RoiBase? CreateClearedDetectionRoi(RoiBase roi)
+        {
+            switch (roi)
+            {
+                case CaliperMeasureRoi caliper:
+                    var clearedCaliper = (CaliperMeasureRoi)caliper.Clone();
+                    clearedCaliper.ClearDetectedEdges();
+                    return clearedCaliper;
+                case CircularCaliperMeasureRoi circular when circular is not ArcCaliperMeasureRoi:
+                    var clearedCircular = (CircularCaliperMeasureRoi)circular.Clone();
+                    clearedCircular.ClearDetectedEdges();
+                    clearedCircular.MarkQualityFailure();
+                    return clearedCircular;
+                default:
+                    return null;
+            }
         }
 
         public async Task ExportSnapshotAsync()
@@ -93,7 +122,8 @@ namespace ImageViewer.Controls
                 var exportContext = new RoiAnalysisExportContext(
                     _dependencies.GetCurrentImagePath(),
                     _dependencies.GetPluginRegistry(),
-                    _dependencies.GetRenderSettings());
+                    _dependencies.GetRenderSettings(),
+                    QualityProfile: _dependencies.GetQualityProfile());
                 await RoiAnalysisExportService.SaveCsvAsync(
                     filePath,
                     _dependencies.GetAllRois(),
@@ -107,6 +137,52 @@ namespace ImageViewer.Controls
             catch (Exception ex)
             {
                 _dependencies.ShowNonCriticalError(UiText.Get("ErrorExportAnalysisTitle"), UiText.Get("ErrorExportAnalysisMessage"), ex);
+            }
+        }
+
+        public async Task ExportBatchAnalysisCsvAsync()
+        {
+            string[] imagePaths = _dependencies.ShowOpenBatchImageFilesDialog();
+            if (imagePaths.Length == 0)
+            {
+                return;
+            }
+
+            string? outputPath = _dependencies.ShowSaveAnalysisCsvDialog();
+            if (string.IsNullOrWhiteSpace(outputPath))
+            {
+                return;
+            }
+
+            try
+            {
+                BatchRoiAnalysisExportSummary summary = await BatchRoiAnalysisExportService.ExportAsync(
+                    outputPath,
+                    imagePaths,
+                    _dependencies.GetAllRois(),
+                    _dependencies.GetPixelSize(),
+                    _dependencies.GetPhysicalUnit(),
+                    _dependencies.GetCalibration(),
+                    _dependencies.GetPluginRegistry(),
+                    _dependencies.GetRenderSettings(),
+                    qualityProfile: _dependencies.GetQualityProfile());
+                _dependencies.ShowStatusHint(
+                    UiText.Format(
+                        "StatusExportBatchCsvSuccess",
+                        summary.RequestedFileCount,
+                        summary.DecodedFileCount,
+                        summary.FullySuccessfulFileCount,
+                        summary.PartiallySuccessfulFileCount,
+                        summary.AllRoiFailedFileCount,
+                        summary.InputFailedFileCount,
+                        summary.ExportedRowCount),
+                    summary.FullySuccessfulFileCount == summary.RequestedFileCount
+                        ? StatusHintKind.Success
+                        : StatusHintKind.Info);
+            }
+            catch (Exception ex)
+            {
+                _dependencies.ShowNonCriticalError(UiText.Get("ErrorExportAnalysisTitle"), UiText.Get("ErrorExportBatchCsvMessage"), ex);
             }
         }
 
@@ -125,10 +201,10 @@ namespace ImageViewer.Controls
             return detected;
         }
 
-        private static CircularCaliperMeasureRoi CreateDetectedCircularCaliperRoi(CircularCaliperMeasureRoi source, CircularCaliperDetectionResult detectionResult)
+        private static CircularCaliperMeasureRoi CreateDetectedCircularCaliperRoi(CircularCaliperMeasureRoi source, CircularCaliperDetectionResult detectionResult, ImageAnalysisQualityProfile profile)
         {
             var detected = (CircularCaliperMeasureRoi)source.Clone();
-            RoiDetectionResultMapper.Apply(detected, detectionResult);
+            RoiDetectionResultMapper.Apply(detected, detectionResult, profile);
             return detected;
         }
     }

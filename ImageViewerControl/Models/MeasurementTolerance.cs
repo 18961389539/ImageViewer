@@ -15,11 +15,16 @@ namespace ImageViewer.Models
 
         public bool IsEnabled => Nominal.HasValue;
 
+        public bool IsValid =>
+            (!Nominal.HasValue || double.IsFinite(Nominal.Value)) &&
+            (!TolerancePlus.HasValue || (double.IsFinite(TolerancePlus.Value) && TolerancePlus.Value >= 0)) &&
+            (!ToleranceMinus.HasValue || (double.IsFinite(ToleranceMinus.Value) && ToleranceMinus.Value >= 0));
+
         public bool IsWithinTolerance(double measured)
         {
-            if (!IsEnabled)
+            if (!IsEnabled || !IsValid || !double.IsFinite(measured))
             {
-                return true;
+                return !IsEnabled;
             }
 
             double upper = Nominal!.Value + (TolerancePlus ?? 0);

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using ImageViewer.Models;
 using ImageViewer.Plugins;
 
 namespace ImageViewer.Services
@@ -9,5 +10,6 @@ namespace ImageViewer.Services
     public sealed record RoiAnalysisExportContext(
         string? SourcePath,
         RoiPluginRegistry? PluginRegistry,
-        IReadOnlyDictionary<string, string>? RenderSettings = null);
+        IReadOnlyDictionary<string, string>? RenderSettings = null,
+        ImageAnalysisQualityProfile? QualityProfile = null);
 }

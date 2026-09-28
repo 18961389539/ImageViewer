@@ -8,7 +8,10 @@ namespace ImageViewer.Models
         double CaliperMinimumGradient,
         int MinimumValidCalipers,
         double CaliperOutlierThreshold,
-        CaliperEdgePolarity CaliperEdgePolarity)
+        CaliperEdgePolarity CaliperEdgePolarity,
+        HalconEdgeExtractionMode CaliperEdgeExtractionMode,
+        HalconLineFitMode CaliperLineFitMode,
+        int CaliperFitClippingEndPoints)
     {
         public static SingleEdgeCaliperConfigurationState Capture(ISingleEdgeCaliperRoi roi)
         {
@@ -20,7 +23,10 @@ namespace ImageViewer.Models
                 roi.CaliperMinimumGradient,
                 roi.MinimumValidCalipers,
                 roi.CaliperOutlierThreshold,
-                roi.CaliperEdgePolarity);
+                roi.CaliperEdgePolarity,
+                roi.CaliperEdgeExtractionMode,
+                roi.CaliperLineFitMode,
+                roi.CaliperFitClippingEndPoints);
         }
 
         public void ApplyTo(ISingleEdgeCaliperRoi roi)
@@ -33,6 +39,9 @@ namespace ImageViewer.Models
             roi.MinimumValidCalipers = MinimumValidCalipers;
             roi.CaliperOutlierThreshold = CaliperOutlierThreshold;
             roi.CaliperEdgePolarity = CaliperEdgePolarity;
+            roi.CaliperEdgeExtractionMode = CaliperEdgeExtractionMode;
+            roi.CaliperLineFitMode = CaliperLineFitMode;
+            roi.CaliperFitClippingEndPoints = CaliperFitClippingEndPoints;
         }
     }
 }

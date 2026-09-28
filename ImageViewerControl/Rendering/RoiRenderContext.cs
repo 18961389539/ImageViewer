@@ -76,7 +76,14 @@ namespace ImageViewer.Rendering
             return ImageToScreen(imagePoint);
         }
 
-        public void DrawLineSegment(Point start, Point end, Brush stroke, double thickness, DoubleCollection? dashArray = null, double opacity = 1.0)
+        public void DrawLineSegment(
+            Point start,
+            Point end,
+            Brush stroke,
+            double thickness,
+            DoubleCollection? dashArray = null,
+            double opacity = 1.0,
+            bool snapToDevicePixels = true)
         {
             Point screenStart = ToScreenPoint(start);
             Point screenEnd = ToScreenPoint(end);
@@ -84,14 +91,14 @@ namespace ImageViewer.Rendering
 
             var line = new Line
             {
-                X1 = AlignCoordinate(screenStart.X, screenThickness),
-                Y1 = AlignCoordinate(screenStart.Y, screenThickness),
-                X2 = AlignCoordinate(screenEnd.X, screenThickness),
-                Y2 = AlignCoordinate(screenEnd.Y, screenThickness),
+                X1 = snapToDevicePixels ? AlignCoordinate(screenStart.X, screenThickness) : screenStart.X,
+                Y1 = snapToDevicePixels ? AlignCoordinate(screenStart.Y, screenThickness) : screenStart.Y,
+                X2 = snapToDevicePixels ? AlignCoordinate(screenEnd.X, screenThickness) : screenEnd.X,
+                Y2 = snapToDevicePixels ? AlignCoordinate(screenEnd.Y, screenThickness) : screenEnd.Y,
                 Stroke = stroke,
                 StrokeThickness = screenThickness,
                 Opacity = opacity,
-                SnapsToDevicePixels = true,
+                SnapsToDevicePixels = snapToDevicePixels,
                 IsHitTestVisible = false
             };
 

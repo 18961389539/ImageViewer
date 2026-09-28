@@ -37,20 +37,25 @@ namespace ImageViewer.Rendering
             }
         }
 
-        public static void DrawLegend(RoiRenderContext context, Point anchor, Brush invalidBrush, Brush rejectedBrush)
+        public static void DrawLegend(RoiRenderContext context, Point anchor, Brush invalidBrush, Brush rejectedBrush, bool showDiagnostics)
         {
+            if (!showDiagnostics)
+            {
+                return;
+            }
+
             DrawLegendItem(context, anchor, Brushes.Cyan, "有效点");
             DrawLegendItem(context, new Point(anchor.X, anchor.Y + 12 / context.Scale), rejectedBrush, "剔除点");
             DrawLegendItem(context, new Point(anchor.X, anchor.Y + 24 / context.Scale), invalidBrush, "无效点");
         }
 
-        public static string BuildSummaryText(ICaliperInfoSource caliper, string geometryText, string fallbackText)
+        public static string BuildSummaryText(ICaliperInfoSource caliper, string geometryText, string fallbackText, bool showDiagnostics)
         {
             string info = string.IsNullOrEmpty(caliper.Label) ? string.Empty : $"{caliper.Label}: ";
             info += caliper.HasDetection
                 ? geometryText
                 : fallbackText;
-            if (caliper.HasDetection)
+            if (caliper.HasDetection && showDiagnostics)
             {
                 info += $"\nFit:{caliper.ValidCaliperCount} Score:{ImageAnalysisService.NormalizeCaliperScore(caliper.AverageScore):F0}% RMS:{caliper.ResidualRms:F2}";
             }

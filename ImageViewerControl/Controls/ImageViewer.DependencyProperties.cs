@@ -47,6 +47,10 @@ namespace ImageViewer.Controls
             DependencyProperty.Register(nameof(DiagnosticErrorText), typeof(string), typeof(ImageViewer),
                 new PropertyMetadata(string.Empty));
 
+        public static readonly DependencyProperty ActiveToolNameProperty =
+            DependencyProperty.Register(nameof(ActiveToolName), typeof(string), typeof(ImageViewer),
+                new PropertyMetadata(string.Empty));
+
         public static readonly DependencyProperty ShowPixelGridProperty =
             DependencyProperty.Register(nameof(ShowPixelGrid), typeof(bool), typeof(ImageViewer),
                 new PropertyMetadata(false, OnShowPixelGridChanged));
@@ -57,11 +61,11 @@ namespace ImageViewer.Controls
 
         public static readonly DependencyProperty ShowInfoPanelProperty =
             DependencyProperty.Register(nameof(ShowInfoPanel), typeof(bool), typeof(ImageViewer),
-                new PropertyMetadata(false, OnShowInfoPanelChanged));
+                new PropertyMetadata(true, OnShowInfoPanelChanged));
 
         public static readonly DependencyProperty ShowCaliperScoresProperty =
             DependencyProperty.Register(nameof(ShowCaliperScores), typeof(bool), typeof(ImageViewer),
-                new PropertyMetadata(true, OnShowCaliperScoresChanged));
+                new PropertyMetadata(false, OnShowCaliperScoresChanged));
 
         public static readonly DependencyProperty ShowHistogramProperty =
             DependencyProperty.Register(nameof(ShowHistogram), typeof(bool), typeof(ImageViewer),
@@ -77,7 +81,7 @@ namespace ImageViewer.Controls
 
         public static readonly DependencyProperty ShowRoiListProperty =
             DependencyProperty.Register(nameof(ShowRoiList), typeof(bool), typeof(ImageViewer),
-                new PropertyMetadata(false, OnShowRoiListChanged));
+                new PropertyMetadata(true, OnShowRoiListChanged));
 
         public static readonly DependencyProperty ShowToolbarProperty =
             DependencyProperty.Register(nameof(ShowToolbar), typeof(bool), typeof(ImageViewer),
@@ -109,7 +113,7 @@ namespace ImageViewer.Controls
 
         public static readonly DependencyProperty PixelSizeProperty =
             DependencyProperty.Register(nameof(PixelSize), typeof(double), typeof(ImageViewer),
-                new PropertyMetadata(1.0, OnCalibrationChanged));
+                new PropertyMetadata(1.0, OnCalibrationChanged), IsValidPixelSize);
 
         public static readonly DependencyProperty PhysicalUnitProperty =
             DependencyProperty.Register(nameof(PhysicalUnit), typeof(string), typeof(ImageViewer),
@@ -181,6 +185,15 @@ namespace ImageViewer.Controls
         {
             get => (string)GetValue(DiagnosticErrorTextProperty);
             set => SetValue(DiagnosticErrorTextProperty, value);
+        }
+
+        /// <summary>
+        /// 当前正在使用的绘制工具名称；没有活动绘制会话时为空。
+        /// </summary>
+        public string ActiveToolName
+        {
+            get => (string)GetValue(ActiveToolNameProperty);
+            private set => SetValue(ActiveToolNameProperty, value);
         }
 
         public bool ShowPixelGrid
@@ -322,9 +335,16 @@ namespace ImageViewer.Controls
         {
             WithViewer<bool>(d, e, (viewer, isVisible) =>
             {
-                viewer.toolbarPanel.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
+                viewer.UpdateToolbarLayout();
                 viewer.UpdateContextMenuState();
             });
+        }
+
+        private static bool IsValidPixelSize(object value)
+        {
+            return value is double pixelSize
+                && double.IsFinite(pixelSize)
+                && pixelSize > 0;
         }
 
         private static void OnImageSourceChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -333,6 +353,10 @@ namespace ImageViewer.Controls
             {
                 viewer._imageSourceController.HandleImageSourceChanged(e.NewValue as ImageSource);
                 viewer.UpdateStatusBar();
+                // Keep the visible toolbar and context menu in sync as soon as a new image is assigned.
+                // Without this refresh, commands such as Save, Undo and Export can remain disabled
+                // until the user opens the context menu or invokes another command first.
+                viewer.UpdateContextMenuState();
                 if (viewer.IsLoaded)
                 {
                     viewer.MarkDocumentDirty();
@@ -344,6 +368,7 @@ namespace ImageViewer.Controls
         {
             WithViewer(d, viewer =>
             {
+                viewer.UpdateCalibrationIndicator();
                 viewer._imageViewStateController.HandleCalibrationChanged();
                 if (viewer.IsLoaded)
                 {

@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Threading;
@@ -66,6 +68,29 @@ namespace ImageViewer.Controls
                 : Path.GetFullPath(filePath);
         }
 
+        public string GetAutoSaveFilePath()
+        {
+            return Path.Combine(_autoSaveDirectory, $"{GetAutoSaveFileName()}.ivsession");
+        }
+
+        public string GetLegacyAutoSaveFilePath()
+        {
+            if (string.IsNullOrWhiteSpace(_currentProjectPath))
+            {
+                return GetAutoSaveFilePath();
+            }
+
+            string baseName = Path.GetFileNameWithoutExtension(_currentProjectPath) ?? "autosave";
+            foreach (char invalidChar in Path.GetInvalidFileNameChars())
+            {
+                baseName = baseName.Replace(invalidChar, '_');
+            }
+
+            return Path.Combine(
+                _autoSaveDirectory,
+                $"{(string.IsNullOrWhiteSpace(baseName) ? "autosave" : baseName)}.ivsession");
+        }
+
         public void Toggle()
         {
             IsEnabled = !IsEnabled;
@@ -101,7 +126,7 @@ namespace ImageViewer.Controls
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 Directory.CreateDirectory(_autoSaveDirectory);
-                string filePath = Path.Combine(_autoSaveDirectory, $"{GetAutoSaveFileName()}.ivsession");
+                string filePath = GetAutoSaveFilePath();
                 await _workflow.SessionService.SaveToFileAsync(
                     filePath,
                     _workflow.CaptureSnapshot(),
@@ -142,7 +167,22 @@ namespace ImageViewer.Controls
                 baseName = baseName.Replace(invalidChar, '_');
             }
 
-            return string.IsNullOrWhiteSpace(baseName) ? "autosave" : baseName;
+            if (string.IsNullOrWhiteSpace(baseName))
+            {
+                baseName = "autosave";
+            }
+
+            // Keep names readable while hashing the full path to prevent same-name projects
+            // in different folders from overwriting one another.
+            if (baseName.Length > 48)
+            {
+                baseName = baseName[..48];
+            }
+
+            string pathHash = Convert.ToHexString(
+                    SHA256.HashData(Encoding.UTF8.GetBytes(_currentProjectPath)))
+                .ToLowerInvariant()[..12];
+            return $"autosave-{baseName}-{pathHash}";
         }
     }
 }

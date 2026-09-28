@@ -36,7 +36,7 @@ namespace ImageViewer.Models
 
         public string DisplayTypeName => RoiDisplayNameLocalizer.GetDisplayName(this);
 
-        public string DisplayName => string.IsNullOrWhiteSpace(Label) ? DisplayTypeName : $"{DisplayTypeName}: {Label}";
+        public virtual string DisplayName => string.IsNullOrWhiteSpace(Label) ? DisplayTypeName : $"{DisplayTypeName}: {Label}";
 
         /// <summary>
         /// 复制共享的视觉状态（颜色、粗细、可见性、锁定）。

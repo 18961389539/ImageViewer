@@ -378,9 +378,9 @@ namespace ImageViewer.Controls
                 try
                 {
                     var stopwatch = Stopwatch.StartNew();
-                    byte[] profileData = ImageAnalysisService.CreateProfile(bitmap, targetLine.P1.ToWpfPoint(), targetLine.P2.ToWpfPoint());
+                    ushort[] profileData = ImageAnalysisService.CreateProfile16(bitmap, targetLine.P1.ToWpfPoint(), targetLine.P2.ToWpfPoint());
                     _host.AnalysisState.LastProfileDuration = stopwatch.Elapsed;
-                    _uiFacade.PresentProfile(new ImageViewerProfileOutput(profileData));
+                    _uiFacade.PresentProfile(new ImageViewerProfileOutput(profileData, GetProfileMaximum(bitmap)));
                 }
                 catch (Exception ex)
                 {
@@ -400,14 +400,27 @@ namespace ImageViewer.Controls
             {
                 await Task.Delay(120, cancellationTokenSource.Token);
                 var stopwatch = Stopwatch.StartNew();
-                byte[]? profileData = await _host.RenderService.CreateProfileAsync(new ImageViewerAnalysisRequest(bitmap, targetLine.P1.ToWpfPoint(), targetLine.P2.ToWpfPoint()), cancellationTokenSource.Token);
+                ImageViewerAnalysisRequest request = new(bitmap, targetLine.P1.ToWpfPoint(), targetLine.P2.ToWpfPoint());
+                ushort[]? profileData;
+                ushort maximumValue;
+                if (_host.RenderService is IImageViewerHighBitDepthAnalysisRenderService highBitDepthService)
+                {
+                    profileData = await highBitDepthService.CreateProfile16Async(request, cancellationTokenSource.Token);
+                    maximumValue = GetProfileMaximum(bitmap);
+                }
+                else
+                {
+                    byte[]? legacyProfile = await _host.RenderService.CreateProfileAsync(request, cancellationTokenSource.Token);
+                    profileData = ConvertLegacyProfile(legacyProfile);
+                    maximumValue = byte.MaxValue;
+                }
                 if (cancellationTokenSource.IsCancellationRequested || profileData == null)
                 {
                     return;
                 }
 
                 _host.AnalysisState.LastProfileDuration = stopwatch.Elapsed;
-                _uiFacade.PresentProfile(new ImageViewerProfileOutput(profileData));
+                _uiFacade.PresentProfile(new ImageViewerProfileOutput(profileData, maximumValue));
             }
             catch (OperationCanceledException)
             {
@@ -417,6 +430,28 @@ namespace ImageViewer.Controls
                 _errorSink.LogNonCriticalError("Failed to update profile", ex);
                 _uiFacade.PresentProfileError(UiText.Get("StatusProfileFailed"));
             }
+        }
+
+        private static ushort GetProfileMaximum(BitmapSource bitmap)
+        {
+            BitmapSource normalized = ImageViewerPixelAccess.NormalizeForIntensity(bitmap);
+            return (ushort)ImageViewerPixelAccess.GetIntensityMaximum(normalized.Format);
+        }
+
+        private static ushort[]? ConvertLegacyProfile(byte[]? profile)
+        {
+            if (profile == null)
+            {
+                return null;
+            }
+
+            ushort[] converted = new ushort[profile.Length];
+            for (int index = 0; index < profile.Length; index++)
+            {
+                converted[index] = profile[index];
+            }
+
+            return converted;
         }
 
         public void RebuildPyramidIfNeeded()

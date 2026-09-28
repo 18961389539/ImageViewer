@@ -30,5 +30,15 @@ namespace ImageViewer.Services
                 return ImageAnalysisService.CreateProfile(request.Bitmap, request.P1, request.P2);
             }, cancellationToken);
         }
+
+        public static Task<ushort[]?> CreateProfile16Async(ImageViewerAnalysisRequest request, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            return Task.Run<ushort[]?>(() =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return ImageAnalysisService.CreateProfile16(request.Bitmap, request.P1, request.P2);
+            }, cancellationToken);
+        }
     }
 }

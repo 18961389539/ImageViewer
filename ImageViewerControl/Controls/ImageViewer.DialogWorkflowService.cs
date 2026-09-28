@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
@@ -71,6 +72,9 @@ namespace ImageViewer.Controls
     {
         private readonly ImageViewerDialogWorkflowDependencies _dependencies;
         private readonly IImageViewerDialogWorkflowAdapter _adapter;
+        private readonly object _imageLoadGate = new();
+        private CancellationTokenSource? _activeImageLoadCancellation;
+        private long _imageLoadGeneration;
         private string? _lastFailedImagePath;
 
         public ImageViewerDialogWorkflowService(ImageViewerDialogWorkflowDependencies dependencies, IImageViewerDialogWorkflowAdapter adapter)
@@ -102,49 +106,122 @@ namespace ImageViewer.Controls
 
         private async Task OpenImageFromPathAsync(string filePath)
         {
+            (CancellationTokenSource cancellation, long generation) = BeginImageLoad();
             ImageViewerDialogImageLoadWorkflow imageLoading = _dependencies.ImageLoading;
-            int retryCount = Math.Max(0, imageLoading.GetRetryCount());
-            int retryDelayMilliseconds = Math.Max(0, imageLoading.GetRetryDelayMilliseconds());
-            Exception? lastException = null;
-
-            imageLoading.SetImageLoadState(true, UiText.Get("ImageLoadStatusStarting"), 5, false);
-
-            for (int attempt = 0; attempt <= retryCount; attempt++)
+            try
             {
-                try
-                {
-                    if (attempt > 0)
-                    {
-                        imageLoading.SetImageLoadState(true, UiText.Get("ImageLoadStatusRetrying"), 15 + attempt * 10, false);
-                        if (retryDelayMilliseconds > 0)
-                        {
-                            await Task.Delay(retryDelayMilliseconds);
-                        }
-                    }
+                _lastFailedImagePath = null;
+                int retryCount = Math.Max(0, imageLoading.GetRetryCount());
+                int retryDelayMilliseconds = Math.Max(0, imageLoading.GetRetryDelayMilliseconds());
+                Exception? lastException = null;
 
-                    imageLoading.SetImageLoadState(true, UiText.Get("ImageLoadStatusDecoding"), 45, false);
-                    BitmapImage bitmap = await Task.Run(() => CreateBitmapFromFile(filePath));
-                    imageLoading.SetImageLoadState(true, UiText.Get("ImageLoadStatusApplying"), 85, false);
-                    imageLoading.SetImage(bitmap);
-                    imageLoading.FitToView();
-                    imageLoading.ClearUndoHistory();
-                    imageLoading.SetImageLoadState(false, UiText.Get("ImageLoadStatusReady"), 100, false);
-                    _lastFailedImagePath = null;
+                if (!IsCurrentImageLoad(cancellation, generation))
+                {
                     return;
                 }
-                catch (Exception ex)
+
+                imageLoading.SetImageLoadState(true, UiText.Get("ImageLoadStatusStarting"), 5, false);
+
+                for (int attempt = 0; attempt <= retryCount; attempt++)
                 {
-                    lastException = ex;
-                    if (attempt < retryCount)
+                    try
                     {
-                        continue;
+                        if (!IsCurrentImageLoad(cancellation, generation))
+                        {
+                            return;
+                        }
+
+                        if (attempt > 0)
+                        {
+                            imageLoading.SetImageLoadState(true, UiText.Get("ImageLoadStatusRetrying"), 15 + attempt * 10, false);
+                            if (retryDelayMilliseconds > 0)
+                            {
+                                await Task.Delay(retryDelayMilliseconds, cancellation.Token);
+                            }
+                        }
+
+                        imageLoading.SetImageLoadState(true, UiText.Get("ImageLoadStatusDecoding"), 45, false);
+                        BitmapImage bitmap = await Task.Run(() => CreateBitmapFromFile(filePath), cancellation.Token);
+                        if (!IsCurrentImageLoad(cancellation, generation))
+                        {
+                            return;
+                        }
+
+                        imageLoading.SetImageLoadState(true, UiText.Get("ImageLoadStatusApplying"), 85, false);
+                        imageLoading.SetImage(bitmap);
+                        imageLoading.FitToView();
+                        imageLoading.ClearUndoHistory();
+                        imageLoading.SetImageLoadState(false, UiText.Get("ImageLoadStatusReady"), 100, false);
+                        _lastFailedImagePath = null;
+                        return;
                     }
+                    catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+                    {
+                        return;
+                    }
+                    catch (Exception ex)
+                    {
+                        if (!IsCurrentImageLoad(cancellation, generation))
+                        {
+                            return;
+                        }
+
+                        lastException = ex;
+                        if (attempt >= retryCount)
+                        {
+                            break;
+                        }
+                    }
+                }
+
+                if (!IsCurrentImageLoad(cancellation, generation))
+                {
+                    return;
+                }
+
+                _lastFailedImagePath = filePath;
+                imageLoading.SetImageLoadState(true, UiText.Get("ImageLoadStatusFailed"), 0, true);
+                imageLoading.ShowNonCriticalError(UiText.Get("ErrorOpenImageTitle"), UiText.Get("ErrorOpenImageMessage"), lastException ?? new InvalidOperationException("Image load failed."));
+            }
+            finally
+            {
+                EndImageLoad(cancellation);
+            }
+        }
+
+        private (CancellationTokenSource Cancellation, long Generation) BeginImageLoad()
+        {
+            lock (_imageLoadGate)
+            {
+                _activeImageLoadCancellation?.Cancel();
+                var cancellation = new CancellationTokenSource();
+                _activeImageLoadCancellation = cancellation;
+                _imageLoadGeneration++;
+                return (cancellation, _imageLoadGeneration);
+            }
+        }
+
+        private bool IsCurrentImageLoad(CancellationTokenSource cancellation, long generation)
+        {
+            lock (_imageLoadGate)
+            {
+                return ReferenceEquals(_activeImageLoadCancellation, cancellation)
+                    && _imageLoadGeneration == generation
+                    && !cancellation.IsCancellationRequested;
+            }
+        }
+
+        private void EndImageLoad(CancellationTokenSource cancellation)
+        {
+            lock (_imageLoadGate)
+            {
+                if (ReferenceEquals(_activeImageLoadCancellation, cancellation))
+                {
+                    _activeImageLoadCancellation = null;
                 }
             }
 
-            _lastFailedImagePath = filePath;
-            imageLoading.SetImageLoadState(true, UiText.Get("ImageLoadStatusFailed"), 0, true);
-            imageLoading.ShowNonCriticalError(UiText.Get("ErrorOpenImageTitle"), UiText.Get("ErrorOpenImageMessage"), lastException ?? new InvalidOperationException("Image load failed."));
+            cancellation.Dispose();
         }
 
         public string? ShowTextInput(string message, string defaultValue)

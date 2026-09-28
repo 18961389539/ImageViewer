@@ -12,7 +12,8 @@ namespace ImageViewer.Models
             IEnumerable<BitmapSource> axialSlices,
             double spacingX = 1.0,
             double spacingY = 1.0,
-            double spacingZ = 1.0)
+            double spacingZ = 1.0,
+            VolumeSliceOrderMetadata? orderMetadata = null)
         {
             ArgumentNullException.ThrowIfNull(axialSlices);
             ValidateSpacing(spacingX, nameof(spacingX));
@@ -39,6 +40,11 @@ namespace ImageViewer.Models
                 throw new ArgumentException("All axial slices must have identical dimensions.", nameof(axialSlices));
             }
 
+            if (orderMetadata is not null && orderMetadata.Slices.Count != frozenSlices.Length)
+            {
+                throw new ArgumentException("Slice order metadata must contain one item per axial slice.", nameof(orderMetadata));
+            }
+
             Slices = new ReadOnlyCollection<BitmapSource>(frozenSlices);
             Width = width;
             Height = height;
@@ -46,6 +52,7 @@ namespace ImageViewer.Models
             SpacingX = spacingX;
             SpacingY = spacingY;
             SpacingZ = spacingZ;
+            SliceOrderMetadata = orderMetadata;
         }
 
         public IReadOnlyList<BitmapSource> Slices { get; }
@@ -61,6 +68,11 @@ namespace ImageViewer.Models
         public double SpacingY { get; }
 
         public double SpacingZ { get; }
+
+        /// <summary>
+        /// The exact ordering evidence used when this volume was assembled.
+        /// </summary>
+        public VolumeSliceOrderMetadata? SliceOrderMetadata { get; }
 
         public BitmapSource GetAxialSlice(int sliceIndex)
         {

@@ -1,3 +1,4 @@
+using System;
 using System.Windows;
 using ImageViewer.Abstractions;
 using ImageViewer.Localization;
@@ -16,6 +17,18 @@ namespace ImageViewer.Dialogs
             };
 
             return dialog.ShowDialog(owner) == true ? dialog.FileName : null;
+        }
+
+        public string[] ShowOpenImageFilesDialog(Window? owner)
+        {
+            var dialog = new OpenFileDialog
+            {
+                Title = UiText.Get("FileDialogOpenBatchImagesTitle"),
+                Filter = UiText.Get("FileDialogOpenImageFilter"),
+                Multiselect = true
+            };
+
+            return dialog.ShowDialog(owner) == true ? dialog.FileNames : Array.Empty<string>();
         }
 
         public string? ShowSaveRoiDialog(Window? owner)

@@ -50,8 +50,8 @@ namespace ImageViewer.Services
             int count = 0;
             long sum = 0;
             double sumSquares = 0;
-            byte min = byte.MaxValue;
-            byte max = byte.MinValue;
+            ushort min = ushort.MaxValue;
+            ushort max = ushort.MinValue;
 
             for (int localY = 0; localY < roiH; localY++)
             {
@@ -64,10 +64,10 @@ namespace ImageViewer.Services
                     }
 
                     int index = localY * stride + localX * bytesPerPixel;
-                    byte value = GetPixelIntensity(pixels, index, bytesPerPixel, bitmap.Format);
+                    ushort value = GetPixelIntensity(pixels, index, bytesPerPixel, bitmap.Format);
                     count++;
                     sum += value;
-                    sumSquares += value * value;
+                    sumSquares += (double)value * value;
                     if (value < min)
                     {
                         min = value;

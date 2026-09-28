@@ -120,19 +120,30 @@ namespace ImageViewer.Controls
             int pointIndex = _host.GetPolygonPointIndexAt(imagePosition);
             if (pointIndex != -1)
             {
-                _state.OriginalRoiState = viewModel.SelectedRoi?.Clone();
-                if (isRightButtonPressed && viewModel.SelectedRoi is PolygonRoi removablePolygon && removablePolygon.Points.Count > 3)
+                if (isRightButtonPressed)
                 {
-                    removablePolygon.Points.RemoveAt(pointIndex);
-                    if (_state.OriginalRoiState is PolygonRoi oldPolygon)
+                    if (viewModel.SelectedRoi is PolygonRoi removablePolygon && removablePolygon.Points.Count > 3)
                     {
-                        viewModel.UndoRedo.Execute(new RoiStateCommand(removablePolygon, oldPolygon, removablePolygon.Clone()));
+                        RoiBase oldState = removablePolygon.Clone();
+                        removablePolygon.Points.RemoveAt(pointIndex);
+                        viewModel.UndoRedo.Execute(new RoiStateCommand(removablePolygon, oldState, removablePolygon.Clone()));
+                        _host.DrawRois();
+                        return true;
                     }
 
-                    _host.DrawRois();
-                    return true;
+                    if (viewModel.SelectedRoi is PolylineRoi removablePolyline && removablePolyline.Points.Count > 2)
+                    {
+                        RoiBase oldState = removablePolyline.Clone();
+                        removablePolyline.Points.RemoveAt(pointIndex);
+                        viewModel.UndoRedo.Execute(new RoiStateCommand(removablePolyline, oldState, removablePolyline.Clone()));
+                        _host.DrawRois();
+                        return true;
+                    }
+
+                    return false;
                 }
 
+                _state.OriginalRoiState = viewModel.SelectedRoi?.Clone();
                 _state.ActivePolygonPointIndex = pointIndex;
                 _state.LastMousePosition = imagePosition;
                 _host.CaptureRootMouse();
@@ -140,15 +151,22 @@ namespace ImageViewer.Controls
             }
 
             int segmentIndex = _host.GetPolygonSegmentAt(imagePosition);
-            if (segmentIndex != -1 && viewModel.SelectedRoi is PolygonRoi segmentPolygon)
+            if (!isRightButtonPressed && segmentIndex != -1 && viewModel.SelectedRoi is PolygonRoi or PolylineRoi)
             {
-                PolygonRoi? oldState = segmentPolygon.Clone() as PolygonRoi;
-                segmentPolygon.Points.Insert(segmentIndex + 1, imagePosition.ToPointD());
-                PolygonRoi? newState = segmentPolygon.Clone() as PolygonRoi;
-
-                if (oldState != null && newState != null)
+                RoiBase selectedPath = viewModel.SelectedRoi;
+                _state.OriginalRoiState = selectedPath.Clone();
+                if (selectedPath is PolygonRoi segmentPolygon)
                 {
-                    viewModel.UndoRedo.Execute(new RoiStateCommand(segmentPolygon, oldState, newState));
+                    segmentPolygon.Points.Insert(segmentIndex + 1, imagePosition.ToPointD());
+                }
+                else if (selectedPath is PolylineRoi segmentPolyline)
+                {
+                    segmentPolyline.Points.Insert(segmentIndex + 1, imagePosition.ToPointD());
+                }
+                else
+                {
+                    _state.OriginalRoiState = null;
+                    return false;
                 }
 
                 _state.ActivePolygonPointIndex = segmentIndex + 1;
@@ -192,9 +210,17 @@ namespace ImageViewer.Controls
                 return true;
             }
 
-            if (_state.ActivePolygonPointIndex != -1 && viewModel.SelectedRoi is PolygonRoi polygon)
+            if (_state.ActivePolygonPointIndex != -1 && viewModel.SelectedRoi is PolygonRoi or PolylineRoi)
             {
-                polygon.Points[_state.ActivePolygonPointIndex] = imagePosition.ToPointD();
+                if (viewModel.SelectedRoi is PolygonRoi polygon)
+                {
+                    polygon.Points[_state.ActivePolygonPointIndex] = imagePosition.ToPointD();
+                }
+                else if (viewModel.SelectedRoi is PolylineRoi polyline)
+                {
+                    polyline.Points[_state.ActivePolygonPointIndex] = imagePosition.ToPointD();
+                }
+
                 _state.LastMousePosition = imagePosition;
                 _host.DrawSelectedRoiLayer();
                 return true;

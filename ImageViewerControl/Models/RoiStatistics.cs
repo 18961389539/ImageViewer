@@ -4,8 +4,8 @@ namespace ImageViewer.Models
     {
         public int PixelCount { get; init; }
         public double Mean { get; init; }
-        public byte Min { get; init; }
-        public byte Max { get; init; }
+        public ushort Min { get; init; }
+        public ushort Max { get; init; }
         public double StandardDeviation { get; init; }
     }
 }

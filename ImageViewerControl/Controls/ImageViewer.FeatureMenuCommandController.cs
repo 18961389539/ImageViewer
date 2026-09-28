@@ -19,6 +19,7 @@ namespace ImageViewer.Controls
         public required Action DrawRois { get; init; }
         public required Func<string?> ShowSaveSnapshotDialog { get; init; }
         public required Func<string?> ShowSaveAnalysisCsvDialog { get; init; }
+        public required Func<string[]> ShowOpenBatchImageFilesDialog { get; init; }
         public required Action<string, string> ShowReadOnlyText { get; init; }
         public required Func<IReadOnlyList<RoiBase>> GetAllRois { get; init; }
         public required Func<double> GetPixelSize { get; init; }
@@ -27,6 +28,7 @@ namespace ImageViewer.Controls
         public required Func<string?> GetCurrentImagePath { get; init; }
         public required Func<RoiPluginRegistry> GetPluginRegistry { get; init; }
         public required Func<IReadOnlyDictionary<string, string>> GetRenderSettings { get; init; }
+        public Func<ImageAnalysisQualityProfile> GetQualityProfile { get; init; } = static () => ImageAnalysisQualityProfile.Default;
         public required Action<string, string, Exception> ShowNonCriticalError { get; init; }
         public required Action<string, StatusHintKind> ShowStatusHint { get; init; }
         public required Action UpdateContextMenuState { get; init; }
@@ -39,6 +41,8 @@ namespace ImageViewer.Controls
         Task ExportSnapshotAsync();
 
         Task ExportAnalysisCsvAsync();
+
+        Task ExportBatchAnalysisCsvAsync();
 
         void ShowAnalysisSummary();
 
@@ -64,6 +68,9 @@ namespace ImageViewer.Controls
                     break;
                 case ImageViewerFeatureMenuCommand.ExportAnalysisCsv:
                     await Host.ExportAnalysisCsvAsync();
+                    break;
+                case ImageViewerFeatureMenuCommand.ExportBatchAnalysisCsv:
+                    await Host.ExportBatchAnalysisCsvAsync();
                     break;
                 case ImageViewerFeatureMenuCommand.ShowAnalysisSummary:
                     Host.ShowAnalysisSummary();

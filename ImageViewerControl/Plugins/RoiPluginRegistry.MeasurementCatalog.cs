@@ -58,6 +58,9 @@ namespace ImageViewer.Plugins
                             CaliperMinimumGradient = data.Measurement.CaliperMinimumGradient > 0 ? data.Measurement.CaliperMinimumGradient : 8,
                             CaliperOutlierThreshold = data.Measurement.CaliperOutlierThreshold > 0 ? data.Measurement.CaliperOutlierThreshold : 2.5,
                             CaliperEdgePolarity = ParseCaliperEdgePolarity(data.Measurement.CaliperEdgePolarity),
+                            CaliperEdgeExtractionMode = ParseCaliperEdgeExtractionMode(data.Measurement.CaliperEdgeExtractionMode),
+                            CaliperLineFitMode = ParseCaliperLineFitMode(data.Measurement.CaliperLineFitMode),
+                            CaliperFitClippingEndPoints = Math.Max(0, data.Measurement.CaliperFitClippingEndPoints),
                             EdgeSelection = Math.Max(1, data.Measurement.EdgeSelection)
                         },
                         static roi => roi.Center,
@@ -73,7 +76,10 @@ namespace ImageViewer.Plugins
                                 roi.MinimumValidCalipers,
                                 roi.CaliperMinimumGradient,
                                 roi.CaliperOutlierThreshold,
-                                roi.CaliperEdgePolarity);
+                                roi.CaliperEdgePolarity,
+                                roi.CaliperEdgeExtractionMode,
+                                roi.CaliperLineFitMode,
+                                roi.CaliperFitClippingEndPoints);
                             data.Measurement.EdgeSelection = roi.EdgeSelection;
                         })),
 
@@ -99,6 +105,9 @@ namespace ImageViewer.Plugins
                             CaliperMinimumGradient = data.Measurement.CaliperMinimumGradient > 0 ? data.Measurement.CaliperMinimumGradient : 8,
                             CaliperOutlierThreshold = data.Measurement.CaliperOutlierThreshold > 0 ? data.Measurement.CaliperOutlierThreshold : 2.5,
                             CaliperEdgePolarity = ParseCaliperEdgePolarity(data.Measurement.CaliperEdgePolarity),
+                            CaliperEdgeExtractionMode = ParseCaliperEdgeExtractionMode(data.Measurement.CaliperEdgeExtractionMode),
+                            CaliperLineFitMode = ParseCaliperLineFitMode(data.Measurement.CaliperLineFitMode),
+                            CaliperFitClippingEndPoints = Math.Max(0, data.Measurement.CaliperFitClippingEndPoints),
                             EdgeSelection = Math.Max(1, data.Measurement.EdgeSelection)
                         },
                         static roi => roi.Center,
@@ -114,9 +123,12 @@ namespace ImageViewer.Plugins
                                  roi.CaliperSamplingHalfWidth,
                                  roi.CaliperEdgeSigma,
                                 roi.MinimumValidCalipers,
-                                roi.CaliperMinimumGradient,
-                                roi.CaliperOutlierThreshold,
-                                roi.CaliperEdgePolarity);
+                                 roi.CaliperMinimumGradient,
+                                 roi.CaliperOutlierThreshold,
+                                roi.CaliperEdgePolarity,
+                                roi.CaliperEdgeExtractionMode,
+                                roi.CaliperLineFitMode,
+                                roi.CaliperFitClippingEndPoints);
                             data.Measurement.EdgeSelection = roi.EdgeSelection;
                         })),
 
@@ -153,6 +165,9 @@ namespace ImageViewer.Plugins
                             CaliperSearchRange = data.Geometry.Height > 0 ? (int)Math.Round(data.Geometry.Height / 2) : 24,
                             CaliperAngleDegrees = data.Geometry.Angle,
                             CaliperEdgeSigma = data.Measurement.CaliperEdgeSigma > 0 ? data.Measurement.CaliperEdgeSigma : 1.0,
+                            CaliperEdgeExtractionMode = ParseCaliperEdgeExtractionMode(data.Measurement.CaliperEdgeExtractionMode),
+                            CaliperLineFitMode = ParseCaliperLineFitMode(data.Measurement.CaliperLineFitMode),
+                            CaliperFitClippingEndPoints = Math.Max(0, data.Measurement.CaliperFitClippingEndPoints),
                             HasExplicitCaliperRegion = data.Geometry.Center != null,
                             MinimumEdgeGap = data.Measurement.MinimumEdgeGap,
                             NominalEdgeGap = data.Measurement.NominalEdgeGap,
@@ -167,6 +182,9 @@ namespace ImageViewer.Plugins
                             data.Geometry.Height = roi.CaliperSearchRange * 2;
                             data.Geometry.Angle = roi.CaliperAngleDegrees;
                             data.Measurement.CaliperEdgeSigma = roi.CaliperEdgeSigma;
+                            data.Measurement.CaliperEdgeExtractionMode = roi.CaliperEdgeExtractionMode.ToString();
+                            data.Measurement.CaliperLineFitMode = roi.CaliperLineFitMode.ToString();
+                            data.Measurement.CaliperFitClippingEndPoints = roi.CaliperFitClippingEndPoints;
                             data.Measurement.MinimumEdgeGap = roi.MinimumEdgeGap;
                             data.Measurement.NominalEdgeGap = roi.NominalEdgeGap;
                             data.Measurement.NominalEdgeGapTolerance = roi.NominalEdgeGapTolerance;
@@ -192,6 +210,9 @@ namespace ImageViewer.Plugins
                             CaliperMinimumGradient = data.Measurement.CaliperMinimumGradient > 0 ? data.Measurement.CaliperMinimumGradient : 8,
                             CaliperOutlierThreshold = data.Measurement.CaliperOutlierThreshold > 0 ? data.Measurement.CaliperOutlierThreshold : 2.5,
                             CaliperEdgePolarity = ParseCaliperEdgePolarity(data.Measurement.CaliperEdgePolarity),
+                            CaliperEdgeExtractionMode = ParseCaliperEdgeExtractionMode(data.Measurement.CaliperEdgeExtractionMode),
+                            CaliperLineFitMode = ParseCaliperLineFitMode(data.Measurement.CaliperLineFitMode),
+                            CaliperFitClippingEndPoints = Math.Max(0, data.Measurement.CaliperFitClippingEndPoints),
                             EdgeSelection = Math.Max(1, data.Measurement.EdgeSelection)
                         },
                         static roi => roi.P1,
@@ -207,7 +228,10 @@ namespace ImageViewer.Plugins
                                 roi.MinimumValidCalipers,
                                 roi.CaliperMinimumGradient,
                                 roi.CaliperOutlierThreshold,
-                                roi.CaliperEdgePolarity);
+                                roi.CaliperEdgePolarity,
+                                roi.CaliperEdgeExtractionMode,
+                                roi.CaliperLineFitMode,
+                                roi.CaliperFitClippingEndPoints);
                             data.Measurement.EdgeSelection = roi.EdgeSelection;
                         })),
 

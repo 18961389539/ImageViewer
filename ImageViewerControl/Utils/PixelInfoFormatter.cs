@@ -47,6 +47,11 @@ namespace ImageViewer.Utils
                 {
                     builder.Append(UiText.FormatInvariant("PixelInfoGray", pixels[0]));
                 }
+                else if (bitmap.Format == PixelFormats.Gray16)
+                {
+                    ushort value = (ushort)(pixels[0] | (pixels[1] << 8));
+                    builder.Append(UiText.FormatInvariant("PixelInfoGray", value));
+                }
                 else if (bytesPerPixel >= 3)
                 {
                     builder.Append(UiText.FormatInvariant("PixelInfoValues", pixels[0], pixels[1], pixels[2]));

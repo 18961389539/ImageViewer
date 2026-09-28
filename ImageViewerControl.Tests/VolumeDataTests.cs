@@ -35,6 +35,37 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
+        public void Constructor_RetainsSliceOrderProvenance()
+        {
+            var metadata = new VolumeSliceOrderMetadata(
+                "ExplicitPosition",
+                true,
+                [
+                    new VolumeSliceProvenance("slice-a", -1.5),
+                    new VolumeSliceProvenance("slice-b", 2.5)
+                ]);
+
+            var volume = new VolumeData([CreateBitmap(2, 2, 1), CreateBitmap(2, 2, 2)], orderMetadata: metadata);
+
+            Assert.Same(metadata, volume.SliceOrderMetadata);
+            Assert.Equal("slice-a", volume.SliceOrderMetadata!.Slices[0].Path);
+            Assert.Equal(-1.5, volume.SliceOrderMetadata.Slices[0].Position);
+        }
+
+        [Fact]
+        public void Constructor_RejectsProvenanceDepthMismatch()
+        {
+            var metadata = new VolumeSliceOrderMetadata(
+                "NaturalFileName",
+                false,
+                [new VolumeSliceProvenance("only-slice")]);
+
+            Assert.Throws<ArgumentException>(() => new VolumeData(
+                [CreateBitmap(2, 2, 1), CreateBitmap(2, 2, 2)],
+                orderMetadata: metadata));
+        }
+
+        [Fact]
         public void GetAxialSlice_RejectsInvalidIndex()
         {
             var volume = new VolumeData([CreateBitmap(2, 2, 1)]);

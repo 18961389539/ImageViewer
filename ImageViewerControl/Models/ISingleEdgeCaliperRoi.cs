@@ -10,5 +10,8 @@ namespace ImageViewer.Models
         int MinimumValidCalipers { get; set; }
         double CaliperOutlierThreshold { get; set; }
         CaliperEdgePolarity CaliperEdgePolarity { get; set; }
+        HalconEdgeExtractionMode CaliperEdgeExtractionMode { get; set; }
+        HalconLineFitMode CaliperLineFitMode { get; set; }
+        int CaliperFitClippingEndPoints { get; set; }
     }
 }

@@ -90,16 +90,19 @@ namespace ImageViewer.Controls
             switch (kind)
             {
                 case StatusHintKind.Success:
+                    statusHintBorder.Background = GetBrushResource("ViewerAccentSoftBrush");
                     statusHintBorder.BorderBrush = GetBrushResource("ViewerAccentBorderBrush");
                     statusHintTextBlock.Foreground = GetBrushResource("ViewerTextPrimaryBrush");
                     ApplyStatusHintIcon("StatusHintIconSuccess", GetBrushResource("ViewerAccentBrush"));
                     break;
                 case StatusHintKind.Error:
+                    statusHintBorder.Background = GetBrushResource("ViewerErrorSoftBrush");
                     statusHintBorder.BorderBrush = GetBrushResource("ViewerErrorBorderBrush");
-                    statusHintTextBlock.Foreground = GetBrushResource("ViewerErrorBrush");
+                    statusHintTextBlock.Foreground = GetBrushResource("ViewerTextPrimaryBrush");
                     ApplyStatusHintIcon("StatusHintIconError", GetBrushResource("ViewerErrorBrush"));
                     break;
                 default:
+                    statusHintBorder.Background = GetBrushResource("ViewerSurfaceBrush");
                     statusHintBorder.BorderBrush = GetBrushResource("ViewerPanelBorderBrush");
                     statusHintTextBlock.Foreground = GetBrushResource("ViewerTextPrimaryBrush");
                     ApplyStatusHintIcon(null, null);

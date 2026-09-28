@@ -22,6 +22,7 @@ namespace ImageViewerControl.Tests
             {
                 using var viewer = new ImageViewer.Controls.ImageViewer();
                 var menuItem = viewer.showInfoPanelMenuItem;
+                viewer.ShowInfoPanel = false;
 
                 WpfTestRunner.InvokePrivate(viewer, "OnViewCommandMenuClick", new MenuItem { Tag = ImageViewerViewMenuTags.ToggleInfoPanel }, new RoutedEventArgs());
                 WpfTestRunner.DrainDispatcher();
@@ -164,11 +165,15 @@ namespace ImageViewerControl.Tests
                 using var viewer = new ImageViewer.Controls.ImageViewer();
                 var dismissButton = viewer.diagnosticErrorDismissButton;
                 var diagnosticText = viewer.diagnosticErrorTextBlock;
+                var diagnosticIcon = viewer.diagnosticErrorIconTextBlock;
                 var loadStatus = viewer.imageLoadStatusTextBlock;
 
                 Assert.Equal(UiText.Get("MenuDismissError"), AutomationProperties.GetName(dismissButton));
                 Assert.Equal(AutomationLiveSetting.Assertive, AutomationProperties.GetLiveSetting(diagnosticText));
                 Assert.Equal(AutomationLiveSetting.Polite, AutomationProperties.GetLiveSetting(loadStatus));
+                Assert.Equal("⚠", diagnosticIcon.Text);
+                Assert.Same(viewer.FindResource("ViewerErrorSoftBrush"), viewer.diagnosticErrorBorder.Background);
+                Assert.Same(viewer.FindResource("ViewerErrorBorderBrush"), viewer.diagnosticErrorBorder.BorderBrush);
             });
         }
 

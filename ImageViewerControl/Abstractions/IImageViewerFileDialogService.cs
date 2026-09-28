@@ -6,6 +6,8 @@ namespace ImageViewer.Abstractions
     {
         string? ShowOpenImageDialog(Window? owner);
 
+        string[] ShowOpenImageFilesDialog(Window? owner);
+
         string? ShowSaveRoiDialog(Window? owner);
 
         string? ShowOpenRoiDialog(Window? owner);

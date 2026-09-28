@@ -55,7 +55,7 @@ namespace ImageViewer.Services
             if (_tileCache.TryGet(level.Bitmap, sourceCrop, out BitmapSource? cachedFrame))
             {
                 Prefetch(level.Bitmap, sourceCrop, prefetchAdjacentTiles, tilePrefetchRadius);
-                return new ImageViewerRenderFrame(cachedFrame, visibleRegion.X, visibleRegion.Y, visibleRegion.Width, visibleRegion.Height, level.ScaleFactor, true);
+                return BuildTiledFrame(cachedFrame!, sourceCrop, level.ScaleFactor);
             }
 
             Int32Rect cacheCrop = ImageViewerRenderTileCache.ExpandToTileGrid(sourceCrop, level.Bitmap.PixelWidth, level.Bitmap.PixelHeight);
@@ -72,7 +72,25 @@ namespace ImageViewer.Services
 
             _tileCache.Store(level.Bitmap, sourceCrop, tiledSource);
             Prefetch(level.Bitmap, cacheCrop, prefetchAdjacentTiles, tilePrefetchRadius);
-            return new ImageViewerRenderFrame(tiledSource, visibleRegion.X, visibleRegion.Y, visibleRegion.Width, visibleRegion.Height, level.ScaleFactor, true);
+            return BuildTiledFrame(tiledSource, sourceCrop, level.ScaleFactor);
+        }
+
+        private static ImageViewerRenderFrame BuildTiledFrame(BitmapSource source, Int32Rect sourceCrop, double scaleFactor)
+        {
+            double resolvedScaleFactor = Math.Max(scaleFactor, double.Epsilon);
+            // The bitmap starts at the integer crop origin. Placing it at the
+            // fractional visible-region origin introduces a sub-pixel offset;
+            // at high zoom that becomes a visible gap between the image edge
+            // and its ROI overlay. Keep the image frame anchored to the exact
+            // pixels that were cropped, expressed in base-image coordinates.
+            return new ImageViewerRenderFrame(
+                source,
+                sourceCrop.X / resolvedScaleFactor,
+                sourceCrop.Y / resolvedScaleFactor,
+                sourceCrop.Width / resolvedScaleFactor,
+                sourceCrop.Height / resolvedScaleFactor,
+                scaleFactor,
+                true);
         }
 
         private void Prefetch(BitmapSource source, Int32Rect rect, bool enabled, int radius)

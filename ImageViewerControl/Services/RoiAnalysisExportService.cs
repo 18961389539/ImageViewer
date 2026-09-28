@@ -21,6 +21,7 @@ namespace ImageViewer.Services
         public static string BuildSummary(IEnumerable<RoiBase> rois, BitmapSource? bitmap, double pixelSize, string? physicalUnit, CameraCalibration? calibration = null)
         {
             ArgumentNullException.ThrowIfNull(rois);
+            ImageViewerValidation.ValidatePixelSize(pixelSize);
 
             var roiList = rois.ToList();
             var lines = new List<string>
@@ -66,7 +67,7 @@ namespace ImageViewer.Services
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
             ArgumentNullException.ThrowIfNull(rois);
-            File.WriteAllText(filePath, BuildCsv(rois, bitmap, pixelSize, physicalUnit, calibration), Encoding.UTF8);
+            ImageViewerAtomicFile.WriteAllText(filePath, BuildCsv(rois, bitmap, pixelSize, physicalUnit, calibration), Encoding.UTF8);
         }
 
         public static Task SaveCsvAsync(string filePath, IEnumerable<RoiBase> rois, BitmapSource? bitmap, double pixelSize, string? physicalUnit, CameraCalibration? calibration = null, CancellationToken cancellationToken = default)
@@ -91,7 +92,7 @@ namespace ImageViewer.Services
             RoiAnalysisExportContext? exportContext,
             CancellationToken cancellationToken)
         {
-            await File.WriteAllTextAsync(filePath, BuildCsv(rois, bitmap, pixelSize, physicalUnit, calibration), Encoding.UTF8, cancellationToken).ConfigureAwait(false);
+            await ImageViewerAtomicFile.WriteAllTextAsync(filePath, BuildCsv(rois, bitmap, pixelSize, physicalUnit, calibration), Encoding.UTF8, cancellationToken).ConfigureAwait(false);
             if (exportContext == null)
             {
                 return;
@@ -100,7 +101,7 @@ namespace ImageViewer.Services
             string metadataPath = Path.ChangeExtension(filePath, ".metadata.json");
             string csvHash = await ComputeSha256Async(filePath, cancellationToken).ConfigureAwait(false);
             string metadata = await BuildMetadataJsonAsync(rois, bitmap, pixelSize, physicalUnit, calibration, exportContext, csvHash, cancellationToken).ConfigureAwait(false);
-            await File.WriteAllTextAsync(metadataPath, metadata, Encoding.UTF8, cancellationToken).ConfigureAwait(false);
+            await ImageViewerAtomicFile.WriteAllTextAsync(metadataPath, metadata, Encoding.UTF8, cancellationToken).ConfigureAwait(false);
         }
 
         private static async Task<string> ComputeSha256Async(string filePath, CancellationToken cancellationToken)
@@ -136,7 +137,7 @@ namespace ImageViewer.Services
             object? roiDocument = null;
             if (exportContext.PluginRegistry != null)
             {
-                string roiJson = RoiPersistenceService.Serialize(rois, pixelSize, physicalUnit, exportContext.PluginRegistry);
+                string roiJson = RoiPersistenceService.Serialize(rois, pixelSize, physicalUnit, exportContext.PluginRegistry, exportContext.QualityProfile);
                 using JsonDocument document = JsonDocument.Parse(roiJson);
                 roiDocument = document.RootElement.Clone();
             }
@@ -151,6 +152,9 @@ namespace ImageViewer.Services
                 {
                     ["ellipseAlgorithm"] = FittingAlgorithmMetadata.Ellipse,
                     ["caliperEdgeAlgorithm"] = FittingAlgorithmMetadata.CaliperEdge,
+                    ["caliperEdgeExtraction"] = FittingAlgorithmMetadata.CaliperEdgeExtraction,
+                    ["lineFit"] = FittingAlgorithmMetadata.LineFit,
+                    ["lineGeometry"] = FittingAlgorithmMetadata.LineGeometry,
                     ["ellipseLoss"] = RobustFitLoss.Tukey.ToString(),
                     ["ellipseMaxIterations"] = EllipseFitOptions.Default.MaxIterations,
                     ["ellipseMaxRansacSamples"] = EllipseFitOptions.Default.MaxRansacSamples,
@@ -169,9 +173,27 @@ namespace ImageViewer.Services
                         ["algorithm"] = ellipse.FitAlgorithm
                     }).ToList()
                 },
+                ["qualityThresholds"] = exportContext.QualityProfile ?? ImageAnalysisQualityProfile.Default,
                 ["result"] = new Dictionary<string, object?>
                 {
-                    ["csvSha256"] = csvHash
+                    ["csvSha256"] = csvHash,
+                    ["inspectionResults"] = rois.Select((roi, index) =>
+                    {
+                        RoiInspectionResult inspection = RoiInspectionEvaluator.Evaluate(roi, pixelSize, calibration);
+                        return new Dictionary<string, object?>
+                        {
+                            ["index"] = index,
+                            ["type"] = roi.RoiTypeName,
+                            ["label"] = roi.Label,
+                            ["detectionStatus"] = inspection.DetectionStatus.ToString(),
+                            ["specificationStatus"] = inspection.SpecificationStatus.ToString(),
+                            ["measuredValue"] = inspection.MeasuredValue,
+                            ["nominalValue"] = inspection.NominalValue,
+                            ["tolerancePlus"] = inspection.TolerancePlus,
+                            ["toleranceMinus"] = inspection.ToleranceMinus,
+                            ["physicalUnit"] = string.IsNullOrWhiteSpace(physicalUnit) ? "px" : physicalUnit
+                        };
+                    }).ToList()
                 },
                 ["source"] = new Dictionary<string, object?>
                 {
@@ -203,10 +225,11 @@ namespace ImageViewer.Services
         public static string BuildCsv(IEnumerable<RoiBase> rois, BitmapSource? bitmap, double pixelSize, string? physicalUnit, CameraCalibration? calibration = null)
         {
             ArgumentNullException.ThrowIfNull(rois);
+            ImageViewerValidation.ValidatePixelSize(pixelSize);
 
             string unit = string.IsNullOrWhiteSpace(physicalUnit) ? "px" : physicalUnit;
             var builder = new StringBuilder();
-            builder.AppendLine("Type,Label,Metric1,Metric2,Metric3,Mean,Min,Max,StdDev,PixelCount");
+            builder.AppendLine("Type,Label,Metric1,Metric2,Metric3,Mean,Min,Max,StdDev,PixelCount,DetectionStatus,SpecificationStatus,MeasuredValue,NominalValue,TolerancePlus,ToleranceMinus,PhysicalUnit");
 
             foreach (var roi in rois)
             {
@@ -226,6 +249,8 @@ namespace ImageViewer.Services
                     pixelCount = statistics.PixelCount.ToString(CultureInfo.InvariantCulture);
                 }
 
+                RoiInspectionResult inspection = RoiInspectionEvaluator.Evaluate(roi, pixelSize, calibration);
+
                 builder.AppendLine(string.Join(",",
                     Escape(roi.RoiTypeName),
                     Escape(roi.Label),
@@ -236,7 +261,14 @@ namespace ImageViewer.Services
                     min,
                     max,
                     stddev,
-                    pixelCount));
+                    pixelCount,
+                    Escape(inspection.DetectionStatus.ToString()),
+                    Escape(inspection.SpecificationStatus.ToString()),
+                    FormatNullable(inspection.MeasuredValue),
+                    FormatNullable(inspection.NominalValue),
+                    FormatNullable(inspection.TolerancePlus),
+                    FormatNullable(inspection.ToleranceMinus),
+                    Escape(unit)));
             }
 
             return builder.ToString();
@@ -251,6 +283,19 @@ namespace ImageViewer.Services
                 RotatedRect rect => ($"Width={rect.Width * correction * pixelSize:F2} {unit}", $"Height={rect.Height * correction * pixelSize:F2} {unit}", $"Angle={rect.Angle:F1}°"),
                 FittedEllipseRoi fittedEllipse => ($"RadiusX={fittedEllipse.RadiusX * correction * pixelSize:F2} {unit}", $"RadiusY={fittedEllipse.RadiusY * correction * pixelSize:F2} {unit}", $"Angle={fittedEllipse.Angle:F1}°;RMS={fittedEllipse.FitResidualRms * correction * pixelSize:F3};Inliers={fittedEllipse.FitInlierCount}"),
                 EllipseRoi ellipse => ($"RadiusX={ellipse.RadiusX * correction * pixelSize:F2} {unit}", $"RadiusY={ellipse.RadiusY * correction * pixelSize:F2} {unit}", $"Angle={ellipse.Angle:F1}°"),
+                CaliperMeasureRoi caliper => GetDualEdgeCaliperMetrics(caliper, correction, pixelSize, unit),
+                LineCaliperMeasureRoi lineCaliper => (
+                    $"Length={GeometryUtils.Distance(lineCaliper.P1.ToWpfPoint(), lineCaliper.P2.ToWpfPoint()) * correction * pixelSize:F2} {unit}",
+                    $"Angle={lineCaliper.AngleDegrees:F2}°",
+                    $"Confidence={lineCaliper.Confidence:F3};RMS={lineCaliper.ResidualRms * correction:F3};Valid={lineCaliper.ValidCaliperCount}"),
+                ArcCaliperMeasureRoi arcCaliper => (
+                    $"Radius={arcCaliper.Radius * correction * pixelSize:F2} {unit}",
+                    $"Arc={arcCaliper.SweepAngle:F1}°",
+                    $"Confidence={arcCaliper.Confidence:F3};RMS={arcCaliper.ResidualRms * correction:F3};Valid={arcCaliper.ValidCaliperCount}"),
+                CircularCaliperMeasureRoi circular => (
+                    $"Radius={circular.Radius * correction * pixelSize:F2} {unit}",
+                    $"Quality={circular.QualityStatus}",
+                    $"QualityReason={circular.QualityReason};Confidence={circular.Confidence:F3};Coverage={circular.QualityAngularCoverageDegrees:F1};RMS={circular.ResidualRms:F3}"),
                 CircleRoi circle => ($"Radius={circle.Radius * correction * pixelSize:F2} {unit}", string.Empty, string.Empty),
                 PolygonRoi polygon when polygon.IsClosed && polygon.Points.Count >= 3 => ($"Area={GeometryUtils.PolygonArea(polygon.Points.ToWpfPointArray()) * areaCorrection * pixelSize * pixelSize:F2} {unit}²", $"Perimeter={GeometryUtils.PolygonPerimeter(polygon.Points.ToWpfPointArray()) * correction * pixelSize:F2} {unit}", $"Vertices={polygon.Points.Count};Closed=true"),
                 PolygonRoi polygon => ($"Perimeter={GeometryUtils.PolylineLength(polygon.Points.ToWpfPointArray()) * correction * pixelSize:F2} {unit}", $"Vertices={polygon.Points.Count}", "Closed=false"),
@@ -266,9 +311,83 @@ namespace ImageViewer.Services
             };
         }
 
+        private static (string Metric1, string Metric2, string Metric3) GetDualEdgeCaliperMetrics(CaliperMeasureRoi caliper, double correction, double pixelSize, string unit)
+        {
+            CaliperWidthMeasurementResult width = caliper.WidthMeasurement;
+            string requested = $"Requested={GeometryUtils.Distance(caliper.P1.ToWpfPoint(), caliper.P2.ToWpfPoint()) * correction * pixelSize:F2} {unit}";
+            string detection = width.IsMeasured
+                ? $"Center={width.CenterDistance * correction * pixelSize:F2} {unit};Mean={width.Mean * correction * pixelSize:F2} {unit};Median={width.Median * correction * pixelSize:F2} {unit}"
+                : "Detected=n/a";
+            string spread = width.IsMeasured
+                ? $"Min={width.Minimum * correction * pixelSize:F2} {unit};Max={width.Maximum * correction * pixelSize:F2} {unit};Range={width.Range * correction * pixelSize:F2} {unit};StdDev={width.StandardDeviation * correction * pixelSize:F3} {unit};Samples={width.SampleCount}"
+                : $"Valid={caliper.ValidCaliperCount};Confidence={caliper.Confidence:F3};RMS={Math.Max(caliper.Edge1ResidualRms, caliper.Edge2ResidualRms) * correction:F3}";
+            return (requested, detection, spread);
+        }
+
+        internal static string BuildBatchCsv(IEnumerable<RoiAnalysisBatchCsvRow> rows)
+        {
+            ArgumentNullException.ThrowIfNull(rows);
+
+            var builder = new StringBuilder();
+            builder.AppendLine("Source,Status,Error,Type,Label,Metric1,Metric2,Metric3,Mean,Min,Max,StdDev,PixelCount,DetectionStatus,SpecificationStatus,MeasuredValue,NominalValue,TolerancePlus,ToleranceMinus,PhysicalUnit");
+            foreach (RoiAnalysisBatchCsvRow row in rows)
+            {
+                var metrics = GetMetrics(row.Roi, row.PixelSize, string.IsNullOrWhiteSpace(row.PhysicalUnit) ? "px" : row.PhysicalUnit, row.Calibration);
+                string mean = string.Empty;
+                string min = string.Empty;
+                string max = string.Empty;
+                string stddev = string.Empty;
+                string pixelCount = string.Empty;
+                if (row.Bitmap != null && ImageAnalysisService.TryCalculateStatistics(row.Bitmap, row.Roi, out RoiStatistics statistics))
+                {
+                    mean = statistics.Mean.ToString("F2", CultureInfo.InvariantCulture);
+                    min = statistics.Min.ToString(CultureInfo.InvariantCulture);
+                    max = statistics.Max.ToString(CultureInfo.InvariantCulture);
+                    stddev = statistics.StandardDeviation.ToString("F2", CultureInfo.InvariantCulture);
+                    pixelCount = statistics.PixelCount.ToString(CultureInfo.InvariantCulture);
+                }
+
+                RoiInspectionResult inspection = row.Bitmap == null
+                    ? RoiInspectionEvaluator.EvaluateInputFailure(row.Roi)
+                    : RoiInspectionEvaluator.Evaluate(row.Roi, row.PixelSize, row.Calibration);
+                string unit = string.IsNullOrWhiteSpace(row.PhysicalUnit) ? "px" : row.PhysicalUnit!;
+
+                builder.AppendLine(string.Join(",",
+                    Escape(row.SourcePath),
+                    Escape(row.Status),
+                    Escape(row.Error),
+                    Escape(row.Roi.RoiTypeName),
+                    Escape(row.Roi.Label),
+                    Escape(metrics.Metric1),
+                    Escape(metrics.Metric2),
+                    Escape(metrics.Metric3),
+                    mean,
+                    min,
+                    max,
+                    stddev,
+                    pixelCount,
+                    Escape(inspection.DetectionStatus.ToString()),
+                    Escape(inspection.SpecificationStatus.ToString()),
+                    FormatNullable(inspection.MeasuredValue),
+                    FormatNullable(inspection.NominalValue),
+                    FormatNullable(inspection.TolerancePlus),
+                    FormatNullable(inspection.ToleranceMinus),
+                    Escape(unit)));
+            }
+
+            return builder.ToString();
+        }
+
         private static string Escape(string? value)
         {
             return $"\"{(value ?? string.Empty).Replace("\"", "\"\"")}\"";
+        }
+
+        private static string FormatNullable(double? value)
+        {
+            return value is { } number && double.IsFinite(number)
+                ? number.ToString("G17", CultureInfo.InvariantCulture)
+                : string.Empty;
         }
     }
 }

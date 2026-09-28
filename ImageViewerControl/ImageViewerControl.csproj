@@ -5,6 +5,14 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <IsPackable>true</IsPackable>
+    <PackageId>ImageViewerControl</PackageId>
+    <Authors>ImageViewer contributors</Authors>
+    <Description>Embeddable WPF image viewer with ROI annotation, measurement, analysis, export, and MPR workflows.</Description>
+    <PackageTags>wpf;image-viewer;roi;measurement;image-analysis;computer-vision</PackageTags>
+    <RepositoryUrl>https://github.com/18961389539/ImageViewer</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -12,6 +20,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ImageViewer.Core\ImageViewer.Core.csproj" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="HelixToolkit.Wpf.SharpDX" />

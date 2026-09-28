@@ -28,7 +28,7 @@ namespace ImageViewer.Controls
                 tool.Header,
                 ToolTip: null,
                 IsEnabled: true,
-                Tag: new ImageViewerRoiToolMenuTag(tool.Activate),
+                Tag: new ImageViewerRoiToolMenuTag(tool.Header, tool.Activate),
                 Group: tool.IsMeasurement ? ImageViewerDynamicMenuGroup.Measurement : ImageViewerDynamicMenuGroup.Drawing,
                 CreateIcon: tool.CreateIcon);
         }
@@ -54,10 +54,13 @@ namespace ImageViewer.Controls
     {
         private readonly Action<ImageViewer> _activate;
 
-        public ImageViewerRoiToolMenuTag(Action<ImageViewer> activate)
+        public ImageViewerRoiToolMenuTag(string toolName, Action<ImageViewer> activate)
         {
+            ToolName = string.IsNullOrWhiteSpace(toolName) ? UiText.Get("ActiveToolGeneric") : toolName;
             _activate = activate ?? throw new ArgumentNullException(nameof(activate));
         }
+
+        public string ToolName { get; }
 
         public void Activate(ImageViewer owner)
         {

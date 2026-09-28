@@ -29,6 +29,7 @@ namespace ImageViewer.Models
 
             DualEdgeCaliperConfigurationState.Capture(source).ApplyTo(target);
             DualEdgeCaliperDetectionDisplayState.Capture(source).ApplyTo(target);
+            target.ApplyWidthMeasurement(source.WidthMeasurement);
         }
     }
 }

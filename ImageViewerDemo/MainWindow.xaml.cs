@@ -1,11 +1,13 @@
 using Microsoft.Win32;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media.Imaging;
 using ImageViewer.Controls;
+using ImageViewer.Services;
 using ImageViewerDemo.Localization;
 using ImageViewer.Models;
 
@@ -91,11 +93,52 @@ public partial class MainWindow : Window
 
         try
         {
-            string[] orderedPaths = dialog.FileNames
-                .OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
+            string[] selectedPaths = dialog.FileNames;
+            VolumeSliceOrderingResult ordering = await VolumeSliceOrderingService.OrderPathsWithMetadataAsync(selectedPaths);
+            IReadOnlyList<string> orderedPaths = ordering.OrderedPaths;
+            bool orderNeedsConfirmation = !ordering.IsAuthoritative ||
+                ordering.Warnings.Count > 0 ||
+                VolumeSliceOrderingService.HasOrderChanged(selectedPaths, orderedPaths);
+            if (orderNeedsConfirmation)
+            {
+                string orderSource = ordering.Source switch
+                {
+                    VolumeSliceOrderSource.ExplicitPosition => "空间位置元数据",
+                    VolumeSliceOrderSource.InstanceNumber => "实例号元数据",
+                    VolumeSliceOrderSource.AcquisitionTime => "采集时间元数据",
+                    _ => "文件名自然排序（缺少完整元数据）"
+                };
+                MessageBoxResult orderConfirmation = MessageBox.Show(
+                    this,
+                    DemoText.Format(
+                        "OpenVolumeOrderChangedMessage",
+                        orderedPaths.Count,
+                        orderSource,
+                        Path.GetFileName(orderedPaths[0]),
+                        Path.GetFileName(orderedPaths[Math.Min(1, orderedPaths.Count - 1)]),
+                        Path.GetFileName(orderedPaths[Math.Max(0, orderedPaths.Count - 2)]),
+                        Path.GetFileName(orderedPaths[^1]),
+                        ordering.Warnings.Count == 0 ? string.Empty : $"\n{string.Join(Environment.NewLine, ordering.Warnings)}"),
+                    DemoText.Get("OpenVolumeOrderChangedTitle"),
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning);
+
+                if (orderConfirmation != MessageBoxResult.Yes)
+                {
+                    return;
+                }
+            }
+
             BitmapSource[] slices = await Task.Run(() => orderedPaths.Select(LoadBitmap).ToArray());
-            var volume = new VolumeData(slices);
+            var orderMetadata = new VolumeSliceOrderMetadata(
+                ordering.Source.ToString(),
+                ordering.IsAuthoritative,
+                ordering.Slices.Select(slice => new VolumeSliceProvenance(
+                    slice.Path,
+                    slice.Position,
+                    slice.InstanceNumber,
+                    slice.AcquisitionTime)));
+            var volume = new VolumeData(slices, orderMetadata: orderMetadata);
             Viewer.Volume = volume;
             Viewer.ImageSource = volume.GetAxialSlice(0);
             Viewer.DisplayMode = AdaptiveDisplayMode.Auto;

@@ -11,6 +11,11 @@ namespace ImageViewer.Services
 
         public bool TryDetectSelectedLineCaliperEdges(ImageSource? imageSource, RoiBase? selectedRoi, out LineCaliperDetectionResult result)
         {
+            return TryDetectSelectedLineCaliperEdges(imageSource, selectedRoi, out result, ImageAnalysisQualityProfile.Default);
+        }
+
+        public bool TryDetectSelectedLineCaliperEdges(ImageSource? imageSource, RoiBase? selectedRoi, out LineCaliperDetectionResult result, ImageAnalysisQualityProfile? qualityProfile)
+        {
             result = default;
             if (selectedRoi is not LineCaliperMeasureRoi lineCaliper)
             {
@@ -22,7 +27,7 @@ namespace ImageViewer.Services
                 return false;
             }
 
-            if (!ImageAnalysisService.TryDetectLineCaliperEdges(bitmap, lineCaliper, out result))
+            if (!ImageAnalysisService.TryDetectLineCaliperEdges(bitmap, lineCaliper, out result, qualityProfile))
             {
                 lineCaliper.ClearDetectedLine();
                 return false;

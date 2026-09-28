@@ -43,7 +43,7 @@ namespace ImageViewer.Controls
             Reload();
 
             RecentImageViewerProject[] updated = _recentProjects
-                .Where(item => !string.Equals(Path.GetFullPath(item.Path), Path.GetFullPath(filePath), StringComparison.OrdinalIgnoreCase))
+                .Where(item => !PathsEqual(item.Path, filePath))
                 .ToArray();
 
             if (updated.Length == _recentProjects.Length)
@@ -69,6 +69,18 @@ namespace ImageViewer.Controls
         private static RecentImageViewerProject[] AsRecentProjectArray(IReadOnlyList<RecentImageViewerProject> recentProjects)
         {
             return recentProjects as RecentImageViewerProject[] ?? [.. recentProjects];
+        }
+
+        private static bool PathsEqual(string left, string right)
+        {
+            try
+            {
+                return string.Equals(Path.GetFullPath(left), Path.GetFullPath(right), StringComparison.OrdinalIgnoreCase);
+            }
+            catch (Exception exception) when (exception is ArgumentException or NotSupportedException)
+            {
+                return string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
+            }
         }
     }
 }

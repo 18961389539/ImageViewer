@@ -15,6 +15,7 @@ namespace ImageViewer.Services
         public static string BuildInfo(RoiBase roi, BitmapSource? bitmap, double pixelSize, string? physicalUnit, RoiPluginRegistry? pluginRegistry = null, bool includeStatistics = true, CameraCalibration? calibration = null)
         {
             ArgumentNullException.ThrowIfNull(roi);
+            ImageViewerValidation.ValidatePixelSize(pixelSize);
             var roiPlugins = pluginRegistry ?? throw new ArgumentNullException(nameof(pluginRegistry));
             List<string> lines = new();
             if (!string.IsNullOrWhiteSpace(roi.Label))
@@ -31,6 +32,12 @@ namespace ImageViewer.Services
             {
                 AppendBuiltInInfoLines(lines, roi, pixelSize, physicalUnit, calibration);
             }
+
+            // Tolerance judgement is a cross-cutting inspection result.  It must
+            // be shown even when a custom ROI plugin supplies its own geometry
+            // lines; otherwise the information panel can omit the specification
+            // decision for plugin-backed ROIs.
+            AppendToleranceJudgementLine(lines, roi, pixelSize, calibration);
 
             if (includeStatistics && bitmap != null && ImageAnalysisService.TryCalculateStatistics(bitmap, roi, out RoiStatistics statistics))
             {
@@ -226,7 +233,6 @@ namespace ImageViewer.Services
                     break;
             }
 
-            AppendToleranceJudgementLine(lines, roi, pixelSize, calibration);
         }
 
         /// <summary>
@@ -241,35 +247,17 @@ namespace ImageViewer.Services
                 return;
             }
 
-            double? measured = GetPrimaryMeasurementValue(roi, pixelSize, calibration);
-            if (measured == null)
+            RoiInspectionResult inspection = RoiInspectionEvaluator.Evaluate(roi, pixelSize, calibration);
+            if (inspection.SpecificationStatus is not (RoiSpecificationStatus.Passed or RoiSpecificationStatus.Failed) ||
+                inspection.MeasuredValue is not { } measured)
             {
                 return;
             }
 
-            string key = tolerance.IsWithinTolerance(measured.Value)
+            string key = inspection.SpecificationStatus == RoiSpecificationStatus.Passed
                 ? "InfoTolerancePass"
                 : "InfoToleranceFail";
-            lines.Add(UiText.FormatInvariant(key, measured.Value, tolerance.Nominal ?? 0));
-        }
-
-        /// <summary>
-        /// 主测量值（物理单位）：距离类取 P1-P2 距离，圆/弧类取半径。
-        /// Chinese: 与信息面板中展示的"距离/半径"保持一致，便于按同一数值设定公差。
-        /// English: Primary measurement value in physical units for tolerance judgement.
-        /// </summary>
-        private static double? GetPrimaryMeasurementValue(RoiBase roi, double pixelSize, CameraCalibration? calibration)
-        {
-            double correction = RoiCalibrationHelper.GetLengthCorrection(roi, calibration);
-            return roi switch
-            {
-                LineMeasureRoi line => GeometryUtils.Distance(line.P1.ToWpfPoint(), line.P2.ToWpfPoint()) * correction * pixelSize,
-                CircularCaliperMeasureRoi circular => circular.Radius * correction * pixelSize,
-                ArcMeasureRoi arc => arc.Radius * correction * pixelSize,
-                ThreePointCircleMeasureRoi threePointCircle when threePointCircle.IsValid => threePointCircle.Radius * correction * pixelSize,
-                CenterDistanceMeasureRoi centerDistance => centerDistance.CenterDistance * correction * pixelSize,
-                _ => null
-            };
+            lines.Add(UiText.FormatInvariant(key, measured, tolerance.Nominal ?? 0));
         }
 
         private static void AppendBlobAnalysisInfoLines(List<string> lines, BlobAnalysisRoi blob, double pixelSize, string? physicalUnit, double correction, double areaCorrection)
@@ -316,6 +304,22 @@ namespace ImageViewer.Services
             }
 
             AppendDetectionQualityLines(lines, caliper);
+            CaliperWidthMeasurementResult width = caliper.WidthMeasurement;
+            if (width.IsMeasured)
+            {
+                lines.Add(UiText.FormatInvariant(
+                    "InfoLineCaliperDetectedWidth",
+                    FormatLength(width.CenterDistance * correction, pixelSize, physicalUnit),
+                    FormatLength(width.Mean * correction, pixelSize, physicalUnit),
+                    FormatLength(width.Median * correction, pixelSize, physicalUnit)));
+                lines.Add(UiText.FormatInvariant(
+                    "InfoLineCaliperWidthSpread",
+                    FormatLength(width.Minimum * correction, pixelSize, physicalUnit),
+                    FormatLength(width.Maximum * correction, pixelSize, physicalUnit),
+                    FormatLength(width.Range * correction, pixelSize, physicalUnit),
+                    FormatLength(width.StandardDeviation * correction, pixelSize, physicalUnit),
+                    width.SampleCount));
+            }
             lines.Add(UiText.FormatInvariant("InfoLineCaliperAngles", caliper.Edge1AngleDegrees, caliper.Edge2AngleDegrees, caliper.ParallelismErrorDegrees));
         }
 
@@ -324,6 +328,11 @@ namespace ImageViewer.Services
             lines.Add(UiText.FormatInvariant("InfoLineSingleCaliper", title, geometryLine));
             lines.Add(UiText.FormatInvariant("InfoLineSingleSearch", FormatLength(caliper.CaliperSearchRange * 2 * correction, pixelSize, physicalUnit)));
             AppendCaliperParameterLine(lines, caliper);
+            if (caliper is CircularCaliperMeasureRoi circularCaliper && circularCaliper is not ArcCaliperMeasureRoi)
+            {
+                lines.Add(GetCircularQualityLine(circularCaliper));
+            }
+
             if (!caliper.HasDetection)
             {
                 return;
@@ -348,6 +357,32 @@ namespace ImageViewer.Services
             lines.Add(UiText.FormatInvariant("InfoLineConfidence", caliper.Confidence));
         }
 
+        private static string GetCircularQualityLine(CircularCaliperMeasureRoi caliper)
+        {
+            return caliper.QualityStatus switch
+            {
+                CircularCaliperQualityStatus.Passed => UiText.FormatInvariant("InfoLineCircularQualityPassed", caliper.QualityAngularCoverageDegrees),
+                CircularCaliperQualityStatus.Review => UiText.FormatInvariant("InfoLineCircularQualityReview", caliper.QualityAngularCoverageDegrees, GetCircularQualityReason(caliper.QualityReason)),
+                CircularCaliperQualityStatus.Failed => UiText.FormatInvariant("InfoLineCircularQualityFailed", GetCircularQualityReason(caliper.QualityReason)),
+                _ => UiText.Get("InfoLineCircularQualityNotMeasured")
+            };
+        }
+
+        private static string GetCircularQualityReason(CircularCaliperQualityReason reason)
+        {
+            return reason switch
+            {
+                CircularCaliperQualityReason.DetectionFailed => UiText.Get("CircularQualityReasonDetectionFailed"),
+                CircularCaliperQualityReason.InvalidGeometry => UiText.Get("CircularQualityReasonInvalidGeometry"),
+                CircularCaliperQualityReason.LowConfidence => UiText.Get("CircularQualityReasonLowConfidence"),
+                CircularCaliperQualityReason.InsufficientValidCalipers => UiText.Get("CircularQualityReasonInsufficientValidCalipers"),
+                CircularCaliperQualityReason.InsufficientAngularCoverage => UiText.Get("CircularQualityReasonInsufficientCoverage"),
+                CircularCaliperQualityReason.HighResidual => UiText.Get("CircularQualityReasonHighResidual"),
+                CircularCaliperQualityReason.BorderlineEvidence => UiText.Get("CircularQualityReasonBorderlineEvidence"),
+                _ => UiText.Get("CircularQualityReasonUnknown")
+            };
+        }
+
         private static void AppendStatisticsLines(List<string> lines, RoiStatistics statistics)
         {
             lines.Add(UiText.FormatInvariant("InfoLineStatisticsMean", statistics.Mean, statistics.Min, statistics.Max));
@@ -363,7 +398,22 @@ namespace ImageViewer.Services
 
             if (calibration is { IsEnabled: true })
             {
-                lines.Add(UiText.FormatInvariant("InfoLineCalibrationDistortion", calibration.K1, calibration.K2));
+                if (calibration.HasExtendedDistortionModel || calibration.ReprojectionErrorRms > 0 || calibration.MeasurementUncertaintyPixels > 0)
+                {
+                    lines.Add(UiText.FormatInvariant(
+                        "InfoLineCalibrationDistortionExtended",
+                        calibration.K1,
+                        calibration.K2,
+                        calibration.K3,
+                        calibration.TangentialP1,
+                        calibration.TangentialP2,
+                        calibration.ReprojectionErrorRms,
+                        calibration.MeasurementUncertaintyPixels));
+                }
+                else
+                {
+                    lines.Add(UiText.FormatInvariant("InfoLineCalibrationDistortion", calibration.K1, calibration.K2));
+                }
             }
         }
 

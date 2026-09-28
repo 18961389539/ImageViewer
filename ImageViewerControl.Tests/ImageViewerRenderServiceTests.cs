@@ -120,6 +120,42 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
+        public void BuildRenderFrame_TiledCropKeepsImageAndOverlayCoordinatesAlignedAtHighZoom()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                const int edgeX = 120;
+                const double zoom = 12;
+                const double translationX = -1242.8;
+                var service = new ImageViewerRenderService();
+                BitmapSource source = CreateStepBitmap(2100, 2000, edgeX);
+
+                ImageViewerRenderFrame frame = service.BuildRenderFrame(
+                    source,
+                    [new ImagePyramidLevel(source, 1.0)],
+                    new Size(631, 1240),
+                    zoom,
+                    new Point(translationX, 0),
+                    PseudoColorPalette.None,
+                    enableTiledRendering: true,
+                    autoSelectPyramidLevel: false,
+                    prefetchAdjacentTiles: false,
+                    tileCacheMaximumMegabytes: 128,
+                    tilePrefetchRadius: 0);
+
+                BitmapSource renderedTile = Assert.IsAssignableFrom<BitmapSource>(frame.Source);
+                byte[] pixels = new byte[renderedTile.PixelWidth * renderedTile.PixelHeight];
+                renderedTile.CopyPixels(pixels, renderedTile.PixelWidth, 0);
+                int localEdgeX = Array.FindIndex(pixels, value => value == 48);
+                Assert.True(localEdgeX >= 0);
+
+                double imageEdgeScreenX = (frame.Left + localEdgeX * frame.Width / renderedTile.PixelWidth) * zoom + translationX;
+                double overlayEdgeScreenX = edgeX * zoom + translationX;
+                Assert.InRange(Math.Abs(imageEdgeScreenX - overlayEdgeScreenX), 0, 0.1);
+            });
+        }
+
+        [Fact]
         public void RenderTileCache_SetSmallBudget_EvictsOlderEntries()
         {
             WpfTestRunner.Run(() =>
@@ -204,6 +240,20 @@ namespace ImageViewerControl.Tests
                 null,
                 pixels,
                 width);
+        }
+
+        private static BitmapSource CreateStepBitmap(int width, int height, int edgeX)
+        {
+            byte[] pixels = new byte[width * height];
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    pixels[y * width + x] = (byte)(x < edgeX ? 255 : 48);
+                }
+            }
+
+            return BitmapSource.Create(width, height, 96, 96, PixelFormats.Gray8, null, pixels, width);
         }
     }
 }

@@ -154,6 +154,7 @@ namespace ImageViewer.Controls
         public static ImageViewerFeatureMenuCommandTag GradientDetect { get; } = new(ImageViewerFeatureMenuCommand.GradientDetect);
         public static ImageViewerFeatureMenuCommandTag ExportSnapshot { get; } = new(ImageViewerFeatureMenuCommand.ExportSnapshot);
         public static ImageViewerFeatureMenuCommandTag ExportAnalysisCsv { get; } = new(ImageViewerFeatureMenuCommand.ExportAnalysisCsv);
+        public static ImageViewerFeatureMenuCommandTag ExportBatchAnalysisCsv { get; } = new(ImageViewerFeatureMenuCommand.ExportBatchAnalysisCsv);
         public static ImageViewerFeatureMenuCommandTag ShowAnalysisSummary { get; } = new(ImageViewerFeatureMenuCommand.ShowAnalysisSummary);
     }
 }

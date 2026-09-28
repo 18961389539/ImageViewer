@@ -17,6 +17,10 @@ namespace ImageViewer.Models
         private int _minimumValidCalipers = 4;
         private double _caliperOutlierThreshold = 2.5;
         private CaliperEdgePolarity _caliperEdgePolarity = CaliperEdgePolarity.Any;
+        private HalconEdgeExtractionMode _caliperEdgeExtractionMode = HalconEdgeExtractionMode.GaussianDerivative;
+        private HalconLineFitMode _caliperLineFitMode = HalconLineFitMode.Tukey;
+        private int _caliperFitClippingEndPoints;
+        private CaliperWidthMeasurementResult _widthMeasurement = CaliperWidthMeasurementResult.Empty;
 
         private DualEdgeCaliperDetectionDisplayState DetectionDisplayState => DualEdgeCaliperDetectionDisplayStateStore.GetOrCreate(this);
 
@@ -223,6 +227,27 @@ namespace ImageViewer.Models
             set => SetProperty(ref _caliperEdgePolarity, value);
         }
 
+        /// <summary>卡尺剖面的 HALCON 风格边缘提取模式。</summary>
+        public HalconEdgeExtractionMode CaliperEdgeExtractionMode
+        {
+            get => _caliperEdgeExtractionMode;
+            set => SetProperty(ref _caliperEdgeExtractionMode, value);
+        }
+
+        /// <summary>卡尺边缘点的 HALCON 风格直线拟合模式。</summary>
+        public HalconLineFitMode CaliperLineFitMode
+        {
+            get => _caliperLineFitMode;
+            set => SetProperty(ref _caliperLineFitMode, value);
+        }
+
+        /// <summary>拟合时从每条边缘轮廓首尾各忽略的点数；端点输出仍使用原始首尾点。</summary>
+        public int CaliperFitClippingEndPoints
+        {
+            get => _caliperFitClippingEndPoints;
+            set => SetProperty(ref _caliperFitClippingEndPoints, Math.Max(0, value));
+        }
+
         public double Edge1AverageScore
         {
             get => DetectionDisplayState.Edge1AverageScore;
@@ -289,6 +314,21 @@ namespace ImageViewer.Models
             set => SetDetectionDisplayStateValue(DetectionDisplayState.Confidence, Math.Clamp(value, 0, 1), static (state, v) => state.Confidence = v);
         }
 
+        /// <summary>
+        /// 双边缘卡尺的逐点宽度结果和统计值。
+        /// </summary>
+        public CaliperWidthMeasurementResult WidthMeasurement
+        {
+            get => _widthMeasurement;
+            private set => SetProperty(ref _widthMeasurement, value);
+        }
+
+        internal void ApplyWidthMeasurement(CaliperWidthMeasurementResult measurement)
+        {
+            ArgumentNullException.ThrowIfNull(measurement);
+            WidthMeasurement = measurement;
+        }
+
         public void SetDetectedEdges(PointD edge1Start, PointD edge1End, PointD edge2Start, PointD edge2End)
         {
             Edge1Start = edge1Start;
@@ -301,6 +341,7 @@ namespace ImageViewer.Models
         public void ClearDetectedEdges()
         {
             this.ClearDetection();
+            ApplyWidthMeasurement(CaliperWidthMeasurementResult.Empty);
         }
 
         public void SyncCaliperRegionFromMeasurementLine(bool updateSearchRange = true)

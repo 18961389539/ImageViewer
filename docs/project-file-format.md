@@ -17,6 +17,11 @@ ROI JSON 由 `RoiPersistenceService` 负责读写，顶层结构如下：
   "Version": 1,
   "PixelSize": 0.5,
   "PhysicalUnit": "mm",
+  "QualityProfile": {
+    "MinimumDetectionConfidence": 0.05,
+    "PassConfidence": 0.55,
+    "PassResidualRms": 1.5
+  },
   "Items": [
     {
       "Type": "circle",
@@ -35,8 +40,9 @@ ROI JSON 由 `RoiPersistenceService` 负责读写，顶层结构如下：
 字段说明：
 
 - `Version`：当前固定为 `1`。读取时会校验：高于当前支持版本的文件会被拒绝加载；缺失或非正数视为早期文件，宽容接受。
-- `PixelSize`：像素尺寸；读取时如果小于等于 `0`，会回退到 `1.0`。
+- `PixelSize`：像素尺寸；缺失时兼容使用 `1.0`，但显式的 `0`、负数或非有限值会拒绝加载，避免把无效标定静默当成真实尺寸。
 - `PhysicalUnit`：物理单位；空值会回退到 `px`。
+- `QualityProfile`：本次项目使用的检测质量门限；缺失时使用默认配置，写出时保留完整门限。
 - `Items`：ROI 项数组。
 
 ### ROI 项约定
@@ -62,6 +68,11 @@ ROI JSON 由 `RoiPersistenceService` 负责读写，顶层结构如下：
     "Version": 1,
     "PixelSize": 0.5,
     "PhysicalUnit": "mm",
+    "QualityProfile": {
+      "MinimumDetectionConfidence": 0.05,
+      "PassConfidence": 0.55,
+      "PassResidualRms": 1.5
+    },
     "Items": []
   },
   "Scale": 1.25,
@@ -79,7 +90,9 @@ ROI JSON 由 `RoiPersistenceService` 负责读写，顶层结构如下：
 - `SavedAtUtc`：保存时间戳。
 - `ImagePath`：图像路径，可为绝对路径，也可为相对会话文件所在目录的相对路径。
 - `RoiDocument`：完整的 ROI 文档对象，结构与 `.json` ROI 文件一致（含自己的 `Version`）。
+- `RoiDocument.QualityProfile`：项目实际使用的质量门限。缺失时使用兼容默认值；保存时会把当前项目门限写回，避免只记录算法结果而丢失判定依据。除检测置信度、有效比例、角度覆盖率和残差门限外，还包括体数据过曝、欠曝和低对比度直方图门限。
 - `Scale`、`TranslateX`、`TranslateY`：保存当前视图缩放和平移状态。
+- `Calibration`：可选的相机标定参数，包括主点、归一化半径、K1/K2/K3 径向系数、P1/P2 切向系数，以及可选的标定 RMS、不确定度、证书标识和标定时间。旧会话缺少扩展字段时仍按 K1/K2 兼容读取。
 
 ## `.ivpkg` 项目包
 

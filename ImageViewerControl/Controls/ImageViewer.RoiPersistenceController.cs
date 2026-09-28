@@ -22,6 +22,8 @@ namespace ImageViewer.Controls
 
         string PhysicalUnit { get; set; }
 
+        ImageAnalysisQualityProfile QualityProfile { get; set; }
+
         void ReplaceAllRois(IReadOnlyList<RoiBase> rois);
 
         void RefreshAllCaliperDetections();
@@ -56,7 +58,7 @@ namespace ImageViewer.Controls
 
             try
             {
-                await RoiPersistenceService.SaveToFileAsync(filePath, _host.AllRois, _host.PixelSize, _host.PhysicalUnit, _host.PluginRegistry);
+                await RoiPersistenceService.SaveToFileAsync(filePath, _host.AllRois, _host.PixelSize, _host.PhysicalUnit, _host.PluginRegistry, qualityProfile: _host.QualityProfile);
                 _host.ShowStatusHint(UiText.Get("StatusSaveRoiSuccess"), StatusHintKind.Success);
             }
             catch (Exception ex)
@@ -79,6 +81,10 @@ namespace ImageViewer.Controls
                 _host.ReplaceAllRois(result.Rois);
                 _host.PixelSize = result.PixelSize;
                 _host.PhysicalUnit = result.PhysicalUnit;
+                if (result.QualityProfile is { } qualityProfile)
+                {
+                    _host.QualityProfile = qualityProfile;
+                }
                 _host.RefreshAllCaliperDetections();
                 _host.DrawRois();
                 _host.RefreshSelectedRoiPropertyPanel();

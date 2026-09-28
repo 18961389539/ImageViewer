@@ -40,8 +40,11 @@ namespace ImageViewer.Services
 
         /// <summary>
         /// 单边缘选择完毕后的亚像素定位（锐利/渐变自适应）。
+        /// Chinese: sampleStep 为剖面采样步长（像素），粗定位阶段用它减少采样点数；1 表示逐像素。
+        /// English: Locates an edge along one search profile with subpixel refinement. <c>sampleStep</c> is
+        /// the profile stepping in pixels: a coarse scan passes a value above 1 to cut sample count.
         /// </summary>
-        private static bool TryFindStrongestCircularGradient(byte[] pixels, int pixelWidth, int pixelHeight, int stride, int bytesPerPixel, PixelFormat format, Point center, Vector measurementDirection, Vector averagingDirection, int searchRange, int averagingHalfWidth, double edgeSigma, double minimumGradient, CaliperEdgePolarity polarity, int edgeSelection, out CaliperEdgeSample edgeSample)
+        private static bool TryFindStrongestCircularGradient(byte[] pixels, int pixelWidth, int pixelHeight, int stride, int bytesPerPixel, PixelFormat format, Point center, Vector measurementDirection, Vector averagingDirection, int searchRange, int averagingHalfWidth, double edgeSigma, double minimumGradient, CaliperEdgePolarity polarity, int edgeSelection, out CaliperEdgeSample edgeSample, HalconEdgeExtractionMode extractionMode = HalconEdgeExtractionMode.GaussianDerivative, int sampleStep = 1)
         {
             edgeSample = default;
             int sampleCount = searchRange * 2 + 1;
@@ -50,11 +53,11 @@ namespace ImageViewer.Services
             for (int i = 0; i < sampleCount; i++)
             {
                 int axisOffset = i - searchRange;
-                Point sampleCenter = center + measurementDirection * axisOffset;
+                Point sampleCenter = center + measurementDirection * (axisOffset * sampleStep);
                 profile[i] = SampleAveragedIntensity(pixels, pixelWidth, pixelHeight, stride, bytesPerPixel, format, sampleCenter, averagingDirection, averagingHalfWidth);
             }
 
-            double[] score = BuildGradientScoreProfile(profile, polarity, edgeSigma);
+            double[] score = BuildGradientScoreProfile(profile, polarity, edgeSigma, extractionMode, minimumGradient);
 
             if (!TrySelectPeak(score, edgeSelection, out int bestIndex, out double strongestGradient))
             {
@@ -68,9 +71,45 @@ namespace ImageViewer.Services
 
             // 亚像素定位：锐利阶跃用灰度矩法，模糊/渐变边缘回退抛物线插值。
             double subpixelPosition = SelectSubpixelPosition(bestIndex, profile, score);
-            Point detectedPosition = center + measurementDirection * (subpixelPosition - searchRange);
+            Point detectedPosition = center + measurementDirection * ((subpixelPosition - searchRange) * sampleStep);
             edgeSample = new CaliperEdgeSample(detectedPosition, strongestGradient);
             return true;
+        }
+
+        /// <summary>
+        /// 沿射线选择离起点最近的可靠边缘。
+        /// Chinese: 自动圆粗定位优先使用点击点向外遇到的第一条边缘，避免被更远但更强的外轮廓抢走。
+        /// English: Selects the nearest reliable edge along a ray so automatic-circle coarse localization
+        /// is not hijacked by a farther, stronger outer contour.
+        /// </summary>
+        private static bool TryFindNearestCircularGradient(byte[] pixels, int pixelWidth, int pixelHeight, int stride, int bytesPerPixel, PixelFormat format, Point center, Vector measurementDirection, Vector averagingDirection, int searchRange, int averagingHalfWidth, double edgeSigma, double minimumGradient, CaliperEdgePolarity polarity, out CaliperEdgeSample edgeSample, HalconEdgeExtractionMode extractionMode = HalconEdgeExtractionMode.GaussianDerivative, int sampleStep = 1)
+        {
+            edgeSample = default;
+            int sampleCount = searchRange * 2 + 1;
+            double[] profile = new double[sampleCount];
+
+            for (int i = 0; i < sampleCount; i++)
+            {
+                int axisOffset = i - searchRange;
+                Point sampleCenter = center + measurementDirection * (axisOffset * sampleStep);
+                profile[i] = SampleAveragedIntensity(pixels, pixelWidth, pixelHeight, stride, bytesPerPixel, format, sampleCenter, averagingDirection, averagingHalfWidth);
+            }
+
+            double[] score = BuildGradientScoreProfile(profile, polarity, edgeSigma, extractionMode, minimumGradient);
+            for (int index = 1; index < score.Length - 1; index++)
+            {
+                if (score[index] < minimumGradient || score[index] < score[index - 1] || score[index] < score[index + 1])
+                {
+                    continue;
+                }
+
+                double subpixelPosition = SelectSubpixelPosition(index, profile, score);
+                Point detectedPosition = center + measurementDirection * ((subpixelPosition - searchRange) * sampleStep);
+                edgeSample = new CaliperEdgeSample(detectedPosition, score[index]);
+                return true;
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -128,44 +167,178 @@ namespace ImageViewer.Services
         /// Chinese: 中心差分梯度 + 极性方向得分；序列端点梯度置零以支持亚像素抛物线插值。
         /// English: Builds a gradient score profile aligned to the sample indices 0..n-1.
         /// </summary>
-        private static double[] BuildGradientScoreProfile(double[] profile, CaliperEdgePolarity polarity, double edgeSigma = 1.0)
+        private static double[] BuildGradientScoreProfile(double[] profile, CaliperEdgePolarity polarity, double edgeSigma = 1.0, HalconEdgeExtractionMode extractionMode = HalconEdgeExtractionMode.GaussianDerivative, double minimumGradient = 0)
         {
+            double[] response = BuildEdgeResponse(profile, edgeSigma, extractionMode);
             var score = new double[profile.Length];
-            double sigma = Math.Clamp(edgeSigma, 0.5, 5.0);
-            int radius = Math.Max(1, (int)Math.Ceiling(3 * sigma));
-            radius = Math.Min(radius, Math.Max(1, (profile.Length - 1) / 2));
-            double[] derivativeKernel = new double[radius * 2 + 1];
-            double normalization = 0;
-            for (int offset = -radius; offset <= radius; offset++)
+            for (int i = 0; i < response.Length; i++)
             {
-                double value = offset * Math.Exp(-(offset * offset) / (2 * sigma * sigma));
-                derivativeKernel[offset + radius] = value;
-                normalization += Math.Abs(value);
+                score[i] = polarity switch
+                {
+                    CaliperEdgePolarity.DarkToLight => Math.Max(response[i], 0),
+                    CaliperEdgePolarity.LightToDark => Math.Max(-response[i], 0),
+                    _ => Math.Abs(response[i])
+                };
             }
 
+            if (extractionMode == HalconEdgeExtractionMode.Canny)
+            {
+                ApplyCannyNonMaximumSuppression(score);
+                ApplyCannyHysteresis(score, Math.Max(0, minimumGradient));
+            }
+
+            return score;
+        }
+
+        private static double[] BuildEdgeResponse(double[] profile, double edgeSigma, HalconEdgeExtractionMode extractionMode)
+        {
+            double sigma = Math.Clamp(edgeSigma, 0.5, 5.0);
+            return extractionMode switch
+            {
+                HalconEdgeExtractionMode.Deriche => BuildRecursiveDerivativeResponse(profile, sigma, symmetric: false),
+                HalconEdgeExtractionMode.Mshen => BuildRecursiveDerivativeResponse(profile, sigma, symmetric: true),
+                HalconEdgeExtractionMode.Lanser1 or HalconEdgeExtractionMode.SobelFast =>
+                    ApplyDerivativeKernel(profile, [-1, 1]),
+                HalconEdgeExtractionMode.Lanser2 or HalconEdgeExtractionMode.Sobel =>
+                    ApplyDerivativeKernel(profile, [-1, -2, 0, 2, 1]),
+                HalconEdgeExtractionMode.Canny or HalconEdgeExtractionMode.GaussianDerivative =>
+                    BuildGaussianDerivativeResponse(profile, sigma),
+                _ => BuildGaussianDerivativeResponse(profile, sigma)
+            };
+        }
+
+        private static double[] BuildGaussianDerivativeResponse(double[] profile, double sigma)
+        {
+            int radius = Math.Max(1, (int)Math.Ceiling(3 * sigma));
+            radius = Math.Min(radius, Math.Max(1, (profile.Length - 1) / 2));
+            double[] kernel = new double[radius * 2 + 1];
+            for (int offset = -radius; offset <= radius; offset++)
+            {
+                kernel[offset + radius] = offset * Math.Exp(-(offset * offset) / (2 * sigma * sigma));
+            }
+
+            return ApplyDerivativeKernel(profile, kernel);
+        }
+
+        private static double[] ApplyDerivativeKernel(double[] profile, double[] kernel)
+        {
+            var response = new double[profile.Length];
+            int radius = kernel.Length / 2;
+            double normalization = kernel.Sum(Math.Abs);
             if (normalization < 1e-9)
             {
-                normalization = 1;
+                return response;
             }
 
             for (int i = radius; i < profile.Length - radius; i++)
             {
-                double gradient = 0;
-                for (int offset = -radius; offset <= radius; offset++)
+                double value = 0;
+                for (int k = 0; k < kernel.Length; k++)
                 {
-                    gradient += profile[i + offset] * derivativeKernel[offset + radius];
+                    value += profile[i + k - radius] * kernel[k];
                 }
 
-                gradient = gradient * 2 / normalization;
-                score[i] = polarity switch
-                {
-                    CaliperEdgePolarity.DarkToLight => Math.Max(gradient, 0),
-                    CaliperEdgePolarity.LightToDark => Math.Max(-gradient, 0),
-                    _ => Math.Abs(gradient)
-                };
+                response[i] = value * 2 / normalization;
             }
 
-            return score;
+            return response;
+        }
+
+        private static double[] BuildRecursiveDerivativeResponse(double[] profile, double sigma, bool symmetric)
+        {
+            var response = new double[profile.Length];
+            if (profile.Length < 3)
+            {
+                return response;
+            }
+
+            double alpha = Math.Clamp(1.0 / (sigma + (symmetric ? 0.5 : 0.1)), 0.08, 0.95);
+            var forward = new double[profile.Length];
+            var backward = new double[profile.Length];
+            forward[0] = profile[0];
+            for (int i = 1; i < profile.Length; i++)
+            {
+                forward[i] = alpha * profile[i] + (1 - alpha) * forward[i - 1];
+            }
+
+            backward[^1] = profile[^1];
+            for (int i = profile.Length - 2; i >= 0; i--)
+            {
+                backward[i] = alpha * profile[i] + (1 - alpha) * backward[i + 1];
+            }
+
+            double[] smooth = new double[profile.Length];
+            for (int i = 0; i < profile.Length; i++)
+            {
+                smooth[i] = symmetric
+                    ? 0.5 * (forward[i] + backward[i])
+                    : forward[i];
+            }
+
+            for (int i = 1; i < profile.Length - 1; i++)
+            {
+                response[i] = smooth[i + 1] - smooth[i - 1];
+            }
+
+            return response;
+        }
+
+        private static void ApplyCannyNonMaximumSuppression(double[] score)
+        {
+            double[] original = [.. score];
+            for (int i = 1; i < score.Length - 1; i++)
+            {
+                score[i] = original[i] >= original[i - 1] && original[i] >= original[i + 1]
+                    ? original[i]
+                    : 0;
+            }
+
+            if (score.Length > 0)
+            {
+                score[0] = 0;
+                score[^1] = 0;
+            }
+        }
+
+        private static void ApplyCannyHysteresis(double[] score, double highThreshold)
+        {
+            if (highThreshold <= 0)
+            {
+                return;
+            }
+
+            double lowThreshold = highThreshold * 0.5;
+            bool[] strong = new bool[score.Length];
+            for (int i = 0; i < score.Length; i++)
+            {
+                strong[i] = score[i] >= highThreshold;
+            }
+
+            for (int i = 0; i < score.Length; i++)
+            {
+                if (!strong[i])
+                {
+                    continue;
+                }
+
+                for (int j = i - 1; j >= 0 && score[j] >= lowThreshold; j--)
+                {
+                    score[j] = Math.Max(score[j], highThreshold);
+                }
+
+                for (int j = i + 1; j < score.Length && score[j] >= lowThreshold; j++)
+                {
+                    score[j] = Math.Max(score[j], highThreshold);
+                }
+            }
+
+            for (int i = 0; i < score.Length; i++)
+            {
+                if (score[i] < highThreshold)
+                {
+                    score[i] = 0;
+                }
+            }
         }
 
         /// <summary>
@@ -198,12 +371,12 @@ namespace ImageViewer.Services
         /// Chinese: 弱边缘点保留最小权重而非完全丢弃，避免低对比区域被忽略。
         /// English: Derives fit weights from edge gradient scores, clamped to [0.15, 1.0].
         /// </summary>
-        private static double[] BuildScoreWeights(IReadOnlyList<CaliperEdgeSample> samples)
+        private static double[] BuildScoreWeights(IReadOnlyList<CaliperEdgeSample> samples, ImageAnalysisQualityProfile quality)
         {
             var weights = new double[samples.Count];
             for (int i = 0; i < samples.Count; i++)
             {
-                weights[i] = 0.15 + 0.85 * Math.Clamp(samples[i].Score / MaxCaliperScore, 0, 1);
+                weights[i] = 0.15 + 0.85 * Math.Clamp(samples[i].Score / quality.MaxCaliperScore, 0, 1);
             }
 
             return weights;
@@ -273,7 +446,7 @@ namespace ImageViewer.Services
             return lo - 0.5 + edgeFromLeft * count;
         }
 
-        private static bool TryFindStrongestGradientPair(byte[] pixels, int pixelWidth, int pixelHeight, int stride, int bytesPerPixel, PixelFormat format, Point center, Vector measurementDirection, Vector averagingDirection, int searchRange, int averagingHalfWidth, double edgeSigma, double minimumGradient, CaliperEdgePolarity polarity, double minimumEdgeGapPx, double nominalEdgeGapPx, double nominalEdgeGapTolerancePx, out CaliperEdgeSample edge1Sample, out CaliperEdgeSample edge2Sample)
+        private static bool TryFindStrongestGradientPair(byte[] pixels, int pixelWidth, int pixelHeight, int stride, int bytesPerPixel, PixelFormat format, Point center, Vector measurementDirection, Vector averagingDirection, int searchRange, int averagingHalfWidth, double edgeSigma, double minimumGradient, CaliperEdgePolarity polarity, double minimumEdgeGapPx, double nominalEdgeGapPx, double nominalEdgeGapTolerancePx, out CaliperEdgeSample edge1Sample, out CaliperEdgeSample edge2Sample, HalconEdgeExtractionMode extractionMode = HalconEdgeExtractionMode.GaussianDerivative)
         {
             edge1Sample = default;
             edge2Sample = default;
@@ -287,109 +460,99 @@ namespace ImageViewer.Services
                 profile[i] = SampleAveragedIntensity(pixels, pixelWidth, pixelHeight, stride, bytesPerPixel, format, sampleCenter, averagingDirection, averagingHalfWidth);
             }
 
-            double[] score = BuildGradientScoreProfile(profile, polarity, edgeSigma);
+            double[] score = BuildGradientScoreProfile(profile, polarity, edgeSigma, extractionMode, minimumGradient);
             int middleIndex = searchRange;
-            double strongestGradient1 = 0;
-            double strongestGradient2 = 0;
-            int bestIndex1 = -1;
-            int bestIndex2 = -1;
-            for (int i = 1; i < score.Length - 1; i++)
-            {
-                if (i < middleIndex)
-                {
-                    double leadingScore = polarity switch
-                    {
-                        CaliperEdgePolarity.DarkToLight => Math.Max(profile[i + 1] - profile[i - 1], 0),
-                        CaliperEdgePolarity.LightToDark => Math.Max(-(profile[i + 1] - profile[i - 1]), 0),
-                        _ => Math.Abs(profile[i + 1] - profile[i - 1])
-                    };
-                    if (leadingScore > strongestGradient1)
-                    {
-                        strongestGradient1 = leadingScore;
-                        bestIndex1 = i;
-                    }
-                }
-                else if (i > middleIndex)
-                {
-                    double trailingScore = polarity switch
-                    {
-                        CaliperEdgePolarity.DarkToLight => Math.Max(-(profile[i + 1] - profile[i - 1]), 0),
-                        CaliperEdgePolarity.LightToDark => Math.Max(profile[i + 1] - profile[i - 1], 0),
-                        _ => Math.Abs(profile[i + 1] - profile[i - 1])
-                    };
-                    if (trailingScore > strongestGradient2)
-                    {
-                        strongestGradient2 = trailingScore;
-                        bestIndex2 = i;
-                    }
-                }
-            }
-
-            if (bestIndex1 < 0 || bestIndex2 < 0 || strongestGradient1 < minimumGradient || strongestGradient2 < minimumGradient)
+            List<int> leadingCandidates = FindGradientPeaks(score, 1, middleIndex - 1, minimumGradient);
+            List<int> trailingCandidates = FindGradientPeaks(score, middleIndex + 1, score.Length - 2, minimumGradient);
+            if (leadingCandidates.Count == 0 || trailingCandidates.Count == 0)
             {
                 return false;
             }
 
-            // 全局边缘对仲裁：在满足“跨中点、最低梯度、最小间距”的全部候选组合中，
-            // 以“两侧得分之和 − 标称宽度先验惩罚”综合评分取最优，避免局部最强对错配。
-            if (minimumEdgeGapPx > 0 || nominalEdgeGapPx > 0)
+            // 全局边缘对仲裁：始终在两侧局部峰中选择一对，而不是分别取两侧的单个最强梯度。
+            // 这样即使存在更强的纹理伪边，也会用两侧得分平衡和标称宽度先验共同决定目标边缘。
+            int bestIndex1 = -1;
+            int bestIndex2 = -1;
+            double bestPairScore = double.NegativeInfinity;
+            foreach (int candidate1 in leadingCandidates)
             {
-                int bestI1 = -1;
-                int bestI2 = -1;
-                double bestPairScore = -1;
-                for (int i1 = 0; i1 < middleIndex; i1++)
+                foreach (int candidate2 in trailingCandidates)
                 {
-                    if (score[i1] < minimumGradient)
+                    double gap = candidate2 - candidate1;
+                    if (gap < Math.Max(0, minimumEdgeGapPx))
                     {
                         continue;
                     }
 
-                    for (int i2 = middleIndex + 1; i2 < score.Length; i2++)
+                    double weakerEdgeScore = Math.Min(score[candidate1], score[candidate2]);
+                    double pairScore = 0.7 * (score[candidate1] + score[candidate2]) + 0.3 * weakerEdgeScore;
+                    if (nominalEdgeGapPx > 0)
                     {
-                        if (score[i2] < minimumGradient)
+                        double deviation = Math.Abs(gap - nominalEdgeGapPx) - Math.Max(0, nominalEdgeGapTolerancePx);
+                        if (deviation > 0)
                         {
-                            continue;
-                        }
-
-                        double gap = i2 - i1;
-                        if (gap < minimumEdgeGapPx)
-                        {
-                            continue;
-                        }
-
-                        double pairScore = score[i1] + score[i2];
-                        if (nominalEdgeGapPx > 0)
-                        {
-                            double deviation = Math.Abs(gap - nominalEdgeGapPx) - Math.Max(0, nominalEdgeGapTolerancePx);
-                            if (deviation > 0)
-                            {
-                                pairScore -= deviation;
-                            }
-                        }
-
-                        if (pairScore > bestPairScore)
-                        {
-                            bestPairScore = pairScore;
-                            bestI1 = i1;
-                            bestI2 = i2;
+                            pairScore -= deviation * 1.25;
                         }
                     }
-                }
 
-                if (bestI1 >= 0)
-                {
-                    bestIndex1 = bestI1;
-                    bestIndex2 = bestI2;
-                    strongestGradient1 = score[bestIndex1];
-                    strongestGradient2 = score[bestIndex2];
+                    if (pairScore > bestPairScore)
+                    {
+                        bestPairScore = pairScore;
+                        bestIndex1 = candidate1;
+                        bestIndex2 = candidate2;
+                    }
                 }
             }
 
+            if (bestIndex1 < 0 || bestIndex2 < 0)
+            {
+                return false;
+            }
+
+            double strongestGradient1 = score[bestIndex1];
+            double strongestGradient2 = score[bestIndex2];
             double subpixelPosition1 = SelectSubpixelPosition(bestIndex1, profile, score);
             double subpixelPosition2 = SelectSubpixelPosition(bestIndex2, profile, score);
             edge1Sample = new CaliperEdgeSample(center + measurementDirection * (subpixelPosition1 - searchRange), strongestGradient1);
             edge2Sample = new CaliperEdgeSample(center + measurementDirection * (subpixelPosition2 - searchRange), strongestGradient2);
             return true;
+        }
+
+        private static List<int> FindGradientPeaks(double[] score, int startIndex, int endIndex, double minimumGradient)
+        {
+            var peaks = new List<int>();
+            int start = Math.Max(1, startIndex);
+            int end = Math.Min(score.Length - 2, endIndex);
+            for (int i = start; i <= end; i++)
+            {
+                if (score[i] >= minimumGradient && score[i] > score[i - 1] && score[i] >= score[i + 1])
+                {
+                    peaks.Add(i);
+                }
+            }
+
+            if (peaks.Count > 0)
+            {
+                return peaks;
+            }
+
+            int strongestIndex = -1;
+            double strongestScore = minimumGradient;
+            for (int i = start; i <= end; i++)
+            {
+                if (score[i] > strongestScore)
+                {
+                    strongestScore = score[i];
+                    strongestIndex = i;
+                }
+            }
+
+            if (strongestIndex >= 0)
+            {
+                peaks.Add(strongestIndex);
+            }
+
+            return peaks;
         }
     }
 }

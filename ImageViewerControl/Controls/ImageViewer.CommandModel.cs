@@ -96,6 +96,7 @@ namespace ImageViewer.Controls
         GradientDetect,
         ExportSnapshot,
         ExportAnalysisCsv,
+        ExportBatchAnalysisCsv,
         ShowAnalysisSummary
     }
 }

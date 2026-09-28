@@ -183,6 +183,12 @@ namespace ImageViewer.Controls
         public void HandleMouseRightButtonDown(MouseButtonEventArgs e)
         {
             Point imagePosition = _pointerInteractionFlow.SnapPoint(e.GetPosition(_host.ImageElement));
+            if (_editInteractionFlow.TryBeginEdit(imagePosition, isRightButtonPressed: true))
+            {
+                e.Handled = true;
+                return;
+            }
+
             if (_selectionInteractionFlow.HandleRightClick(imagePosition))
             {
                 e.Handled = true;

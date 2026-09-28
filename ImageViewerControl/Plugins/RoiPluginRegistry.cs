@@ -496,7 +496,10 @@ namespace ImageViewer.Plugins
             int minimumValidCalipers,
             double caliperMinimumGradient,
             double caliperOutlierThreshold,
-            CaliperEdgePolarity caliperEdgePolarity)
+            CaliperEdgePolarity caliperEdgePolarity,
+            HalconEdgeExtractionMode caliperEdgeExtractionMode,
+            HalconLineFitMode caliperLineFitMode,
+            int caliperFitClippingEndPoints)
         {
             data.Measurement.CaliperCount = caliperCount;
             data.Measurement.CaliperSearchRange = caliperSearchRange;
@@ -506,6 +509,9 @@ namespace ImageViewer.Plugins
             data.Measurement.CaliperMinimumGradient = caliperMinimumGradient;
             data.Measurement.CaliperOutlierThreshold = caliperOutlierThreshold;
             data.Measurement.CaliperEdgePolarity = caliperEdgePolarity.ToString();
+            data.Measurement.CaliperEdgeExtractionMode = caliperEdgeExtractionMode.ToString();
+            data.Measurement.CaliperLineFitMode = caliperLineFitMode.ToString();
+            data.Measurement.CaliperFitClippingEndPoints = Math.Max(0, caliperFitClippingEndPoints);
         }
 
         private static CaliperEdgePolarity ParseCaliperEdgePolarity(string? value)
@@ -513,6 +519,20 @@ namespace ImageViewer.Plugins
             return Enum.TryParse<CaliperEdgePolarity>(value, true, out var polarity)
                 ? polarity
                 : CaliperEdgePolarity.Any;
+        }
+
+        private static HalconEdgeExtractionMode ParseCaliperEdgeExtractionMode(string? value)
+        {
+            return Enum.TryParse<HalconEdgeExtractionMode>(value, true, out var mode)
+                ? mode
+                : HalconEdgeExtractionMode.GaussianDerivative;
+        }
+
+        private static HalconLineFitMode ParseCaliperLineFitMode(string? value)
+        {
+            return Enum.TryParse<HalconLineFitMode>(value, true, out var mode)
+                ? mode
+                : HalconLineFitMode.Tukey;
         }
 
         private static List<IBuiltInPluginRegistration> GetBuiltInRegistrations()

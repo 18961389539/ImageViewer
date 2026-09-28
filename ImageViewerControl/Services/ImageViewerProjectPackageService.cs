@@ -74,7 +74,7 @@ namespace ImageViewer.Services
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();
-                File.Move(temporaryPackagePath, fullPackagePath, true);
+                ImageViewerAtomicFile.Commit(temporaryPackagePath, fullPackagePath);
             }
             finally
             {

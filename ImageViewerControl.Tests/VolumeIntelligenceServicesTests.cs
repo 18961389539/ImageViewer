@@ -59,6 +59,22 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
+        public void QualityAnalyzer_UsesInjectedHistogramThresholds()
+        {
+            var volume = new VolumeData([CreateBitmap(2, 2, 210), CreateBitmap(2, 2, 100)]);
+            ImageAnalysisQualityProfile profile = ImageAnalysisQualityProfile.Default with
+            {
+                VolumeOverexposedMinimumBin = 200,
+                VolumeLowContrastMinimumRange = 0
+            };
+
+            VolumeQualityReport report = VolumeQualityAnalyzer.Analyze(volume, profile);
+
+            Assert.Contains(report.Anomalies, anomaly => anomaly.Kind == VolumeAnomalyKind.OverexposedSlice && anomaly.SliceIndex == 0);
+            Assert.DoesNotContain(report.Anomalies, anomaly => anomaly.Kind == VolumeAnomalyKind.LowContrastSlice);
+        }
+
+        [Fact]
         public void DisplaySettingsSuggestion_LowContrastImage_RecommendsPseudoColor()
         {
             BitmapSource bitmap = CreateBitmap(4, 4, 100);

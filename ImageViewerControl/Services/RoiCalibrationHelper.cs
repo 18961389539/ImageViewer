@@ -15,15 +15,35 @@ namespace ImageViewer.Services
         /// <summary>长度校正因子（无标定或中心未知时为 1.0）。</summary>
         public static double GetLengthCorrection(RoiBase roi, CameraCalibration? calibration)
         {
+            if (calibration is { IsEnabled: true, IsValid: true } &&
+                TryGetSegment(roi, out PointD start, out PointD end))
+            {
+                double rawLength = Distance(start, end);
+                if (rawLength > 1e-9)
+                {
+                    double correctedLength = calibration.CorrectPixelLength(start, end);
+                    if (double.IsFinite(correctedLength) && correctedLength > 0)
+                    {
+                        return correctedLength / rawLength;
+                    }
+                }
+            }
+
             Point? center = GetMeasurementCenter(roi);
             return center.HasValue && calibration is { IsEnabled: true }
-                ? calibration.UndistortScaleFactor(center.Value.ToPointD())
+                ? calibration.LocalLengthScaleFactor(center.Value.ToPointD())
                 : 1.0;
         }
 
         /// <summary>面积校正因子（长度校正因子的平方，各向同性畸变下成立）。</summary>
         public static double GetAreaCorrection(RoiBase roi, CameraCalibration? calibration)
         {
+            Point? center = GetMeasurementCenter(roi);
+            if (center.HasValue && calibration is { IsEnabled: true, IsValid: true })
+            {
+                return calibration.LocalAreaScaleFactor(center.Value.ToPointD());
+            }
+
             double correction = GetLengthCorrection(roi, calibration);
             return correction * correction;
         }
@@ -62,5 +82,31 @@ namespace ImageViewer.Services
         };
 
         private static Point Midpoint(Point a, Point b) => new((a.X + b.X) / 2.0, (a.Y + b.Y) / 2.0);
+
+        private static bool TryGetSegment(RoiBase roi, out PointD start, out PointD end)
+        {
+            switch (roi)
+            {
+                case ArrowAnnotationRoi arrow:
+                    start = arrow.P1;
+                    end = arrow.P2;
+                    return true;
+                case LineMeasureRoi line:
+                    start = line.P1;
+                    end = line.P2;
+                    return true;
+                default:
+                    start = default;
+                    end = default;
+                    return false;
+            }
+        }
+
+        private static double Distance(PointD start, PointD end)
+        {
+            double dx = end.X - start.X;
+            double dy = end.Y - start.Y;
+            return Math.Sqrt(dx * dx + dy * dy);
+        }
     }
 }

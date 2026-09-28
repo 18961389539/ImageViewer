@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -12,7 +13,7 @@ namespace ImageViewer.Services
         /// <summary>
         /// 执行斑点分析，返回找到的连通域列表
         /// </summary>
-        public static List<BlobFeature> DetectBlobs(BitmapSource bitmap, Rect searchRoi, bool useOtsu, int threshold, bool detectDark = false, int minArea = 10)
+        public static List<BlobFeature> DetectBlobs(BitmapSource bitmap, Rect searchRoi, bool useOtsu, int threshold, bool detectDark = false, int minArea = 10, CancellationToken cancellationToken = default)
         {
             if (bitmap == null || searchRoi.Width <= 0 || searchRoi.Height <= 0)
                 return new List<BlobFeature>();
@@ -25,8 +26,9 @@ namespace ImageViewer.Services
 
             if (w <= 0 || h <= 0) return new List<BlobFeature>();
 
+            bitmap = ImageViewerPixelAccess.NormalizeForIntensity(bitmap);
             var format = bitmap.Format;
-            int bytesPerPixel = (format.BitsPerPixel + 7) / 8;
+            int bytesPerPixel = ImageViewerPixelAccess.GetBytesPerPixel(bitmap);
             int stride = w * bytesPerPixel;
             byte[] pixels = new byte[h * stride];
             bitmap.CopyPixels(new Int32Rect(x, y, w, h), pixels, stride, 0);
@@ -34,21 +36,27 @@ namespace ImageViewer.Services
             // 2. 转换为单通道灰度数据并应用阈值
             byte[] binaryMap = new byte[w * h];
             
+            int intensityMaximum = ImageViewerPixelAccess.GetIntensityMaximum(format);
+            // The blob ROI editor exposes an 8-bit threshold. Scale that setting to the
+            // native Gray16 range instead of truncating image samples to bytes.
+            int effectiveThreshold = format == PixelFormats.Gray16
+                ? Math.Clamp(threshold, 0, byte.MaxValue) * 257
+                : Math.Clamp(threshold, 0, intensityMaximum);
+
             if (useOtsu)
             {
-                threshold = CalculateOtsuThreshold(pixels, w, h, bytesPerPixel, stride);
+                effectiveThreshold = CalculateOtsuThreshold(pixels, w, h, bytesPerPixel, stride, format, cancellationToken);
             }
 
             for (int r = 0; r < h; r++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 for (int c = 0; c < w; c++)
                 {
                     int pIndex = r * stride + c * bytesPerPixel;
-                    byte gray = bytesPerPixel >= 3 
-                        ? (byte)((pixels[pIndex] * 0.114) + (pixels[pIndex + 1] * 0.587) + (pixels[pIndex + 2] * 0.299)) 
-                        : pixels[pIndex];
+                    ushort gray = ImageViewerPixelAccess.ReadIntensity(pixels, pIndex, bytesPerPixel, format);
 
-                    bool isForeground = detectDark ? gray <= threshold : gray >= threshold;
+                    bool isForeground = detectDark ? gray <= effectiveThreshold : gray >= effectiveThreshold;
                     binaryMap[r * w + c] = isForeground ? (byte)255 : (byte)0;
                 }
             }
@@ -61,6 +69,7 @@ namespace ImageViewer.Services
             // First pass
             for (int r = 0; r < h; r++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 for (int c = 0; c < w; c++)
                 {
                     if (binaryMap[r * w + c] == 255)
@@ -99,6 +108,7 @@ namespace ImageViewer.Services
 
             for (int r = 0; r < h; r++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 for (int c = 0; c < w; c++)
                 {
                     if (binaryMap[r * w + c] == 255)
@@ -162,18 +172,17 @@ namespace ImageViewer.Services
             }
         }
 
-        private static int CalculateOtsuThreshold(byte[] pixels, int w, int h, int bytesPerPixel, int stride)
+        private static int CalculateOtsuThreshold(byte[] pixels, int w, int h, int bytesPerPixel, int stride, PixelFormat format, CancellationToken cancellationToken)
         {
             int[] histogram = new int[256];
             for (int r = 0; r < h; r++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 for (int c = 0; c < w; c++)
                 {
                     int pIndex = r * stride + c * bytesPerPixel;
-                    byte gray = bytesPerPixel >= 3 
-                        ? (byte)((pixels[pIndex] * 0.114) + (pixels[pIndex + 1] * 0.587) + (pixels[pIndex + 2] * 0.299)) 
-                        : pixels[pIndex];
-                    histogram[gray]++;
+                    ushort gray = ImageViewerPixelAccess.ReadIntensity(pixels, pIndex, bytesPerPixel, format);
+                    histogram[gray * 256 / (ImageViewerPixelAccess.GetIntensityMaximum(format) + 1)]++;
                 }
             }
 
@@ -210,7 +219,7 @@ namespace ImageViewer.Services
                 }
             }
 
-            return threshold;
+            return format == PixelFormats.Gray16 ? threshold * 257 : threshold;
         }
 
         private class BlobData

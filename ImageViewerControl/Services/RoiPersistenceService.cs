@@ -15,28 +15,36 @@ namespace ImageViewer.Services
         private const int CurrentDocumentVersion = 1;
         
 
-        public static void SaveToFile(string filePath, IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, RoiPluginRegistry? pluginRegistry = null)
+        public static void SaveToFile(string filePath, IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, RoiPluginRegistry? pluginRegistry = null, ImageAnalysisQualityProfile? qualityProfile = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
             ArgumentNullException.ThrowIfNull(rois);
             ArgumentNullException.ThrowIfNull(pluginRegistry);
 
-            File.WriteAllText(filePath, Serialize(rois, pixelSize, physicalUnit, pluginRegistry));
+            ImageViewerAtomicFile.WriteAllText(filePath, Serialize(rois, pixelSize, physicalUnit, pluginRegistry, qualityProfile));
         }
 
         public static Task SaveToFileAsync(string filePath, IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, RoiPluginRegistry? pluginRegistry = null, CancellationToken cancellationToken = default)
         {
+            return SaveToFileAsync(filePath, rois, pixelSize, physicalUnit, pluginRegistry, qualityProfile: null, cancellationToken);
+        }
+
+        public static Task SaveToFileAsync(string filePath, IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, RoiPluginRegistry? pluginRegistry, ImageAnalysisQualityProfile? qualityProfile, CancellationToken cancellationToken = default)
+        {
             ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
             ArgumentNullException.ThrowIfNull(rois);
             ArgumentNullException.ThrowIfNull(pluginRegistry);
 
-            return File.WriteAllTextAsync(filePath, Serialize(rois, pixelSize, physicalUnit, pluginRegistry), cancellationToken);
+            return ImageViewerAtomicFile.WriteAllTextAsync(
+                filePath,
+                Serialize(rois, pixelSize, physicalUnit, pluginRegistry, qualityProfile),
+                cancellationToken: cancellationToken);
         }
 
-        public static string Serialize(IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, RoiPluginRegistry? pluginRegistry = null)
+        public static string Serialize(IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, RoiPluginRegistry? pluginRegistry = null, ImageAnalysisQualityProfile? qualityProfile = null)
         {
             var roiPlugins = pluginRegistry ?? throw new ArgumentNullException(nameof(pluginRegistry));
-            return JsonSerializer.Serialize(CreateDocument(rois, pixelSize, physicalUnit, roiPlugins), ImageViewerJsonSerializationContext.Default.RoiDocument);
+            return JsonSerializer.Serialize(CreateDocument(rois, pixelSize, physicalUnit, roiPlugins, qualityProfile: qualityProfile), ImageViewerJsonSerializationContext.Default.RoiDocument);
         }
 
         /// <summary>
@@ -46,16 +54,29 @@ namespace ImageViewer.Services
         /// English: Builds the ROI document object so session files can embed it directly instead of nesting JSON
         /// in a string. Unresolved payloads are appended verbatim so a missing plugin never erases data.
         /// </summary>
-        internal static RoiDocument CreateDocument(IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, RoiPluginRegistry pluginRegistry, IEnumerable<RoiPersistenceData>? unresolvedItems = null)
+        internal static RoiDocument CreateDocument(
+            IEnumerable<RoiBase> rois,
+            double pixelSize,
+            string? physicalUnit,
+            RoiPluginRegistry pluginRegistry,
+            IEnumerable<RoiPersistenceData>? unresolvedItems = null,
+            ImageAnalysisQualityProfile? qualityProfile = null)
         {
             ArgumentNullException.ThrowIfNull(rois);
             ArgumentNullException.ThrowIfNull(pluginRegistry);
+            if (!double.IsFinite(pixelSize) || pixelSize <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(pixelSize), pixelSize, "Pixel size must be a finite positive value.");
+            }
 
+            ImageAnalysisQualityProfile effectiveQualityProfile = qualityProfile ?? ImageAnalysisQualityProfile.Default;
+            effectiveQualityProfile.Validate();
             return new RoiDocument
             {
                 Version = CurrentDocumentVersion,
                 PixelSize = pixelSize,
                 PhysicalUnit = string.IsNullOrWhiteSpace(physicalUnit) ? "px" : physicalUnit,
+                QualityProfile = effectiveQualityProfile,
                 Items = rois
                     .Select(roi => CreateItem(roi, pluginRegistry))
                     .Concat(unresolvedItems ?? [])
@@ -116,11 +137,20 @@ namespace ImageViewer.Services
                 rois.Add(roi);
             }
 
+            double pixelSize = document.PixelSize ?? 1.0;
+            if (!double.IsFinite(pixelSize) || pixelSize <= 0)
+            {
+                throw new ArgumentException("ROI document PixelSize must be a finite positive value.", nameof(document));
+            }
+
             return new RoiDocumentLoadResult(
                 rois,
                 unresolvedItems,
-                document.PixelSize <= 0 ? 1.0 : document.PixelSize,
-                string.IsNullOrWhiteSpace(document.PhysicalUnit) ? "px" : document.PhysicalUnit);
+                pixelSize,
+                string.IsNullOrWhiteSpace(document.PhysicalUnit) ? "px" : document.PhysicalUnit)
+            {
+                QualityProfile = document.QualityProfile
+            };
         }
 
         /// <summary>
@@ -186,5 +216,8 @@ namespace ImageViewer.Services
         IReadOnlyList<RoiBase> Rois,
         IReadOnlyList<RoiPersistenceData> UnresolvedItems,
         double PixelSize,
-        string PhysicalUnit);
+        string PhysicalUnit)
+    {
+        public ImageAnalysisQualityProfile? QualityProfile { get; init; }
+    }
 }

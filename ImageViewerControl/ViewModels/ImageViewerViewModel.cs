@@ -34,6 +34,7 @@ namespace ImageViewer.ViewModels
         private RoiPluginRegistry _pluginRegistry;
         private bool _isRebuildingAllRois;
         private bool _isSynchronizingAllRois;
+        private ImageAnalysisQualityProfile _qualityProfile = ImageAnalysisQualityProfile.Default;
 
         /// <summary>
         /// 尝试对当前选中的拟合直线 ROI 执行边缘检测。
@@ -43,7 +44,18 @@ namespace ImageViewer.ViewModels
         /// <returns>检测成功返回 true，否则 false。</returns>
         public bool TryDetectSelectedLineCaliperEdges(out LineCaliperDetectionResult result)
         {
-            return _selectedRoiDetectionService.TryDetectSelectedLineCaliperEdges(ImageSource, SelectedRoi, out result);
+            return _selectedRoiDetectionService.TryDetectSelectedLineCaliperEdges(ImageSource, SelectedRoi, out result, QualityProfile);
+        }
+
+        public ImageAnalysisQualityProfile QualityProfile
+        {
+            get => _qualityProfile;
+            set
+            {
+                ArgumentNullException.ThrowIfNull(value);
+                value.Validate();
+                _qualityProfile = value;
+            }
         }
 
         public UndoRedoManager UndoRedo => _undoRedoManager;

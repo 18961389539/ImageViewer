@@ -4,13 +4,15 @@ The WPF control remains the delivery surface. Modernization separates new code b
 
 ## Dependency Rule
 
-`ImageViewerControl` may depend on WPF, the rendering backend, and the future core libraries. A future `ImageViewer.Core` project must only target `net10.0` and must not reference `System.Windows`, `System.Windows.Media`, `Dispatcher`, or WPF bitmap types.
+`ImageViewerControl` may depend on WPF, the rendering backend, and `ImageViewer.Core`. `ImageViewer.Core` targets `net10.0` and must not reference `System.Windows`, `System.Windows.Media`, `Dispatcher`, or WPF bitmap types.
 
 ## Code Placement
 
 - Put UI controls, bindings, dialogs, dispatcher scheduling, bitmap decoding, and render frames in the WPF project.
 - Put new immutable data contracts, geometry algorithms using primitive coordinates, serialization formats, import/export schemas, and cancellation-aware analysis orchestration in `ImageViewer.Core`.
 - Keep adapters at the WPF edge: convert `Point`, `Color`, and `BitmapSource` into core contracts before calling core services.
+
+The first migrated slice is measurement statistics: `ImageViewer.Core.Measurements.MeasurementStatistics` owns filtering, sorting, and aggregate calculations for dual-edge width samples. `ImageViewerControl.Models.CaliperWidthMeasurementResult` remains the compatibility-facing adapter and delegates those rules to Core.
 
 ## Migration Order
 

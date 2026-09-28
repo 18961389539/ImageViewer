@@ -1,11 +1,14 @@
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using ImageViewer.Controls;
 using ImageViewer.Localization;
+using ImageViewer.Models;
 using Xunit;
 
 namespace ImageViewerControl.Tests
@@ -182,6 +185,159 @@ namespace ImageViewerControl.Tests
                 Assert.True(viewer.ShowToolbar);
                 Assert.Equal(Visibility.Visible, toolbarPanel.Visibility);
                 Assert.True(toolbarMenuItem.IsChecked);
+
+                viewer.toolbarHideButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                WpfTestRunner.DrainDispatcher();
+
+                Assert.False(viewer.ShowToolbar);
+                Assert.Equal(Visibility.Collapsed, toolbarPanel.Visibility);
+                Assert.False(toolbarMenuItem.IsChecked);
+            });
+        }
+
+        [Fact]
+        public void Toolbar_CollapsesToCompactLauncher_WhenViewportIsNarrow()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                using var viewer = new ImageViewer.Controls.ImageViewer
+                {
+                    ShowToolbar = true
+                };
+                var window = new Window
+                {
+                    Width = 520,
+                    Height = 380,
+                    Content = viewer
+                };
+
+                try
+                {
+                    window.Show();
+                    WpfTestRunner.DrainDispatcher();
+                    window.UpdateLayout();
+
+                    Assert.Equal(Visibility.Collapsed, viewer.toolbarPanel.Visibility);
+                    Assert.Equal(Visibility.Visible, viewer.toolbarCompactButton.Visibility);
+
+                    window.Width = 1100;
+                    window.Height = 720;
+                    window.UpdateLayout();
+                    WpfTestRunner.DrainDispatcher();
+
+                    Assert.Equal(Visibility.Visible, viewer.toolbarPanel.Visibility);
+                    Assert.Equal(Visibility.Collapsed, viewer.toolbarCompactButton.Visibility);
+                }
+                finally
+                {
+                    window.Close();
+                }
+            });
+        }
+
+        [Fact]
+        public void MeasurementResultAndRoiList_AreVisibleByDefault()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                using var viewer = new ImageViewer.Controls.ImageViewer();
+                WpfTestRunner.DrainDispatcher();
+
+                Assert.True(viewer.ShowInfoPanel);
+                Assert.True(viewer.ShowRoiList);
+                Assert.Equal(Visibility.Visible, viewer.infoPanel.Visibility);
+                Assert.Equal(Visibility.Visible, viewer.roiListPanel.Visibility);
+            });
+        }
+
+        [Fact]
+        public void Toolbar_ExposesPrimaryWorkflowActions()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                using var viewer = new ImageViewer.Controls.ImageViewer
+                {
+                    ShowToolbar = true
+                };
+                WpfTestRunner.DrainDispatcher();
+
+                var buttons = FindVisualDescendants<Button>(viewer.toolbarPanel);
+                Button saveSession = Assert.Single(buttons.Where(button => Equals(button.Content, UiText.Get("MenuSaveSession"))));
+                Assert.Contains(buttons, button => Equals(button.Content, UiText.Get("MenuOpenImageFile")));
+                Assert.Contains(buttons, button => Equals(button.Content, UiText.Get("MenuUndo")));
+                Assert.Contains(buttons, button => Equals(button.Content, UiText.Get("MenuRedo")));
+                Assert.Contains(buttons, button => Equals(button.Content, UiText.Get("MenuExportCurrentViewPng")));
+                Assert.False(saveSession.IsEnabled);
+
+                viewer.ImageSource = CreateBitmap(9);
+                WpfTestRunner.DrainDispatcher();
+                Assert.True(saveSession.IsEnabled);
+            });
+        }
+
+        [Fact]
+        public void ActiveToolIndicator_RemainsVisibleUntilDrawModeExits()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                using var viewer = new ImageViewer.Controls.ImageViewer();
+
+                viewer.StartLineMeasureMode();
+                WpfTestRunner.DrainDispatcher();
+
+                Assert.Equal(UiText.Get("ToolLineMeasure"), viewer.ActiveToolName);
+                Assert.Equal(UiText.Get("ToolLineMeasure"), viewer.activeToolNameTextBlock.Text);
+                Assert.Equal(Visibility.Visible, viewer.activeToolBanner.Visibility);
+
+                viewer.ExitCurrentMode();
+                WpfTestRunner.DrainDispatcher();
+
+                Assert.Equal(string.Empty, viewer.ActiveToolName);
+                Assert.Equal(Visibility.Collapsed, viewer.activeToolBanner.Visibility);
+            });
+        }
+
+        [Fact]
+        public void ToolbarQuickTool_StaysHighlightedWhileActive()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                using var viewer = new ImageViewer.Controls.ImageViewer
+                {
+                    ShowToolbar = true
+                };
+                WpfTestRunner.DrainDispatcher();
+
+                ToggleButton toolButton = Assert.IsType<ToggleButton>(viewer.quickToolsPanel.Children[0]);
+                string toolName = Assert.IsType<string>(toolButton.ToolTip);
+                toolButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                WpfTestRunner.DrainDispatcher();
+
+                Assert.Equal(toolName, viewer.ActiveToolName);
+                Assert.True(toolButton.IsChecked);
+
+                viewer.ExitCurrentMode();
+                WpfTestRunner.DrainDispatcher();
+                Assert.False(toolButton.IsChecked);
+            });
+        }
+
+        [Fact]
+        public void CaliperDiagnostics_AreHiddenByDefaultAndCanBeEnabled()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                using var viewer = new ImageViewer.Controls.ImageViewer();
+                WpfTestRunner.DrainDispatcher();
+
+                Assert.False(viewer.ShowCaliperScores);
+                Assert.False(viewer.showCaliperScoresMenuItem.IsChecked);
+
+                viewer.ShowCaliperScores = true;
+                WpfTestRunner.InvokePrivate(viewer, "UpdateContextMenuState");
+                WpfTestRunner.DrainDispatcher();
+
+                Assert.True(viewer.showCaliperScoresMenuItem.IsChecked);
             });
         }
 
@@ -252,6 +408,53 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
+        public void CalibrationIndicator_IsPersistentAndUpdatesWithCalibration()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                using var viewer = new ImageViewer.Controls.ImageViewer();
+                WpfTestRunner.DrainDispatcher();
+
+                Assert.Equal(Visibility.Collapsed, viewer.calibrationBadge.Visibility);
+
+                viewer.PixelSize = 0.5;
+                viewer.PhysicalUnit = "mm";
+                WpfTestRunner.DrainDispatcher();
+
+                Assert.Equal(Visibility.Visible, viewer.calibrationBadge.Visibility);
+                Assert.Equal(UiText.FormatInvariant("CalibrationBadgeText", 0.5, "mm"), viewer.calibrationBadgeTextBlock.Text);
+                Assert.Equal(viewer.calibrationBadgeTextBlock.Text, viewer.calibrationBadgeTextBlock.ToolTip);
+
+                viewer.PixelSize = 1.0;
+                viewer.PhysicalUnit = "px";
+                WpfTestRunner.DrainDispatcher();
+
+                Assert.Equal(Visibility.Collapsed, viewer.calibrationBadge.Visibility);
+            });
+        }
+
+        [Fact]
+        public void CircularCaliperSelection_ExposesDirectSettingsEntry()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                using var viewer = new ImageViewer.Controls.ImageViewer();
+                var circularCaliper = new CircularCaliperMeasureRoi
+                {
+                    Center = new PointD(16, 16),
+                    Radius = 8
+                };
+
+                viewer.ViewerState.SelectedRoi = circularCaliper;
+                WpfTestRunner.DrainDispatcher();
+
+                Assert.Equal(Visibility.Visible, viewer.roiPropertyPanel.Visibility);
+                Assert.Equal(Visibility.Visible, viewer.circularCaliperSettingsButton.Visibility);
+                Assert.Equal(UiText.Get("QuickCircularCaliperSettings"), viewer.circularCaliperSettingsButton.Content);
+            });
+        }
+
+        [Fact]
         public void Automation_SetsAccessibleNamesOnCoreElements()
         {
             WpfTestRunner.Run(() =>
@@ -302,6 +505,32 @@ namespace ImageViewerControl.Tests
                 Assert.Equal(Visibility.Visible, icon.Visibility);
                 Assert.Equal("⚠", icon.Text);
                 Assert.Equal("失败", text.Text);
+                Assert.Same(viewer.FindResource("ViewerErrorSoftBrush"), viewer.statusHintBorder.Background);
+                Assert.Same(viewer.FindResource("ViewerErrorBorderBrush"), viewer.statusHintBorder.BorderBrush);
+
+                viewer.DismissStatusHint();
+            });
+        }
+
+        [Fact]
+        public void AutomaticCircleMeasure_WhenNoCircleFound_ShowsErrorStatusHint()
+        {
+            WpfTestRunner.RunAsync(async () =>
+            {
+                using var viewer = new ImageViewer.Controls.ImageViewer();
+                BitmapSource image = CreateUniformBitmap(64, 64, 128);
+                viewer.SetImage(image);
+                Task prepare = Assert.IsAssignableFrom<Task>(WpfTestRunner.InvokePrivate(viewer, "PrepareAnalysisResourcesAsync", image));
+                await prepare;
+                WpfTestRunner.DrainDispatcher();
+
+                object?[] arguments = [new Point(32, 32), null];
+                object? created = WpfTestRunner.InvokePrivate(viewer, "TryCreateAutomaticCircle", arguments);
+
+                Assert.Equal(false, created);
+                WpfTestRunner.DrainDispatcher();
+                Assert.Equal(UiText.Get("StatusAutomaticCircleNotFound"), viewer.statusHintTextBlock.Text);
+                Assert.Equal(Visibility.Visible, viewer.statusHintBorder.Visibility);
 
                 viewer.DismissStatusHint();
             });
@@ -333,6 +562,25 @@ namespace ImageViewerControl.Tests
                 null,
                 new[] { value, value, value, value },
                 2);
+        }
+
+        private static BitmapSource CreateUniformBitmap(int pixelWidth, int pixelHeight, byte value)
+        {
+            byte[] pixels = new byte[pixelWidth * pixelHeight];
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                pixels[i] = value;
+            }
+
+            return BitmapSource.Create(
+                pixelWidth,
+                pixelHeight,
+                96,
+                96,
+                PixelFormats.Gray8,
+                null,
+                pixels,
+                pixelWidth);
         }
 
         private static string CreateTempPngPath()

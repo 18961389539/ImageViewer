@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.CompilerServices;
+using ImageViewer.Localization;
 
 namespace ImageViewer.Models
 {
@@ -13,10 +14,41 @@ namespace ImageViewer.Models
         private int _minimumValidCalipers = 8;
         private double _caliperOutlierThreshold = 2.5;
         private CaliperEdgePolarity _caliperEdgePolarity = CaliperEdgePolarity.Any;
+        private HalconEdgeExtractionMode _caliperEdgeExtractionMode = HalconEdgeExtractionMode.GaussianDerivative;
+        private HalconLineFitMode _caliperLineFitMode = HalconLineFitMode.Tukey;
+        private int _caliperFitClippingEndPoints;
+        private CircularCaliperQualityStatus _qualityStatus = CircularCaliperQualityStatus.NotMeasured;
+        private CircularCaliperQualityReason _qualityReason = CircularCaliperQualityReason.NotMeasured;
+        private double _qualityValidRatio;
+        private double _qualityAngularCoverageDegrees;
 
         private SingleEdgeCaliperDetectionDisplayState DetectionDisplayState => SingleEdgeCaliperDetectionDisplayStateStore.GetOrCreate(this);
 
         public override string RoiTypeName => nameof(CircularCaliperMeasureRoi);
+
+        /// <summary>
+        /// 在 ROI 列表中直接显示质量门控状态，避免操作员必须打开属性面板确认结果是否可信。
+        /// </summary>
+        public override string DisplayName
+        {
+            get
+            {
+                string displayName = base.DisplayName;
+                if (this is ArcCaliperMeasureRoi || QualityStatus == CircularCaliperQualityStatus.NotMeasured)
+                {
+                    return displayName;
+                }
+
+                string status = QualityStatus switch
+                {
+                    CircularCaliperQualityStatus.Passed => UiText.Get("RoiQualityPassed"),
+                    CircularCaliperQualityStatus.Review => UiText.Get("RoiQualityReview"),
+                    CircularCaliperQualityStatus.Failed => UiText.Get("RoiQualityFailed"),
+                    _ => string.Empty
+                };
+                return string.IsNullOrWhiteSpace(status) ? displayName : $"{displayName} [{status}]";
+            }
+        }
 
         public bool HasDetectedEdges
         {
@@ -127,6 +159,27 @@ namespace ImageViewer.Models
             set => SetProperty(ref _caliperEdgePolarity, value);
         }
 
+        /// <summary>卡尺剖面的 HALCON 风格边缘提取模式。</summary>
+        public HalconEdgeExtractionMode CaliperEdgeExtractionMode
+        {
+            get => _caliperEdgeExtractionMode;
+            set => SetProperty(ref _caliperEdgeExtractionMode, value);
+        }
+
+        /// <summary>共享卡尺配置槽；当前圆拟合路径不使用直线拟合模式。</summary>
+        public HalconLineFitMode CaliperLineFitMode
+        {
+            get => _caliperLineFitMode;
+            set => SetProperty(ref _caliperLineFitMode, value);
+        }
+
+        /// <summary>共享卡尺配置槽；当前圆拟合路径不使用直线端点裁剪。</summary>
+        public int CaliperFitClippingEndPoints
+        {
+            get => _caliperFitClippingEndPoints;
+            set => SetProperty(ref _caliperFitClippingEndPoints, Math.Max(0, value));
+        }
+
         public double AverageScore
         {
             get => DetectionDisplayState.AverageScore;
@@ -157,9 +210,65 @@ namespace ImageViewer.Models
             set => SetDetectionDisplayStateValue(DetectionDisplayState.Confidence, Math.Clamp(value, 0, 1), static (state, v) => state.Confidence = v);
         }
 
+        /// <summary>
+        /// 圆测量质量门控状态。
+        /// </summary>
+        public CircularCaliperQualityStatus QualityStatus
+        {
+            get => _qualityStatus;
+            private set => SetProperty(ref _qualityStatus, value);
+        }
+
+        public CircularCaliperQualityReason QualityReason
+        {
+            get => _qualityReason;
+            private set => SetProperty(ref _qualityReason, value);
+        }
+
+        /// <summary>
+        /// 通过质量门控时实际参与拟合的卡尺比例。
+        /// </summary>
+        public double QualityValidRatio
+        {
+            get => _qualityValidRatio;
+            private set => SetProperty(ref _qualityValidRatio, value);
+        }
+
+        /// <summary>
+        /// 边缘点覆盖的圆周角度。
+        /// </summary>
+        public double QualityAngularCoverageDegrees
+        {
+            get => _qualityAngularCoverageDegrees;
+            private set => SetProperty(ref _qualityAngularCoverageDegrees, value);
+        }
+
+        internal void ApplyQualityAssessment(CircularCaliperQualityAssessment assessment)
+        {
+            QualityStatus = assessment.Status;
+            QualityReason = assessment.Reason;
+            QualityValidRatio = assessment.ValidRatio;
+            QualityAngularCoverageDegrees = assessment.AngularCoverageDegrees;
+            OnPropertyChanged(nameof(DisplayName));
+        }
+
+        internal void MarkQualityFailure()
+        {
+            ApplyQualityAssessment(new CircularCaliperQualityAssessment(
+                CircularCaliperQualityStatus.Failed,
+                0,
+                0,
+                CircularCaliperQualityReason.DetectionFailed));
+        }
+
         public void ClearDetectedEdges()
         {
             this.ClearDetection();
+            ApplyQualityAssessment(new CircularCaliperQualityAssessment(
+                CircularCaliperQualityStatus.NotMeasured,
+                0,
+                0,
+                CircularCaliperQualityReason.NotMeasured));
         }
 
         public void SetCaliperVisualization(
@@ -198,6 +307,11 @@ namespace ImageViewer.Models
 
             base.ApplyFrom(source);
             this.CopyStateFrom(circleCaliper);
+            QualityStatus = circleCaliper.QualityStatus;
+            QualityReason = circleCaliper.QualityReason;
+            QualityValidRatio = circleCaliper.QualityValidRatio;
+            QualityAngularCoverageDegrees = circleCaliper.QualityAngularCoverageDegrees;
+            OnPropertyChanged(nameof(DisplayName));
         }
 
         bool ISingleEdgeCaliperDetectionDisplayStateOwner.HasDetection

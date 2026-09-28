@@ -16,6 +16,7 @@ namespace ImageViewer.Services
     [JsonSerializable(typeof(ImageViewerSessionDocument))]
     [JsonSerializable(typeof(RoiDocument))]
     [JsonSerializable(typeof(CameraCalibration))]
+    [JsonSerializable(typeof(ImageAnalysisQualityProfile))]
     internal partial class ImageViewerJsonSerializationContext : JsonSerializerContext
     {
     }

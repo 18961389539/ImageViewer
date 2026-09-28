@@ -50,6 +50,12 @@ namespace ImageViewer.Controls
             set => _owner.PhysicalUnit = value;
         }
 
+        public ImageAnalysisQualityProfile QualityProfile
+        {
+            get => _owner.QualityProfile;
+            set => _owner.QualityProfile = value;
+        }
+
         public void ReplaceAllRois(IReadOnlyList<RoiBase> rois) => _owner.ViewerState.ReplaceAllRois(rois);
 
         public void RefreshAllCaliperDetections() => _refreshAllCaliperDetections();

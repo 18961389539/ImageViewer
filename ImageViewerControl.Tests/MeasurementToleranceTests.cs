@@ -1,6 +1,7 @@
 using System.Windows;
 using ImageViewer.Models;
 using ImageViewer.Plugins;
+using ImageViewer.Services;
 using Xunit;
 
 namespace ImageViewerControl.Tests
@@ -29,6 +30,23 @@ namespace ImageViewerControl.Tests
 
             Assert.False(tolerance.IsWithinTolerance(9.49));
             Assert.False(tolerance.IsWithinTolerance(10.51));
+        }
+
+        [Fact]
+        public void InvalidTolerance_IsNotEvaluableInsteadOfPassingSilently()
+        {
+            var tolerance = new MeasurementTolerance { Nominal = 10, TolerancePlus = -0.1 };
+            var roi = new LineMeasureRoi
+            {
+                P1 = new PointD(0, 0),
+                P2 = new PointD(10, 0),
+                Tolerance = tolerance
+            };
+
+            Assert.False(tolerance.IsValid);
+            Assert.False(tolerance.IsWithinTolerance(10));
+            RoiInspectionResult result = RoiInspectionEvaluator.Evaluate(roi, pixelSize: 1);
+            Assert.Equal(RoiSpecificationStatus.NotEvaluable, result.SpecificationStatus);
         }
 
         [Fact]

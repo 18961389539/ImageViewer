@@ -33,6 +33,8 @@ namespace ImageViewer.Controls
         private AdaptiveDisplayMode _displayMode = AdaptiveDisplayMode.Auto;
         private bool _isDisposed;
         private CancellationTokenSource? _operationCancellation;
+        private CancellationTokenSource? _mprCancellation;
+        private long _mprRequestGeneration;
         private SegmentationResult? _pendingSegmentation;
         private VolumeQualityReport? _qualityReport;
         private int _coronalSliceIndex;
@@ -44,6 +46,8 @@ namespace ImageViewer.Controls
             InitializeComponent();
             Loaded += OnLoaded;
             _imageViewer = new ImageViewer();
+            // 自适应宿主面向演示和快速浏览，默认显示常用工具、测量结果和 ROI 列表。
+            _imageViewer.ShowToolbar = true;
             _volumeViewer = new VolumeViewer();
             _volume3DViewer = new Volume3DViewer();
             _volume3DViewer.SwitchToAxialSliceRequested += OnSwitchToAxialSliceRequested;
@@ -73,6 +77,8 @@ namespace ImageViewer.Controls
             set
             {
                 ObjectDisposedException.ThrowIf(_isDisposed, this);
+                _mprCancellation?.Cancel();
+                _operationCancellation?.Cancel();
                 _volume = value;
                 _volumeViewer.Volume = value;
                 _volume3DViewer.Volume = value;
@@ -82,6 +88,8 @@ namespace ImageViewer.Controls
                 _qualityReport = null;
                 anomalyList.Items.Clear();
                 segmentationText.Text = string.Empty;
+                retryButton.Visibility = Visibility.Collapsed;
+                UpdateDataQualityPanelVisibility();
                 _volume3DViewer.SetCurrentSlice(_volumeViewer.CurrentSliceIndex);
                 UpdateDisplayedView();
                 UpdateStatus();
@@ -124,8 +132,8 @@ namespace ImageViewer.Controls
             _volumeViewer.CurrentSliceChanged -= OnCurrentSliceChanged;
             Loaded -= OnLoaded;
             _volume3DViewer.Dispose();
+            _mprCancellation?.Cancel();
             _operationCancellation?.Cancel();
-            _operationCancellation?.Dispose();
             contentHost.Content = null;
             _imageSource = null;
             _volume = null;
@@ -190,8 +198,8 @@ namespace ImageViewer.Controls
         private void OnTwoDimensionalClick(object sender, RoutedEventArgs e) => DisplayMode = AdaptiveDisplayMode.TwoDimensional;
         private void OnThreeDimensionalClick(object sender, RoutedEventArgs e) => DisplayMode = AdaptiveDisplayMode.ThreeDimensional;
         private void OnAxialClick(object sender, RoutedEventArgs e) => DisplayMode = AdaptiveDisplayMode.AxialSlice;
-        private void OnCoronalClick(object sender, RoutedEventArgs e) => SetMprMode(AdaptiveDisplayMode.Coronal);
-        private void OnSagittalClick(object sender, RoutedEventArgs e) => SetMprMode(AdaptiveDisplayMode.Sagittal);
+        private async void OnCoronalClick(object sender, RoutedEventArgs e) => await SetMprModeAsync(AdaptiveDisplayMode.Coronal);
+        private async void OnSagittalClick(object sender, RoutedEventArgs e) => await SetMprModeAsync(AdaptiveDisplayMode.Sagittal);
 
         private async void OnQualityClick(object sender, RoutedEventArgs e)
         {
@@ -201,10 +209,17 @@ namespace ImageViewer.Controls
                 return;
             }
 
-            BeginOperation(UiText.Get("StatusAnalyzingQuality"));
+            CancellationTokenSource operation = BeginOperation(UiText.Get("StatusAnalyzingQuality"));
+            dataQualityPanel.Visibility = Visibility.Visible;
             try
             {
-                VolumeQualityReport report = await Task.Run(() => VolumeQualityAnalyzer.Analyze(_volume), _operationCancellation!.Token);
+                VolumeData volume = _volume!;
+                VolumeQualityReport report = await Task.Run(() => VolumeQualityAnalyzer.Analyze(volume, _imageViewer.QualityProfile), operation.Token);
+                if (!IsCurrentOperation(operation))
+                {
+                    return;
+                }
+
                 _qualityReport = report;
                 anomalyList.Items.Clear();
                 foreach (VolumeAnomaly anomaly in report.Anomalies)
@@ -215,22 +230,33 @@ namespace ImageViewer.Controls
                 statusText.Text = report.HasAnomalies ? UiText.Format("StatusQualityFound", report.Anomalies.Count) : UiText.Get("StatusQualityPassed");
                 retryButton.Visibility = Visibility.Collapsed;
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (operation.Token.IsCancellationRequested)
             {
-                statusText.Text = UiText.Get("StatusQualityCancelled");
+                if (IsCurrentOperation(operation))
+                {
+                    statusText.Text = UiText.Get("StatusQualityCancelled");
+                }
             }
             catch (Exception)
             {
-                statusText.Text = UiText.Get("StatusQualityFailed");
-                retryButton.Visibility = Visibility.Visible;
+                if (IsCurrentOperation(operation))
+                {
+                    statusText.Text = UiText.Get("StatusQualityFailed");
+                    retryButton.Visibility = Visibility.Visible;
+                }
             }
             finally
             {
-                EndOperation();
+                bool wasCurrent = ReferenceEquals(_operationCancellation, operation);
+                EndOperation(operation);
+                if (wasCurrent)
+                {
+                    UpdateDataQualityPanelVisibility();
+                }
             }
         }
 
-        private void OnSegmentClick(object sender, RoutedEventArgs e)
+        private async void OnSegmentClick(object sender, RoutedEventArgs e)
         {
             if (_volume == null)
             {
@@ -238,25 +264,52 @@ namespace ImageViewer.Controls
                 return;
             }
 
+            VolumeData volume = _volume!;
+            int sliceIndex = Math.Max(0, _volumeViewer.CurrentSliceIndex);
+            BitmapSource slice = volume.GetAxialSlice(sliceIndex);
+            CancellationTokenSource operation = BeginOperation(UiText.Get("StatusAnalyzingSegmentation"));
             try
             {
-                int sliceIndex = Math.Max(0, _volumeViewer.CurrentSliceIndex);
-                BitmapSource slice = _volume.GetAxialSlice(sliceIndex);
-                _pendingSegmentation = SegmentationPipelineService
-                    .Segment(slice, new Rect(0, 0, slice.PixelWidth, slice.PixelHeight))
+                SegmentationResult segmentation = await Task.Run(() => SegmentationPipelineService
+                    .Segment(slice, new Rect(0, 0, slice.PixelWidth, slice.PixelHeight), cancellationToken: operation.Token), operation.Token);
+                if (!IsCurrentOperation(operation) || !ReferenceEquals(_volume, volume))
+                {
+                    return;
+                }
+
+                _pendingSegmentation = segmentation
                     with { SliceIndex = sliceIndex };
                 segmentationText.Text = UiText.Format("StatusSegmentationCandidates", _pendingSegmentation.Blobs.Count);
                 statusText.Text = UiText.Get("StatusSegmentationComplete");
+                UpdateDataQualityPanelVisibility();
+            }
+            catch (OperationCanceledException) when (operation.Token.IsCancellationRequested)
+            {
+                if (IsCurrentOperation(operation))
+                {
+                    statusText.Text = UiText.Get("StatusSegmentationCancelled");
+                }
             }
             catch (Exception)
             {
-                _pendingSegmentation = null;
-                statusText.Text = UiText.Get("StatusSegmentationFailed");
+                if (IsCurrentOperation(operation))
+                {
+                    _pendingSegmentation = null;
+                    statusText.Text = UiText.Get("StatusSegmentationFailed");
+                }
             }
-            UpdateButtonStates();
+            finally
+            {
+                bool wasCurrent = ReferenceEquals(_operationCancellation, operation);
+                EndOperation(operation);
+                if (wasCurrent)
+                {
+                    UpdateButtonStates();
+                }
+            }
         }
 
-        private void SetMprMode(AdaptiveDisplayMode mode)
+        private async Task SetMprModeAsync(AdaptiveDisplayMode mode)
         {
             if (_volume == null)
             {
@@ -267,13 +320,16 @@ namespace ImageViewer.Controls
             try
             {
                 VolumeSliceOrientation orientation = mode == AdaptiveDisplayMode.Coronal ? VolumeSliceOrientation.Coronal : VolumeSliceOrientation.Sagittal;
-                UpdateMprSlice(mode, orientation, GetMprSliceIndex(mode));
-                DisplayMode = mode;
+                if (await UpdateMprSliceAsync(mode, orientation, GetMprSliceIndex(mode)))
+                {
+                    DisplayMode = mode;
+                }
             }
             catch (Exception)
             {
                 statusText.Text = UiText.Format("StatusUnableCreateView", LocalizeMode(mode));
                 retryButton.Visibility = Visibility.Visible;
+                UpdateDataQualityPanelVisibility();
             }
         }
 
@@ -319,6 +375,7 @@ namespace ImageViewer.Controls
             DisplayMode = AdaptiveDisplayMode.TwoDimensional;
             _pendingSegmentation = null;
             segmentationText.Text = string.Empty;
+            UpdateDataQualityPanelVisibility();
             statusText.Text = UiText.Format("StatusSegmentationAccepted", roi.DetectedBlobs.Count);
             UpdateButtonStates();
         }
@@ -327,17 +384,18 @@ namespace ImageViewer.Controls
         {
             _pendingSegmentation = null;
             segmentationText.Text = UiText.Get("StatusCandidateRejected");
+            UpdateDataQualityPanelVisibility();
             statusText.Text = UiText.Get("StatusNoRoiChanged");
             UpdateButtonStates();
         }
 
-        private void OnPreviewKeyDown(object sender, KeyEventArgs e)
+        private async void OnPreviewKeyDown(object sender, KeyEventArgs e)
         {
             switch (e.Key)
             {
                 case Key.D1: DisplayMode = AdaptiveDisplayMode.AxialSlice; break;
-                case Key.D2: SetMprMode(AdaptiveDisplayMode.Coronal); break;
-                case Key.D3: SetMprMode(AdaptiveDisplayMode.Sagittal); break;
+                case Key.D2: await SetMprModeAsync(AdaptiveDisplayMode.Coronal); break;
+                case Key.D3: await SetMprModeAsync(AdaptiveDisplayMode.Sagittal); break;
                 case Key.D4: DisplayMode = AdaptiveDisplayMode.ThreeDimensional; break;
                 case Key.Home: ResetActiveView(); break;
                 case Key.F:
@@ -347,9 +405,12 @@ namespace ImageViewer.Controls
                         statusText.Text = UiText.Get("StatusVolumeFitted");
                     }
                     break;
-                case Key.Up: StepMprSlice(1); break;
-                case Key.Down: StepMprSlice(-1); break;
-                case Key.Escape: _operationCancellation?.Cancel(); break;
+                case Key.Up: await StepMprSliceAsync(1); break;
+                case Key.Down: await StepMprSliceAsync(-1); break;
+                case Key.Escape:
+                    _operationCancellation?.Cancel();
+                    _mprCancellation?.Cancel();
+                    break;
                 default: return;
             }
 
@@ -357,6 +418,11 @@ namespace ImageViewer.Controls
         }
 
         internal void StepMprSlice(int offset)
+        {
+            _ = StepMprSliceAsync(offset);
+        }
+
+        private async Task StepMprSliceAsync(int offset)
         {
             if (_volume == null || (_displayMode != AdaptiveDisplayMode.Coronal && _displayMode != AdaptiveDisplayMode.Sagittal))
             {
@@ -368,34 +434,89 @@ namespace ImageViewer.Controls
                 : VolumeSliceOrientation.Sagittal;
             int maximumSliceIndex = orientation == VolumeSliceOrientation.Coronal ? _volume.Height - 1 : _volume.Width - 1;
             int sliceIndex = Math.Clamp(GetMprSliceIndex(_displayMode) + offset, 0, maximumSliceIndex);
-            UpdateMprSlice(_displayMode, orientation, sliceIndex);
+            try
+            {
+                await UpdateMprSliceAsync(_displayMode, orientation, sliceIndex);
+            }
+            catch (Exception)
+            {
+                statusText.Text = UiText.Format("StatusUnableCreateView", LocalizeMode(_displayMode));
+                retryButton.Visibility = Visibility.Visible;
+                UpdateDataQualityPanelVisibility();
+            }
         }
 
         private int GetMprSliceIndex(AdaptiveDisplayMode mode) =>
             mode == AdaptiveDisplayMode.Coronal ? _coronalSliceIndex : _sagittalSliceIndex;
 
-        private void UpdateMprSlice(AdaptiveDisplayMode mode, VolumeSliceOrientation orientation, int sliceIndex)
+        private async Task<bool> UpdateMprSliceAsync(AdaptiveDisplayMode mode, VolumeSliceOrientation orientation, int sliceIndex)
         {
-            if (_volume == null)
+            VolumeData? volume = _volume;
+            if (volume == null || _isDisposed)
             {
-                return;
+                return false;
             }
 
-            _imageViewer.ImageSource = VolumeSliceService.GetSlice(_volume, orientation, sliceIndex);
+            // Publish the requested plane immediately. Pixel extraction remains on the
+            // worker thread below, while the 3D crosshair and navigation state respond
+            // to the user's command without waiting for a large MPR reconstruction.
+            ApplyMprSelection(mode, sliceIndex, volume);
+            (CancellationTokenSource cancellation, long generation) = BeginMprRequest();
+            try
+            {
+                BitmapSource slice = await Task.Run(
+                    () => VolumeSliceService.GetSlice(volume, orientation, sliceIndex, cancellation.Token),
+                    cancellation.Token);
+
+                if (!IsCurrentMprRequest(cancellation, generation, volume))
+                {
+                    return false;
+                }
+
+                _imageViewer.ImageSource = slice;
+                UpdateMprStatus(mode, sliceIndex, volume);
+
+                UpdateMprSliceControl(mode);
+                return true;
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+                return false;
+            }
+            finally
+            {
+                EndMprRequest(cancellation);
+            }
+        }
+
+        private void ApplyMprSelection(AdaptiveDisplayMode mode, int sliceIndex, VolumeData volume)
+        {
             if (mode == AdaptiveDisplayMode.Coronal)
             {
-                _coronalSliceIndex = sliceIndex;
-                _volume3DViewer.SetCoronalSlice(sliceIndex);
-                statusText.Text = UiText.Format("StatusCoronalSlice", sliceIndex + 1, _volume.Height);
+                _coronalSliceIndex = Math.Clamp(sliceIndex, 0, volume.Height - 1);
+                _volume3DViewer.SetCoronalSlice(_coronalSliceIndex);
             }
             else
             {
-                _sagittalSliceIndex = sliceIndex;
-                _volume3DViewer.SetSagittalSlice(sliceIndex);
-                statusText.Text = UiText.Format("StatusSagittalSlice", sliceIndex + 1, _volume.Width);
+                _sagittalSliceIndex = Math.Clamp(sliceIndex, 0, volume.Width - 1);
+                _volume3DViewer.SetSagittalSlice(_sagittalSliceIndex);
+            }
+
+            // A direct DisplayMode assignment can arrive before the first async MPR
+            // result. Keep the view populated while that result is being reconstructed.
+            if (_imageViewer.ImageSource == null)
+            {
+                _imageViewer.ImageSource = volume.GetAxialSlice(_volumeViewer.CurrentSliceIndex);
             }
 
             UpdateMprSliceControl(mode);
+        }
+
+        private void UpdateMprStatus(AdaptiveDisplayMode mode, int sliceIndex, VolumeData volume)
+        {
+            statusText.Text = mode == AdaptiveDisplayMode.Coronal
+                ? UiText.Format("StatusCoronalSlice", sliceIndex + 1, volume.Height)
+                : UiText.Format("StatusSagittalSlice", sliceIndex + 1, volume.Width);
         }
 
         private void ResetActiveView()
@@ -421,6 +542,7 @@ namespace ImageViewer.Controls
         private void OnCancelClick(object sender, RoutedEventArgs e)
         {
             _operationCancellation?.Cancel();
+            _mprCancellation?.Cancel();
             statusText.Text = UiText.Get("StatusCancelRequested");
             operationProgress.Visibility = Visibility.Collapsed;
             UpdateButtonStates();
@@ -430,7 +552,7 @@ namespace ImageViewer.Controls
 
         private void OnNextMprSliceClick(object sender, RoutedEventArgs e) => StepMprSlice(1);
 
-        private void OnMprSliceValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        private async void OnMprSliceValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (_isUpdatingMprSlider || _volume == null || (_displayMode != AdaptiveDisplayMode.Coronal && _displayMode != AdaptiveDisplayMode.Sagittal))
             {
@@ -441,34 +563,86 @@ namespace ImageViewer.Controls
             VolumeSliceOrientation orientation = _displayMode == AdaptiveDisplayMode.Coronal
                 ? VolumeSliceOrientation.Coronal
                 : VolumeSliceOrientation.Sagittal;
-            UpdateMprSlice(_displayMode, orientation, sliceIndex);
+            try
+            {
+                await UpdateMprSliceAsync(_displayMode, orientation, sliceIndex);
+            }
+            catch (Exception)
+            {
+                statusText.Text = UiText.Format("StatusUnableCreateView", LocalizeMode(_displayMode));
+                retryButton.Visibility = Visibility.Visible;
+                UpdateDataQualityPanelVisibility();
+            }
         }
 
-        private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        private async void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
         {
             if (_volume != null && (_displayMode == AdaptiveDisplayMode.Coronal || _displayMode == AdaptiveDisplayMode.Sagittal))
             {
-                StepMprSlice(e.Delta > 0 ? 1 : -1);
+                await StepMprSliceAsync(e.Delta > 0 ? 1 : -1);
                 e.Handled = true;
             }
         }
 
-        private void BeginOperation(string message)
+        private (CancellationTokenSource Cancellation, long Generation) BeginMprRequest()
+        {
+            _mprCancellation?.Cancel();
+            var cancellation = new CancellationTokenSource();
+            _mprCancellation = cancellation;
+            long generation = Interlocked.Increment(ref _mprRequestGeneration);
+            return (cancellation, generation);
+        }
+
+        private bool IsCurrentMprRequest(CancellationTokenSource cancellation, long generation, VolumeData volume)
+        {
+            return ReferenceEquals(_mprCancellation, cancellation) &&
+                   generation == Volatile.Read(ref _mprRequestGeneration) &&
+                   ReferenceEquals(_volume, volume) &&
+                   !cancellation.IsCancellationRequested &&
+                   !_isDisposed;
+        }
+
+        private void EndMprRequest(CancellationTokenSource cancellation)
+        {
+            if (ReferenceEquals(_mprCancellation, cancellation))
+            {
+                _mprCancellation = null;
+            }
+
+            cancellation.Dispose();
+        }
+
+        private CancellationTokenSource BeginOperation(string message)
         {
             _operationCancellation?.Cancel();
-            _operationCancellation?.Dispose();
-            _operationCancellation = new CancellationTokenSource();
+            var operation = new CancellationTokenSource();
+            _operationCancellation = operation;
             statusText.Text = message;
             operationProgress.Visibility = Visibility.Visible;
             UpdateButtonStates();
+            return operation;
         }
 
-        private void EndOperation()
+        private bool IsCurrentOperation(CancellationTokenSource operation)
         {
-            operationProgress.Visibility = Visibility.Collapsed;
-            _operationCancellation?.Dispose();
+            return ReferenceEquals(_operationCancellation, operation) && !operation.IsCancellationRequested && !_isDisposed;
+        }
+
+        private void EndOperation(CancellationTokenSource operation)
+        {
+            if (!ReferenceEquals(_operationCancellation, operation))
+            {
+                operation.Dispose();
+                return;
+            }
+
+            operation.Dispose();
             _operationCancellation = null;
-            UpdateButtonStates();
+            if (!_isDisposed)
+            {
+                operationProgress.Visibility = Visibility.Collapsed;
+                UpdateButtonStates();
+            }
         }
 
         private void UpdateStatus()
@@ -538,6 +712,34 @@ namespace ImageViewer.Controls
             mprNextButton.IsEnabled = isMpr && !operationActive && mprSliceSlider.Value < mprSliceSlider.Maximum;
             acceptSegmentationButton.IsEnabled = _pendingSegmentation != null;
             rejectSegmentationButton.IsEnabled = _pendingSegmentation != null;
+            UpdateModeButtonVisuals();
+            UpdateDataQualityPanelVisibility();
+        }
+
+        private void UpdateModeButtonVisuals()
+        {
+            SetModeButtonVisual(autoButton, _displayMode == AdaptiveDisplayMode.Auto);
+            SetModeButtonVisual(twoDimensionalButton, _displayMode == AdaptiveDisplayMode.TwoDimensional);
+            SetModeButtonVisual(threeDimensionalButton, _displayMode == AdaptiveDisplayMode.ThreeDimensional);
+            SetModeButtonVisual(axialButton, _displayMode == AdaptiveDisplayMode.AxialSlice);
+            SetModeButtonVisual(coronalButton, _displayMode == AdaptiveDisplayMode.Coronal);
+            SetModeButtonVisual(sagittalButton, _displayMode == AdaptiveDisplayMode.Sagittal);
+        }
+
+        private static void SetModeButtonVisual(Button button, bool isSelected)
+        {
+            button.Background = (Brush)button.FindResource(isSelected ? "AdaptiveModeSelectedBrush" : "AdaptiveModeDefaultBrush");
+            button.BorderBrush = (Brush)button.FindResource(isSelected ? "AdaptiveModeSelectedBorderBrush" : "AdaptiveModeDefaultBorderBrush");
+            button.FontWeight = isSelected ? FontWeights.SemiBold : FontWeights.Normal;
+        }
+
+        private void UpdateDataQualityPanelVisibility()
+        {
+            bool hasQualityResult = _qualityReport is not null || retryButton.Visibility == Visibility.Visible;
+            bool hasSegmentationResult = _pendingSegmentation is not null;
+            dataQualityPanel.Visibility = hasQualityResult || hasSegmentationResult ? Visibility.Visible : Visibility.Collapsed;
+            segmentationActionsPanel.Visibility = hasSegmentationResult ? Visibility.Visible : Visibility.Collapsed;
+            qualityActionsPanel.Visibility = retryButton.Visibility == Visibility.Visible ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private AdaptiveDisplayMode ResolveMode()

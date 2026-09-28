@@ -30,10 +30,11 @@ namespace ImageViewer.Services
             bitmap.CopyPixels(pixels, stride, 0);
 
             int[] histogram = new int[binCount];
+            int intensityRange = ImageViewerPixelAccess.GetIntensityMaximum(bitmap.Format) + 1;
             for (int index = 0; index < pixels.Length; index += bytesPerPixel)
             {
-                byte intensity = GetPixelIntensity(pixels, index, bytesPerPixel, bitmap.Format);
-                int binIndex = intensity * binCount / 256;
+                ushort intensity = GetPixelIntensity(pixels, index, bytesPerPixel, bitmap.Format);
+                int binIndex = (int)((long)intensity * binCount / intensityRange);
                 if (binIndex >= binCount)
                 {
                     binIndex = binCount - 1;
@@ -45,7 +46,7 @@ namespace ImageViewer.Services
             return histogram;
         }
 
-        public static byte[] CreateProfile(BitmapSource bitmap, Point start, Point end)
+        public static ushort[] CreateProfile16(BitmapSource bitmap, Point start, Point end)
         {
             ArgumentNullException.ThrowIfNull(bitmap);
 
@@ -54,7 +55,7 @@ namespace ImageViewer.Services
             var points = GetLinePoints(start, end);
             if (points.Count == 0)
             {
-                return Array.Empty<byte>();
+                return Array.Empty<ushort>();
             }
 
             int minX = (int)points.Min(p => p.X);
@@ -64,7 +65,7 @@ namespace ImageViewer.Services
 
             if (maxX < 0 || maxY < 0 || minX >= bitmap.PixelWidth || minY >= bitmap.PixelHeight)
             {
-                return Array.Empty<byte>();
+                return Array.Empty<ushort>();
             }
 
             int roiX = Math.Max(0, minX);
@@ -73,7 +74,7 @@ namespace ImageViewer.Services
             int roiH = Math.Min(bitmap.PixelHeight, maxY + 1) - roiY;
             if (roiW <= 0 || roiH <= 0)
             {
-                return Array.Empty<byte>();
+                return Array.Empty<ushort>();
             }
 
             int bytesPerPixel = (bitmap.Format.BitsPerPixel + 7) / 8;
@@ -81,7 +82,7 @@ namespace ImageViewer.Services
             byte[] pixels = new byte[roiH * stride];
             bitmap.CopyPixels(new Int32Rect(roiX, roiY, roiW, roiH), pixels, stride, 0);
 
-            byte[] profileData = new byte[points.Count];
+            ushort[] profileData = new ushort[points.Count];
             for (int i = 0; i < points.Count; i++)
             {
                 int pixelX = (int)points[i].X;
@@ -98,6 +99,24 @@ namespace ImageViewer.Services
             }
 
             return profileData;
+        }
+
+        /// <summary>
+        /// Legacy 8-bit profile view. New callers should use <see cref="CreateProfile16"/>.
+        /// </summary>
+        public static byte[] CreateProfile(BitmapSource bitmap, Point start, Point end)
+        {
+            ArgumentNullException.ThrowIfNull(bitmap);
+            ushort[] profile = CreateProfile16(bitmap, start, end);
+            ushort maximum = (ushort)ImageViewerPixelAccess.GetIntensityMaximum(NormalizeBitmap(bitmap).Format);
+            if (maximum == byte.MaxValue)
+            {
+                return profile.Select(value => (byte)value).ToArray();
+            }
+
+            return profile
+                .Select(value => (byte)Math.Clamp((int)Math.Round(value * 255d / maximum), 0, 255))
+                .ToArray();
         }
 
         private static List<Point> GetLinePoints(Point start, Point end)
@@ -141,22 +160,9 @@ namespace ImageViewer.Services
             return points;
         }
 
-        private static byte GetPixelIntensity(byte[] pixels, int index, int bytesPerPixel, PixelFormat format)
+        private static ushort GetPixelIntensity(byte[] pixels, int index, int bytesPerPixel, PixelFormat format)
         {
-            if (format == PixelFormats.Gray8)
-            {
-                return pixels[index];
-            }
-
-            if (bytesPerPixel >= 3)
-            {
-                byte b = pixels[index];
-                byte g = pixels[index + 1];
-                byte r = pixels[index + 2];
-                return (byte)(0.299 * r + 0.587 * g + 0.114 * b);
-            }
-
-            return 0;
+            return ImageViewerPixelAccess.ReadIntensity(pixels, index, bytesPerPixel, format);
         }
 
         private static double SampleAveragedIntensity(byte[] pixels, int pixelWidth, int pixelHeight, int stride, int bytesPerPixel, PixelFormat format, Point center, Vector normal, int averagingHalfWidth)
@@ -183,21 +189,7 @@ namespace ImageViewer.Services
 
         private static BitmapSource NormalizeBitmap(BitmapSource bitmap)
         {
-            if (bitmap.Format == PixelFormats.Gray8 ||
-                bitmap.Format == PixelFormats.Bgr24 ||
-                bitmap.Format == PixelFormats.Bgr32 ||
-                bitmap.Format == PixelFormats.Bgra32)
-            {
-                return bitmap;
-            }
-
-            var converted = new FormatConvertedBitmap();
-            converted.BeginInit();
-            converted.Source = bitmap;
-            converted.DestinationFormat = PixelFormats.Bgra32;
-            converted.EndInit();
-            converted.Freeze();
-            return converted;
+            return ImageViewerPixelAccess.NormalizeForIntensity(bitmap);
         }
     }
 }

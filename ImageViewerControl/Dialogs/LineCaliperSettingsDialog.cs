@@ -23,7 +23,10 @@ namespace ImageViewer.Dialogs
         private readonly TextBox _minimumValidCalipersTextBox;
         private readonly TextBox _outlierThresholdTextBox;
         private readonly TextBox _edgeSelectionTextBox;
+        private readonly TextBox _fitClippingEndPointsTextBox;
         private readonly ComboBox _polarityComboBox;
+        private readonly ComboBox _edgeExtractionModeComboBox;
+        private readonly ComboBox _lineFitModeComboBox;
 
         public LineCaliperSettingsDialog(LineCaliperMeasureRoi model, Action<LineCaliperMeasureRoi>? previewAction)
             : base(
@@ -46,6 +49,7 @@ namespace ImageViewer.Dialogs
             _minimumValidCalipersTextBox = AddField(AdvancedPanel, UiText.Get("CaliperFieldMinimumValid"), _model.MinimumValidCalipers.ToString(CultureInfo.InvariantCulture));
             _outlierThresholdTextBox = AddField(AdvancedPanel, UiText.Get("CaliperFieldOutlierThreshold"), _model.CaliperOutlierThreshold.ToString(CultureInfo.InvariantCulture));
             _edgeSelectionTextBox = AddField(AdvancedPanel, UiText.Get("CaliperFieldEdgeSelection"), _model.EdgeSelection.ToString(CultureInfo.InvariantCulture));
+            _fitClippingEndPointsTextBox = AddField(AdvancedPanel, UiText.Get("CaliperFieldFitClippingEndPoints"), _model.CaliperFitClippingEndPoints.ToString(CultureInfo.InvariantCulture));
 
             AdvancedPanel.Children.Add(new TextBlock { Text = UiText.Get("CaliperFieldPolarity"), Margin = new Thickness(0, 8, 0, 2) });
             _polarityComboBox = new ComboBox
@@ -56,6 +60,24 @@ namespace ImageViewer.Dialogs
             };
             AdvancedPanel.Children.Add(_polarityComboBox);
 
+            AdvancedPanel.Children.Add(new TextBlock { Text = UiText.Get("CaliperFieldEdgeExtractionMode"), Margin = new Thickness(0, 8, 0, 2) });
+            _edgeExtractionModeComboBox = new ComboBox
+            {
+                ItemsSource = Enum.GetValues<HalconEdgeExtractionMode>(),
+                SelectedItem = _model.CaliperEdgeExtractionMode,
+                Margin = new Thickness(0, 0, 0, 4)
+            };
+            AdvancedPanel.Children.Add(_edgeExtractionModeComboBox);
+
+            AdvancedPanel.Children.Add(new TextBlock { Text = UiText.Get("CaliperFieldLineFitMode"), Margin = new Thickness(0, 8, 0, 2) });
+            _lineFitModeComboBox = new ComboBox
+            {
+                ItemsSource = Enum.GetValues<HalconLineFitMode>(),
+                SelectedItem = _model.CaliperLineFitMode,
+                Margin = new Thickness(0, 0, 0, 4)
+            };
+            AdvancedPanel.Children.Add(_lineFitModeComboBox);
+
             EnableLivePreview(_caliperCountTextBox);
             EnableLivePreview(_searchRangeTextBox);
             EnableLivePreview(_samplingHalfWidthTextBox);
@@ -64,7 +86,10 @@ namespace ImageViewer.Dialogs
             EnableLivePreview(_minimumValidCalipersTextBox);
             EnableLivePreview(_outlierThresholdTextBox);
             EnableLivePreview(_edgeSelectionTextBox);
+            EnableLivePreview(_fitClippingEndPointsTextBox);
             EnableLivePreview(_polarityComboBox);
+            EnableLivePreview(_edgeExtractionModeComboBox);
+            EnableLivePreview(_lineFitModeComboBox);
         }
 
         public LineCaliperMeasureRoi? Result => AppliedModel as LineCaliperMeasureRoi;
@@ -82,7 +107,10 @@ namespace ImageViewer.Dialogs
                 !TryParsePositiveInt(_minimumValidCalipersTextBox.Text, out int minimumValidCalipers, minValue: 3) ||
                 !TryParseNonNegativeDouble(_outlierThresholdTextBox.Text, out double outlierThreshold) ||
                 !TryParsePositiveInt(_edgeSelectionTextBox.Text, out int edgeSelection, minValue: 1) ||
-                _polarityComboBox.SelectedItem is not CaliperEdgePolarity polarity)
+                !TryParseNonNegativeInt(_fitClippingEndPointsTextBox.Text, out int fitClippingEndPoints) ||
+                _polarityComboBox.SelectedItem is not CaliperEdgePolarity polarity ||
+                _edgeExtractionModeComboBox.SelectedItem is not HalconEdgeExtractionMode edgeExtractionMode ||
+                _lineFitModeComboBox.SelectedItem is not HalconLineFitMode lineFitMode)
             {
                 return false;
             }
@@ -95,7 +123,10 @@ namespace ImageViewer.Dialogs
             _model.MinimumValidCalipers = minimumValidCalipers;
             _model.CaliperOutlierThreshold = outlierThreshold;
             _model.EdgeSelection = Math.Clamp(edgeSelection, 1, 8);
+            _model.CaliperFitClippingEndPoints = fitClippingEndPoints;
             _model.CaliperEdgePolarity = polarity;
+            _model.CaliperEdgeExtractionMode = edgeExtractionMode;
+            _model.CaliperLineFitMode = lineFitMode;
             return true;
         }
     }

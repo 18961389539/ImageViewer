@@ -50,6 +50,49 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
+        public void RoiCalibrationHelper_UsesEndpointCorrectionForBasicRadialModel()
+        {
+            var calibration = new CameraCalibration
+            {
+                PrincipalX = 0,
+                PrincipalY = 0,
+                NormalizationRadius = 100,
+                K1 = 0.25
+            };
+            var line = new LineMeasureRoi
+            {
+                P1 = new PointD(100, 0),
+                P2 = new PointD(200, 0)
+            };
+
+            double rawLength = line.P1.DistanceTo(line.P2);
+            double endpointCorrection = calibration.CorrectPixelLength(line.P1, line.P2) / rawLength;
+            double midpointCorrection = calibration.UndistortScaleFactor(new PointD(150, 0));
+
+            Assert.Equal(endpointCorrection, RoiCalibrationHelper.GetLengthCorrection(line, calibration), 9);
+            Assert.NotEqual(midpointCorrection, endpointCorrection);
+        }
+
+        [Fact]
+        public void RoiCalibrationHelper_UsesJacobianDeterminantForAreaCorrection()
+        {
+            var calibration = new CameraCalibration
+            {
+                PrincipalX = 0,
+                PrincipalY = 0,
+                NormalizationRadius = 100,
+                K1 = 0.25
+            };
+            var circle = new CircleRoi { Center = new PointD(150, 0), Radius = 10 };
+
+            double areaCorrection = RoiCalibrationHelper.GetAreaCorrection(circle, calibration);
+            double lengthSquareApproximation = Math.Pow(calibration.LocalLengthScaleFactor(circle.Center), 2);
+
+            Assert.Equal(calibration.LocalAreaScaleFactor(circle.Center), areaCorrection, 9);
+            Assert.NotEqual(lengthSquareApproximation, areaCorrection);
+        }
+
+        [Fact]
         public void UndistortScaleFactor_ExtremeCoefficients_AreClamped()
         {
             var calibration = new CameraCalibration { PrincipalX = 100, PrincipalY = 100, NormalizationRadius = 100, K1 = 10 };
@@ -111,6 +154,48 @@ namespace ImageViewerControl.Tests
             string info = RoiInfoService.BuildInfo(circle, null, 0.01, "mm", registry, includeStatistics: false);
 
             Assert.DoesNotContain("畸变校正", info);
+        }
+
+        [Fact]
+        public void ExtendedBrownConradyModel_RoundTripsDistortedPoint()
+        {
+            var calibration = new CameraCalibration
+            {
+                PrincipalX = 320,
+                PrincipalY = 240,
+                NormalizationRadius = 320,
+                K1 = 0.08,
+                K2 = -0.015,
+                K3 = 0.002,
+                TangentialP1 = 0.001,
+                TangentialP2 = -0.0008
+            };
+            PointD ideal = new(410, 285);
+
+            PointD distorted = calibration.DistortPoint(ideal);
+            PointD restored = calibration.UndistortPoint(distorted);
+
+            Assert.InRange(Math.Abs(restored.X - ideal.X), 0, 1e-6);
+            Assert.InRange(Math.Abs(restored.Y - ideal.Y), 0, 1e-6);
+            Assert.True(calibration.IsValid);
+            Assert.True(calibration.HasExtendedDistortionModel);
+        }
+
+        [Fact]
+        public void Calibration_WithNonFiniteParameter_IsInvalidAndDoesNotTransform()
+        {
+            var calibration = new CameraCalibration
+            {
+                PrincipalX = 10,
+                PrincipalY = 10,
+                NormalizationRadius = 10,
+                K1 = double.NaN
+            };
+            PointD point = new(14, 12);
+
+            Assert.False(calibration.IsValid);
+            Assert.Equal(point, calibration.DistortPoint(point));
+            Assert.Equal(point, calibration.UndistortPoint(point));
         }
     }
 }

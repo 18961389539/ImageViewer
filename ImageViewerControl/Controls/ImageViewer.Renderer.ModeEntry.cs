@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Input;
 using ImageViewer.Drawing;
+using ImageViewer.Localization;
 using ImageViewer.Models;
 using ImageViewer.Plugins;
 
@@ -19,87 +20,89 @@ namespace ImageViewer.Controls
 
         public void StartRoiMode()
         {
-            StartDraw(BuiltInDrawControllers.RotatedRect);
+            StartDraw(BuiltInDrawControllers.RotatedRect, UiText.Get("ToolRotatedRect"));
         }
 
         public void StartBlobAnalysisMode()
         {
-            StartDraw(BuiltInDrawControllers.BlobAnalysis);
+            StartDraw(BuiltInDrawControllers.BlobAnalysis, UiText.Get("ToolBlobAnalysis"));
         }
 
         public void StartCircleRoiMode()
         {
-            StartDraw(BuiltInDrawControllers.Circle);
+            StartDraw(BuiltInDrawControllers.Circle, UiText.Get("ToolCircle"));
         }
 
         public void StartRingRoiMode()
         {
-            StartDraw(BuiltInDrawControllers.Ring);
+            StartDraw(BuiltInDrawControllers.Ring, UiText.Get("ToolRing"));
         }
 
         public void StartCircularCaliperMeasureMode()
         {
-            StartDraw(BuiltInDrawControllers.CircularCaliper);
+            StartDraw(BuiltInDrawControllers.CircularCaliper, UiText.Get("ToolCircularCaliper"));
         }
 
         public void StartAutomaticCircleMeasureMode()
         {
-            StartDraw(BuiltInDrawControllers.AutomaticCircle);
+            StartDraw(BuiltInDrawControllers.AutomaticCircle, UiText.Get("ToolAutomaticCircle"));
         }
 
         public void StartArcCaliperMeasureMode()
         {
-            StartDraw(BuiltInDrawControllers.ArcCaliper);
+            StartDraw(BuiltInDrawControllers.ArcCaliper, UiText.Get("ToolArcCaliper"));
         }
 
         public void StartLineCaliperMeasureMode()
         {
-            StartDraw(BuiltInDrawControllers.LineCaliper);
+            StartDraw(BuiltInDrawControllers.LineCaliper, UiText.Get("ToolLineCaliper"));
         }
 
         public void StartPointAnnotationMode()
         {
-            StartDraw(BuiltInDrawControllers.PointAnnotation);
+            StartDraw(BuiltInDrawControllers.PointAnnotation, UiText.Get("ToolPointAnnotation"));
         }
 
         public void StartPointCoordinateMeasureMode()
         {
-            StartDraw(BuiltInDrawControllers.PointCoordinate);
+            StartDraw(BuiltInDrawControllers.PointCoordinate, UiText.Get("ToolPointCoordinate"));
         }
 
         public void StartAutomaticEdgePointMeasureMode()
         {
-            StartDraw(BuiltInDrawControllers.AutomaticEdgePoint);
+            StartDraw(BuiltInDrawControllers.AutomaticEdgePoint, UiText.Get("ToolAutomaticEdgePoint"));
         }
 
         public void StartArrowAnnotationMode()
         {
-            StartDraw(BuiltInDrawControllers.ArrowAnnotation);
+            StartDraw(BuiltInDrawControllers.ArrowAnnotation, UiText.Get("ToolArrowAnnotation"));
         }
 
         public void StartTextAnnotationMode()
         {
-            StartDraw(BuiltInDrawControllers.TextAnnotation);
+            StartDraw(BuiltInDrawControllers.TextAnnotation, UiText.Get("ToolTextAnnotation"));
         }
 
         public void StartPolylineRoiMode(bool freehand)
         {
-            StartDraw(freehand ? BuiltInDrawControllers.FreehandPolyline : BuiltInDrawControllers.Polyline);
+            StartDraw(
+                freehand ? BuiltInDrawControllers.FreehandPolyline : BuiltInDrawControllers.Polyline,
+                UiText.Get(freehand ? "ToolFreehand" : "ToolPolyline"));
         }
 
         public void StartPolygonRoiMode()
         {
-            StartDraw(BuiltInDrawControllers.Polygon);
+            StartDraw(BuiltInDrawControllers.Polygon, UiText.Get("ToolPolygon"));
         }
 
         public void StartAreaMeasureMode()
         {
-            StartDraw(BuiltInDrawControllers.Polygon);
+            StartDraw(BuiltInDrawControllers.Polygon, UiText.Get("ToolAreaMeasure"));
         }
 
         public void StartPolylineMeasureMode()
         {
-            StartDraw(BuiltInDrawControllers.Polyline);
+            StartDraw(BuiltInDrawControllers.Polyline, UiText.Get("ToolPolylineMeasure"));
         }
 
         /// <summary>
@@ -122,62 +125,62 @@ namespace ImageViewer.Controls
 
         public void StartFitEllipseMode()
         {
-            StartDraw(BuiltInDrawControllers.FittedEllipse);
+            StartDraw(BuiltInDrawControllers.FittedEllipse, UiText.Get("ToolFittedEllipse"));
         }
 
         public void StartLineMeasureMode()
         {
-            StartDraw(BuiltInDrawControllers.LineMeasure);
+            StartDraw(BuiltInDrawControllers.LineMeasure, UiText.Get("ToolLineMeasure"));
         }
 
         public void StartCaliperMeasureMode()
         {
-            StartDraw(BuiltInDrawControllers.CaliperMeasure);
+            StartDraw(BuiltInDrawControllers.CaliperMeasure, UiText.Get("ToolCaliperMeasure"));
         }
 
         public void StartAngleMeasureMode()
         {
-            StartDraw(BuiltInDrawControllers.AngleMeasure);
+            StartDraw(BuiltInDrawControllers.AngleMeasure, UiText.Get("ToolAngleMeasure"));
         }
 
         public void StartArcMeasureMode()
         {
-            StartDraw(BuiltInDrawControllers.ArcMeasure);
+            StartDraw(BuiltInDrawControllers.ArcMeasure, UiText.Get("ToolArcMeasure"));
         }
 
         public void StartThreePointCircleMeasureMode()
         {
-            StartDraw(BuiltInDrawControllers.ThreePointCircle);
+            StartDraw(BuiltInDrawControllers.ThreePointCircle, UiText.Get("ToolThreePointCircle"));
         }
 
         public void StartPointToLineMeasureMode()
         {
-            StartDraw(BuiltInDrawControllers.PointToLineDistance);
+            StartDraw(BuiltInDrawControllers.PointToLineDistance, UiText.Get("ToolPointToLineDistance"));
         }
 
         public void StartPointToCircleMeasureMode()
         {
-            StartDraw(BuiltInDrawControllers.PointToCircleDistance);
+            StartDraw(BuiltInDrawControllers.PointToCircleDistance, UiText.Get("ToolPointToCircleDistance"));
         }
 
         public void StartParallelismMeasureMode()
         {
-            StartDraw(BuiltInDrawControllers.Parallelism);
+            StartDraw(BuiltInDrawControllers.Parallelism, UiText.Get("ToolParallelism"));
         }
 
         public void StartPerpendicularityMeasureMode()
         {
-            StartDraw(BuiltInDrawControllers.Perpendicularity);
+            StartDraw(BuiltInDrawControllers.Perpendicularity, UiText.Get("ToolPerpendicularity"));
         }
 
         public void StartConcentricityMeasureMode()
         {
-            StartDraw(BuiltInDrawControllers.Concentricity);
+            StartDraw(BuiltInDrawControllers.Concentricity, UiText.Get("ToolConcentricity"));
         }
 
         public void StartCenterDistanceMeasureMode()
         {
-            StartDraw(BuiltInDrawControllers.CenterDistance);
+            StartDraw(BuiltInDrawControllers.CenterDistance, UiText.Get("ToolCenterDistance"));
         }
 
     }

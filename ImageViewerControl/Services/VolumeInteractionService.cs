@@ -22,12 +22,11 @@ namespace ImageViewer.Services
                 throw new ArgumentOutOfRangeException(nameof(x), "Voxel coordinates must be inside the volume.");
             }
 
-            BitmapSource slice = volume.GetAxialSlice(z);
-            byte[] pixel = new byte[Math.Max(1, (slice.Format.BitsPerPixel + 7) / 8)];
-            slice.CopyPixels(new Int32Rect(x, y, 1, 1), pixel, pixel.Length, 0);
-            byte intensity = pixel.Length >= 3
-                ? (byte)(pixel[0] * 0.114 + pixel[1] * 0.587 + pixel[2] * 0.299)
-                : pixel[0];
+            BitmapSource slice = ImageViewerPixelAccess.NormalizeForIntensity(volume.GetAxialSlice(z));
+            int bytesPerPixel = ImageViewerPixelAccess.GetBytesPerPixel(slice);
+            byte[] pixel = new byte[bytesPerPixel];
+            slice.CopyPixels(new Int32Rect(x, y, 1, 1), pixel, bytesPerPixel, 0);
+            ushort intensity = ImageViewerPixelAccess.ReadIntensity(pixel, 0, bytesPerPixel, slice.Format);
             return new VolumeVoxelLocation(
                 x,
                 y,

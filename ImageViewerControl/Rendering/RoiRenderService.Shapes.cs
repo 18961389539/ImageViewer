@@ -233,7 +233,12 @@ namespace ImageViewer.Rendering
 
                 foreach (var point in polyline.Points)
                 {
-                    context.DrawHandle(point.ToWpfPoint(), ResizeHandle.None, context.PointAnnotationSize / context.Scale, false, brush);
+                    context.DrawHandle(
+                        point.ToWpfPoint(),
+                        isSelected ? ResizeHandle.Vertex : ResizeHandle.None,
+                        isSelected ? context.HandleSize / context.Scale : context.PointAnnotationSize / context.Scale,
+                        false,
+                        brush);
                 }
 
                 if (polyline.Points.Count > 1)

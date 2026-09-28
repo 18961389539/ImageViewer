@@ -109,6 +109,30 @@
             <Setter Property="BorderBrush" Value="{StaticResource ViewerAccentBorderBrush}" />
         </Style>
 
+        <Style x:Key="ViewerErrorPanelStyle" TargetType="Border" BasedOn="{StaticResource ViewerFloatingPanelStyle}">
+            <Setter Property="Background" Value="{StaticResource ViewerErrorSoftBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource ViewerErrorBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+        </Style>
+
+        <Style x:Key="ViewerErrorActionButtonStyle" TargetType="Button" BasedOn="{StaticResource ViewerToolbarButtonStyle}">
+            <Setter Property="Background" Value="{StaticResource ViewerErrorSoftBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource ViewerErrorBorderBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource ViewerTextPrimaryBrush}" />
+        </Style>
+
+        <Style x:Key="ViewerErrorDismissButtonStyle" TargetType="Button">
+            <Setter Property="Foreground" Value="{StaticResource ViewerErrorBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{StaticResource ViewerErrorBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="6,0" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template" Value="{StaticResource ViewerChromeButtonTemplate}" />
+        </Style>
+
         <Style x:Key="ViewerToolbarToggleButtonStyle" TargetType="ToggleButton">
             <Setter Property="Foreground" Value="{StaticResource ViewerTextPrimaryBrush}" />
             <Setter Property="Background" Value="{StaticResource ViewerSurfaceAltBrush}" />
@@ -266,14 +290,14 @@
                         <Setter Property="SelectionBrush" Value="#69AFFF" />
                     </Style>
                 </ContextMenu.Resources>
-                <MenuItem Header="{Binding PlacementTarget.ImageLoadStatusText, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                <MenuItem Header="{Binding DataContext.ImageLoadStatusText, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                           IsEnabled="False"
                           Foreground="{StaticResource ViewerErrorBrush}"
-                          Visibility="{Binding PlacementTarget.ImageLoadHasError, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                          Visibility="{Binding DataContext.ImageLoadHasError, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 <MenuItem Header="{localization:UiText ImageLoadRetry}"
                           Click="OnRetryImageLoadClick"
-                          Visibility="{Binding PlacementTarget.CanRetryImageLoad, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                <Separator Visibility="{Binding PlacementTarget.ImageLoadHasError, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                          Visibility="{Binding DataContext.CanRetryImageLoad, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <Separator Visibility="{Binding DataContext.ImageLoadHasError, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 <MenuItem x:Name="drawRoiMenuItem" x:FieldModifier="internal" Header="{localization:UiText MenuDraw}" ToolTip="{localization:UiText MenuDrawTooltip}" IsEnabled="{Binding MenuState.Context.DrawRoiEnabled}" />
                 <MenuItem x:Name="measureMenuItem" Header="{localization:UiText MenuMeasure}">
                     <MenuItem x:Name="gradientDetectMenuItem" Click="OnFeatureMenuCommandClick" Tag="{x:Static controls:ImageViewerFeatureMenuTags.GradientDetect}" Header="{localization:UiText MenuGradientAlignCaliper}" IsEnabled="{Binding MenuState.Context.GradientDetectEnabled}" />
@@ -351,6 +375,7 @@
                 <MenuItem Header="{localization:UiText MenuAnalysisAndExport}">
                     <MenuItem x:Name="exportSnapshotMenuItem" x:FieldModifier="internal" Click="OnFeatureMenuCommandClick" Tag="{x:Static controls:ImageViewerFeatureMenuTags.ExportSnapshot}" Header="{localization:UiText MenuExportCurrentViewPng}" IsEnabled="{Binding MenuState.Context.ExportSnapshotEnabled}" />
                     <MenuItem x:Name="exportAnalysisCsvMenuItem" Click="OnFeatureMenuCommandClick" Tag="{x:Static controls:ImageViewerFeatureMenuTags.ExportAnalysisCsv}" Header="{localization:UiText MenuExportAnalysisCsv}" IsEnabled="{Binding MenuState.Context.ExportAnalysisCsvEnabled}" />
+                    <MenuItem x:Name="exportBatchAnalysisCsvMenuItem" Click="OnFeatureMenuCommandClick" Tag="{x:Static controls:ImageViewerFeatureMenuTags.ExportBatchAnalysisCsv}" Header="{localization:UiText MenuExportBatchAnalysisCsv}" IsEnabled="{Binding MenuState.Context.ExportAnalysisCsvEnabled}" />
                     <MenuItem x:Name="showAnalysisSummaryMenuItem" Click="OnFeatureMenuCommandClick" Tag="{x:Static controls:ImageViewerFeatureMenuTags.ShowAnalysisSummary}" Header="{localization:UiText MenuShowAnalysisSummary}" IsEnabled="{Binding MenuState.Context.ShowAnalysisSummaryEnabled}" />
                     <Separator />
                     <MenuItem Header="{localization:UiText MenuAnalysisRun}">
@@ -440,28 +465,32 @@
             </Border>
         </Canvas>
 
-        <Border HorizontalAlignment="Right"
+        <Border x:Name="diagnosticErrorBorder"
+            x:FieldModifier="internal"
+            HorizontalAlignment="Right"
             VerticalAlignment="Top"
             Margin="16"
             Padding="12,9,8,9"
-            Background="{StaticResource ViewerErrorSoftBrush}"
-            BorderBrush="{StaticResource ViewerErrorBorderBrush}"
-            BorderThickness="1"
-            CornerRadius="10"
+            Style="{StaticResource ViewerErrorPanelStyle}"
             Panel.ZIndex="120"
             Visibility="{Binding HasDiagnosticError, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}">
             <DockPanel LastChildFill="True">
                 <Button x:Name="diagnosticErrorDismissButton" x:FieldModifier="internal"
                     DockPanel.Dock="Right"
                     Margin="12,0,0,0"
-                    Padding="6,0"
-                        Content="×"
+                    Content="×"
                         ToolTip="{localization:UiText MenuDismissError}"
                     automation:AutomationProperties.Name="{localization:UiText MenuDismissError}"
                     Click="OnDismissDiagnosticErrorClick"
+                    Style="{StaticResource ViewerErrorDismissButtonStyle}" />
+                <TextBlock x:Name="diagnosticErrorIconTextBlock" x:FieldModifier="internal"
+                    DockPanel.Dock="Left"
+                    Text="⚠"
+                    Margin="0,0,8,0"
+                    VerticalAlignment="Center"
                     Foreground="{StaticResource ViewerErrorBrush}"
-                    Background="Transparent"
-                    BorderThickness="0" />
+                    FontSize="15"
+                    FontWeight="Bold" />
                  <TextBlock x:Name="diagnosticErrorTextBlock" x:FieldModifier="internal"
                      Text="{Binding DiagnosticErrorText, RelativeSource={RelativeSource AncestorType=UserControl}}"
                    Foreground="{StaticResource ViewerTextPrimaryBrush}"
@@ -521,7 +550,7 @@
                 HorizontalAlignment="Center"
                 VerticalAlignment="Bottom"
                 Margin="10,0,10,10"
-                MaxWidth="520"
+                MaxWidth="620"
                 Padding="10,6"
                 Background="#C0141D29"
                 BorderBrush="#334A63"
@@ -529,20 +558,48 @@
                 CornerRadius="12"
                 IsHitTestVisible="False"
                 Panel.ZIndex="5">
-            <StackPanel Orientation="Horizontal">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
                 <TextBlock x:Name="statusBarTextBlock" x:FieldModifier="internal"
+                           Grid.Column="0"
                            Foreground="{StaticResource ViewerTextPrimaryBrush}"
                            FontWeight="SemiBold"
                            FontSize="12"
                            TextTrimming="CharacterEllipsis"
                            automation:AutomationProperties.LiveSetting="Polite" />
-                <TextBlock Margin="8,0,0,0"
+                <TextBlock Grid.Column="1"
+                           Margin="8,0,0,0"
                            Text="{localization:UiText StatusUnsavedMarker}"
                            Foreground="{StaticResource ViewerAccentBrush}"
                            FontWeight="Bold"
                            Visibility="{Binding IsDirty, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}"
                            automation:AutomationProperties.Name="{localization:UiText StatusUnsavedAccessibleName}" />
-            </StackPanel>
+                <Border x:Name="calibrationBadge"
+                        x:FieldModifier="internal"
+                        Grid.Column="2"
+                        Margin="10,0,0,0"
+                        Padding="8,3"
+                        Background="{StaticResource ViewerAccentSoftBrush}"
+                        BorderBrush="{StaticResource ViewerAccentBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Visibility="Collapsed"
+                        automation:AutomationProperties.Name="{localization:UiText CalibrationBadgeAccessibleName}"
+                        automation:AutomationProperties.LiveSetting="Polite">
+                    <TextBlock x:Name="calibrationBadgeTextBlock"
+                               x:FieldModifier="internal"
+                               MaxWidth="300"
+                               Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                               FontWeight="Bold"
+                               FontSize="12"
+                               TextTrimming="CharacterEllipsis"
+                               automation:AutomationProperties.LiveSetting="Polite" />
+                </Border>
+            </Grid>
         </Border>
 
         <Border x:Name="recoveryBanner"
@@ -578,95 +635,123 @@
             </DockPanel>
         </Border>
 
-        <!-- 信息面板 -->
-        <Border x:Name="infoPanel" 
-                Margin="10" 
-                Padding="5" 
-                HorizontalAlignment="Right" 
-                VerticalAlignment="Top" 
-                Style="{StaticResource ViewerFloatingPanelStyle}"
-                IsHitTestVisible="False"
-                Visibility="Collapsed">
-            <TextBlock x:Name="infoTextBlock" Foreground="{StaticResource ViewerTextPrimaryBrush}" TextWrapping="Wrap" MaxWidth="320" />
-        </Border>
+        <!-- 右侧信息区按垂直顺序排列，避免结果、ROI 列表和属性编辑器相互覆盖。 -->
+        <StackPanel x:Name="rightOverlayPanel"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    Margin="10"
+                    Width="340"
+                    Panel.ZIndex="95">
+            <!-- 信息面板 -->
+            <Border x:Name="infoPanel"
+                    x:FieldModifier="internal"
+                    Margin="0,0,0,8"
+                    Padding="5"
+                    HorizontalAlignment="Right"
+                    Style="{StaticResource ViewerFloatingPanelStyle}"
+                    IsHitTestVisible="False"
+                    Visibility="Visible">
+                <TextBlock x:Name="infoTextBlock" Foreground="{StaticResource ViewerTextPrimaryBrush}" TextWrapping="Wrap" MaxWidth="320" />
+            </Border>
 
-        <Border x:Name="roiListPanel"
-                Margin="10"
-                Padding="6"
-                HorizontalAlignment="Left"
-                VerticalAlignment="Top"
-                Width="240"
-                MaxHeight="320"
-                Style="{StaticResource ViewerFloatingPanelStyle}"
-                Visibility="Collapsed">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-                <TextBlock Text="{localization:UiText RoiListTitle}" Foreground="{StaticResource ViewerTextPrimaryBrush}" FontWeight="Bold" Margin="0,0,0,6" />
-                <ListBox Grid.Row="1"
-                         x:Name="roiListBox" x:FieldModifier="internal"
-                         Background="Transparent"
-                         BorderThickness="0"
-                         Foreground="{StaticResource ViewerTextPrimaryBrush}"
-                         automation:AutomationProperties.Name="{localization:UiText RoiListAccessibleName}"
-                         ItemsSource="{Binding ViewerState.AllRois, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                         SelectedItem="{Binding ViewerState.SelectedRoi, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <Grid Margin="0,2">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0"
-                                           VerticalAlignment="Center"
-                                           Foreground="{StaticResource ViewerTextPrimaryBrush}"
-                                           Text="{Binding DisplayName}"
-                                           TextTrimming="CharacterEllipsis" />
-                                <CheckBox Grid.Column="1"
-                                          Margin="8,0,0,0"
-                                          VerticalAlignment="Center"
-                                          Foreground="{StaticResource ViewerTextPrimaryBrush}"
-                                          IsChecked="{Binding IsVisible, Mode=TwoWay}"
-                                          ToolTip="{localization:UiText RoiListToggleVisibleTooltip}"
-                                          Content="{localization:UiText RoiListToggleVisible}" />
-                                <CheckBox Grid.Column="2"
-                                          Margin="6,0,0,0"
-                                          VerticalAlignment="Center"
-                                          Foreground="{StaticResource ViewerTextPrimaryBrush}"
-                                          IsChecked="{Binding IsLocked, Mode=TwoWay}"
-                                          ToolTip="{localization:UiText RoiListToggleLockedTooltip}"
-                                          Content="{localization:UiText RoiListToggleLocked}" />
-                            </Grid>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-            </Grid>
-        </Border>
+            <Border x:Name="roiListPanel"
+                    x:FieldModifier="internal"
+                    Margin="0,0,0,8"
+                    Padding="6"
+                    HorizontalAlignment="Right"
+                    Width="240"
+                    MaxHeight="320"
+                    Style="{StaticResource ViewerFloatingPanelStyle}"
+                    Visibility="Visible">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="{localization:UiText RoiListTitle}" Foreground="{StaticResource ViewerTextPrimaryBrush}" FontWeight="Bold" Margin="0,0,0,6" />
+                    <ListBox Grid.Row="1"
+                             x:Name="roiListBox" x:FieldModifier="internal"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                             automation:AutomationProperties.Name="{localization:UiText RoiListAccessibleName}"
+                             ItemsSource="{Binding ViewerState.AllRois, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                             SelectedItem="{Binding ViewerState.SelectedRoi, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                               VerticalAlignment="Center"
+                                               Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                                               Text="{Binding DisplayName}"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <CheckBox Grid.Column="1"
+                                              Margin="8,0,0,0"
+                                              VerticalAlignment="Center"
+                                              Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                                              IsChecked="{Binding IsVisible, Mode=TwoWay}"
+                                              ToolTip="{localization:UiText RoiListToggleVisibleTooltip}"
+                                              Content="{localization:UiText RoiListToggleVisible}" />
+                                    <CheckBox Grid.Column="2"
+                                              Margin="6,0,0,0"
+                                              VerticalAlignment="Center"
+                                              Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                                              IsChecked="{Binding IsLocked, Mode=TwoWay}"
+                                              ToolTip="{localization:UiText RoiListToggleLockedTooltip}"
+                                              Content="{localization:UiText RoiListToggleLocked}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
 
-        <Border x:Name="roiPropertyPanel"
-                Margin="10,56,10,10"
-                Padding="6"
-                HorizontalAlignment="Right"
-                VerticalAlignment="Top"
-                Width="320"
-                MaxHeight="420"
-                Style="{StaticResource ViewerFloatingPanelStyle}"
-                Visibility="Collapsed">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-                <TextBlock Text="{localization:UiText PropertyPanelTitle}" Foreground="{StaticResource ViewerTextPrimaryBrush}" FontWeight="Bold" Margin="0,0,0,6" />
-                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                    <ContentControl x:Name="roiPropertyEditorHost" />
-                </ScrollViewer>
-            </Grid>
-        </Border>
+            <Border x:Name="roiPropertyPanel"
+                    Margin="0"
+                    Padding="6"
+                    HorizontalAlignment="Right"
+                    Width="320"
+                    MaxHeight="420"
+                    Style="{StaticResource ViewerFloatingPanelStyle}"
+                    Visibility="Collapsed">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid Grid.Row="0" Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="{localization:UiText PropertyPanelTitle}"
+                                   Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                                   FontWeight="Bold"
+                                   VerticalAlignment="Center" />
+                        <Button x:Name="circularCaliperSettingsButton"
+                                x:FieldModifier="internal"
+                                Grid.Column="1"
+                                Padding="8,3"
+                                Margin="8,0,0,0"
+                                Content="{localization:UiText QuickCircularCaliperSettings}"
+                                ToolTip="{localization:UiText QuickCircularCaliperSettingsTooltip}"
+                                Click="OnQuickCircularCaliperSettingsClick"
+                                Style="{StaticResource ViewerToolbarPrimaryButtonStyle}"
+                                Visibility="Collapsed"
+                                automation:AutomationProperties.Name="{localization:UiText QuickCircularCaliperSettings}" />
+                    </Grid>
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ContentControl x:Name="roiPropertyEditorHost" />
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </StackPanel>
 
         <!-- 直方图面板 -->
         <Border x:Name="histogramPanel" 
@@ -789,15 +874,103 @@
                 Visibility="Collapsed"
                 Style="{StaticResource ViewerFloatingPanelStyle}">
             <StackPanel Width="Auto">
-                <TextBlock Text="{localization:UiText MenuFileAndProjects}" Style="{StaticResource ViewerSectionTitleStyle}" />
-                <WrapPanel>
+                <Grid Margin="0,0,0,2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               Text="{localization:UiText MenuPrimaryActions}"
+                               Style="{StaticResource ViewerSectionTitleStyle}"
+                               VerticalAlignment="Center" />
+                    <Button x:Name="toolbarHideButton"
+                            x:FieldModifier="internal"
+                            Grid.Column="1"
+                            Content="{localization:UiText ToolbarHideButton}"
+                            ToolTip="{localization:UiText ToolbarHideHint}"
+                            automation:AutomationProperties.Name="{localization:UiText ToolbarHideButton}"
+                            automation:AutomationProperties.HelpText="{localization:UiText ToolbarHideHint}"
+                            Click="OnToolbarHideClick"
+                            Margin="8,0,0,6"
+                            Padding="8,3"
+                            FontSize="11"
+                            Style="{StaticResource ViewerToolbarButtonStyle}" />
+                </Grid>
+                <WrapPanel MaxWidth="460">
                     <Button Content="{localization:UiText MenuOpenImageFile}"
                             Click="OnToolbarFileCommandClick"
                             Tag="{x:Static controls:ImageViewerFileMenuTags.OpenImage}"
                             ToolTip="{localization:UiText ToolbarOpenImageTooltip}"
+                            automation:AutomationProperties.Name="{localization:UiText MenuOpenImageFile}"
                             automation:AutomationProperties.HelpText="{localization:UiText ToolbarOpenImageTooltip}"
                             Style="{StaticResource ViewerToolbarPrimaryButtonStyle}" />
+                    <Button Content="{localization:UiText MenuOpenProjectOrSession}"
+                            Click="OnToolbarFileCommandClick"
+                            Tag="{x:Static controls:ImageViewerFileMenuTags.LoadSession}"
+                            ToolTip="{localization:UiText MenuOpenProjectOrSession}"
+                            automation:AutomationProperties.Name="{localization:UiText MenuOpenProjectOrSession}"
+                            automation:AutomationProperties.HelpText="{localization:UiText MenuOpenProjectOrSession}"
+                            Style="{StaticResource ViewerToolbarButtonStyle}" />
+                    <Button Content="{localization:UiText MenuSaveSession}"
+                            Click="OnToolbarFileCommandClick"
+                            Tag="{x:Static controls:ImageViewerFileMenuTags.SaveSession}"
+                            ToolTip="{localization:UiText MenuSaveSession}"
+                            automation:AutomationProperties.Name="{localization:UiText MenuSaveSession}"
+                            automation:AutomationProperties.HelpText="{localization:UiText MenuSaveSession}"
+                            IsEnabled="{Binding MenuState.File.SaveSessionEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            Style="{StaticResource ViewerToolbarButtonStyle}" />
+                    <Button Content="{localization:UiText MenuUndo}"
+                            Click="OnRoiMenuCommandClick"
+                            Tag="{x:Static controls:ImageViewerRoiMenuTags.Undo}"
+                            ToolTip="Ctrl+Z"
+                            automation:AutomationProperties.Name="{localization:UiText MenuUndo}"
+                            automation:AutomationProperties.HelpText="Ctrl+Z"
+                            IsEnabled="{Binding MenuState.Context.UndoEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            Style="{StaticResource ViewerToolbarButtonStyle}" />
+                    <Button Content="{localization:UiText MenuRedo}"
+                            Click="OnRoiMenuCommandClick"
+                            Tag="{x:Static controls:ImageViewerRoiMenuTags.Redo}"
+                            ToolTip="Ctrl+Y"
+                            automation:AutomationProperties.Name="{localization:UiText MenuRedo}"
+                            automation:AutomationProperties.HelpText="Ctrl+Y"
+                            IsEnabled="{Binding MenuState.Context.RedoEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            Style="{StaticResource ViewerToolbarButtonStyle}" />
+                    <ToggleButton Content="{localization:UiText MenuShowRoiList}"
+                                  IsChecked="{Binding ShowRoiList, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
+                                  Checked="OnToolbarPanelToggleChanged"
+                                  Unchecked="OnToolbarPanelToggleChanged"
+                                  ToolTip="{localization:UiText ToolbarToggleRoiListTooltip}"
+                                  automation:AutomationProperties.Name="{localization:UiText MenuShowRoiList}"
+                                  automation:AutomationProperties.HelpText="{localization:UiText ToolbarToggleRoiListTooltip}"
+                                  Style="{StaticResource ViewerToolbarToggleButtonStyle}" />
+                    <Button Content="{localization:UiText MenuExportCurrentViewPng}"
+                            Click="OnFeatureMenuCommandClick"
+                            Tag="{x:Static controls:ImageViewerFeatureMenuTags.ExportSnapshot}"
+                            ToolTip="{localization:UiText MenuExportCurrentViewPng}"
+                            automation:AutomationProperties.Name="{localization:UiText MenuExportCurrentViewPng}"
+                            automation:AutomationProperties.HelpText="{localization:UiText MenuExportCurrentViewPng}"
+                            IsEnabled="{Binding MenuState.Context.ExportSnapshotEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            Style="{StaticResource ViewerToolbarButtonStyle}" />
+                    <Button Content="{localization:UiText MenuExportAnalysisCsv}"
+                            Click="OnFeatureMenuCommandClick"
+                            Tag="{x:Static controls:ImageViewerFeatureMenuTags.ExportAnalysisCsv}"
+                            ToolTip="{localization:UiText MenuExportAnalysisCsv}"
+                            automation:AutomationProperties.Name="{localization:UiText MenuExportAnalysisCsv}"
+                            automation:AutomationProperties.HelpText="{localization:UiText MenuExportAnalysisCsv}"
+                            IsEnabled="{Binding MenuState.Context.ExportAnalysisCsvEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            Style="{StaticResource ViewerToolbarButtonStyle}" />
+                    <Button Content="{localization:UiText MenuExportBatchAnalysisCsv}"
+                            Click="OnFeatureMenuCommandClick"
+                            Tag="{x:Static controls:ImageViewerFeatureMenuTags.ExportBatchAnalysisCsv}"
+                            ToolTip="{localization:UiText MenuExportBatchAnalysisCsvTooltip}"
+                            automation:AutomationProperties.Name="{localization:UiText MenuExportBatchAnalysisCsv}"
+                            automation:AutomationProperties.HelpText="{localization:UiText MenuExportBatchAnalysisCsvTooltip}"
+                            IsEnabled="{Binding MenuState.Context.ExportAnalysisCsvEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            Style="{StaticResource ViewerToolbarButtonStyle}" />
                 </WrapPanel>
+
+                <TextBlock Text="{localization:UiText MenuQuickTools}" Style="{StaticResource ViewerSectionTitleStyle}" Margin="0,4,0,8" />
+                <WrapPanel x:Name="quickToolsPanel" />
 
                 <TextBlock Text="{localization:UiText MenuViewControl}" Style="{StaticResource ViewerSectionTitleStyle}" Margin="0,4,0,8" />
                 <WrapPanel>
@@ -882,6 +1055,66 @@
             </StackPanel>
         </Border>
 
+        <Button x:Name="toolbarCompactButton"
+                x:FieldModifier="internal"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Top"
+                Margin="16"
+                Width="40"
+                Height="40"
+                Padding="0"
+                Panel.ZIndex="101"
+                Content="☰"
+                ToolTip="{localization:UiText ToolbarCompactHint}"
+                automation:AutomationProperties.Name="{localization:UiText MenuShowToolbar}"
+                automation:AutomationProperties.HelpText="{localization:UiText ToolbarCompactHint}"
+                Click="OnCompactToolbarClick"
+                Style="{StaticResource ViewerToolbarPrimaryButtonStyle}"
+                Visibility="Collapsed" />
+
+        <!-- 当前工具状态（绘制期间持续显示，直到完成或取消） -->
+        <Border x:Name="activeToolBanner" x:FieldModifier="internal"
+                MaxWidth="680"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Bottom"
+                Margin="16,0,16,54"
+                Padding="12,8"
+                Background="{StaticResource ViewerAccentSoftBrush}"
+                BorderBrush="{StaticResource ViewerAccentBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="10"
+                Panel.ZIndex="125"
+                Visibility="Collapsed"
+                automation:AutomationProperties.LiveSetting="Polite">
+            <DockPanel LastChildFill="True">
+                <Button DockPanel.Dock="Right"
+                        Content="{localization:UiText ActiveToolCancel}"
+                        Click="OnActiveToolCancelClick"
+                        ToolTip="{localization:UiText ActiveToolCancel}"
+                        Margin="12,0,0,0"
+                        Padding="12,5"
+                        Style="{StaticResource ViewerToolbarButtonStyle}" />
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="{localization:UiText ActiveToolPrefix}"
+                               Foreground="{StaticResource ViewerTextSecondaryBrush}"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center" />
+                    <TextBlock x:Name="activeToolNameTextBlock" x:FieldModifier="internal"
+                               Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                               FontSize="13"
+                               FontWeight="Bold"
+                               Margin="4,0,10,0"
+                               VerticalAlignment="Center"
+                               automation:AutomationProperties.LiveSetting="Polite" />
+                    <TextBlock Text="{localization:UiText ActiveToolHint}"
+                               Foreground="{StaticResource ViewerTextSecondaryBrush}"
+                               FontSize="11"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
         <!-- 状态提示横幅（顶部居中，约 3 秒自动消失） -->
         <Border x:Name="statusHintBorder" x:FieldModifier="internal"
                 MaxWidth="520"
@@ -922,7 +1155,6 @@
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
 
-                CornerRadius="18"
                 Panel.ZIndex="110"
                 Width="420"
                 Visibility="{Binding IsImageLoading, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -932,7 +1164,8 @@
                         <DataTrigger Binding="{Binding ImageLoadHasError, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
                             <Setter Property="Background" Value="{StaticResource ViewerErrorSoftBrush}" />
                             <Setter Property="BorderBrush" Value="{StaticResource ViewerErrorBorderBrush}" />
-                            <Setter Property="BorderThickness" Value="2" />
+                            <Setter Property="BorderThickness" Value="1" />
+                            <Setter Property="CornerRadius" Value="10" />
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>
@@ -950,10 +1183,26 @@
                              StrokeDashArray="1.2 2.5"
                              StrokeDashCap="Round"
                              StrokeThickness="4">
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ImageLoadHasError, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Ellipse.Style>
                         <Ellipse.RenderTransform>
                             <RotateTransform x:Name="loadingSpinnerRotate" CenterX="24" CenterY="24" />
                         </Ellipse.RenderTransform>
                     </Ellipse>
+                    <TextBlock Text="⚠"
+                               Foreground="{StaticResource ViewerErrorBrush}"
+                               FontSize="24"
+                               FontWeight="Bold"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Visibility="{Binding ImageLoadHasError, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     <Grid.Triggers>
                         <EventTrigger RoutedEvent="FrameworkElement.Loaded">
                             <BeginStoryboard>
@@ -977,23 +1226,32 @@
                                FontSize="14"
                                TextWrapping="Wrap"
                                automation:AutomationProperties.LiveSetting="Polite" />
-                    <TextBlock Text="!"
+                    <TextBlock Text="⚠"
                                Foreground="{StaticResource ViewerErrorBrush}"
-                               FontSize="18"
+                               FontSize="16"
                                FontWeight="Bold"
                                Margin="0,6,0,0"
                                Visibility="{Binding ImageLoadHasError, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                    <ProgressBar Style="{StaticResource ViewerProgressBarStyle}"
-                                 Minimum="0"
+                    <ProgressBar Minimum="0"
                                  Maximum="100"
-                                 Value="{Binding ImageLoadProgress, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                                 Value="{Binding ImageLoadProgress, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                        <ProgressBar.Style>
+                            <Style TargetType="ProgressBar" BasedOn="{StaticResource ViewerProgressBarStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ImageLoadHasError, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ProgressBar.Style>
+                    </ProgressBar>
                     <Button Margin="0,12,0,0"
                             HorizontalAlignment="Left"
                             Padding="14,6"
                             Click="OnRetryImageLoadClick"
                             Content="{localization:UiText ImageLoadRetry}"
                             Visibility="{Binding CanRetryImageLoad, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}"
-                            Style="{StaticResource ViewerToolbarPrimaryButtonStyle}" />
+                            Style="{StaticResource ViewerErrorActionButtonStyle}" />
                 </StackPanel>
             </Grid>
         </Border>

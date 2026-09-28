@@ -255,6 +255,24 @@ namespace ImageViewerControl.Tests
             Assert.Equal("mm", physicalUnit);
         }
 
+        [Theory]
+        [InlineData(0)]
+        [InlineData(-0.5)]
+        public void Deserialize_ExplicitInvalidPixelSize_IsRejected(double pixelSize)
+        {
+            RoiPluginRegistry registry = RoiPluginRegistry.CreateBuiltIn();
+            string json = $$"""
+                {
+                  "Version": 1,
+                  "PixelSize": {{pixelSize.ToString(System.Globalization.CultureInfo.InvariantCulture)}},
+                  "PhysicalUnit": "mm",
+                  "Items": []
+                }
+                """;
+
+            Assert.Throws<ArgumentException>(() => RoiPersistenceService.Deserialize(json, registry));
+        }
+
         /// <summary>
         /// 既有的颜色字符串必须继续可读。
         /// Chinese: 会话文件里存的是 WPF Color.ToString 的结果（#AARRGGBB），也兼容命名色与简写。

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Windows;
 using System.Windows.Media.Imaging;
 using ImageViewer.Models;
@@ -75,9 +76,11 @@ namespace ImageViewer.Services
 
     public sealed class VolumeQualityAnalyzer
     {
-        public static VolumeQualityReport Analyze(VolumeData volume)
+        public static VolumeQualityReport Analyze(VolumeData volume, ImageAnalysisQualityProfile? qualityProfile = null)
         {
             ArgumentNullException.ThrowIfNull(volume);
+            ImageAnalysisQualityProfile quality = qualityProfile ?? ImageAnalysisQualityProfile.Default;
+            quality.Validate();
             List<VolumeAnomaly> anomalies = new();
             for (int index = 0; index < volume.Depth; index++)
             {
@@ -90,15 +93,15 @@ namespace ImageViewer.Services
                 {
                     anomalies.Add(new VolumeAnomaly(VolumeAnomalyKind.BlankSlice, index, "Slice contains no signal."));
                 }
-                else if (minimum >= 250)
+                else if (minimum >= quality.VolumeOverexposedMinimumBin)
                 {
                     anomalies.Add(new VolumeAnomaly(VolumeAnomalyKind.OverexposedSlice, index, "Slice is saturated."));
                 }
-                else if (maximum <= 5)
+                else if (maximum <= quality.VolumeUnderexposedMaximumBin)
                 {
                     anomalies.Add(new VolumeAnomaly(VolumeAnomalyKind.UnderexposedSlice, index, "Slice is nearly black."));
                 }
-                else if (maximum - minimum < 16)
+                else if (maximum - minimum < quality.VolumeLowContrastMinimumRange)
                 {
                     anomalies.Add(new VolumeAnomaly(VolumeAnomalyKind.LowContrastSlice, index, "Slice has low contrast."));
                 }
@@ -153,10 +156,10 @@ namespace ImageViewer.Services
 
     public sealed class SegmentationPipelineService
     {
-        public static SegmentationResult Segment(BitmapSource bitmap, Rect roi, bool useOtsu = true, int threshold = 128, int minArea = 10)
+        public static SegmentationResult Segment(BitmapSource bitmap, Rect roi, bool useOtsu = true, int threshold = 128, int minArea = 10, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(bitmap);
-            List<BlobFeature> blobs = BlobAnalysisService.DetectBlobs(bitmap, roi, useOtsu, threshold, minArea: minArea);
+            List<BlobFeature> blobs = BlobAnalysisService.DetectBlobs(bitmap, roi, useOtsu, threshold, minArea: minArea, cancellationToken: cancellationToken);
             return new SegmentationResult(0, blobs, threshold);
         }
     }

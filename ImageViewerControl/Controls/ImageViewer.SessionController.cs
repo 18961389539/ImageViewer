@@ -45,6 +45,10 @@ namespace ImageViewer.Controls
 
         public required Func<CameraCalibration?> GetCalibration { get; init; }
 
+        public Func<ImageAnalysisQualityProfile> GetQualityProfile { get; init; } = static () => ImageAnalysisQualityProfile.Default;
+
+        public Action<ImageAnalysisQualityProfile> SetQualityProfile { get; init; } = static _ => { };
+
         public required Action<CameraCalibration?> SetCalibration { get; init; }
 
         public required Func<ImageViewerViewportState> GetCurrentViewportState { get; init; }
@@ -94,7 +98,8 @@ namespace ImageViewer.Controls
                 viewportState.TranslateY,
                 GetCalibration())
             {
-                UnresolvedRois = UnresolvedRois
+                UnresolvedRois = UnresolvedRois,
+                QualityProfile = GetQualityProfile()
             };
         }
     }
@@ -116,6 +121,8 @@ namespace ImageViewer.Controls
         public required Func<string> GetPhysicalUnit { get; init; }
 
         public required Func<CameraCalibration?> GetCalibration { get; init; }
+
+        public Func<ImageAnalysisQualityProfile> GetQualityProfile { get; init; } = static () => ImageAnalysisQualityProfile.Default;
 
         public required IImageViewerSessionService SessionService { get; init; }
 
@@ -148,7 +155,8 @@ namespace ImageViewer.Controls
                 viewportState.TranslateY,
                 GetCalibration())
             {
-                UnresolvedRois = UnresolvedRois
+                UnresolvedRois = UnresolvedRois,
+                QualityProfile = GetQualityProfile()
             };
         }
     }
@@ -297,30 +305,70 @@ namespace ImageViewer.Controls
         public async Task RecoverLatestAutoSaveAsync()
         {
             RefreshRecoverySnapshot();
-            string? recoveryFilePath = _recoveryFilePath;
-            if (recoveryFilePath == null)
+            IReadOnlyList<string> recoveryCandidates = GetRecoveryCandidates();
+            if (recoveryCandidates.Count == 0)
             {
                 _persistence.ShowStatusHint(UiText.Get("StatusNoRecoverySnapshot"), StatusHintKind.Info);
                 return;
             }
 
-            try
+            Exception? lastLoadException = null;
+            string? missingImagePath = null;
+            foreach (string recoveryFilePath in recoveryCandidates)
             {
-                ImageViewerSessionData session = await _persistence.SessionService.LoadFromFileAsync(
-                    recoveryFilePath,
-                    _persistence.GetPluginRegistry());
+                try
+                {
+                    ImageViewerSessionData session = await _persistence.SessionService.LoadFromFileAsync(
+                        recoveryFilePath,
+                        _persistence.GetPluginRegistry());
 
-                ApplySession(session);
-                _persistence.ClearUndoHistory();
-                ReportUnresolvedRois(session.UnresolvedRois);
-                _recoveryPromptDismissed = true;
-                StateChanged?.Invoke(this, EventArgs.Empty);
-                MarkDirty();
-                _persistence.ShowStatusHint(UiText.Get("StatusRecoveryLoaded"), StatusHintKind.Success);
+                    // Skip stale entries whose image was removed, then try an older candidate.
+                    if (!string.IsNullOrWhiteSpace(session.ImagePath) && !File.Exists(session.ImagePath))
+                    {
+                        missingImagePath = session.ImagePath;
+                        continue;
+                    }
+
+                    if (!ApplySession(session))
+                    {
+                        continue;
+                    }
+
+                    _recoveryFilePath = recoveryFilePath;
+                    _persistence.ClearUndoHistory();
+                    ReportUnresolvedRois(session.UnresolvedRois);
+                    _recoveryPromptDismissed = true;
+                    StateChanged?.Invoke(this, EventArgs.Empty);
+                    MarkDirty();
+                    _persistence.ShowStatusHint(UiText.Get("StatusRecoveryLoaded"), StatusHintKind.Success);
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    lastLoadException = ex;
+                    _autoSave.LogNonCriticalError("Load autosave candidate", ex);
+                }
             }
-            catch (Exception ex)
+
+            _recoveryFilePath = null;
+            _recoveryPromptDismissed = false;
+            StateChanged?.Invoke(this, EventArgs.Empty);
+            if (lastLoadException != null)
             {
-                _persistence.ShowNonCriticalError(UiText.Get("ErrorRecoveryTitle"), UiText.Get("ErrorRecoveryMessage"), ex);
+                _persistence.ShowNonCriticalError(
+                    UiText.Get("ErrorRecoveryTitle"),
+                    UiText.Get("ErrorRecoveryMessage"),
+                    lastLoadException);
+            }
+            else if (missingImagePath != null)
+            {
+                _persistence.ShowStatusHint(
+                    UiText.Format("StatusSessionImageMissing", missingImagePath),
+                    StatusHintKind.Error);
+            }
+            else
+            {
+                _persistence.ShowStatusHint(UiText.Get("StatusNoRecoverySnapshot"), StatusHintKind.Info);
             }
         }
 
@@ -365,7 +413,10 @@ namespace ImageViewer.Controls
                     ? await _persistence.ProjectPackageService.LoadAsync(filePath, _persistence.GetPluginRegistry())
                     : await _persistence.SessionService.LoadFromFileAsync(filePath, _persistence.GetPluginRegistry());
 
-                ApplySession(session);
+                if (!ApplySession(session))
+                {
+                    return;
+                }
                 SetCurrentProject(filePath, string.Equals(Path.GetExtension(filePath), ".ivpkg", StringComparison.OrdinalIgnoreCase) ? PackageProjectKind : SessionProjectKind);
                 _persistence.ClearUndoHistory();
                 MarkClean();
@@ -378,27 +429,28 @@ namespace ImageViewer.Controls
             }
         }
 
-        private void ApplySession(ImageViewerSessionData session)
+        private bool ApplySession(ImageViewerSessionData session)
         {
             if (!string.IsNullOrWhiteSpace(session.ImagePath))
             {
-                if (File.Exists(session.ImagePath))
-                {
-                    _persistence.LoadImageFromFile(session.ImagePath, false);
-                }
-                else
+                if (!File.Exists(session.ImagePath))
                 {
                     _persistence.ShowStatusHint(UiText.Format("StatusSessionImageMissing", session.ImagePath), StatusHintKind.Error);
+                    return false;
                 }
+
+                _persistence.LoadImageFromFile(session.ImagePath, false);
             }
 
             _persistence.ReplaceAllRois(session.Rois);
             _persistence.SetPixelSize(session.PixelSize);
             _persistence.SetPhysicalUnit(session.PhysicalUnit);
+            _persistence.SetQualityProfile(session.QualityProfile);
             _persistence.SetCalibration(session.Calibration);
             _persistence.ApplyViewportState(new ImageViewerViewportState(session.Scale, session.TranslateX, session.TranslateY));
             _persistence.DrawRois();
             _persistence.UpdateContextMenuState();
+            return true;
         }
 
         private void SetCurrentProject(string filePath, string projectKind)
@@ -412,8 +464,13 @@ namespace ImageViewer.Controls
         private void CompleteSuccessfulSave()
         {
             MarkClean();
-            string defaultRecoveryPath = Path.Combine(_autoSaveDirectory, "autosave.ivsession");
-            string[] recoveryPaths = new[] { _recoveryFilePath, defaultRecoveryPath }
+            string[] recoveryPaths = new[]
+                {
+                    _recoveryFilePath,
+                    _autoSaveController.GetAutoSaveFilePath(),
+                    _autoSaveController.GetLegacyAutoSaveFilePath(),
+                    Path.Combine(_autoSaveDirectory, "autosave.ivsession")
+                }
                 .Where(path => !string.IsNullOrWhiteSpace(path))
                 .Select(path => path!)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -447,19 +504,66 @@ namespace ImageViewer.Controls
 
         private void RefreshRecoverySnapshot()
         {
+            IReadOnlyList<string> candidates = GetRecoveryCandidates();
+            _recoveryFilePath = candidates.Count == 0 ? null : candidates[0];
+        }
+
+        private IReadOnlyList<string> GetRecoveryCandidates()
+        {
+            if (!Directory.Exists(_autoSaveDirectory))
+            {
+                return [];
+            }
+
             try
             {
-                _recoveryFilePath = Directory.Exists(_autoSaveDirectory)
-                    ? Directory
-                        .EnumerateFiles(_autoSaveDirectory, "*.ivsession", SearchOption.TopDirectoryOnly)
-                        .Where(path => new FileInfo(path).Length > 0)
-                        .OrderByDescending(File.GetLastWriteTimeUtc)
-                        .FirstOrDefault()
-                    : null;
+                return Directory
+                    .EnumerateFiles(_autoSaveDirectory, "*.ivsession", SearchOption.TopDirectoryOnly)
+                    .Where(path =>
+                    {
+                        string fileName = Path.GetFileName(path);
+                        return !fileName.StartsWith('.') &&
+                               !fileName.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase) &&
+                               HasContent(path);
+                    })
+                    .OrderByDescending(GetLastWriteTimeUtc)
+                    .ToArray();
             }
             catch
             {
-                _recoveryFilePath = null;
+                return [];
+            }
+        }
+
+        private static bool HasContent(string filePath)
+        {
+            try
+            {
+                return new FileInfo(filePath).Length > 0;
+            }
+            catch (IOException)
+            {
+                return false;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return false;
+            }
+        }
+
+        private static DateTime GetLastWriteTimeUtc(string filePath)
+        {
+            try
+            {
+                return File.GetLastWriteTimeUtc(filePath);
+            }
+            catch (IOException)
+            {
+                return DateTime.MinValue;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return DateTime.MinValue;
             }
         }
 

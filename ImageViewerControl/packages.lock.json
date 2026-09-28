@@ -203,6 +203,9 @@
           "NETStandard.Library": "1.6.1",
           "SharpDX": "4.2.0"
         }
+      },
+      "imageviewer.core": {
+        "type": "Project"
       }
     }
   }

@@ -82,7 +82,7 @@ namespace ImageViewer.Controls
             _profileCanvas.Children.Clear();
             if (output != null)
             {
-                ImageViewerAnalysisGraphRenderer.DrawProfile(_profileCanvas, output.ProfileData);
+                ImageViewerAnalysisGraphRenderer.DrawProfile(_profileCanvas, output);
             }
         }
 

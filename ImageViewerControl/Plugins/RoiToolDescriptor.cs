@@ -27,7 +27,7 @@ namespace ImageViewer.Plugins
 
             Header = header;
             DrawController = drawController;
-            Activate = viewer => viewer.StartDraw(drawController);
+            Activate = viewer => viewer.StartDraw(drawController, Header);
             MenuOrder = menuOrder;
             CreateIcon = createIcon;
             IsMeasurement = isMeasurement;

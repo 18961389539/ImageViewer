@@ -52,10 +52,13 @@ namespace ImageViewer.Controls
             canvas.Children.Add(polygon);
         }
 
-        public static void DrawProfile(Canvas canvas, byte[] data)
+        public static void DrawProfile(Canvas canvas, ImageViewerProfileOutput output)
         {
             canvas.Children.Clear();
-            if (data.Length == 0)
+            ushort[]? samples16 = output.Samples16;
+            byte[] data = output.ProfileData;
+            int sampleCount = samples16?.Length ?? data.Length;
+            if (sampleCount == 0)
             {
                 return;
             }
@@ -70,10 +73,12 @@ namespace ImageViewer.Controls
                 StrokeThickness = 1.5
             };
 
-            for (int i = 0; i < data.Length; i++)
+            double maximum = samples16?.Length > 0 ? output.MaximumValue : byte.MaxValue;
+            for (int i = 0; i < sampleCount; i++)
             {
-                double x = (double)i / (data.Length > 1 ? data.Length - 1 : 1) * width;
-                double y = height - ((double)data[i] / 255.0 * height);
+                double x = (double)i / (sampleCount > 1 ? sampleCount - 1 : 1) * width;
+                double sample = samples16 != null ? samples16[i] : data[i];
+                double y = height - (sample / maximum * height);
                 polyline.Points.Add(new Point(x, y));
             }
 

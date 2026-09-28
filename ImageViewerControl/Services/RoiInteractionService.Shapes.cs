@@ -331,6 +331,40 @@ namespace ImageViewer.Services
                 return ResizeHandle.None;
             }
 
+            public int GetVertexIndexAt(RoiBase roi, Point point, double scale, double handleSize, double polygonVertexHitPadding)
+            {
+                var polyline = (PolylineRoi)roi;
+                double hSize = (handleSize + polygonVertexHitPadding) / scale;
+                for (int i = 0; i < polyline.Points.Count; i++)
+                {
+                    if (IsWithinHandle(point, polyline.Points[i].ToWpfPoint(), hSize))
+                    {
+                        return i;
+                    }
+                }
+
+                return -1;
+            }
+
+            public int GetSegmentIndexAt(RoiBase roi, Point point, double scale, double hitTestTolerance)
+            {
+                var polyline = (PolylineRoi)roi;
+                double threshold = hitTestTolerance / scale;
+                for (int i = 0; i < polyline.Points.Count - 1; i++)
+                {
+                    if (GeometryUtils.IsPointNearSegment(
+                        point,
+                        polyline.Points[i].ToWpfPoint(),
+                        polyline.Points[i + 1].ToWpfPoint(),
+                        threshold))
+                    {
+                        return i;
+                    }
+                }
+
+                return -1;
+            }
+
             public void Move(RoiBase roi, double dx, double dy)
             {
                 var polyline = (PolylineRoi)roi;

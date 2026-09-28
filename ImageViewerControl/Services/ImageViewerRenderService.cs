@@ -11,7 +11,7 @@ using ImageViewer.Abstractions;
 
 namespace ImageViewer.Services
 {
-    public sealed class ImageViewerRenderService : IImageViewerRenderService, IDisposable, IAsyncDisposable
+    public sealed class ImageViewerRenderService : IImageViewerRenderService, IImageViewerHighBitDepthAnalysisRenderService, IDisposable, IAsyncDisposable
     {
         private readonly ImageViewerTileRenderService _tileRenderService = new();
 
@@ -89,6 +89,11 @@ namespace ImageViewer.Services
         public Task<byte[]?> CreateProfileAsync(ImageViewerAnalysisRequest request, CancellationToken cancellationToken)
         {
             return ImageViewerAnalysisBitmapService.CreateProfileAsync(request, cancellationToken);
+        }
+
+        public Task<ushort[]?> CreateProfile16Async(ImageViewerAnalysisRequest request, CancellationToken cancellationToken)
+        {
+            return ImageViewerAnalysisBitmapService.CreateProfile16Async(request, cancellationToken);
         }
 
         private static BitmapSource Freeze(BitmapSource source)

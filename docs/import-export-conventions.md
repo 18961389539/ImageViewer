@@ -28,7 +28,7 @@
 导入约定：
 
 - `Version` 高于当前支持版本时拒绝加载，避免旧代码误读新格式。
-- `PixelSize <= 0` 时回退到 `1.0`。
+- 缺失 `PixelSize` 时兼容使用 `1.0`；显式 `PixelSize <= 0` 或非有限值会拒绝加载。
 - `PhysicalUnit` 为空时回退到 `px`。
 - 未知 ROI 类型会被跳过，以保证其余可识别对象仍可恢复。
 - 为兼容老文件，系统同时接受按 ROI 类型名进行的回退匹配。
@@ -60,7 +60,7 @@
 CSV 文件首行固定为：
 
 ```text
-Type,Label,Metric1,Metric2,Metric3,Mean,Min,Max,StdDev,PixelCount
+Type,Label,Metric1,Metric2,Metric3,Mean,Min,Max,StdDev,PixelCount,DetectionStatus,SpecificationStatus,MeasuredValue,NominalValue,TolerancePlus,ToleranceMinus,PhysicalUnit
 ```
 
 列含义：
@@ -69,6 +69,25 @@ Type,Label,Metric1,Metric2,Metric3,Mean,Min,Max,StdDev,PixelCount
 - `Label`：用户标签。
 - `Metric1` 至 `Metric3`：按 ROI 类型填充的几何或测量指标。
 - `Mean`、`Min`、`Max`、`StdDev`、`PixelCount`：在存在图像统计结果时输出。
+- `DetectionStatus`：检测证据状态，例如 `NotMeasured`、`Passed`、`Review`、`Failed`；它不表示尺寸是否合格。
+- `SpecificationStatus`：将测量值与 ROI 公差比较后的状态。检测失败或证据不足时为 `NotEvaluable`。
+- `MeasuredValue`、`NominalValue`、`TolerancePlus`、`ToleranceMinus`：以 `PhysicalUnit` 表示的测量值和判定参数。
+- `PhysicalUnit`：测量单位；未标定时为 `px`。
+
+批量导出会在上述列前增加 `Source,Status,Error`。输入图像缺失、解码失败或分析失败时，仍会为每个输入图像和每个 ROI 输出一行，确保失败项不会从结果集中消失。
+
+批量导出元数据的 `result` 同时记录以下状态统计：
+
+- `processedFileCount` / `failedFileCount`：兼容字段，分别表示 ROI 全部成功和存在任意 ROI 或输入失败的输入数。
+- `decodedFileCount`：成功读取的输入数，包含 ROI 部分失败或全部失败的输入。
+- `fullySuccessfulFileCount`：所有 ROI 都完成分析的输入数。
+- `partiallySuccessfulFileCount`：至少一个 ROI 成功、至少一个 ROI 失败的输入数。
+- `allRoiFailedFileCount`：图像已读取但所有 ROI 都失败的输入数。
+- `inputFailedFileCount`：缺失或无法解码的输入数。
+
+界面摘要使用这些分类，因此“读取成功”不会再被显示成“分析成功”。`inputRecords[*].status` 对应 `Processed`、`PartiallyProcessed`、`AnalysisFailed`、`InputMissing` 或 `DecodeFailed`。
+
+分析元数据中的 `qualityThresholds` 保存本次运行实际使用的检测门限。项目应通过查看器实例的 `QualityProfile` 配置设备级门限，避免把默认值误认为现场验收标准。
 
 不同 ROI 的典型指标示例：
 

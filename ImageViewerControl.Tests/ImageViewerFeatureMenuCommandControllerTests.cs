@@ -32,6 +32,18 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
+        public async Task ExecuteAsync_ExportBatchAnalysisCsv_DelegatesAndRefreshesMenuState()
+        {
+            var host = new FakeFeatureMenuCommandHost();
+            var controller = new ImageViewerFeatureMenuCommandController(host);
+
+            await controller.ExecuteAsync(ImageViewerFeatureMenuCommand.ExportBatchAnalysisCsv);
+
+            Assert.Equal(1, host.ExportBatchAnalysisCsvCount);
+            Assert.Equal(1, host.UpdateContextMenuStateCount);
+        }
+
+        [Fact]
         public async Task ExecuteAsync_UnknownCommand_ThrowsArgumentOutOfRangeException()
         {
             var controller = new ImageViewerFeatureMenuCommandController(new FakeFeatureMenuCommandHost());
@@ -45,6 +57,7 @@ namespace ImageViewerControl.Tests
             public int RunGradientDetectionCount { get; private set; }
             public int ExportSnapshotCount { get; private set; }
             public int ExportAnalysisCsvCount { get; private set; }
+            public int ExportBatchAnalysisCsvCount { get; private set; }
             public int ShowAnalysisSummaryCount { get; private set; }
             public int UpdateContextMenuStateCount { get; private set; }
 
@@ -59,6 +72,12 @@ namespace ImageViewerControl.Tests
             public Task ExportAnalysisCsvAsync()
             {
                 ExportAnalysisCsvCount++;
+                return Task.CompletedTask;
+            }
+
+            public Task ExportBatchAnalysisCsvAsync()
+            {
+                ExportBatchAnalysisCsvCount++;
                 return Task.CompletedTask;
             }
 

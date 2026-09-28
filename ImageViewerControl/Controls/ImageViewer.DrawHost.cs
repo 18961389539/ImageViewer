@@ -61,8 +61,7 @@ namespace ImageViewer.Controls
 
             public void EndDraw()
             {
-                _owner.ReleaseRootGridMouseIfCaptured();
-                _owner.LeaveInteractionMode();
+                _owner.EndActiveDraw();
                 _owner.DrawRois();
             }
         }

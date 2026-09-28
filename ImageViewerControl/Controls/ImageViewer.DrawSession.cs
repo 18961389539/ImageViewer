@@ -1,7 +1,10 @@
 using System;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using ImageViewer.Drawing;
+using ImageViewer.Localization;
 using ImageViewer.Models;
 
 namespace ImageViewer.Controls
@@ -28,17 +31,21 @@ namespace ImageViewer.Controls
         /// English: Enters a plugin-supplied draw mode. This is the public extension point that replaces
         /// hard-coding one StartXxxMode() per tool.
         /// </summary>
-        public void StartDraw(IRoiDrawController controller)
+        public void StartDraw(IRoiDrawController controller, string? toolName = null)
         {
             ArgumentNullException.ThrowIfNull(controller);
 
             ExitCurrentMode();
 
             _activeDrawSession = controller.CreateSession();
+            ActiveToolName = string.IsNullOrWhiteSpace(toolName)
+                ? UiText.Get("ActiveToolGeneric")
+                : toolName;
             rootGrid.Cursor = controller.Cursor;
             rootGrid.MouseDown += OnToolMouseDown;
             rootGrid.MouseMove += OnToolMouseMove;
             rootGrid.MouseUp += OnToolMouseUp;
+            UpdateActiveToolVisuals();
         }
 
         /// <summary>
@@ -56,6 +63,8 @@ namespace ImageViewer.Controls
 
             ReleaseRootGridMouseIfCaptured();
             LeaveInteractionMode();
+            ActiveToolName = string.Empty;
+            UpdateActiveToolVisuals();
             DrawRois();
         }
 
@@ -69,6 +78,44 @@ namespace ImageViewer.Controls
             _activeDrawSession = null;
             ReleaseRootGridMouseIfCaptured();
             LeaveInteractionMode();
+            ActiveToolName = string.Empty;
+            UpdateActiveToolVisuals();
+        }
+
+        /// <summary>
+        /// 更新持续显示的工具状态和工具栏高亮，避免工具激活提示只出现几秒后消失。
+        /// </summary>
+        internal void SetActiveToolName(string? toolName)
+        {
+            ActiveToolName = IsToolInteractionActive && !string.IsNullOrWhiteSpace(toolName)
+                ? toolName
+                : IsToolInteractionActive ? UiText.Get("ActiveToolGeneric") : string.Empty;
+            UpdateActiveToolVisuals();
+        }
+
+        private void UpdateActiveToolVisuals()
+        {
+            bool isActive = IsToolInteractionActive;
+            if (activeToolBanner is not null)
+            {
+                activeToolNameTextBlock.Text = isActive
+                    ? (string.IsNullOrWhiteSpace(ActiveToolName) ? UiText.Get("ActiveToolGeneric") : ActiveToolName)
+                    : string.Empty;
+                activeToolBanner.Visibility = isActive ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            if (quickToolsPanel is null)
+            {
+                return;
+            }
+
+            foreach (object child in quickToolsPanel.Children)
+            {
+                if (child is ToggleButton { Tag: ImageViewerRoiToolMenuTag tool } button)
+                {
+                    button.IsChecked = isActive && string.Equals(tool.ToolName, ActiveToolName, StringComparison.Ordinal);
+                }
+            }
         }
 
         private void LeaveInteractionMode()

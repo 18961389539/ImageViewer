@@ -2,6 +2,7 @@ using System;
 using System.Windows;
 using System.Windows.Input;
 using ImageViewer.Drawing;
+using ImageViewer.Localization;
 using ImageViewer.Models;
 using ImageViewer.Plugins;
 using ImageViewer.Utils;
@@ -13,7 +14,7 @@ namespace ImageViewer.Controls
     {
         public void StartEllipseRoiMode()
         {
-            StartDraw(BuiltInDrawControllers.Ellipse);
+            StartDraw(BuiltInDrawControllers.Ellipse, UiText.Get("ToolEllipse"));
         }
     }
 }

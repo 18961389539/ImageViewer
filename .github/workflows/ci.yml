@@ -1,0 +1,130 @@
+name: ImageViewer CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-and-core:
+    name: Build and Core coverage
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.302
+
+      - name: Restore locked dependencies
+        run: dotnet restore ImageViewer.sln --locked-mode
+
+      - name: Build Release
+        run: dotnet build ImageViewer.sln --configuration Release --no-restore --nologo
+
+      - name: Test Core with coverage
+        run: >-
+          dotnet test ImageViewer.Core.Tests\ImageViewer.Core.Tests.csproj
+          --configuration Release --no-build --nologo
+          --settings coverage.runsettings
+          --collect:"XPlat Code Coverage"
+          --results-directory artifacts\coverage\core
+
+      - name: Enforce Core line coverage
+        shell: pwsh
+        run: .\build\coverage-summary.ps1 -CoverageRoot artifacts\coverage\core -AssemblyPattern 'ImageViewer.Core' -MinimumLineRate 0.80
+
+      - name: Upload Core coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: imageviewer-core-coverage
+          path: artifacts/coverage/core
+          if-no-files-found: error
+
+  desktop-verification:
+    name: Desktop and batch verification
+    runs-on: windows-latest
+    needs: build-and-core
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.302
+
+      - name: Restore locked dependencies
+        run: dotnet restore ImageViewer.sln --locked-mode
+
+      - name: Build Release
+        run: dotnet build ImageViewer.sln --configuration Release --no-restore --nologo
+
+      - name: Test export and batch paths
+        run: >-
+          dotnet test ImageViewerControl.Tests\ImageViewerControl.Tests.csproj
+          --configuration Release --no-build --nologo
+          --filter "FullyQualifiedName~BatchRoiAnalysisExportServiceTests|FullyQualifiedName~CaliperWidthMeasurementResultTests|FullyQualifiedName~ImageViewerFeatureMenuCommandControllerTests"
+
+      - name: Run Smoke tests
+        run: >-
+          dotnet test ImageViewerControl.Tests\ImageViewerControl.Tests.csproj
+          --configuration Release --no-build --nologo
+          --filter "Category=Smoke"
+
+      - name: Upload desktop test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: imageviewer-desktop-test-results
+          path: '**/TestResults/**'
+          if-no-files-found: ignore
+
+  full-regression:
+    name: Full regression gate
+    runs-on: windows-latest
+    needs: build-and-core
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.302
+
+      - name: Restore locked dependencies
+        run: dotnet restore ImageViewer.sln --locked-mode
+
+      - name: Build Release
+        run: dotnet build ImageViewer.sln --configuration Release --no-restore --nologo
+
+      - name: Run full regression with coverage
+        run: >-
+          dotnet test ImageViewer.sln --configuration Release --no-build --nologo
+          --settings coverage.runsettings
+          --collect:"XPlat Code Coverage"
+          --results-directory artifacts\coverage\full
+
+      - name: Print coverage summary
+        if: always()
+        shell: pwsh
+        run: .\build\coverage-summary.ps1 -CoverageRoot artifacts\coverage\full
+
+      - name: Upload full regression and coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: imageviewer-full-regression
+          path: artifacts/coverage/full
+          if-no-files-found: ignore

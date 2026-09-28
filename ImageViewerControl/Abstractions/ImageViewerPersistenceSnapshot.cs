@@ -26,5 +26,10 @@ namespace ImageViewer.Abstractions
         /// English: ROI payloads that could not be resolved on load, written back verbatim so a save never erases them.
         /// </summary>
         public IReadOnlyList<RoiPersistenceData> UnresolvedRois { get; init; } = [];
+
+        /// <summary>
+        /// 当前项目使用的检测质量门限；保存后重新打开项目仍使用同一组门限。
+        /// </summary>
+        public ImageAnalysisQualityProfile QualityProfile { get; init; } = ImageAnalysisQualityProfile.Default;
     }
 }

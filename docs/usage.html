@@ -371,7 +371,8 @@
 
       <section id="volume">
         <h2>3D 体数据与 MPR</h2>
-        <p>体数据模式提供 3D 容积视图，以及轴位、冠状和矢状三个正交的多平面重建视图。MPR 位置会和 3D 场景中的交叉平面同步。</p>
+        <p>当前 3D 功能的目标是提供体数据的空间定位和 MPR 联动。三维场景显示按体素尺寸构建的包围盒、轴位/冠状/矢状切面、坐标系和可选裁剪边界，并支持相机旋转和预设视角；宿主还可以通过 API 进行体素拾取。MPR 位置会和 3D 场景中的交叉平面同步。体数据排序优先使用空间位置、实例号或采集时间元数据，缺少元数据时才回退到文件名自然排序并要求确认。</p>
+        <div class="callout"><strong>实现边界：</strong>当前三维场景是空间参考视图，不对体素灰度做 GPU 体渲染，也不提供传递函数、体积光照或等值面提取。需要检查像素内容时，请使用轴位、冠状或矢状 MPR。MPR 复用灰度缓存，Gray16 数据保持 16 位输出；检测质量门限随项目会话保存。真正的体渲染应作为后续目标单独引入 3D 纹理、采样步长、传递函数和显存预算。</div>
         <div class="workflow" aria-label="三维浏览流程">
           <div><strong>选择视图</strong><span>使用 Axial、Coronal、Sagittal 或 3D 按钮，键盘可使用 <kbd>1</kbd> 至 <kbd>4</kbd>。</span></div>
           <div><strong>浏览切片</strong><span>轴位使用滑块或鼠标滚轮；冠状与矢状使用 <kbd>↑</kbd> / <kbd>↓</kbd>。</span></div>
@@ -384,8 +385,8 @@
             <tr><td>轴位视图</td><td><kbd>1</kbd></td><td>进入轴位切片浏览。</td></tr>
             <tr><td>冠状视图</td><td><kbd>2</kbd></td><td>进入冠状 MPR；使用上下方向键浏览切片。</td></tr>
             <tr><td>矢状视图</td><td><kbd>3</kbd></td><td>进入矢状 MPR；使用上下方向键浏览切片。</td></tr>
-            <tr><td>3D 视图</td><td><kbd>4</kbd></td><td>进入 3D 场景。</td></tr>
-            <tr><td>适配体数据</td><td><kbd>F</kbd></td><td>将 3D 体数据适应当前视图。</td></tr>
+            <tr><td>3D 视图</td><td><kbd>4</kbd></td><td>进入三维空间参考场景。</td></tr>
+            <tr><td>适配体数据</td><td><kbd>F</kbd></td><td>将体数据包围盒适应当前视图。</td></tr>
             <tr><td>重置活动视图</td><td><kbd>Home</kbd></td><td>重置 3D 相机，或将 2D 切片回到起始位置。</td></tr>
           </tbody>
         </table>

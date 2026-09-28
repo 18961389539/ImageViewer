@@ -13,6 +13,9 @@ namespace ImageViewer.Models
         private int _minimumValidCalipers = 8;
         private double _caliperOutlierThreshold = 2.5;
         private CaliperEdgePolarity _caliperEdgePolarity = CaliperEdgePolarity.Any;
+        private HalconEdgeExtractionMode _caliperEdgeExtractionMode = HalconEdgeExtractionMode.GaussianDerivative;
+        private HalconLineFitMode _caliperLineFitMode = HalconLineFitMode.Tukey;
+        private int _caliperFitClippingEndPoints;
         private double _angleDegrees;
 
         private SingleEdgeCaliperDetectionDisplayState DetectionDisplayState => SingleEdgeCaliperDetectionDisplayStateStore.GetOrCreate(this);
@@ -126,6 +129,27 @@ namespace ImageViewer.Models
         {
             get => _caliperEdgePolarity;
             set => SetProperty(ref _caliperEdgePolarity, value);
+        }
+
+        /// <summary>卡尺剖面的 HALCON 风格边缘提取模式。</summary>
+        public HalconEdgeExtractionMode CaliperEdgeExtractionMode
+        {
+            get => _caliperEdgeExtractionMode;
+            set => SetProperty(ref _caliperEdgeExtractionMode, value);
+        }
+
+        /// <summary>卡尺边缘点的 HALCON 风格直线拟合模式。</summary>
+        public HalconLineFitMode CaliperLineFitMode
+        {
+            get => _caliperLineFitMode;
+            set => SetProperty(ref _caliperLineFitMode, value);
+        }
+
+        /// <summary>拟合时从边缘轮廓首尾各忽略的点数；端点输出仍使用原始首尾点。</summary>
+        public int CaliperFitClippingEndPoints
+        {
+            get => _caliperFitClippingEndPoints;
+            set => SetProperty(ref _caliperFitClippingEndPoints, Math.Max(0, value));
         }
 
         public double AverageScore

@@ -31,6 +31,7 @@ namespace ImageViewer.Controls
                             DrawRois = () => _owner.DrawRois(),
                             ShowSaveSnapshotDialog = dialogWorkflowService.ShowSaveSnapshotDialog,
                             ShowSaveAnalysisCsvDialog = dialogWorkflowService.ShowSaveAnalysisCsvDialog,
+                            ShowOpenBatchImageFilesDialog = () => _owner.FileDialogService.ShowOpenImageFilesDialog(System.Windows.Window.GetWindow(_owner)),
                             ShowReadOnlyText = dialogWorkflowService.ShowReadOnlyText,
                             GetAllRois = () => _owner.ViewerState.AllRois,
                             GetPixelSize = () => _owner.PixelSize,
@@ -51,6 +52,7 @@ namespace ImageViewer.Controls
                                 ["pseudoColorPalette"] = _owner.PseudoColorPalette.ToString(),
                                 ["enableAsyncAnalysis"] = _owner.RuntimeOptions.EnableAsyncAnalysis.ToString()
                             },
+                            GetQualityProfile = () => _owner.QualityProfile,
                             ShowNonCriticalError = _owner.ShowNonCriticalError,
                             ShowStatusHint = (message, kind) => _owner.ShowStatusHint(message, kind),
                             UpdateContextMenuState = _owner.UpdateContextMenuState

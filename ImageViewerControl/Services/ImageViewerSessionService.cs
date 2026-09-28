@@ -22,8 +22,9 @@ namespace ImageViewer.Services
             ArgumentNullException.ThrowIfNull(snapshot);
             ArgumentNullException.ThrowIfNull(pluginRegistry);
 
-            EnsureDirectory(filePath);
-            File.WriteAllText(filePath, SerializeSession(Path.GetFileNameWithoutExtension(filePath), snapshot, pluginRegistry));
+            ImageViewerAtomicFile.WriteAllText(
+                filePath,
+                SerializeSession(Path.GetFileNameWithoutExtension(filePath), snapshot, pluginRegistry));
         }
 
         public Task SaveToFileAsync(string filePath, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry? pluginRegistry = null, CancellationToken cancellationToken = default)
@@ -32,8 +33,10 @@ namespace ImageViewer.Services
             ArgumentNullException.ThrowIfNull(snapshot);
             ArgumentNullException.ThrowIfNull(pluginRegistry);
 
-            EnsureDirectory(filePath);
-            return File.WriteAllTextAsync(filePath, SerializeSession(Path.GetFileNameWithoutExtension(filePath), snapshot, pluginRegistry), cancellationToken);
+            return ImageViewerAtomicFile.WriteAllTextAsync(
+                filePath,
+                SerializeSession(Path.GetFileNameWithoutExtension(filePath), snapshot, pluginRegistry),
+                cancellationToken: cancellationToken);
         }
 
         public string SerializeSession(string? sessionName, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry? pluginRegistry = null)
@@ -47,7 +50,13 @@ namespace ImageViewer.Services
                 SessionName = sessionName,
                 SavedAtUtc = DateTimeOffset.UtcNow,
                 ImagePath = snapshot.ImagePath,
-                RoiDocument = RoiPersistenceService.CreateDocument(snapshot.Rois, snapshot.PixelSize, snapshot.PhysicalUnit, pluginRegistry, snapshot.UnresolvedRois),
+                RoiDocument = RoiPersistenceService.CreateDocument(
+                    snapshot.Rois,
+                    snapshot.PixelSize,
+                    snapshot.PhysicalUnit,
+                    pluginRegistry,
+                    snapshot.UnresolvedRois,
+                    snapshot.QualityProfile),
                 Scale = snapshot.Scale,
                 TranslateX = snapshot.TranslateX,
                 TranslateY = snapshot.TranslateY,
@@ -80,9 +89,12 @@ namespace ImageViewer.Services
                 ?? new ImageViewerSessionDocument();
             ValidateSessionVersion(session.Version);
             var roiData = RoiPersistenceService.CreateRois(session.RoiDocument ?? new RoiDocument(), pluginRegistry);
+            ImageAnalysisQualityProfile qualityProfile = roiData.QualityProfile ?? ImageAnalysisQualityProfile.Default;
+            qualityProfile.Validate();
             return new ImageViewerSessionData(session.SessionName, session.SavedAtUtc, ResolveImagePath(session.ImagePath, sessionBaseDirectory), roiData.Rois, roiData.PixelSize, roiData.PhysicalUnit, session.Scale, session.TranslateX, session.TranslateY, session.Calibration)
             {
-                UnresolvedRois = roiData.UnresolvedItems
+                UnresolvedRois = roiData.UnresolvedItems,
+                QualityProfile = qualityProfile
             };
         }
 
@@ -111,15 +123,6 @@ namespace ImageViewer.Services
             return Path.GetFullPath(Path.Combine(sessionBaseDirectory, imagePath));
         }
 
-        private static void EnsureDirectory(string filePath)
-        {
-            string? directory = Path.GetDirectoryName(Path.GetFullPath(filePath));
-            if (!string.IsNullOrWhiteSpace(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-        }
-
     }
 
     public sealed record ImageViewerSessionData(
@@ -140,5 +143,7 @@ namespace ImageViewer.Services
         /// English: ROI payloads that no registered plugin could resolve on load; carried back into saves.
         /// </summary>
         public IReadOnlyList<RoiPersistenceData> UnresolvedRois { get; init; } = [];
+
+        public ImageAnalysisQualityProfile QualityProfile { get; init; } = ImageAnalysisQualityProfile.Default;
     }
 }

@@ -82,7 +82,20 @@ namespace ImageViewerControl.Tests
         {
             var registry = RoiPluginRegistry.CreateBuiltIn();
             var service = new ImageViewerSessionService();
-            var calibration = new CameraCalibration { K1 = 0.05, K2 = -0.003, PrincipalX = 200, PrincipalY = 150, NormalizationRadius = 100 };
+            var calibration = new CameraCalibration
+            {
+                K1 = 0.05,
+                K2 = -0.003,
+                K3 = 0.0004,
+                TangentialP1 = 0.001,
+                TangentialP2 = -0.0007,
+                PrincipalX = 200,
+                PrincipalY = 150,
+                NormalizationRadius = 100,
+                ReprojectionErrorRms = 0.08,
+                MeasurementUncertaintyPixels = 0.12,
+                CalibrationId = "CAL-2026-001"
+            };
 
             string sessionJson = service.SerializeSession("sample", CreateSnapshot(null, [], 0.02, "mm", calibration), registry);
             ImageViewerSessionData result = service.LoadFromJson(sessionJson, null, registry);
@@ -93,6 +106,40 @@ namespace ImageViewerControl.Tests
             Assert.Equal(200, result.Calibration.PrincipalX, 6);
             Assert.Equal(150, result.Calibration.PrincipalY, 6);
             Assert.Equal(100, result.Calibration.NormalizationRadius, 6);
+            Assert.Equal(0.0004, result.Calibration.K3, 6);
+            Assert.Equal(0.001, result.Calibration.TangentialP1, 6);
+            Assert.Equal(-0.0007, result.Calibration.TangentialP2, 6);
+            Assert.Equal(0.08, result.Calibration.ReprojectionErrorRms, 6);
+            Assert.Equal(0.12, result.Calibration.MeasurementUncertaintyPixels, 6);
+            Assert.Equal("CAL-2026-001", result.Calibration.CalibrationId);
+        }
+
+        [Fact]
+        public void SerializeSession_RoundTripsProjectQualityProfile()
+        {
+            var registry = RoiPluginRegistry.CreateBuiltIn();
+            var service = new ImageViewerSessionService();
+            var profile = new ImageAnalysisQualityProfile
+            {
+                MaxCaliperScore = 180,
+                MinimumDetectionConfidence = 0.12,
+                MinimumReviewConfidence = 0.32,
+                MinimumReviewValidRatio = 0.64,
+                MinimumReviewAngularCoverageDegrees = 210,
+                PassConfidence = 0.78,
+                PassValidRatio = 0.86,
+                PassAngularCoverageDegrees = 300,
+                PassResidualRms = 0.9,
+                ReviewResidualRms = 2.5
+            };
+
+            ImageViewerPersistenceSnapshot snapshot = CreateSnapshot(null, []) with { QualityProfile = profile };
+            string sessionJson = service.SerializeSession("quality-project", snapshot, registry);
+            ImageViewerSessionData result = service.LoadFromJson(sessionJson, null, registry);
+
+            Assert.Equal(profile, result.QualityProfile);
+            Assert.Contains("\"QualityProfile\"", sessionJson, StringComparison.Ordinal);
+            Assert.Contains("\"PassResidualRms\": 0.9", sessionJson, StringComparison.Ordinal);
         }
 
         [Fact]

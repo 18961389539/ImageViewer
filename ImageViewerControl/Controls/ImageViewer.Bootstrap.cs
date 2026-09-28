@@ -36,6 +36,7 @@ namespace ImageViewer.Controls
         {
             _lifetime.Attach();
             UpdateStatusBar();
+            UpdateCalibrationIndicator();
             UpdateRenderedImage();
             RefreshRoiDrawingMenuItems();
             ApplyMenuItemContentAlignment(mainContextMenu);

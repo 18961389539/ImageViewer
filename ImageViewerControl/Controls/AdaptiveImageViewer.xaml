@@ -8,6 +8,13 @@
     >
     <Grid Background="#0A0F16" Focusable="True" PreviewKeyDown="OnPreviewKeyDown">
         <Grid.Resources>
+            <SolidColorBrush x:Key="AdaptiveModeSelectedBrush" Color="#2869AFFF" />
+            <SolidColorBrush x:Key="AdaptiveModeSelectedBorderBrush" Color="#69AFFF" />
+            <SolidColorBrush x:Key="AdaptiveModeDefaultBrush" Color="#111824" />
+            <SolidColorBrush x:Key="AdaptiveModeDefaultBorderBrush" Color="#35506D" />
+            <SolidColorBrush x:Key="AdaptiveErrorBrush" Color="#FF6B6B" />
+            <SolidColorBrush x:Key="AdaptiveErrorSoftBrush" Color="#3D1F2A" />
+            <SolidColorBrush x:Key="AdaptiveErrorBorderBrush" Color="#B94A5A" />
             <Style x:Key="AdaptiveBarButtonStyle" TargetType="Button">
                 <Setter Property="Foreground" Value="#F5F8FC" />
                 <Setter Property="Background" Value="#111824" />
@@ -27,6 +34,12 @@
                     </Trigger>
                 </Style.Triggers>
             </Style>
+            <Style x:Key="AdaptiveGroupTitleStyle" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="#AAB5C3" />
+                <Setter Property="FontSize" Value="11" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Margin" Value="0,0,0,5" />
+            </Style>
         </Grid.Resources>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -35,17 +48,21 @@
         </Grid.RowDefinitions>
         <Border Padding="8" Background="#18212E" BorderBrush="#314158" BorderThickness="0,0,0,1">
             <StackPanel>
-            <WrapPanel>
-                <Button x:Name="autoButton" Content="{localization:UiText AdaptiveAuto}" Click="OnAutoClick" Margin="0,0,6,0" ToolTip="{localization:UiText AdaptiveAutoTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
-                <Button x:Name="twoDimensionalButton" Content="{localization:UiText Adaptive2D}" Click="OnTwoDimensionalClick" Margin="0,0,6,0" ToolTip="{localization:UiText Adaptive2DTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
-                <Button x:Name="threeDimensionalButton" Content="{localization:UiText Adaptive3D}" Click="OnThreeDimensionalClick" Margin="0,0,6,0" ToolTip="{localization:UiText Adaptive3DTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
-                <Button x:Name="axialButton" Content="{localization:UiText AdaptiveAxial}" Click="OnAxialClick" Margin="0,0,6,0" ToolTip="{localization:UiText AdaptiveAxialTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
-                <Button x:Name="coronalButton" Content="{localization:UiText AdaptiveCoronal}" Click="OnCoronalClick" Margin="0,0,6,0" ToolTip="{localization:UiText AdaptiveCoronalTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
-                <Button x:Name="sagittalButton" Content="{localization:UiText AdaptiveSagittal}" Click="OnSagittalClick" Margin="0,0,6,0" ToolTip="{localization:UiText AdaptiveSagittalTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
-                <Button x:Name="qualityButton" Content="{localization:UiText AdaptiveQuality}" Click="OnQualityClick" Margin="0,0,6,0" ToolTip="{localization:UiText AdaptiveQualityTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
-                <Button x:Name="segmentButton" Content="{localization:UiText AdaptiveSegment}" Click="OnSegmentClick" Margin="0,0,6,0" ToolTip="{localization:UiText AdaptiveSegmentTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
-                <Button x:Name="cancelButton" Content="{localization:UiText AdaptiveCancel}" Click="OnCancelClick" Style="{StaticResource AdaptiveBarButtonStyle}" ToolTip="{localization:UiText AdaptiveCancelTooltip}" />
-            </WrapPanel>
+                <TextBlock Text="{localization:UiText AdaptiveViewGroup}" Style="{StaticResource AdaptiveGroupTitleStyle}" />
+                <WrapPanel>
+                    <Button x:Name="autoButton" Content="{localization:UiText AdaptiveAuto}" Click="OnAutoClick" Margin="0,0,6,0" ToolTip="{localization:UiText AdaptiveAutoTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
+                    <Button x:Name="twoDimensionalButton" Content="{localization:UiText Adaptive2D}" Click="OnTwoDimensionalClick" Margin="0,0,6,0" ToolTip="{localization:UiText Adaptive2DTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
+                    <Button x:Name="threeDimensionalButton" Content="{localization:UiText Adaptive3D}" Click="OnThreeDimensionalClick" Margin="0,0,6,0" ToolTip="{localization:UiText Adaptive3DTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
+                    <Button x:Name="axialButton" Content="{localization:UiText AdaptiveAxial}" Click="OnAxialClick" Margin="0,0,6,0" ToolTip="{localization:UiText AdaptiveAxialTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
+                    <Button x:Name="coronalButton" Content="{localization:UiText AdaptiveCoronal}" Click="OnCoronalClick" Margin="0,0,6,0" ToolTip="{localization:UiText AdaptiveCoronalTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
+                    <Button x:Name="sagittalButton" Content="{localization:UiText AdaptiveSagittal}" Click="OnSagittalClick" Margin="0,0,6,0" ToolTip="{localization:UiText AdaptiveSagittalTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
+                </WrapPanel>
+                <TextBlock Text="{localization:UiText AdaptiveAnalysisGroup}" Style="{StaticResource AdaptiveGroupTitleStyle}" Margin="0,7,0,5" />
+                <WrapPanel>
+                    <Button x:Name="qualityButton" Content="{localization:UiText AdaptiveQuality}" Click="OnQualityClick" Margin="0,0,6,0" ToolTip="{localization:UiText AdaptiveQualityTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
+                    <Button x:Name="segmentButton" Content="{localization:UiText AdaptiveSegment}" Click="OnSegmentClick" Margin="0,0,6,0" ToolTip="{localization:UiText AdaptiveSegmentTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
+                    <Button x:Name="cancelButton" Content="{localization:UiText AdaptiveCancel}" Click="OnCancelClick" Style="{StaticResource AdaptiveBarButtonStyle}" ToolTip="{localization:UiText AdaptiveCancelTooltip}" />
+                </WrapPanel>
             <Border x:Name="mprSliceBar"
                     Margin="0,8,0,0"
                     Padding="8,5"
@@ -88,21 +105,57 @@
         </Border>
         <Grid Grid.Row="1" PreviewMouseWheel="OnPreviewMouseWheel">
             <ContentControl x:Name="contentHost" />
-            <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10" Padding="8" Background="#C018212E" BorderBrush="#49627D" BorderThickness="1" CornerRadius="8">
+            <Border x:Name="operationStatusPanel" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10" Padding="8">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Background" Value="#C018212E" />
+                        <Setter Property="BorderBrush" Value="#49627D" />
+                        <Setter Property="BorderThickness" Value="1" />
+                        <Setter Property="CornerRadius" Value="8" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Visibility, ElementName=retryButton}" Value="Visible">
+                                <Setter Property="Background" Value="{StaticResource AdaptiveErrorSoftBrush}" />
+                                <Setter Property="BorderBrush" Value="{StaticResource AdaptiveErrorBorderBrush}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
                 <StackPanel>
-                    <TextBlock x:Name="statusText" Foreground="#F5F8FC" automation:AutomationProperties.Name="{localization:UiText AdaptiveViewerStatusName}" automation:AutomationProperties.LiveSetting="Polite" />
+                    <DockPanel LastChildFill="True">
+                        <TextBlock Text="⚠" Foreground="{StaticResource AdaptiveErrorBrush}" FontSize="15" FontWeight="Bold" Margin="0,0,7,0" Visibility="{Binding Visibility, ElementName=retryButton}" />
+                        <TextBlock x:Name="statusText" Foreground="#F5F8FC" automation:AutomationProperties.Name="{localization:UiText AdaptiveViewerStatusName}" automation:AutomationProperties.LiveSetting="Polite" />
+                    </DockPanel>
                     <ProgressBar x:Name="operationProgress" Height="5" Width="180" Margin="0,6,0,0" Visibility="Collapsed" IsIndeterminate="True" />
                 </StackPanel>
             </Border>
-            <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="10" Padding="8" Background="#C018212E" BorderBrush="#49627D" BorderThickness="1" CornerRadius="8" MaxWidth="360">
+            <Border x:Name="dataQualityPanel" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="10" Padding="8" MaxWidth="360" Visibility="Collapsed">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Background" Value="#C018212E" />
+                        <Setter Property="BorderBrush" Value="#49627D" />
+                        <Setter Property="BorderThickness" Value="1" />
+                        <Setter Property="CornerRadius" Value="8" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Visibility, ElementName=retryButton}" Value="Visible">
+                                <Setter Property="Background" Value="{StaticResource AdaptiveErrorSoftBrush}" />
+                                <Setter Property="BorderBrush" Value="{StaticResource AdaptiveErrorBorderBrush}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
                 <StackPanel>
-                    <TextBlock Text="{localization:UiText AdaptiveDataQualityTitle}" Foreground="#F5F8FC" FontWeight="SemiBold" />
+                    <DockPanel LastChildFill="True">
+                        <TextBlock Text="⚠" Foreground="{StaticResource AdaptiveErrorBrush}" FontSize="15" FontWeight="Bold" Margin="0,0,7,0" Visibility="{Binding Visibility, ElementName=retryButton}" />
+                        <TextBlock Text="{localization:UiText AdaptiveDataQualityTitle}" Foreground="#F5F8FC" FontWeight="SemiBold" />
+                    </DockPanel>
                     <ListBox x:Name="anomalyList" MaxHeight="100" Margin="0,4,0,0" Background="Transparent" BorderThickness="0" Foreground="#F5C26B" SelectionChanged="OnAnomalySelected" />
                     <TextBlock x:Name="segmentationText" Foreground="#A8C7E8" TextWrapping="Wrap" />
-                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <StackPanel x:Name="segmentationActionsPanel" Orientation="Horizontal" Margin="0,4,0,0" Visibility="Collapsed">
                         <Button x:Name="acceptSegmentationButton" Content="{localization:UiText AdaptiveAccept}" Click="OnAcceptSegmentationClick" Margin="0,0,6,0" Padding="8,3" />
                         <Button x:Name="rejectSegmentationButton" Content="{localization:UiText AdaptiveReject}" Click="OnRejectSegmentationClick" Padding="8,3" />
-                        <Button x:Name="retryButton" Content="{localization:UiText AdaptiveRetry}" Click="OnRetryQualityClick" Margin="6,0,0,0" Padding="8,3" Visibility="Collapsed" />
+                    </StackPanel>
+                    <StackPanel x:Name="qualityActionsPanel" Orientation="Horizontal" Margin="0,4,0,0" Visibility="Collapsed">
+                        <Button x:Name="retryButton" Content="{localization:UiText AdaptiveRetry}" Click="OnRetryQualityClick" Margin="6,0,0,0" Padding="8,3" Visibility="Collapsed" Background="{StaticResource AdaptiveErrorSoftBrush}" BorderBrush="{StaticResource AdaptiveErrorBorderBrush}" Foreground="#F5F8FC" />
                     </StackPanel>
                 </StackPanel>
             </Border>

@@ -1,18 +1,25 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using ImageViewer.Localization;
+using ImageViewer.Models;
+using ImageViewer.Plugins;
 
 namespace ImageViewer.Controls
 {
     public partial class ImageViewer
     {
+        private const double ToolbarCompactWidthThreshold = 760;
+        private const double ToolbarCompactHeightThreshold = 420;
+
         private void InitializeEventHandlers()
         {
             rootGrid.MouseWheel += OnMouseWheel;
@@ -45,7 +52,29 @@ namespace ImageViewer.Controls
 
         private void OnRootGridSizeChanged(object sender, SizeChangedEventArgs e)
         {
+            UpdateToolbarLayout();
             _imageViewStateController.HandleRootGridSizeChanged();
+        }
+
+        private void UpdateToolbarLayout()
+        {
+            double width = rootGrid.ActualWidth;
+            double height = rootGrid.ActualHeight;
+            bool isCompactViewport = width > 0 && (width < ToolbarCompactWidthThreshold || height > 0 && height < ToolbarCompactHeightThreshold);
+
+            toolbarPanel.Visibility = ShowToolbar && !isCompactViewport ? Visibility.Visible : Visibility.Collapsed;
+            toolbarCompactButton.Visibility = ShowToolbar && isCompactViewport ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void OnCompactToolbarClick(object sender, RoutedEventArgs e)
+        {
+            mainContextMenu.PlacementTarget = toolbarCompactButton;
+            mainContextMenu.IsOpen = true;
+        }
+
+        private void OnToolbarHideClick(object sender, RoutedEventArgs e)
+        {
+            ShowToolbar = false;
         }
 
         private void OnLoaded(object sender, RoutedEventArgs e)
@@ -116,6 +145,52 @@ namespace ImageViewer.Controls
             measureMenuItem.Visibility = measureMenuItem.Items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
             ApplyMenuItemContentAlignment(drawRoiMenuItem);
             ApplyMenuItemContentAlignment(measureMenuItem);
+            RefreshToolbarQuickTools();
+        }
+
+        /// <summary>
+        /// 将最常用的少量 ROI 工具放到可见工具栏，完整工具集仍保留在右键菜单中。
+        /// </summary>
+        private void RefreshToolbarQuickTools()
+        {
+            quickToolsPanel.Children.Clear();
+
+            IEnumerable<RoiToolDescriptor> quickTools = AvailableDrawingTools
+                .Where(tool => !tool.IsMeasurement)
+                .Take(5)
+                .Concat(AvailableDrawingTools.Where(tool => tool.IsMeasurement).Take(3));
+
+            foreach (RoiToolDescriptor tool in quickTools)
+            {
+                var button = new ToggleButton
+                {
+                    ToolTip = tool.Header,
+                    Tag = new ImageViewerRoiToolMenuTag(tool.Header, tool.Activate),
+                    Style = (Style)FindResource("ViewerToolbarToggleButtonStyle"),
+                    IsChecked = IsToolInteractionActive && string.Equals(tool.Header, ActiveToolName, StringComparison.Ordinal)
+                };
+
+                if (tool.CreateIcon is Func<FrameworkElement> createIcon)
+                {
+                    var content = new StackPanel { Orientation = Orientation.Horizontal };
+                    FrameworkElement icon = createIcon();
+                    icon.Margin = new Thickness(0, 0, 5, 0);
+                    content.Children.Add(icon);
+                    content.Children.Add(new TextBlock
+                    {
+                        Text = tool.Header,
+                        VerticalAlignment = VerticalAlignment.Center
+                    });
+                    button.Content = content;
+                }
+                else
+                {
+                    button.Content = tool.Header;
+                }
+
+                button.Click += OnToolbarRoiToolClick;
+                quickToolsPanel.Children.Add(button);
+            }
         }
 
         private static MenuItem CreateDynamicMenuItem(ImageViewerDynamicMenuItem item)
@@ -150,7 +225,18 @@ namespace ImageViewer.Controls
             if (sender is MenuItem { Tag: ImageViewerRoiToolMenuTag tool } menuItem)
             {
                 tool.Activate(this);
-                ShowStatusHint(UiText.Format("StatusToolActivated", menuItem.Header?.ToString() ?? string.Empty));
+                SetActiveToolName(tool.ToolName);
+                ShowStatusHint(UiText.Format("StatusToolActivated", tool.ToolName));
+            }
+        }
+
+        private void OnToolbarRoiToolClick(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement { Tag: ImageViewerRoiToolMenuTag tool })
+            {
+                tool.Activate(this);
+                SetActiveToolName(tool.ToolName);
+                ShowStatusHint(UiText.Format("StatusToolActivated", tool.ToolName));
             }
         }
 
@@ -169,6 +255,14 @@ namespace ImageViewer.Controls
 
         private async void OnKeyDown(object sender, KeyEventArgs e)
         {
+            if (e.Key == Key.Escape && IsToolInteractionActive)
+            {
+                e.Handled = true;
+                ExitCurrentMode();
+                ShowStatusHint(UiText.Get("StatusDrawCancelled"));
+                return;
+            }
+
             if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.O)
             {
                 e.Handled = true;
@@ -195,6 +289,28 @@ namespace ImageViewer.Controls
             {
                 ReportUiOperationFailure("键盘快捷键处理", ex);
             }
+        }
+
+        private void OnActiveToolCancelClick(object sender, RoutedEventArgs e)
+        {
+            if (!IsToolInteractionActive)
+            {
+                return;
+            }
+
+            ExitCurrentMode();
+            ShowStatusHint(UiText.Get("StatusDrawCancelled"));
+        }
+
+        private void OnQuickCircularCaliperSettingsClick(object sender, RoutedEventArgs e)
+        {
+            if (ViewerState.SelectedRoi is not CircularCaliperMeasureRoi circularCaliper)
+            {
+                return;
+            }
+
+            _dialogWorkflowService.ShowCaliperSettings(circularCaliper);
+            _roiSelectionStateController.RefreshPropertyPanel();
         }
 
         private void OnMouseRightButtonDown(object sender, MouseButtonEventArgs e) => _interactionController.HandleMouseRightButtonDown(e);
@@ -469,6 +585,51 @@ namespace ImageViewer.Controls
             }
 
             statusBarBorder.Visibility = Visibility.Visible;
+        }
+
+        /// <summary>
+        /// 更新常驻标定状态。只要像素尺寸、单位或镜头畸变参数被设置，就在状态栏中保留醒目标识。
+        /// Chinese: 标定状态不再依赖一次性的成功提示或选中 ROI 才能看到。
+        /// English: Keep calibration visible in the status bar instead of relying on a transient hint or a selected ROI.
+        /// </summary>
+        private void UpdateCalibrationIndicator()
+        {
+            if (calibrationBadge is null || calibrationBadgeTextBlock is null)
+            {
+                return;
+            }
+
+            string unit = string.IsNullOrWhiteSpace(PhysicalUnit)
+                ? UiText.Get("InfoUnitPixels")
+                : PhysicalUnit.Trim();
+            bool isCalibrated = double.IsFinite(PixelSize)
+                && PixelSize > 0
+                && (Calibration is not null
+                    || Math.Abs(PixelSize - 1.0) > 1e-9
+                    || !string.Equals(unit, UiText.Get("InfoUnitPixels"), StringComparison.OrdinalIgnoreCase));
+
+            if (!isCalibrated)
+            {
+                calibrationBadge.Visibility = Visibility.Collapsed;
+                calibrationBadgeTextBlock.Text = string.Empty;
+                calibrationBadgeTextBlock.ToolTip = null;
+                return;
+            }
+
+            string text = UiText.FormatInvariant("CalibrationBadgeText", PixelSize, unit);
+            if (Calibration is not null)
+            {
+                text += " " + UiText.Get("CalibrationBadgeDistortionSuffix");
+            }
+
+            bool textChanged = !string.Equals(calibrationBadgeTextBlock.Text, text, StringComparison.Ordinal);
+            calibrationBadgeTextBlock.Text = text;
+            calibrationBadgeTextBlock.ToolTip = text;
+            calibrationBadge.Visibility = Visibility.Visible;
+            if (textChanged)
+            {
+                RaiseLiveRegionChanged(calibrationBadgeTextBlock);
+            }
         }
 
         private async void OnViewCommandMenuClick(object sender, RoutedEventArgs e)

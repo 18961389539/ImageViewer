@@ -41,7 +41,7 @@ namespace ImageViewer.Models
         double PhysicalX,
         double PhysicalY,
         double PhysicalZ,
-        byte Intensity);
+        ushort Intensity);
 
     public sealed class VolumeVoxelPickedEventArgs : EventArgs
     {
