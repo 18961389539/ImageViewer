@@ -25,9 +25,19 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ImageViewer.Core\ImageViewer.Core.csproj" />
+    <ProjectReference Include="..\third_party\JLVision\JLVisionLib.csproj" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="HelixToolkit.Wpf.SharpDX" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\third_party\JLVision\Libs\JLVisionCore.dll"
+             Link="JLVisionCore.dll"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest"
+             Pack="true"
+             PackagePath="lib\$(TargetFramework)" />
   </ItemGroup>
 
   <ItemGroup>

@@ -281,7 +281,8 @@
         "type": "Project",
         "dependencies": {
           "HelixToolkit.Wpf.SharpDX": "[3.1.2, )",
-          "ImageViewer.Core": "[1.0.0, )",
+          "ImageViewer.Core": "[0.1.0, )",
+          "JLVisionLib": "[0.1.0, )",
           "Microsoft.Extensions.DependencyInjection": "[10.0.0, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.0, )"
         }
@@ -289,8 +290,11 @@
       "imageviewerdemo": {
         "type": "Project",
         "dependencies": {
-          "ImageViewerControl": "[1.0.0, )"
+          "ImageViewerControl": "[0.1.0, )"
         }
+      },
+      "jlvisionlib": {
+        "type": "Project"
       },
       "HelixToolkit.Wpf.SharpDX": {
         "type": "CentralTransitive",

@@ -428,6 +428,14 @@ namespace ImageViewer.Services
                 return new LineSegmentOverlay((origin - fallback * fallbackHalfLength).ToPointD(), (origin + fallback * fallbackHalfLength).ToPointD());
             }
 
+            // Use the native JLVision fit_line_contour_xld implementation whenever the
+            // runtime is present. The managed implementation below remains as a fallback
+            // for deployments that do not ship JLVisionCore.dll.
+            if (JLVisionFitAdapter.TryFitLine(points, fitMode, clippingEndPoints, out LineSegmentOverlay nativeFit))
+            {
+                return nativeFit;
+            }
+
             int clipped = Math.Clamp(clippingEndPoints, 0, Math.Max(0, (points.Length - 2) / 2));
             Point[] fitPoints = clipped == 0
                 ? points

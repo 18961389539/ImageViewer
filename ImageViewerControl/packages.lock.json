@@ -206,6 +206,9 @@
       },
       "imageviewer.core": {
         "type": "Project"
+      },
+      "jlvisionlib": {
+        "type": "Project"
       }
     }
   }
