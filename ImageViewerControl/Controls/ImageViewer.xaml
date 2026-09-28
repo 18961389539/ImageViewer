@@ -1065,9 +1065,9 @@
                 Padding="0"
                 Panel.ZIndex="101"
                 Content="☰"
-                ToolTip="{localization:UiText ToolbarCompactHint}"
+                ToolTip="{localization:UiText ToolbarRestoreHint}"
                 automation:AutomationProperties.Name="{localization:UiText MenuShowToolbar}"
-                automation:AutomationProperties.HelpText="{localization:UiText ToolbarCompactHint}"
+                automation:AutomationProperties.HelpText="{localization:UiText ToolbarRestoreHint}"
                 Click="OnCompactToolbarClick"
                 Style="{StaticResource ViewerToolbarPrimaryButtonStyle}"
                 Visibility="Collapsed" />
