@@ -73,7 +73,7 @@ namespace ImageViewer.Controls
             _pixelGridPath.Visibility = Visibility.Visible;
         }
 
-        private void DrawRois(bool immediate = false, bool forceAnalysis = false)
+        internal void DrawRois(bool immediate = false, bool forceAnalysis = false)
         {
             RequestViewportOverlayRefresh(immediate);
             RequestAnalysisRefresh(forceAnalysis, immediate: immediate && forceAnalysis);

@@ -350,6 +350,7 @@
                 </MenuItem>
                 <MenuItem Header="{localization:UiText MenuViewControl}">
                     <MenuItem x:Name="fitToViewMenuItem" x:FieldModifier="internal" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.FitToView}" Header="{localization:UiText MenuFitToView}" InputGestureText="Ctrl+F" IsEnabled="{Binding MenuState.View.FitToViewEnabled}" />
+                    <MenuItem Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.FillToView}" Header="{localization:UiText MenuFillToView}" IsEnabled="{Binding MenuState.View.FitToViewEnabled}" />
                     <MenuItem x:Name="actualSizeMenuItem" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ActualSize}" Header="{localization:UiText MenuActualSize}" IsEnabled="{Binding MenuState.View.ActualSizeEnabled}" />
                     <MenuItem x:Name="resetViewMenuItem" x:FieldModifier="internal" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ResetView}" Header="{localization:UiText MenuResetView}" InputGestureText="Ctrl+0" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
                     <Separator />
@@ -666,10 +667,28 @@
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <TextBlock Text="{localization:UiText RoiListTitle}" Foreground="{StaticResource ViewerTextPrimaryBrush}" FontWeight="Bold" Margin="0,0,0,6" />
-                    <ListBox Grid.Row="1"
+                    <DockPanel Grid.Row="0" LastChildFill="True" Margin="0,0,0,6">
+                        <TextBlock DockPanel.Dock="Left"
+                                   Text="{localization:UiText RoiListTitle}"
+                                   Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                                   FontWeight="Bold" />
+                        <TextBlock x:Name="roiListCountText"
+                                   Margin="8,0,0,0"
+                                   Foreground="{StaticResource ViewerTextSecondaryBrush}"
+                                   Text="{Binding ViewerState.AllRois.Count, RelativeSource={RelativeSource AncestorType=UserControl}, StringFormat={}({0})}" />
+                    </DockPanel>
+                    <TextBox x:Name="roiFilterTextBox"
+                             Grid.Row="1"
+                             Margin="0,0,0,6"
+                             Padding="7,4"
+                             TextChanged="OnRoiFilterTextChanged"
+                             ToolTip="{localization:UiText RoiListFilterTooltip}"
+                             automation:AutomationProperties.Name="{localization:UiText RoiListFilterAccessibleName}" />
+                    <ListBox Grid.Row="2"
                              x:Name="roiListBox" x:FieldModifier="internal"
                              Background="Transparent"
                              BorderThickness="0"
@@ -685,11 +704,15 @@
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0"
-                                               VerticalAlignment="Center"
-                                               Foreground="{StaticResource ViewerTextPrimaryBrush}"
-                                               Text="{Binding DisplayName}"
-                                               TextTrimming="CharacterEllipsis" />
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <TextBlock Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                                                   Text="{Binding DisplayName}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Foreground="{StaticResource ViewerTextSecondaryBrush}"
+                                                   FontSize="10"
+                                                   Text="{Binding DisplayTypeName}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
                                     <CheckBox Grid.Column="1"
                                               Margin="8,0,0,0"
                                               VerticalAlignment="Center"
@@ -708,6 +731,19 @@
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
+                    <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,6,0,0">
+                        <Button Padding="8,3"
+                                Margin="0,0,6,0"
+                                Content="{localization:UiText RoiListZoomButton}"
+                                Click="OnRoiListZoomClick"
+                                IsEnabled="{Binding MenuState.View.ZoomToSelectionEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                ToolTip="{localization:UiText RoiListZoomTooltip}" />
+                        <Button Padding="8,3"
+                                Content="{localization:UiText RoiListDeleteButton}"
+                                Click="OnRoiListDeleteClick"
+                                IsEnabled="{Binding MenuState.Context.DeleteSelectedEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                ToolTip="{localization:UiText RoiListDeleteTooltip}" />
+                    </StackPanel>
                 </Grid>
             </Border>
 
@@ -752,6 +788,19 @@
                 </Grid>
             </Border>
         </StackPanel>
+
+        <Button x:Name="rightOverlayToggleButton"
+                x:FieldModifier="internal"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Top"
+                Margin="0,10,10,0"
+                Padding="7,4"
+                Panel.ZIndex="96"
+                Content="◀"
+                Click="OnRightOverlayToggleClick"
+                ToolTip="{localization:UiText FloatingPanelsToggleTooltip}"
+                automation:AutomationProperties.Name="{localization:UiText FloatingPanelsToggleAccessibleName}"
+                Style="{StaticResource ViewerToolbarPrimaryButtonStyle}" />
 
         <!-- 直方图面板 -->
         <Border x:Name="histogramPanel" 
@@ -935,6 +984,14 @@
                             automation:AutomationProperties.HelpText="Ctrl+Y"
                             IsEnabled="{Binding MenuState.Context.RedoEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
                             Style="{StaticResource ViewerToolbarButtonStyle}" />
+                    <Button Content="{localization:UiText MenuCalibratePixels}"
+                            Click="OnRoiMenuCommandClick"
+                            Tag="{x:Static controls:ImageViewerRoiMenuTags.CalibratePixels}"
+                            ToolTip="{localization:UiText ToolbarCalibratePixelsTooltip}"
+                            automation:AutomationProperties.Name="{localization:UiText MenuCalibratePixels}"
+                            automation:AutomationProperties.HelpText="{localization:UiText ToolbarCalibratePixelsTooltip}"
+                            IsEnabled="{Binding MenuState.Context.CalibratePixelsEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            Style="{StaticResource ViewerToolbarPrimaryButtonStyle}" />
                     <ToggleButton Content="{localization:UiText MenuShowRoiList}"
                                   IsChecked="{Binding ShowRoiList, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
                                   Checked="OnToolbarPanelToggleChanged"
@@ -1000,6 +1057,12 @@
                             ToolTip="{localization:UiText ToolbarFitToViewTooltip}"
                             automation:AutomationProperties.HelpText="{localization:UiText ToolbarFitToViewTooltip}"
                             Style="{StaticResource ViewerToolbarButtonStyle}" />
+                    <Button Content="{localization:UiText MenuFillToView}"
+                            Click="OnToolbarViewCommandClick"
+                            Tag="{x:Static controls:ImageViewerViewMenuTags.FillToView}"
+                            ToolTip="{localization:UiText ToolbarFillToViewTooltip}"
+                            automation:AutomationProperties.HelpText="{localization:UiText ToolbarFillToViewTooltip}"
+                            Style="{StaticResource ViewerToolbarButtonStyle}" />
                     <Button Content="{localization:UiText MenuActualSize}"
                             Click="OnToolbarViewCommandClick"
                             Tag="{x:Static controls:ImageViewerViewMenuTags.ActualSize}"
@@ -1060,11 +1123,11 @@
                 HorizontalAlignment="Left"
                 VerticalAlignment="Top"
                 Margin="16"
-                Width="40"
+                MinWidth="40"
                 Height="40"
-                Padding="0"
+                Padding="10,0"
                 Panel.ZIndex="101"
-                Content="☰"
+                Content="{localization:UiText ToolbarRestoreButton}"
                 ToolTip="{localization:UiText ToolbarRestoreHint}"
                 automation:AutomationProperties.Name="{localization:UiText MenuShowToolbar}"
                 automation:AutomationProperties.HelpText="{localization:UiText ToolbarRestoreHint}"

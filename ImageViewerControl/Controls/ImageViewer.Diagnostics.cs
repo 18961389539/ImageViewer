@@ -18,7 +18,7 @@ namespace ImageViewer.Controls
         private ImageViewerBackgroundOperationObserver BackgroundOperationObserver =>
             _backgroundOperationObserver ??= new ImageViewerBackgroundOperationObserver(LogNonCriticalError);
 
-        private void ShowNonCriticalError(string title, string message, Exception ex)
+        internal void ShowNonCriticalError(string title, string message, Exception ex)
         {
             LogNonCriticalError(title, ex);
             DiagnosticErrorText = $"{title}: {message}";
@@ -85,7 +85,7 @@ namespace ImageViewer.Controls
             DiagnosticErrorText = string.Empty;
         }
 
-        private static RoiStateCommand CreateStateCommand(RoiBase roi, RoiBase oldState, RoiBase newState)
+        internal static RoiStateCommand CreateStateCommand(RoiBase roi, RoiBase oldState, RoiBase newState)
         {
             return new RoiStateCommand(roi, oldState, newState);
         }

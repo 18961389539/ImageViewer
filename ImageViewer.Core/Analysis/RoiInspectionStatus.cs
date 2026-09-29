@@ -1,3 +1,5 @@
+#pragma warning disable CS1591
+
 using System;
 
 namespace ImageViewer.Models
@@ -40,3 +42,5 @@ namespace ImageViewer.Models
         public bool HasMeasuredValue => MeasuredValue is { } value && double.IsFinite(value);
     }
 }
+
+#pragma warning restore CS1591

@@ -113,6 +113,13 @@ namespace ImageViewer.Controls
 
         public ImageViewer ImageViewer => _imageViewer;
 
+        public bool IsDirty => _imageViewer.IsDirty;
+
+        public Task SaveSessionAsync() => _imageViewer.SaveSessionAsync();
+
+        /// <summary>Marks host-provided initial content as the saved baseline.</summary>
+        public void MarkDocumentClean() => _imageViewer.MarkDocumentClean();
+
         public VolumeViewer VolumeViewer => _volumeViewer;
 
         public Volume3DViewer Volume3DViewer => _volume3DViewer;
@@ -625,7 +632,15 @@ namespace ImageViewer.Controls
         {
             if (_volume != null && (_displayMode == AdaptiveDisplayMode.Coronal || _displayMode == AdaptiveDisplayMode.Sagittal))
             {
-                await StepMprSliceAsync(e.Delta > 0 ? 1 : -1);
+                // 与轴位体数据保持一致：普通滚轮切片，Shift 快速跳层，Ctrl+滚轮
+                // 交给嵌套 ImageViewer 执行缩放。
+                if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+                {
+                    return;
+                }
+
+                int step = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) ? 5 : 1;
+                await StepMprSliceAsync((e.Delta > 0 ? 1 : -1) * step);
                 e.Handled = true;
             }
         }
@@ -759,7 +774,21 @@ namespace ImageViewer.Controls
             acceptSegmentationButton.IsEnabled = _pendingSegmentation != null;
             rejectSegmentationButton.IsEnabled = _pendingSegmentation != null;
             UpdateModeButtonVisuals();
+            UpdateGestureHint();
             UpdateDataQualityPanelVisibility();
+        }
+
+        private void UpdateGestureHint()
+        {
+            if (_volume == null || ResolveMode() == AdaptiveDisplayMode.TwoDimensional)
+            {
+                gestureHintText.Text = UiText.Get("AdaptiveGestureImage");
+                return;
+            }
+
+            gestureHintText.Text = ResolveMode() == AdaptiveDisplayMode.ThreeDimensional
+                ? UiText.Get("AdaptiveGesture3D")
+                : UiText.Get("AdaptiveGestureVolume");
         }
 
         private void UpdateModeButtonVisuals()

@@ -6,13 +6,13 @@ namespace ImageViewer.Plugins
 {
     internal static class RoiToolCatalog
     {
-        public static bool ContainsFilteredTools(IRoiPlugin plugin)
+        public static bool ContainsFilteredTools(IRoiPluginDefinition plugin)
         {
             ArgumentNullException.ThrowIfNull(plugin);
             return plugin.DrawingTools.Any(tool => !ShouldExpose(tool));
         }
 
-        public static IReadOnlyList<RoiToolDescriptor> GetVisibleTools(IRoiPlugin plugin)
+        public static IReadOnlyList<RoiToolDescriptor> GetVisibleTools(IRoiPluginDefinition plugin)
         {
             ArgumentNullException.ThrowIfNull(plugin);
             return plugin.DrawingTools
@@ -20,7 +20,7 @@ namespace ImageViewer.Plugins
                 .ToArray();
         }
 
-        public static IEnumerable<RoiToolDescriptor> OrderVisibleTools(IEnumerable<IRoiPlugin> plugins)
+        public static IEnumerable<RoiToolDescriptor> OrderVisibleTools(IEnumerable<IRoiPluginDefinition> plugins)
         {
             ArgumentNullException.ThrowIfNull(plugins);
             return plugins

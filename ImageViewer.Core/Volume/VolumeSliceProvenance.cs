@@ -1,3 +1,4 @@
+#pragma warning disable CS1591
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -49,3 +50,4 @@ namespace ImageViewer.Models
         }
     }
 }
+#pragma warning restore CS1591

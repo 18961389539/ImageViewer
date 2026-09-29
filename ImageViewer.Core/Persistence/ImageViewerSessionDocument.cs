@@ -1,10 +1,12 @@
+#pragma warning disable CS1591
 using System;
 using System.Text.Json.Serialization;
 using ImageViewer.Models;
 
 namespace ImageViewer.Services
 {
-    internal sealed class ImageViewerSessionDocument
+    /// <summary>Portable session envelope shared by persistence and UI hosts.</summary>
+    public sealed class ImageViewerSessionDocument
     {
         /// <summary>
         /// 会话文档结构版本。
@@ -42,3 +44,4 @@ namespace ImageViewer.Services
         public CameraCalibration? Calibration { get; set; }
     }
 }
+#pragma warning restore CS1591

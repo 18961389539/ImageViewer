@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
+using CoreCircularDetectionResult = ImageViewer.Core.Analysis.CircularCaliperDetectionResult;
 using ImageViewer.Models;
 
 namespace ImageViewer.Services
@@ -16,6 +17,14 @@ namespace ImageViewer.Services
         public static CircularCaliperQualityAssessment Evaluate(
             CircularCaliperMeasureRoi caliper,
             CircularCaliperDetectionResult result,
+            ImageAnalysisQualityProfile? profile = null)
+        {
+            return Evaluate(caliper, result.ToCore(), profile);
+        }
+
+        public static CircularCaliperQualityAssessment Evaluate(
+            CircularCaliperMeasureRoi caliper,
+            CoreCircularDetectionResult result,
             ImageAnalysisQualityProfile? profile = null)
         {
             ArgumentNullException.ThrowIfNull(caliper);
@@ -80,7 +89,7 @@ namespace ImageViewer.Services
                 reason);
         }
 
-        private static double ComputeAngularCoverage(IReadOnlyList<Point> points, Point center)
+        private static double ComputeAngularCoverage(IReadOnlyList<PointD> points, PointD center)
         {
             if (points.Count < 3)
             {

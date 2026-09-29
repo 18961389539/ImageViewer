@@ -6,6 +6,7 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -19,6 +20,8 @@ namespace ImageViewer.Controls
     {
         private const double ToolbarCompactWidthThreshold = 760;
         private const double ToolbarCompactHeightThreshold = 420;
+        private bool _rightOverlayPanelsCollapsed;
+        private ICollectionView? _roiListView;
 
         private void InitializeEventHandlers()
         {
@@ -69,6 +72,9 @@ namespace ImageViewer.Controls
             string launcherHint = ShowToolbar
                 ? UiText.Get("ToolbarCompactHint")
                 : UiText.Get("ToolbarRestoreHint");
+            toolbarCompactButton.Content = ShowToolbar
+                ? UiText.Get("ToolbarCommandMenuButton")
+                : UiText.Get("ToolbarRestoreButton");
             toolbarCompactButton.ToolTip = launcherHint;
             toolbarCompactButton.SetValue(System.Windows.Automation.AutomationProperties.HelpTextProperty, launcherHint);
         }
@@ -92,6 +98,8 @@ namespace ImageViewer.Controls
 
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
+            _roiListView ??= new ListCollectionView(ViewerState.AllRois);
+            roiListBox.ItemsSource = _roiListView;
             UpdateStatusBar();
             _controlComposition.SessionController.StartAutoSave();
             _externalImageSourceBindingController.Refresh();
@@ -552,7 +560,7 @@ namespace ImageViewer.Controls
 
         private void OnZoomOutClick(object sender, RoutedEventArgs e) => ZoomAtViewportCenter(0.8);
 
-        private void ZoomAtViewportCenter(double factor)
+        internal void ZoomAtViewportCenter(double factor)
         {
             ImageViewerViewportState state = _controlComposition.ViewportController.CurrentState;
             if (state.Scale <= 0 || rootGrid.ActualWidth <= 0 || rootGrid.ActualHeight <= 0)
@@ -567,7 +575,7 @@ namespace ImageViewer.Controls
             _controlComposition.ViewportController.ZoomAt(imagePoint, factor);
         }
 
-        private void UpdateContextMenuState() => _contextMenuController.UpdateState();
+        internal void UpdateContextMenuState() => _contextMenuController.UpdateState();
 
         /// <summary>
         /// 更新常驻状态栏：显示当前图像像素尺寸与文件路径；无图像时显示"未加载数据"。
@@ -627,7 +635,9 @@ namespace ImageViewer.Controls
                     || Math.Abs(PixelSize - 1.0) > 1e-9
                     || !string.Equals(unit, UiText.Get("InfoUnitPixels"), StringComparison.OrdinalIgnoreCase));
 
-            if (!isCalibrated)
+            // A host may configure calibration before assigning an image. Keep that
+            // state visible so the calibration UI is not coupled to image loading.
+            if (ImageSource is null && !isCalibrated)
             {
                 calibrationBadge.Visibility = Visibility.Collapsed;
                 calibrationBadgeTextBlock.Text = string.Empty;
@@ -635,8 +645,10 @@ namespace ImageViewer.Controls
                 return;
             }
 
-            string text = UiText.FormatInvariant("CalibrationBadgeText", PixelSize, unit);
-            if (Calibration is not null)
+            string text = isCalibrated
+                ? UiText.FormatInvariant("CalibrationBadgeText", PixelSize, unit)
+                : UiText.Get("CalibrationBadgeUncalibratedText");
+            if (isCalibrated && Calibration is not null)
             {
                 text += " " + UiText.Get("CalibrationBadgeDistortionSuffix");
             }
@@ -714,6 +726,58 @@ namespace ImageViewer.Controls
 
         private void OnToolbarPanelToggleChanged(object sender, RoutedEventArgs e)
         {
+            UpdateContextMenuState();
+        }
+
+        private void OnRightOverlayToggleClick(object sender, RoutedEventArgs e)
+        {
+            _rightOverlayPanelsCollapsed = !_rightOverlayPanelsCollapsed;
+            UpdateRightOverlayPanelLayout();
+        }
+
+        private void UpdateRightOverlayPanelLayout()
+        {
+            rightOverlayPanel.Visibility = _rightOverlayPanelsCollapsed ? Visibility.Collapsed : Visibility.Visible;
+            rightOverlayToggleButton.Content = _rightOverlayPanelsCollapsed ? "▶" : "◀";
+        }
+
+        private void OnRoiFilterTextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_roiListView is null)
+            {
+                return;
+            }
+
+            ICollectionView view = _roiListView;
+            string query = roiFilterTextBox.Text.Trim();
+            string[] words = query.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries);
+            view.Filter = item => item is RoiBase roi && (words.Length == 0 || MatchesAllWords(roi, words));
+            view.Refresh();
+        }
+
+        private static bool MatchesAllWords(RoiBase roi, IReadOnlyList<string> words)
+        {
+            string searchable = $"{roi.DisplayName} {roi.DisplayTypeName} {roi.Label}";
+            foreach (string word in words)
+            {
+                if (!searchable.Contains(word, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private void OnRoiListZoomClick(object sender, RoutedEventArgs e)
+        {
+            _viewCommandController.Execute(ImageViewerViewCommand.ZoomToSelection);
+            UpdateContextMenuState();
+        }
+
+        private void OnRoiListDeleteClick(object sender, RoutedEventArgs e)
+        {
+            _roiMenuCommandController.Execute(ImageViewerRoiMenuCommand.DeleteSelected);
             UpdateContextMenuState();
         }
 

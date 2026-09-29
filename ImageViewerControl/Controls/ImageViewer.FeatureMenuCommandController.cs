@@ -9,29 +9,45 @@ using ImageViewer.ViewModels;
 
 namespace ImageViewer.Controls
 {
-    internal sealed class ImageViewerFeatureMenuCommandDependencies
+    internal interface IImageViewerFeatureAnalysisCapability
     {
-        public required FrameworkElement RenderRoot { get; init; }
-        public required Func<RoiBase?> GetSelectedRoi { get; init; }
-        public required Func<BitmapSource?> GetAnalysisBitmapSource { get; init; }
-        public required Func<RoiBase, RoiBase, RoiBase, IUndoRedoCommand?> CreateStateCommand { get; init; }
-        public required Action<IUndoRedoCommand> ExecuteUndoRedoCommand { get; init; }
-        public required Action DrawRois { get; init; }
-        public required Func<string?> ShowSaveSnapshotDialog { get; init; }
-        public required Func<string?> ShowSaveAnalysisCsvDialog { get; init; }
-        public required Func<string[]> ShowOpenBatchImageFilesDialog { get; init; }
-        public required Action<string, string> ShowReadOnlyText { get; init; }
-        public required Func<IReadOnlyList<RoiBase>> GetAllRois { get; init; }
-        public required Func<double> GetPixelSize { get; init; }
-        public required Func<string> GetPhysicalUnit { get; init; }
-        public required Func<CameraCalibration?> GetCalibration { get; init; }
-        public required Func<string?> GetCurrentImagePath { get; init; }
-        public required Func<RoiPluginRegistry> GetPluginRegistry { get; init; }
-        public required Func<IReadOnlyDictionary<string, string>> GetRenderSettings { get; init; }
-        public Func<ImageAnalysisQualityProfile> GetQualityProfile { get; init; } = static () => ImageAnalysisQualityProfile.Default;
-        public required Action<string, string, Exception> ShowNonCriticalError { get; init; }
-        public required Action<string, StatusHintKind> ShowStatusHint { get; init; }
-        public required Action UpdateContextMenuState { get; init; }
+        RoiBase? SelectedRoi { get; }
+        BitmapSource? AnalysisBitmapSource { get; }
+        ImageAnalysisQualityProfile QualityProfile { get; }
+    }
+
+    internal interface IImageViewerFeatureMutationCapability
+    {
+        IUndoRedoCommand? CreateStateCommand(RoiBase roi, RoiBase oldState, RoiBase newState);
+        void ExecuteUndoRedoCommand(IUndoRedoCommand command);
+        void DrawRois();
+    }
+
+    internal interface IImageViewerFeatureExportDataCapability
+    {
+        FrameworkElement RenderRoot { get; }
+        IReadOnlyList<RoiBase> AllRois { get; }
+        double PixelSize { get; }
+        string PhysicalUnit { get; }
+        CameraCalibration? Calibration { get; }
+        string? CurrentImagePath { get; }
+        RoiPluginRegistry PluginRegistry { get; }
+        IReadOnlyDictionary<string, string> RenderSettings { get; }
+    }
+
+    internal interface IImageViewerFeatureDialogCapability
+    {
+        string? ShowSaveSnapshotDialog();
+        string? ShowSaveAnalysisCsvDialog();
+        string[] ShowOpenBatchImageFilesDialog();
+        void ShowReadOnlyText(string title, string text);
+    }
+
+    internal interface IImageViewerFeatureFeedbackCapability
+    {
+        void ShowNonCriticalError(string title, string message, Exception exception);
+        void ShowStatusHint(string message, StatusHintKind kind);
+        void UpdateContextMenuState();
     }
 
     internal interface IImageViewerFeatureMenuCommandHost

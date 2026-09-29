@@ -9,13 +9,6 @@ using ImageViewer.Models;
 
 namespace ImageViewer.Services
 {
-    public enum VolumeSliceOrientation
-    {
-        Axial,
-        Coronal,
-        Sagittal
-    }
-
     public sealed class VolumeSliceService
     {
         private static readonly ConditionalWeakTable<VolumeData, CachedIntensityVolume> IntensityCaches = new();

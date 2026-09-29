@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using ImageViewer.Localization;
 
 namespace ImageViewer.Controls
@@ -21,42 +20,11 @@ namespace ImageViewer.Controls
 
                 return new ImageViewerFeatureMenuCommandController(
                     new ImageViewerFeatureMenuCommandHostAdapter(
-                        new ImageViewerFeatureMenuCommandDependencies
-                        {
-                            RenderRoot = _owner.rootGrid,
-                            GetSelectedRoi = () => _owner.ViewerState.SelectedRoi,
-                            GetAnalysisBitmapSource = _owner.GetAnalysisBitmapSource,
-                            CreateStateCommand = ImageViewer.CreateStateCommand,
-                            ExecuteUndoRedoCommand = command => _owner.ViewerState.UndoRedo.Execute(command),
-                            DrawRois = () => _owner.DrawRois(),
-                            ShowSaveSnapshotDialog = dialogWorkflowService.ShowSaveSnapshotDialog,
-                            ShowSaveAnalysisCsvDialog = dialogWorkflowService.ShowSaveAnalysisCsvDialog,
-                            ShowOpenBatchImageFilesDialog = () => _owner.FileDialogService.ShowOpenImageFilesDialog(System.Windows.Window.GetWindow(_owner)),
-                            ShowReadOnlyText = dialogWorkflowService.ShowReadOnlyText,
-                            GetAllRois = () => _owner.ViewerState.AllRois,
-                            GetPixelSize = () => _owner.PixelSize,
-                            GetPhysicalUnit = () => _owner.PhysicalUnit,
-                            GetCalibration = () => _owner.Calibration,
-                            GetCurrentImagePath = () => _owner._controlComposition.ViewportController.TryGetCurrentImagePath(),
-                            GetPluginRegistry = () => _owner.PluginRegistry,
-                            GetRenderSettings = () => new Dictionary<string, string>(StringComparer.Ordinal)
-                            {
-                                ["enableImagePyramid"] = _owner.RuntimeOptions.EnableImagePyramid.ToString(),
-                                ["autoSelectPyramidLevel"] = _owner.RuntimeOptions.AutoSelectPyramidLevel.ToString(),
-                                ["enableTiledRendering"] = _owner.RuntimeOptions.EnableTiledRendering.ToString(),
-                                ["prefetchAdjacentTiles"] = _owner.RuntimeOptions.PrefetchAdjacentTiles.ToString(),
-                                ["autoTuneLargeImageRendering"] = _owner.RuntimeOptions.AutoTuneLargeImageRendering.ToString(),
-                                ["tileCacheMaximumMegabytes"] = _owner.RuntimeOptions.TileCacheMaximumMegabytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                                ["tilePrefetchRadius"] = _owner.RuntimeOptions.TilePrefetchRadius.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                                ["enableGpuRendering"] = _owner.EnableGpuRendering.ToString(),
-                                ["pseudoColorPalette"] = _owner.PseudoColorPalette.ToString(),
-                                ["enableAsyncAnalysis"] = _owner.RuntimeOptions.EnableAsyncAnalysis.ToString()
-                            },
-                            GetQualityProfile = () => _owner.QualityProfile,
-                            ShowNonCriticalError = _owner.ShowNonCriticalError,
-                            ShowStatusHint = (message, kind) => _owner.ShowStatusHint(message, kind),
-                            UpdateContextMenuState = _owner.UpdateContextMenuState
-                        }));
+                        new ImageViewerFeatureAnalysisCapability(_owner),
+                        new ImageViewerFeatureMutationCapability(_owner),
+                        new ImageViewerFeatureExportDataCapability(_owner),
+                        new ImageViewerFeatureDialogCapability(_owner, dialogWorkflowService),
+                        new ImageViewerFeatureFeedbackCapability(_owner)));
             }
 
             public ImageViewerRoiMenuCommandController CreateRoiMenuCommandController(
@@ -70,90 +38,24 @@ namespace ImageViewer.Controls
 
                 return new ImageViewerRoiMenuCommandController(
                     new ImageViewerRoiMenuCommandHostAdapter(
-                        new ImageViewerRoiMenuCommandDependencies
-                        {
-                            GetSelectedRoi = () => _owner.ViewerState.SelectedRoi,
-                            RoiEditController = roiEditController,
-                            CalibrationController = calibrationController,
-                            ShowRoiProperties = dialogWorkflowService.ShowRoiProperties,
-                            ShowCaliperSettings = dialogWorkflowService.ShowCaliperSettings,
-                            UpdateContextMenuState = _owner.UpdateContextMenuState
-                        }));
+                        new ImageViewerRoiSelectionCapability(_owner),
+                        new ImageViewerRoiEditingCapability(roiEditController, calibrationController, dialogWorkflowService),
+                        new ImageViewerContextMenuCapability(_owner)));
             }
 
             public ImageViewerViewCommandController CreateViewCommandController(ViewportController viewportController)
             {
                 ArgumentNullException.ThrowIfNull(viewportController);
-                return new ImageViewerViewCommandController(new ImageViewerViewCommandHostAdapter(new ImageViewerViewCommandDependencies
-                {
-                    GetShowPixelGrid = () => _owner.ShowPixelGrid,
-                    SetShowPixelGrid = value => _owner.ShowPixelGrid = value,
-                    GetShowCrosshair = () => _owner.ShowCrosshair,
-                    SetShowCrosshair = value => _owner.ShowCrosshair = value,
-                    GetShowCaliperScores = () => _owner.ShowCaliperScores,
-                    SetShowCaliperScores = value => _owner.ShowCaliperScores = value,
-                    GetShowInfoPanel = () => _owner.ShowInfoPanel,
-                    SetShowInfoPanel = value => _owner.ShowInfoPanel = value,
-                    GetShowHistogram = () => _owner.ShowHistogram,
-                    SetShowHistogram = value => _owner.ShowHistogram = value,
-                    GetShowProfile = () => _owner.ShowProfile,
-                    SetShowProfile = value => _owner.ShowProfile = value,
-                    GetShowScaleBar = () => _owner.ShowScaleBar,
-                    SetShowScaleBar = value => _owner.ShowScaleBar = value,
-                    GetShowRoiList = () => _owner.ShowRoiList,
-                    SetShowRoiList = value => _owner.ShowRoiList = value,
-                    GetShowToolbar = () => _owner.ShowToolbar,
-                    SetShowToolbar = value => _owner.ShowToolbar = value,
-                    GetShowSnapGrid = () => _owner.ShowSnapGrid,
-                    SetShowSnapGrid = value => _owner.ShowSnapGrid = value,
-                    GetEnableSnapToGrid = () => _owner.EnableSnapToGrid,
-                    SetEnableSnapToGrid = value => _owner.EnableSnapToGrid = value,
-                    FitToView = () =>
-                    {
-                        viewportController.FitToView();
-                        _owner.ShowStatusHint(UiText.Get("StatusFitToView"), StatusHintKind.Success);
-                    },
-                    ResetView = () =>
-                    {
-                        viewportController.ResetView();
-                        _owner.ResetImageOrientation();
-                        _owner.ShowStatusHint(UiText.Get("StatusResetViewDone"), StatusHintKind.Success);
-                    },
-                    ShowFullImage = () =>
-                    {
-                        viewportController.ShowFullImage();
-                        _owner.ShowStatusHint(UiText.Get("StatusShowFullImage"), StatusHintKind.Success);
-                    },
-                    SetActualSize = () =>
-                    {
-                        viewportController.SetActualSize();
-                        _owner.ShowStatusHint(UiText.Get("StatusActualSize"), StatusHintKind.Success);
-                    },
-                    ZoomIn = () => _owner.ZoomAtViewportCenter(1.25),
-                    ZoomOut = () => _owner.ZoomAtViewportCenter(0.8),
-                    ZoomToSelection = viewportController.ZoomToSelection,
-                    RotateLeft = _owner.RotateImageLeft,
-                    RotateRight = _owner.RotateImageRight,
-                    FlipHorizontal = _owner.FlipImageHorizontal,
-                    FlipVertical = _owner.FlipImageVertical
-                }));
+                var options = new ImageViewerViewOptionsAdapter(_owner);
+                var viewport = new ImageViewerViewportOperationsAdapter(_owner, viewportController);
+                var imageTransform = new ImageViewerImageTransformOperationsAdapter(_owner);
+                var host = new ImageViewerViewCommandHostAdapter(options, viewport, imageTransform);
+                return new ImageViewerViewCommandController(host);
             }
 
             public ImageViewerModeCommandController CreateModeCommandController()
             {
-                return new ImageViewerModeCommandController(new ImageViewerModeCommandHostAdapter(new ImageViewerModeCommandDependencies
-                {
-                    StartRectangleMode = _owner.StartRoiMode,
-                    StartEllipseMode = _owner.StartEllipseRoiMode,
-                    StartCircleMode = _owner.StartCircleRoiMode,
-                    StartPolygonMode = _owner.StartPolygonRoiMode,
-                    StartPolylineMode = () => _owner.StartPolylineRoiMode(freehand: false),
-                    StartFreehandMode = () => _owner.StartPolylineRoiMode(freehand: true),
-                    StartPointAnnotationMode = _owner.StartPointAnnotationMode,
-                    StartTextAnnotationMode = _owner.StartTextAnnotationMode,
-                    StartLineMeasureMode = _owner.StartLineMeasureMode,
-                    StartAngleMeasureMode = _owner.StartAngleMeasureMode
-                }));
+                return new ImageViewerModeCommandController(new ImageViewerModeCommandHostAdapter(_owner));
             }
         }
     }

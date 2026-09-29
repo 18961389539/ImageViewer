@@ -98,6 +98,7 @@ namespace ImageViewer.Controls
         private readonly IImageViewerAnalysisHost _host;
         private readonly IImageViewerAnalysisUiFacade _uiFacade;
         private readonly IImageViewerProfileTargetResolver _profileTargetResolver;
+        private readonly IImageViewerAnalysisPipeline _analysisPipeline;
         internal readonly IImageViewerAnalysisErrorSink _errorSink;
         private ImageViewerBackgroundOperationObserver? _backgroundOperationObserver;
 
@@ -105,11 +106,13 @@ namespace ImageViewer.Controls
             IImageViewerAnalysisHost host,
             IImageViewerAnalysisUiFacade uiFacade,
             IImageViewerProfileTargetResolver profileTargetResolver,
-            IImageViewerAnalysisErrorSink errorSink)
+            IImageViewerAnalysisErrorSink errorSink,
+            IImageViewerAnalysisPipeline? analysisPipeline = null)
         {
             _host = host;
             _uiFacade = uiFacade;
             _profileTargetResolver = profileTargetResolver;
+            _analysisPipeline = analysisPipeline ?? new ImageViewerAnalysisPipeline();
             _errorSink = errorSink;
         }
 
@@ -309,7 +312,7 @@ namespace ImageViewer.Controls
                 try
                 {
                     var stopwatch = Stopwatch.StartNew();
-                    int[] histogram = ImageAnalysisService.CreateHistogram(bitmap, _host.HistogramBinCount);
+                    int[] histogram = await _analysisPipeline.CreateHistogramAsync(bitmap, _host.HistogramBinCount);
                     _host.AnalysisState.LastHistogramDuration = stopwatch.Elapsed;
                     _uiFacade.PresentHistogram(new ImageViewerHistogramOutput(histogram, _host.HistogramBinCount));
                 }
@@ -378,7 +381,7 @@ namespace ImageViewer.Controls
                 try
                 {
                     var stopwatch = Stopwatch.StartNew();
-                    ushort[] profileData = ImageAnalysisService.CreateProfile16(bitmap, targetLine.P1.ToWpfPoint(), targetLine.P2.ToWpfPoint());
+                    ushort[] profileData = await _analysisPipeline.CreateProfile16Async(bitmap, targetLine.P1.ToWpfPoint(), targetLine.P2.ToWpfPoint());
                     _host.AnalysisState.LastProfileDuration = stopwatch.Elapsed;
                     _uiFacade.PresentProfile(new ImageViewerProfileOutput(profileData, GetProfileMaximum(bitmap)));
                 }

@@ -13,9 +13,18 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="WindowTitle" xml:space="preserve"><value>ImageViewer Demo</value></data>
-  <data name="ToolbarHint" xml:space="preserve"><value>滚轮缩放，左键拖拽平移，右键打开功能菜单。</value></data>
+  <data name="ToolbarHint" xml:space="preserve"><value>滚轮缩放；中键拖拽平移；左键选择或编辑 ROI；空白处右键打开菜单，ROI 上右键查看属性。</value></data>
   <data name="OpenImageButton" xml:space="preserve"><value>打开图像文件</value></data>
   <data name="OpenVolumeButton" xml:space="preserve"><value>打开体数据</value></data>
+  <data name="CancelOpenButton" xml:space="preserve"><value>取消</value></data>
+  <data name="ImageLoadingStatus" xml:space="preserve"><value>正在读取图像…</value></data>
+  <data name="VolumeInspectingStatus" xml:space="preserve"><value>正在检查体数据切片和排序信息…</value></data>
+  <data name="VolumeLoadingProgress" xml:space="preserve"><value>正在读取切片 {0}/{1}…</value></data>
+  <data name="VolumeAssemblingStatus" xml:space="preserve"><value>正在组装体数据…</value></data>
+  <data name="OpenVolumeDimensionMismatch" xml:space="preserve"><value>第 {0} 张切片尺寸为 {1} × {2}，与第一张切片的 {3} × {4} 不一致。</value></data>
+  <data name="OpenVolumeMemoryWarning" xml:space="preserve"><value>这组切片预计需要约 {0} MB 内存，可能影响交互流畅度。仍要继续加载吗？</value></data>
+  <data name="OpenVolumeSpacingWarning" xml:space="preserve"><value>侧车元数据中的 {0} 方向体素间距不完整或不一致，将使用首个有效值；请确认导入后的间距摘要。</value></data>
+  <data name="OpenCancelledStatus" xml:space="preserve"><value>已取消打开操作</value></data>
   <data name="OpenImageDialogTitle" xml:space="preserve"><value>选择图像文件</value></data>
   <data name="OpenImageDialogFilter" xml:space="preserve"><value>图像文件|*.png;*.jpg;*.jpeg;*.bmp;*.tif;*.tiff|所有文件|*.*</value></data>
   <data name="OpenVolumeDialogTitle" xml:space="preserve"><value>选择体数据切片（可多选）</value></data>
@@ -31,6 +40,11 @@
 {6}
 
 请确认这些文件属于同一序列，并按此顺序加载。</value></data>
-  <data name="OpenVolumeLoaded" xml:space="preserve"><value>已加载 {0} 层体数据（{1} × {2}）</value></data>
+  <data name="OpenVolumeLoaded" xml:space="preserve"><value>已加载 {0} 层体数据（{1} × {2}），间距 {3:0.###} × {4:0.###} × {5:0.###} mm</value></data>
+  <data name="OpenVolumeSourceSummary" xml:space="preserve"><value>排序依据：{0}；间距来源：X={1}，Y={2}，Z={3}</value></data>
+  <data name="OpenVolumeWarningSummary" xml:space="preserve"><value>导入警告：{0}</value></data>
   <data name="OpenImageErrorTitle" xml:space="preserve"><value>无法打开图像文件</value></data>
+  <data name="UnsavedCloseTitle" xml:space="preserve"><value>有未保存的更改</value></data>
+  <data name="UnsavedCloseMessage" xml:space="preserve"><value>当前图像或 ROI 有未保存的更改。关闭前是否保存？</value></data>
+  <data name="UnsavedCloseSaveFailed" xml:space="preserve"><value>保存未完成，窗口仍保持打开。</value></data>
 </root>

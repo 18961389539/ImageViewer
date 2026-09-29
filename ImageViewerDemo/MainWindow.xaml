@@ -10,6 +10,7 @@
     Width="1100"
     Height="720"
     Background="#0A0F16"
+    Closing="OnMainWindowClosing"
     mc:Ignorable="d">
     <Grid Margin="12">
         <Grid.RowDefinitions>
@@ -29,14 +30,27 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <TextBlock
-                    VerticalAlignment="Center"
-                    Foreground="#F5F8FC"
-                    FontSize="14"
-                    Text="{localization:DemoText ToolbarHint}" />
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock
+                        Foreground="#F5F8FC"
+                        FontSize="14"
+                        Text="{localization:DemoText ToolbarHint}" />
+                    <StackPanel x:Name="openProgressPanel" Margin="0,6,0,0" Visibility="Collapsed">
+                        <TextBlock x:Name="openStatusText" Foreground="#AAB5C3" FontSize="12" />
+                        <ProgressBar x:Name="openProgressBar" Height="5" Margin="0,4,0,0" Minimum="0" Maximum="100" />
+                    </StackPanel>
+                    <TextBlock
+                        x:Name="openSummaryText"
+                        Margin="0,6,0,0"
+                        Foreground="#AAB5C3"
+                        FontSize="12"
+                        TextWrapping="Wrap"
+                        Visibility="Collapsed" />
+                </StackPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
                     <Button
+                        x:Name="openImageButton"
                         Padding="12,6"
                         Click="OnOpenImageClick"
                         Background="#69AFFF"
@@ -44,6 +58,7 @@
                         Content="{localization:DemoText OpenImageButton}"
                         Foreground="#11151C" />
                     <Button
+                        x:Name="openVolumeButton"
                         Margin="8,0,0,0"
                         Padding="12,6"
                         Click="OnOpenVolumeClick"
@@ -51,6 +66,13 @@
                         BorderBrush="#69AFFF"
                         Content="{localization:DemoText OpenVolumeButton}"
                         Foreground="#F5F8FC" />
+                    <Button
+                        x:Name="cancelOpenButton"
+                        Margin="8,0,0,0"
+                        Padding="12,6"
+                        Click="OnCancelOpenClick"
+                        Content="{localization:DemoText CancelOpenButton}"
+                        Visibility="Collapsed" />
                 </StackPanel>
             </Grid>
         </Border>

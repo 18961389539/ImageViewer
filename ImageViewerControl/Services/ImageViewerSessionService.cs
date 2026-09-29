@@ -63,7 +63,7 @@ namespace ImageViewer.Services
                 Calibration = snapshot.Calibration
             };
 
-            return JsonSerializer.Serialize(session, ImageViewerJsonSerializationContext.Default.ImageViewerSessionDocument);
+            return JsonSerializer.Serialize(session, ImageViewer.Persistence.ImageViewerCoreJsonSerializationContext.Default.ImageViewerSessionDocument);
         }
 
         public ImageViewerSessionData LoadFromFile(string filePath, RoiPluginRegistry? pluginRegistry = null)
@@ -85,7 +85,7 @@ namespace ImageViewer.Services
         public ImageViewerSessionData LoadFromJson(string sessionJson, string? sessionBaseDirectory = null, RoiPluginRegistry? pluginRegistry = null)
         {
             ArgumentNullException.ThrowIfNull(pluginRegistry);
-            var session = JsonSerializer.Deserialize(sessionJson, ImageViewerJsonSerializationContext.Default.ImageViewerSessionDocument)
+            var session = JsonSerializer.Deserialize(sessionJson, ImageViewer.Persistence.ImageViewerCoreJsonSerializationContext.Default.ImageViewerSessionDocument)
                 ?? new ImageViewerSessionDocument();
             ValidateSessionVersion(session.Version);
             var roiData = RoiPersistenceService.CreateRois(session.RoiDocument ?? new RoiDocument(), pluginRegistry);

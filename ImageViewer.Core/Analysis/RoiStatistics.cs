@@ -1,3 +1,5 @@
+#pragma warning disable CS1591
+
 namespace ImageViewer.Models
 {
     public sealed class RoiStatistics
@@ -9,3 +11,5 @@ namespace ImageViewer.Models
         public double StandardDeviation { get; init; }
     }
 }
+
+#pragma warning restore CS1591

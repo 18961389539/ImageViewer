@@ -16,42 +16,11 @@ namespace ImageViewerControl.Tests
             {
                 using var viewer = new ImageViewer.Controls.ImageViewer();
                 ImageViewerControlComposition composition = GetComposition(viewer);
-                var controller = new ImageViewerViewCommandController(new ImageViewerViewCommandHostAdapter(new ImageViewerViewCommandDependencies
-                {
-                    GetShowPixelGrid = () => viewer.ShowPixelGrid,
-                    SetShowPixelGrid = value => viewer.ShowPixelGrid = value,
-                    GetShowCrosshair = () => viewer.ShowCrosshair,
-                    SetShowCrosshair = value => viewer.ShowCrosshair = value,
-                    GetShowCaliperScores = () => viewer.ShowCaliperScores,
-                    SetShowCaliperScores = value => viewer.ShowCaliperScores = value,
-                    GetShowInfoPanel = () => viewer.ShowInfoPanel,
-                    SetShowInfoPanel = value => viewer.ShowInfoPanel = value,
-                    GetShowHistogram = () => viewer.ShowHistogram,
-                    SetShowHistogram = value => viewer.ShowHistogram = value,
-                    GetShowProfile = () => viewer.ShowProfile,
-                    SetShowProfile = value => viewer.ShowProfile = value,
-                    GetShowScaleBar = () => viewer.ShowScaleBar,
-                    SetShowScaleBar = value => viewer.ShowScaleBar = value,
-                    GetShowRoiList = () => viewer.ShowRoiList,
-                    SetShowRoiList = value => viewer.ShowRoiList = value,
-                    GetShowToolbar = () => viewer.ShowToolbar,
-                    SetShowToolbar = value => viewer.ShowToolbar = value,
-                    GetShowSnapGrid = () => viewer.ShowSnapGrid,
-                    SetShowSnapGrid = value => viewer.ShowSnapGrid = value,
-                    GetEnableSnapToGrid = () => viewer.EnableSnapToGrid,
-                    SetEnableSnapToGrid = value => viewer.EnableSnapToGrid = value,
-                    FitToView = composition.ViewportController.FitToView,
-                    ResetView = composition.ViewportController.ResetView,
-                    ShowFullImage = composition.ViewportController.ShowFullImage,
-                    SetActualSize = composition.ViewportController.SetActualSize,
-                    ZoomIn = static () => { },
-                    ZoomOut = static () => { },
-                    ZoomToSelection = composition.ViewportController.ZoomToSelection,
-                    RotateLeft = static () => { },
-                    RotateRight = static () => { },
-                    FlipHorizontal = static () => { },
-                    FlipVertical = static () => { }
-                }));
+                var controller = new ImageViewerViewCommandController(
+                    new ImageViewerViewCommandHostAdapter(
+                        new ImageViewerViewOptionsAdapter(viewer),
+                        new ImageViewerViewportOperationsAdapter(viewer, composition.ViewportController),
+                        new ImageViewerImageTransformOperationsAdapter(viewer)));
                 bool initial = viewer.ShowInfoPanel;
 
                 controller.Execute(ImageViewerViewCommand.ToggleInfoPanel);
@@ -72,20 +41,13 @@ namespace ImageViewerControl.Tests
                 int smartDisplaySuggestionCount = 0;
                 var controller = new ImageViewerAnalysisCommandController(
                     new ImageViewerAnalysisCommandHostAdapter(
-                        new ImageViewerAnalysisCommandDependencies
-                        {
-                            RuntimeOptions = viewer.RuntimeOptions,
-                            GetEnableGpuRendering = () => viewer.EnableGpuRendering,
-                            SetEnableGpuRendering = value => viewer.EnableGpuRendering = value,
-                            UpdateRenderedImage = () => updateRenderedImageCount++,
-                            RefreshAnalysis = composition.AnalysisController.HandleRefreshAnalysisRequested,
-                            ClearAnalysisCache = composition.AnalysisController.HandleClearAnalysisCacheRequested,
-                            ResetPyramidToBaseLevel = () => { composition.AnalysisController.ClearRenderCache(); analysisState.ResetPyramidToBaseLevel(); },
-                            RebuildPyramidIfNeeded = () => { },
-                            SetPseudoColorPalette = value => viewer.PseudoColorPalette = value,
-                            ShowSmartDisplaySuggestion = () => smartDisplaySuggestionCount++,
-                            ShowRenderStatus = () => { }
-                        }));
+                        new ImageViewerAnalysisOptionsAdapter(viewer),
+                        new CountingAnalysisOperations(
+                            viewer,
+                            () => updateRenderedImageCount++,
+                            () => smartDisplaySuggestionCount++,
+                            analysisState,
+                            composition.AnalysisController)));
                 bool initialGpuRendering = viewer.EnableGpuRendering;
 
                 controller.Execute(ImageViewerAnalysisCommand.ToggleGpuRendering);
@@ -110,15 +72,9 @@ namespace ImageViewerControl.Tests
                 RoiBase? shownRoi = null;
                 var controller = new ImageViewerRoiMenuCommandController(
                     new ImageViewerRoiMenuCommandHostAdapter(
-                        new ImageViewerRoiMenuCommandDependencies
-                        {
-                            GetSelectedRoi = () => viewer.ViewerState.SelectedRoi,
-                            RoiEditController = composition.RoiEditController,
-                            CalibrationController = composition.CalibrationController,
-                            ShowRoiProperties = roi => shownRoi = roi,
-                            ShowCaliperSettings = _ => { },
-                            UpdateContextMenuState = () => { }
-                        }));
+                        new ImageViewerRoiSelectionCapability(viewer),
+                        new TestRoiEditingCapability(roi => shownRoi = roi, _ => { }),
+                        new NoOpContextMenuCapability()));
 
                 viewer.ViewerState.SelectedRoi = selectedRoi;
                 controller.Execute(ImageViewerRoiMenuCommand.EditProperties);
@@ -138,15 +94,9 @@ namespace ImageViewerControl.Tests
                 RoiBase? shownRoi = null;
                 var controller = new ImageViewerRoiMenuCommandController(
                     new ImageViewerRoiMenuCommandHostAdapter(
-                        new ImageViewerRoiMenuCommandDependencies
-                        {
-                            GetSelectedRoi = () => viewer.ViewerState.SelectedRoi,
-                            RoiEditController = composition.RoiEditController,
-                            CalibrationController = composition.CalibrationController,
-                            ShowRoiProperties = _ => { },
-                            ShowCaliperSettings = roi => shownRoi = roi,
-                            UpdateContextMenuState = () => { }
-                        }));
+                        new ImageViewerRoiSelectionCapability(viewer),
+                        new TestRoiEditingCapability(_ => { }, roi => shownRoi = roi),
+                        new NoOpContextMenuCapability()));
 
                 viewer.ViewerState.SelectedRoi = selectedRoi;
                 controller.Execute(ImageViewerRoiMenuCommand.EditCaliperSettings);
@@ -164,13 +114,9 @@ namespace ImageViewerControl.Tests
                 ImageViewerControlComposition composition = GetComposition(viewer);
                 var controller = new ImageViewerFileMenuCommandController(
                     new ImageViewerFileMenuCommandHostAdapter(
-                        new ImageViewerFileMenuCommandDependencies
-                        {
-                            ShowOpenImageDialogAsync = composition.DialogWorkflowService.OpenImageAsync,
-                            SessionController = composition.SessionController,
-                            RoiPersistenceController = composition.RoiPersistenceController,
-                            UpdateContextMenuState = () => { }
-                        }));
+                        new ImageViewerFileDialogCapability(composition.DialogWorkflowService),
+                        new ImageViewerFileOperationsCapability(composition.SessionController, composition.RoiPersistenceController),
+                        new NoOpContextMenuCapability()));
                 bool initial = composition.SessionController.IsAutoSaveEnabled;
 
                 controller.ExecuteAsync(ImageViewerFileMenuCommand.ToggleAutoSave).GetAwaiter().GetResult();
@@ -182,6 +128,65 @@ namespace ImageViewerControl.Tests
         private static ImageViewerControlComposition GetComposition(ImageViewer.Controls.ImageViewer viewer)
         {
             return viewer._controlComposition;
+        }
+
+        private sealed class CountingAnalysisOperations : IImageViewerAnalysisOperations
+        {
+            private readonly ImageViewer.Controls.ImageViewer _viewer;
+            private readonly Action _onUpdateRenderedImage;
+            private readonly Action _onShowSuggestion;
+            private readonly ImageViewerAnalysisState _analysisState;
+            private readonly ImageViewerAnalysisCoordinator _coordinator;
+
+            public CountingAnalysisOperations(
+                ImageViewer.Controls.ImageViewer viewer,
+                Action onUpdateRenderedImage,
+                Action onShowSuggestion,
+                ImageViewerAnalysisState analysisState,
+                ImageViewerAnalysisCoordinator coordinator)
+            {
+                _viewer = viewer;
+                _onUpdateRenderedImage = onUpdateRenderedImage;
+                _onShowSuggestion = onShowSuggestion;
+                _analysisState = analysisState;
+                _coordinator = coordinator;
+            }
+
+            public void UpdateRenderedImage() => _onUpdateRenderedImage();
+            public void RefreshAnalysis() => _coordinator.HandleRefreshAnalysisRequested();
+            public void ClearAnalysisCache() => _coordinator.HandleClearAnalysisCacheRequested();
+            public void ResetPyramidToBaseLevel() => _analysisState.ResetPyramidToBaseLevel();
+            public void RebuildPyramidIfNeeded() { }
+            public void SetPseudoColorPalette(PseudoColorPalette palette) => _viewer.PseudoColorPalette = palette;
+            public void ShowSmartDisplaySuggestion() => _onShowSuggestion();
+            public void ShowRenderStatus() { }
+        }
+
+        private sealed class NoOpContextMenuCapability : IImageViewerContextMenuCapability
+        {
+            public void UpdateContextMenuState() { }
+        }
+
+        private sealed class TestRoiEditingCapability : IImageViewerRoiEditingCapability
+        {
+            private readonly Action<RoiBase> _showProperties;
+            private readonly Action<RoiBase> _showCaliperSettings;
+
+            public TestRoiEditingCapability(Action<RoiBase> showProperties, Action<RoiBase> showCaliperSettings)
+            {
+                _showProperties = showProperties;
+                _showCaliperSettings = showCaliperSettings;
+            }
+
+            public void Undo() { }
+            public void Redo() { }
+            public void DeleteSelected() { }
+            public void ClearAll() { }
+            public void SetSelectedLabel() { }
+            public void SetSelectedColor(RoiColor color) { }
+            public void CalibrateSelectedRoi() { }
+            public void ShowProperties(RoiBase roi) => _showProperties(roi);
+            public void ShowCaliperSettings(RoiBase roi) => _showCaliperSettings(roi);
         }
     }
 }

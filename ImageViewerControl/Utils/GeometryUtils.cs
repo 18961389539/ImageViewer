@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
+using ImageViewer.Models;
 
 namespace ImageViewer.Utils
 {
@@ -15,273 +16,89 @@ namespace ImageViewer.Utils
 
         public static double Distance(Point p1, Point p2)
         {
-            double dx = p1.X - p2.X;
-            double dy = p1.Y - p2.Y;
-            return Math.Sqrt(dx * dx + dy * dy);
+            return ImageViewer.Core.Geometry.Geometry2D.Distance(p1.ToPointD(), p2.ToPointD());
         }
 
         public static double DistanceToSegment(Point point, Point segmentStart, Point segmentEnd)
         {
-            double l2 = Math.Pow(segmentStart.X - segmentEnd.X, 2) + Math.Pow(segmentStart.Y - segmentEnd.Y, 2);
-            if (l2 == 0)
-            {
-                return Distance(point, segmentStart);
-            }
-
-            double t = ((point.X - segmentStart.X) * (segmentEnd.X - segmentStart.X) +
-                        (point.Y - segmentStart.Y) * (segmentEnd.Y - segmentStart.Y)) / l2;
-            t = Math.Max(0, Math.Min(1, t));
-
-            Point projection = new(
-                segmentStart.X + t * (segmentEnd.X - segmentStart.X),
-                segmentStart.Y + t * (segmentEnd.Y - segmentStart.Y));
-
-            return Distance(point, projection);
+            return ImageViewer.Core.Geometry.Geometry2D.DistanceToSegment(
+                point.ToPointD(), segmentStart.ToPointD(), segmentEnd.ToPointD());
         }
 
         public static double PolylineLength(IReadOnlyList<Point> points)
         {
             ArgumentNullException.ThrowIfNull(points);
-            double length = 0;
-            for (int i = 1; i < points.Count; i++)
-            {
-                length += Distance(points[i - 1], points[i]);
-            }
-
-            return length;
+            return ImageViewer.Core.Geometry.Geometry2D.PolylineLength(points.ToPointDs().ToArray());
         }
 
         public static IReadOnlyList<double> GetPolylineSegmentLengths(IReadOnlyList<Point> points)
         {
             ArgumentNullException.ThrowIfNull(points);
-            if (points.Count < 2)
-            {
-                return Array.Empty<double>();
-            }
-
-            var lengths = new double[points.Count - 1];
-            for (int i = 1; i < points.Count; i++)
-            {
-                lengths[i - 1] = Distance(points[i - 1], points[i]);
-            }
-
-            return lengths;
+            return ImageViewer.Core.Geometry.Geometry2D.GetPolylineSegmentLengths(points.ToPointDs().ToArray());
         }
 
         public static bool IsPointNearSegment(Point point, Point segmentStart, Point segmentEnd, double threshold)
         {
-            return DistanceToSegment(point, segmentStart, segmentEnd) < threshold;
+            return ImageViewer.Core.Geometry.Geometry2D.IsPointNearSegment(
+                point.ToPointD(), segmentStart.ToPointD(), segmentEnd.ToPointD(), threshold);
         }
-
-        /// <summary>
-        /// 计算两点之间的欧几里得距离。
-        /// Chinese: 传入两个点，返回它们之间的直线距离。
-        /// English: Computes the Euclidean distance between two points.
-        /// </summary>
-        /// <param name="p1">第一个点 / First point</param>
-        /// <param name="p2">第二个点 / Second point</param>
-        /// <returns>两点之间的距离（double） / The distance between the two points.</returns>
 
         public static double Angle(Point p1, Point center, Point p2)
         {
-            double angle1 = Math.Atan2(p1.Y - center.Y, p1.X - center.X);
-            double angle2 = Math.Atan2(p2.Y - center.Y, p2.X - center.X);
-            double result = (angle2 - angle1) * 180 / Math.PI;
-            if (result < 0) result += 360;
-            return result;
+            return ImageViewer.Core.Geometry.Geometry2D.Angle(p1.ToPointD(), center.ToPointD(), p2.ToPointD());
         }
-
-        /// <summary>
-        /// 计算以 center 为顶点，从 p1 指向 p2 的角度（度）。
-        /// Chinese: 返回以 center 为中心的扇形角度，从向量(center->p1) 到向量(center->p2) 的角度，范围 [0,360)。
-        /// English: Calculates the angle (in degrees) from p1 to p2 around the given center point.
-        /// </summary>
-        /// <param name="p1">起点 / Start point</param>
-        /// <param name="center">顶点 / Center vertex</param>
-        /// <param name="p2">终点 / End point</param>
-        /// <returns>角度（度） / Angle in degrees in range [0,360).</returns>
 
         public static Point RotatePoint(Point point, Point center, double angleDegrees)
         {
-            double angleRadians = angleDegrees * Math.PI / 180;
-            double cos = Math.Cos(angleRadians);
-            double sin = Math.Sin(angleRadians);
-
-            double dx = point.X - center.X;
-            double dy = point.Y - center.Y;
-
-            return new Point(
-                center.X + dx * cos - dy * sin,
-                center.Y + dx * sin + dy * cos
-            );
+            return ImageViewer.Core.Geometry.Geometry2D.RotatePoint(
+                point.ToPointD(), center.ToPointD(), angleDegrees).ToWpfPoint();
         }
-
-        /// <summary>
-        /// 绕指定中心旋转点。
-        /// Chinese: 将给定点绕 center 旋转 angleDegrees（度），并返回旋转后的新坐标。
-        /// English: Rotates the point around the specified center by angleDegrees and returns the new point.
-        /// </summary>
-        /// <param name="point">要旋转的点 / Point to rotate</param>
-        /// <param name="center">旋转中心 / Rotation center</param>
-        /// <param name="angleDegrees">旋转角度（度） / Rotation angle in degrees</param>
-        /// <returns>旋转后的点坐标 / The rotated point.</returns>
 
         public static Rect GetBoundingBox(IEnumerable<Point> points)
         {
             ArgumentNullException.ThrowIfNull(points);
-
-            using IEnumerator<Point> enumerator = points.GetEnumerator();
-            if (!enumerator.MoveNext()) return Rect.Empty;
-
-            Point first = enumerator.Current;
-            double minX = first.X;
-            double maxX = first.X;
-            double minY = first.Y;
-            double maxY = first.Y;
-
-            while (enumerator.MoveNext())
-            {
-                Point point = enumerator.Current;
-                minX = Math.Min(minX, point.X);
-                maxX = Math.Max(maxX, point.X);
-                minY = Math.Min(minY, point.Y);
-                maxY = Math.Max(maxY, point.Y);
-            }
-
-            return new Rect(minX, minY, maxX - minX, maxY - minY);
+            RectD? bounds = ImageViewer.Core.Geometry.Geometry2D.GetBoundingBox(points.ToPointDs());
+            return bounds is { } rect ? rect.ToWpfRect() : Rect.Empty;
         }
 
         public static Point GetCentroid(IReadOnlyList<Point> points)
         {
             ArgumentNullException.ThrowIfNull(points);
-            if (points.Count == 0)
-            {
-                return default;
-            }
-
-            double sumX = 0;
-            double sumY = 0;
-            foreach (Point point in points)
-            {
-                sumX += point.X;
-                sumY += point.Y;
-            }
-
-            return new Point(sumX / points.Count, sumY / points.Count);
+            return ImageViewer.Core.Geometry.Geometry2D.GetCentroid(points.ToPointDs().ToArray()).ToWpfPoint();
         }
 
         public static bool IsPointInPolygon(Point point, IReadOnlyList<Point> polygon)
         {
-            if (polygon.Count < 3)
-            {
-                return false;
-            }
-
-            bool inside = false;
-            for (int i = 0, j = polygon.Count - 1; i < polygon.Count; j = i++)
-            {
-                if (((polygon[i].Y > point.Y) != (polygon[j].Y > point.Y)) &&
-                    (point.X < (polygon[j].X - polygon[i].X) * (point.Y - polygon[i].Y) / (polygon[j].Y - polygon[i].Y) + polygon[i].X))
-                {
-                    inside = !inside;
-                }
-            }
-
-            return inside;
+            ArgumentNullException.ThrowIfNull(polygon);
+            return ImageViewer.Core.Geometry.Geometry2D.IsPointInPolygon(
+                point.ToPointD(), polygon.ToPointDs().ToArray());
         }
 
         public static double PolygonPerimeter(IReadOnlyList<Point> points)
         {
             ArgumentNullException.ThrowIfNull(points);
-            if (points.Count < 2)
-            {
-                return 0;
-            }
-
-            double perimeter = 0;
-            for (int i = 0; i < points.Count; i++)
-            {
-                perimeter += Distance(points[i], points[(i + 1) % points.Count]);
-            }
-
-            return perimeter;
+            return ImageViewer.Core.Geometry.Geometry2D.PolygonPerimeter(points.ToPointDs().ToArray());
         }
 
         public static double PolygonArea(IReadOnlyList<Point> points)
         {
             ArgumentNullException.ThrowIfNull(points);
-            if (points.Count < 3)
-            {
-                return 0;
-            }
-
-            double area = 0;
-            for (int i = 0; i < points.Count; i++)
-            {
-                Point p1 = points[i];
-                Point p2 = points[(i + 1) % points.Count];
-                area += (p1.X * p2.Y) - (p2.X * p1.Y);
-            }
-
-            return Math.Abs(area) / 2;
+            return ImageViewer.Core.Geometry.Geometry2D.PolygonArea(points.ToPointDs().ToArray());
         }
 
         public static (double Area, double Perimeter, Point Centroid) GetPolygonMetrics(IReadOnlyList<Point> points)
         {
             ArgumentNullException.ThrowIfNull(points);
-            if (points.Count == 0)
-            {
-                return (0, 0, default);
-            }
-
-            double areaAccumulator = 0;
-            double centroidXAccumulator = 0;
-            double centroidYAccumulator = 0;
-            double perimeter = 0;
-            double sumX = 0;
-            double sumY = 0;
-
-            for (int i = 0; i < points.Count; i++)
-            {
-                Point current = points[i];
-                Point next = points[(i + 1) % points.Count];
-                sumX += current.X;
-                sumY += current.Y;
-
-                if (points.Count >= 2)
-                {
-                    perimeter += Distance(current, next);
-                }
-
-                if (points.Count >= 3)
-                {
-                    double cross = (current.X * next.Y) - (next.X * current.Y);
-                    areaAccumulator += cross;
-                    centroidXAccumulator += (current.X + next.X) * cross;
-                    centroidYAccumulator += (current.Y + next.Y) * cross;
-                }
-            }
-
-            Point centroid = new(sumX / points.Count, sumY / points.Count);
-            if (points.Count >= 3 && Math.Abs(areaAccumulator) > 1e-9)
-            {
-                centroid = new Point(
-                    centroidXAccumulator / (3 * areaAccumulator),
-                    centroidYAccumulator / (3 * areaAccumulator));
-            }
-
-            return (Math.Abs(areaAccumulator) / 2, perimeter, centroid);
+            (double area, double perimeter, PointD centroid) =
+                ImageViewer.Core.Geometry.Geometry2D.GetPolygonMetrics(points.ToPointDs().ToArray());
+            return (area, perimeter, centroid.ToWpfPoint());
         }
 
         public static double SmallestAngle(Point p1, Point vertex, Point p2)
         {
-            double angle1 = Math.Atan2(p1.Y - vertex.Y, p1.X - vertex.X);
-            double angle2 = Math.Atan2(p2.Y - vertex.Y, p2.X - vertex.X);
-
-            double diff = Math.Abs(angle1 - angle2) * 180 / Math.PI;
-            return diff > 180 ? 360 - diff : diff;
+            return ImageViewer.Core.Geometry.Geometry2D.SmallestAngle(
+                p1.ToPointD(), vertex.ToPointD(), p2.ToPointD());
         }
-
         public static bool TryFitEllipse(IReadOnlyList<Point> points, out Point center, out double radiusX, out double radiusY, out double angleDegrees)
         {
             if (!TryFitEllipse(points, EllipseFitOptions.Default, out EllipseFitResult fit))

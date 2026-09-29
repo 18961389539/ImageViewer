@@ -546,7 +546,7 @@ namespace ImageViewer.Services
                 ReferenceCenter = detection.DetectedCenter,
                 ReferenceRadius = detection.DetectedRadius
             };
-            RoiDetectionResultMapper.Apply(candidate, displayDetection);
+            RoiDetectionResultMapper.Apply(candidate, displayDetection.ToCore());
             roi = candidate;
             return true;
         }

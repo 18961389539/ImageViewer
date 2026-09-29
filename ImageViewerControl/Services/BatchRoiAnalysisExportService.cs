@@ -362,13 +362,13 @@ namespace ImageViewer.Services
         {
             switch (roi)
             {
-                case CaliperMeasureRoi dualEdge when ImageAnalysisService.TryDetectLineMeasureEdges(bitmap, dualEdge, out LineMeasureGradientDetectionResult dualResult, quality):
+                case CaliperMeasureRoi dualEdge when ImageAnalysisService.TryDetectLineMeasureEdgesCore(bitmap, dualEdge, out ImageViewer.Core.Analysis.LineMeasureGradientDetectionResult dualResult, quality):
                     RoiDetectionResultMapper.Apply(dualEdge, dualResult);
                     return true;
-                case LineCaliperMeasureRoi line when ImageAnalysisService.TryDetectLineCaliperEdges(bitmap, line, out LineCaliperDetectionResult lineResult, quality):
+                case LineCaliperMeasureRoi line when ImageAnalysisService.TryDetectLineCaliperEdgesCore(bitmap, line, out ImageViewer.Core.Analysis.LineCaliperDetectionResult lineResult, quality):
                     RoiDetectionResultMapper.Apply(line, lineResult);
                     return true;
-                case CircularCaliperMeasureRoi circular when ImageAnalysisService.TryDetectCircularCaliperEdges(bitmap, circular, out CircularCaliperDetectionResult circularResult, quality):
+                case CircularCaliperMeasureRoi circular when ImageAnalysisService.TryDetectCircularCaliperEdgesCore(bitmap, circular, out ImageViewer.Core.Analysis.CircularCaliperDetectionResult circularResult, quality):
                     RoiDetectionResultMapper.Apply(circular, circularResult, quality);
                     return true;
                 case CaliperMeasureRoi:

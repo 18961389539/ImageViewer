@@ -1,6 +1,6 @@
 using System.Windows.Media;
+using ImageViewer.Core.Analysis;
 using ImageViewer.Models;
-using ImageViewer.Services;
 
 namespace ImageViewer.Abstractions
 {

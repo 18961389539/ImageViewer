@@ -1,6 +1,7 @@
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using ImageViewer.Abstractions;
+using CoreLineCaliperDetectionResult = ImageViewer.Core.Analysis.LineCaliperDetectionResult;
 using ImageViewer.Models;
 
 namespace ImageViewer.Services
@@ -9,12 +10,12 @@ namespace ImageViewer.Services
     {
         public static SelectedRoiDetectionService Default { get; } = new();
 
-        public bool TryDetectSelectedLineCaliperEdges(ImageSource? imageSource, RoiBase? selectedRoi, out LineCaliperDetectionResult result)
+        public bool TryDetectSelectedLineCaliperEdges(ImageSource? imageSource, RoiBase? selectedRoi, out CoreLineCaliperDetectionResult result)
         {
             return TryDetectSelectedLineCaliperEdges(imageSource, selectedRoi, out result, ImageAnalysisQualityProfile.Default);
         }
 
-        public bool TryDetectSelectedLineCaliperEdges(ImageSource? imageSource, RoiBase? selectedRoi, out LineCaliperDetectionResult result, ImageAnalysisQualityProfile? qualityProfile)
+        public bool TryDetectSelectedLineCaliperEdges(ImageSource? imageSource, RoiBase? selectedRoi, out CoreLineCaliperDetectionResult result, ImageAnalysisQualityProfile? qualityProfile)
         {
             result = default;
             if (selectedRoi is not LineCaliperMeasureRoi lineCaliper)
@@ -27,7 +28,7 @@ namespace ImageViewer.Services
                 return false;
             }
 
-            if (!ImageAnalysisService.TryDetectLineCaliperEdges(bitmap, lineCaliper, out result, qualityProfile))
+            if (!ImageAnalysisService.TryDetectLineCaliperEdgesCore(bitmap, lineCaliper, out result, qualityProfile))
             {
                 lineCaliper.ClearDetectedLine();
                 return false;

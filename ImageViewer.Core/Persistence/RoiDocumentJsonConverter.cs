@@ -17,18 +17,18 @@ namespace ImageViewer.Services
         {
             if (reader.TokenType != JsonTokenType.String)
             {
-                return JsonSerializer.Deserialize(ref reader, ImageViewerJsonSerializationContext.Default.RoiDocument);
+                return JsonSerializer.Deserialize(ref reader, ImageViewer.Persistence.ImageViewerCoreJsonSerializationContext.Default.RoiDocument);
             }
 
             string? legacyJson = reader.GetString();
             return string.IsNullOrWhiteSpace(legacyJson)
                 ? null
-                : JsonSerializer.Deserialize(legacyJson, ImageViewerJsonSerializationContext.Default.RoiDocument);
+                : JsonSerializer.Deserialize(legacyJson, ImageViewer.Persistence.ImageViewerCoreJsonSerializationContext.Default.RoiDocument);
         }
 
         public override void Write(Utf8JsonWriter writer, RoiDocument value, JsonSerializerOptions options)
         {
-            JsonSerializer.Serialize(writer, value, ImageViewerJsonSerializationContext.Default.RoiDocument);
+            JsonSerializer.Serialize(writer, value, ImageViewer.Persistence.ImageViewerCoreJsonSerializationContext.Default.RoiDocument);
         }
     }
 }

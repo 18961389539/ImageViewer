@@ -14,6 +14,7 @@ namespace ImageViewer.Controls
         ToggleSnapGrid,
         ToggleSnapToGrid,
         FitToView,
+        FillToView,
         ActualSize,
         ZoomIn,
         ZoomOut,

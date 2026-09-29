@@ -1,3 +1,5 @@
+#pragma warning disable CS1591
+
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using ImageViewer.Models;
@@ -382,3 +384,5 @@ namespace ImageViewer.Plugins
         public double Y { get; set; }
     }
 }
+
+#pragma warning restore CS1591

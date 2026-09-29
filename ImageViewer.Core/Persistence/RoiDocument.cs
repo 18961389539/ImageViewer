@@ -1,10 +1,12 @@
+#pragma warning disable CS1591
 using System.Collections.Generic;
 using ImageViewer.Models;
 using ImageViewer.Plugins;
 
 namespace ImageViewer.Services
 {
-    internal sealed class RoiDocument
+    /// <summary>Portable ROI persistence payload embedded in a session document.</summary>
+    public sealed class RoiDocument
     {
         public int Version { get; set; } = 1;
         // Null means the legacy document omitted the field. An explicit zero,
@@ -15,3 +17,4 @@ namespace ImageViewer.Services
         public List<RoiPersistenceData> Items { get; set; } = new();
     }
 }
+#pragma warning restore CS1591

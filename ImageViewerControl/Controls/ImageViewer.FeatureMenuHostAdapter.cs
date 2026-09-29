@@ -1,11 +1,16 @@
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media.Imaging;
+using CoreCircularDetectionResult = ImageViewer.Core.Analysis.CircularCaliperDetectionResult;
+using CoreLineMeasureDetectionResult = ImageViewer.Core.Analysis.LineMeasureGradientDetectionResult;
 using ImageViewer.Localization;
 using ImageViewer.Models;
+using ImageViewer.Plugins;
 using ImageViewer.Services;
 using ImageViewer.ViewModels;
 
@@ -13,17 +18,30 @@ namespace ImageViewer.Controls
 {
     internal sealed class ImageViewerFeatureMenuCommandHostAdapter : IImageViewerFeatureMenuCommandHost
     {
-        private readonly ImageViewerFeatureMenuCommandDependencies _dependencies;
+        private readonly IImageViewerFeatureAnalysisCapability _analysis;
+        private readonly IImageViewerFeatureMutationCapability _mutation;
+        private readonly IImageViewerFeatureExportDataCapability _data;
+        private readonly IImageViewerFeatureDialogCapability _dialogs;
+        private readonly IImageViewerFeatureFeedbackCapability _feedback;
         private CancellationTokenSource? _batchExportCancellation;
 
-        public ImageViewerFeatureMenuCommandHostAdapter(ImageViewerFeatureMenuCommandDependencies dependencies)
+        public ImageViewerFeatureMenuCommandHostAdapter(
+            IImageViewerFeatureAnalysisCapability analysis,
+            IImageViewerFeatureMutationCapability mutation,
+            IImageViewerFeatureExportDataCapability data,
+            IImageViewerFeatureDialogCapability dialogs,
+            IImageViewerFeatureFeedbackCapability feedback)
         {
-            _dependencies = dependencies ?? throw new ArgumentNullException(nameof(dependencies));
+            _analysis = analysis ?? throw new ArgumentNullException(nameof(analysis));
+            _mutation = mutation ?? throw new ArgumentNullException(nameof(mutation));
+            _data = data ?? throw new ArgumentNullException(nameof(data));
+            _dialogs = dialogs ?? throw new ArgumentNullException(nameof(dialogs));
+            _feedback = feedback ?? throw new ArgumentNullException(nameof(feedback));
         }
 
         public void RunGradientDetection()
         {
-            if (_dependencies.GetAnalysisBitmapSource() is not BitmapSource bitmap || _dependencies.GetSelectedRoi() is not RoiBase selectedRoi)
+            if (_analysis.AnalysisBitmapSource is not BitmapSource bitmap || _analysis.SelectedRoi is not RoiBase selectedRoi)
             {
                 return;
             }
@@ -31,8 +49,8 @@ namespace ImageViewer.Controls
             RoiBase oldState = selectedRoi.Clone();
             RoiBase? detectedRoi = selectedRoi switch
             {
-                CaliperMeasureRoi line when ImageAnalysisService.TryDetectLineMeasureEdges(bitmap, line, out LineMeasureGradientDetectionResult lineDetectionResult, _dependencies.GetQualityProfile()) => CreateDetectedLineMeasureRoi(line, lineDetectionResult),
-                CircularCaliperMeasureRoi circular when ImageAnalysisService.TryDetectCircularCaliperEdges(bitmap, circular, out CircularCaliperDetectionResult circularDetectionResult, _dependencies.GetQualityProfile()) => CreateDetectedCircularCaliperRoi(circular, circularDetectionResult, _dependencies.GetQualityProfile()),
+                CaliperMeasureRoi line when ImageAnalysisService.TryDetectLineMeasureEdgesCore(bitmap, line, out CoreLineMeasureDetectionResult lineDetectionResult, _analysis.QualityProfile) => CreateDetectedLineMeasureRoi(line, lineDetectionResult),
+                CircularCaliperMeasureRoi circular when ImageAnalysisService.TryDetectCircularCaliperEdgesCore(bitmap, circular, out CoreCircularDetectionResult circularDetectionResult, _analysis.QualityProfile) => CreateDetectedCircularCaliperRoi(circular, circularDetectionResult, _analysis.QualityProfile),
                 _ => null
             };
 
@@ -41,25 +59,25 @@ namespace ImageViewer.Controls
                 RoiBase? clearedRoi = CreateClearedDetectionRoi(selectedRoi);
                 if (clearedRoi != null)
                 {
-                    IUndoRedoCommand? clearCommand = _dependencies.CreateStateCommand(selectedRoi, oldState, clearedRoi);
+                    IUndoRedoCommand? clearCommand = _mutation.CreateStateCommand(selectedRoi, oldState, clearedRoi);
                     if (clearCommand != null)
                     {
-                        _dependencies.ExecuteUndoRedoCommand(clearCommand);
-                        _dependencies.DrawRois();
+                        _mutation.ExecuteUndoRedoCommand(clearCommand);
+                        _mutation.DrawRois();
                     }
                 }
 
                 return;
             }
 
-            IUndoRedoCommand? command = _dependencies.CreateStateCommand(selectedRoi, oldState, detectedRoi);
+            IUndoRedoCommand? command = _mutation.CreateStateCommand(selectedRoi, oldState, detectedRoi);
             if (command == null)
             {
                 return;
             }
 
-            _dependencies.ExecuteUndoRedoCommand(command);
-            _dependencies.DrawRois();
+            _mutation.ExecuteUndoRedoCommand(command);
+            _mutation.DrawRois();
         }
 
         private static RoiBase? CreateClearedDetectionRoi(RoiBase roi)
@@ -82,7 +100,7 @@ namespace ImageViewer.Controls
 
         public async Task ExportSnapshotAsync()
         {
-            string? filePath = _dependencies.ShowSaveSnapshotDialog();
+            string? filePath = _dialogs.ShowSaveSnapshotDialog();
             if (string.IsNullOrWhiteSpace(filePath))
             {
                 return;
@@ -90,30 +108,30 @@ namespace ImageViewer.Controls
 
             try
             {
-                _dependencies.RenderRoot.UpdateLayout();
+                _data.RenderRoot.UpdateLayout();
                 var bitmap = new RenderTargetBitmap(
-                    Math.Max(1, (int)Math.Ceiling(_dependencies.RenderRoot.ActualWidth)),
-                    Math.Max(1, (int)Math.Ceiling(_dependencies.RenderRoot.ActualHeight)),
+                    Math.Max(1, (int)Math.Ceiling(_data.RenderRoot.ActualWidth)),
+                    Math.Max(1, (int)Math.Ceiling(_data.RenderRoot.ActualHeight)),
                     96,
                     96,
                     System.Windows.Media.PixelFormats.Pbgra32);
-                bitmap.Render(_dependencies.RenderRoot);
+                bitmap.Render(_data.RenderRoot);
 
                 var encoder = new PngBitmapEncoder();
                 encoder.Frames.Add(BitmapFrame.Create(bitmap));
                 await using var stream = File.Create(filePath);
                 await Task.Run(() => encoder.Save(stream));
-                _dependencies.ShowStatusHint(UiText.Get("StatusExportPngSuccess"), StatusHintKind.Success);
+                _feedback.ShowStatusHint(UiText.Get("StatusExportPngSuccess"), StatusHintKind.Success);
             }
             catch (Exception ex)
             {
-                _dependencies.ShowNonCriticalError(UiText.Get("ErrorExportPngTitle"), UiText.Get("ErrorExportPngMessage"), ex);
+                _feedback.ShowNonCriticalError(UiText.Get("ErrorExportPngTitle"), UiText.Get("ErrorExportPngMessage"), ex);
             }
         }
 
         public async Task ExportAnalysisCsvAsync()
         {
-            string? filePath = _dependencies.ShowSaveAnalysisCsvDialog();
+            string? filePath = _dialogs.ShowSaveAnalysisCsvDialog();
             if (string.IsNullOrWhiteSpace(filePath))
             {
                 return;
@@ -122,35 +140,35 @@ namespace ImageViewer.Controls
             try
             {
                 var exportContext = new RoiAnalysisExportContext(
-                    _dependencies.GetCurrentImagePath(),
-                    _dependencies.GetPluginRegistry(),
-                    _dependencies.GetRenderSettings(),
-                    QualityProfile: _dependencies.GetQualityProfile());
+                    _data.CurrentImagePath,
+                    _data.PluginRegistry,
+                    _data.RenderSettings,
+                    QualityProfile: _analysis.QualityProfile);
                 await RoiAnalysisExportService.SaveCsvAsync(
                     filePath,
-                    _dependencies.GetAllRois(),
-                    _dependencies.GetAnalysisBitmapSource(),
-                    _dependencies.GetPixelSize(),
-                    _dependencies.GetPhysicalUnit(),
-                    _dependencies.GetCalibration(),
+                    _data.AllRois,
+                    _analysis.AnalysisBitmapSource,
+                    _data.PixelSize,
+                    _data.PhysicalUnit,
+                    _data.Calibration,
                     exportContext: exportContext);
-                _dependencies.ShowStatusHint(UiText.Get("StatusExportCsvWithMetadataSuccess"), StatusHintKind.Success);
+                _feedback.ShowStatusHint(UiText.Get("StatusExportCsvWithMetadataSuccess"), StatusHintKind.Success);
             }
             catch (Exception ex)
             {
-                _dependencies.ShowNonCriticalError(UiText.Get("ErrorExportAnalysisTitle"), UiText.Get("ErrorExportAnalysisMessage"), ex);
+                _feedback.ShowNonCriticalError(UiText.Get("ErrorExportAnalysisTitle"), UiText.Get("ErrorExportAnalysisMessage"), ex);
             }
         }
 
         public async Task ExportBatchAnalysisCsvAsync()
         {
-            string[] imagePaths = _dependencies.ShowOpenBatchImageFilesDialog();
+            string[] imagePaths = _dialogs.ShowOpenBatchImageFilesDialog();
             if (imagePaths.Length == 0)
             {
                 return;
             }
 
-            string? outputPath = _dependencies.ShowSaveAnalysisCsvDialog();
+            string? outputPath = _dialogs.ShowSaveAnalysisCsvDialog();
             if (string.IsNullOrWhiteSpace(outputPath))
             {
                 return;
@@ -165,23 +183,23 @@ namespace ImageViewer.Controls
                     string current = string.IsNullOrWhiteSpace(update.CurrentPath)
                         ? string.Empty
                         : $"：{Path.GetFileName(update.CurrentPath)}";
-                    _dependencies.ShowStatusHint(
+                    _feedback.ShowStatusHint(
                         $"{update.Phase}{current}（{update.CompletedFileCount}/{update.RequestedFileCount}，已生成 {update.ExportedRowCount} 条）",
                         StatusHintKind.Info);
                 });
                 BatchRoiAnalysisExportSummary summary = await BatchRoiAnalysisExportService.ExportAsync(
                     outputPath,
                     imagePaths,
-                    _dependencies.GetAllRois(),
-                    _dependencies.GetPixelSize(),
-                    _dependencies.GetPhysicalUnit(),
-                    _dependencies.GetCalibration(),
-                    _dependencies.GetPluginRegistry(),
-                    _dependencies.GetRenderSettings(),
-                    qualityProfile: _dependencies.GetQualityProfile(),
+                    _data.AllRois,
+                    _data.PixelSize,
+                    _data.PhysicalUnit,
+                    _data.Calibration,
+                    _data.PluginRegistry,
+                    _data.RenderSettings,
+                    qualityProfile: _analysis.QualityProfile,
                     cancellationToken: cancellation.Token,
                     progress: progress);
-                _dependencies.ShowStatusHint(
+                _feedback.ShowStatusHint(
                     UiText.Format(
                         "StatusExportBatchCsvSuccess",
                         summary.RequestedFileCount,
@@ -197,13 +215,13 @@ namespace ImageViewer.Controls
             }
             catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
             {
-                _dependencies.ShowStatusHint(
+                _feedback.ShowStatusHint(
                     $"批量导出已取消，已完成结果已保存到 {Path.GetFileName(outputPath)} 及其摘要文件。",
                     StatusHintKind.Info);
             }
             catch (Exception ex)
             {
-                _dependencies.ShowNonCriticalError(UiText.Get("ErrorExportAnalysisTitle"), UiText.Get("ErrorExportBatchCsvMessage"), ex);
+                _feedback.ShowNonCriticalError(UiText.Get("ErrorExportAnalysisTitle"), UiText.Get("ErrorExportBatchCsvMessage"), ex);
             }
             finally
             {
@@ -222,30 +240,132 @@ namespace ImageViewer.Controls
             }
 
             cancellation.Cancel();
-            _dependencies.ShowStatusHint("正在取消批量导出，当前文件完成后会保存已有结果。", StatusHintKind.Info);
+            _feedback.ShowStatusHint("正在取消批量导出，当前文件完成后会保存已有结果。", StatusHintKind.Info);
             return true;
         }
 
         public void ShowAnalysisSummary()
         {
-            string summary = RoiAnalysisExportService.BuildSummary(_dependencies.GetAllRois(), _dependencies.GetAnalysisBitmapSource(), _dependencies.GetPixelSize(), _dependencies.GetPhysicalUnit(), _dependencies.GetCalibration());
-            _dependencies.ShowReadOnlyText(UiText.Get("DialogAnalysisSummaryTitle"), summary);
+            string summary = RoiAnalysisExportService.BuildSummary(_data.AllRois, _analysis.AnalysisBitmapSource, _data.PixelSize, _data.PhysicalUnit, _data.Calibration);
+            _dialogs.ShowReadOnlyText(UiText.Get("DialogAnalysisSummaryTitle"), summary);
         }
 
-        public void UpdateContextMenuState() => _dependencies.UpdateContextMenuState();
+        public void UpdateContextMenuState() => _feedback.UpdateContextMenuState();
 
-        private static CaliperMeasureRoi CreateDetectedLineMeasureRoi(CaliperMeasureRoi source, LineMeasureGradientDetectionResult detectionResult)
+        private static CaliperMeasureRoi CreateDetectedLineMeasureRoi(CaliperMeasureRoi source, CoreLineMeasureDetectionResult detectionResult)
         {
             var detected = (CaliperMeasureRoi)source.Clone();
             RoiDetectionResultMapper.Apply(detected, detectionResult);
             return detected;
         }
 
-        private static CircularCaliperMeasureRoi CreateDetectedCircularCaliperRoi(CircularCaliperMeasureRoi source, CircularCaliperDetectionResult detectionResult, ImageAnalysisQualityProfile profile)
+        private static CircularCaliperMeasureRoi CreateDetectedCircularCaliperRoi(CircularCaliperMeasureRoi source, CoreCircularDetectionResult detectionResult, ImageAnalysisQualityProfile profile)
         {
             var detected = (CircularCaliperMeasureRoi)source.Clone();
             RoiDetectionResultMapper.Apply(detected, detectionResult, profile);
             return detected;
         }
+    }
+
+    internal sealed class ImageViewerFeatureAnalysisCapability : IImageViewerFeatureAnalysisCapability
+    {
+        private readonly ImageViewer _owner;
+
+        public ImageViewerFeatureAnalysisCapability(ImageViewer owner)
+        {
+            _owner = owner ?? throw new ArgumentNullException(nameof(owner));
+        }
+
+        public RoiBase? SelectedRoi => _owner.ViewerState.SelectedRoi;
+        public BitmapSource? AnalysisBitmapSource => _owner.GetAnalysisBitmapSource();
+        public ImageAnalysisQualityProfile QualityProfile => _owner.QualityProfile;
+    }
+
+    internal sealed class ImageViewerFeatureMutationCapability : IImageViewerFeatureMutationCapability
+    {
+        private readonly ImageViewer _owner;
+
+        public ImageViewerFeatureMutationCapability(ImageViewer owner)
+        {
+            _owner = owner ?? throw new ArgumentNullException(nameof(owner));
+        }
+
+        public IUndoRedoCommand? CreateStateCommand(RoiBase roi, RoiBase oldState, RoiBase newState)
+            => ImageViewer.CreateStateCommand(roi, oldState, newState);
+
+        public void ExecuteUndoRedoCommand(IUndoRedoCommand command)
+            => _owner.ViewerState.UndoRedo.Execute(command);
+
+        public void DrawRois() => _owner.DrawRois();
+    }
+
+    internal sealed class ImageViewerFeatureExportDataCapability : IImageViewerFeatureExportDataCapability
+    {
+        private readonly ImageViewer _owner;
+
+        public ImageViewerFeatureExportDataCapability(ImageViewer owner)
+        {
+            _owner = owner ?? throw new ArgumentNullException(nameof(owner));
+        }
+
+        public FrameworkElement RenderRoot => _owner.FeatureRenderRoot;
+        public IReadOnlyList<RoiBase> AllRois => _owner.ViewerState.AllRois;
+        public double PixelSize => _owner.PixelSize;
+        public string PhysicalUnit => _owner.PhysicalUnit;
+        public CameraCalibration? Calibration => _owner.Calibration;
+        public string? CurrentImagePath => _owner._controlComposition.ViewportController.TryGetCurrentImagePath();
+        public RoiPluginRegistry PluginRegistry => _owner.PluginRegistry;
+
+        public IReadOnlyDictionary<string, string> RenderSettings => new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["enableImagePyramid"] = _owner.RuntimeOptions.EnableImagePyramid.ToString(),
+            ["autoSelectPyramidLevel"] = _owner.RuntimeOptions.AutoSelectPyramidLevel.ToString(),
+            ["enableTiledRendering"] = _owner.RuntimeOptions.EnableTiledRendering.ToString(),
+            ["prefetchAdjacentTiles"] = _owner.RuntimeOptions.PrefetchAdjacentTiles.ToString(),
+            ["autoTuneLargeImageRendering"] = _owner.RuntimeOptions.AutoTuneLargeImageRendering.ToString(),
+            ["tileCacheMaximumMegabytes"] = _owner.RuntimeOptions.TileCacheMaximumMegabytes.ToString(CultureInfo.InvariantCulture),
+            ["tilePrefetchRadius"] = _owner.RuntimeOptions.TilePrefetchRadius.ToString(CultureInfo.InvariantCulture),
+            ["enableGpuRendering"] = _owner.EnableGpuRendering.ToString(),
+            ["pseudoColorPalette"] = _owner.PseudoColorPalette.ToString(),
+            ["enableAsyncAnalysis"] = _owner.RuntimeOptions.EnableAsyncAnalysis.ToString()
+        };
+    }
+
+    internal sealed class ImageViewerFeatureDialogCapability : IImageViewerFeatureDialogCapability
+    {
+        private readonly ImageViewer _owner;
+        private readonly ImageViewerDialogWorkflowService _dialogWorkflowService;
+
+        public ImageViewerFeatureDialogCapability(ImageViewer owner, ImageViewerDialogWorkflowService dialogWorkflowService)
+        {
+            _owner = owner ?? throw new ArgumentNullException(nameof(owner));
+            _dialogWorkflowService = dialogWorkflowService ?? throw new ArgumentNullException(nameof(dialogWorkflowService));
+        }
+
+        public string? ShowSaveSnapshotDialog() => _dialogWorkflowService.ShowSaveSnapshotDialog();
+        public string? ShowSaveAnalysisCsvDialog() => _dialogWorkflowService.ShowSaveAnalysisCsvDialog();
+        public string[] ShowOpenBatchImageFilesDialog() => _owner.FileDialogService.ShowOpenImageFilesDialog(Window.GetWindow(_owner));
+        public void ShowReadOnlyText(string title, string text) => _dialogWorkflowService.ShowReadOnlyText(title, text);
+    }
+
+    internal sealed class ImageViewerFeatureFeedbackCapability : IImageViewerFeatureFeedbackCapability
+    {
+        private readonly ImageViewer _owner;
+
+        public ImageViewerFeatureFeedbackCapability(ImageViewer owner)
+        {
+            _owner = owner ?? throw new ArgumentNullException(nameof(owner));
+        }
+
+        public void ShowNonCriticalError(string title, string message, Exception exception)
+            => _owner.ShowNonCriticalError(title, message, exception);
+
+        public void ShowStatusHint(string message, StatusHintKind kind) => _owner.ShowStatusHint(message, kind);
+        public void UpdateContextMenuState() => _owner.UpdateContextMenuState();
+    }
+
+    public partial class ImageViewer
+    {
+        internal FrameworkElement FeatureRenderRoot => rootGrid;
     }
 }

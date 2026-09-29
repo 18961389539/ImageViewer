@@ -45,7 +45,7 @@ namespace ImageViewer.Controls
             UpdateContextMenuState();
         }
 
-        private void UpdateRenderedImage()
+        internal void UpdateRenderedImage()
         {
             if (!IsLoaded)
             {
@@ -55,7 +55,7 @@ namespace ImageViewer.Controls
             _analysisController.UpdateRenderedImage();
         }
 
-        private BitmapSource? GetAnalysisBitmapSource() => _analysisController.GetAnalysisBitmapSource();
+        internal BitmapSource? GetAnalysisBitmapSource() => _analysisController.GetAnalysisBitmapSource();
 
         private Task PrepareAnalysisResourcesAsync(ImageSource? source)
         {
@@ -80,13 +80,13 @@ namespace ImageViewer.Controls
 
         private void RefreshAnalysisDisplays(bool force = false) => _ = BackgroundOperationObserver.ObserveAsync(_analysisController.RefreshAnalysisDisplays(force), "Refresh analysis displays");
 
-        private void RebuildPyramidIfNeeded() => _analysisController.RebuildPyramidIfNeeded();
+        internal void RebuildPyramidIfNeeded() => _analysisController.RebuildPyramidIfNeeded();
 
         private void ClearAnalysisCaches() => _analysisController.ClearAnalysisCaches();
 
-        private string BuildRenderStatusSummary() => _analysisController.BuildRenderStatusSummary();
+        internal string BuildRenderStatusSummary() => _analysisController.BuildRenderStatusSummary();
 
-        private void ShowSmartDisplaySuggestion(ImageViewerDialogWorkflowService dialogWorkflowService)
+        internal void ShowSmartDisplaySuggestion(ImageViewerDialogWorkflowService dialogWorkflowService)
         {
             ArgumentNullException.ThrowIfNull(dialogWorkflowService);
 

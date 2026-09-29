@@ -24,7 +24,10 @@ namespace ImageViewer.Services
         string Path,
         double? Position = null,
         int? InstanceNumber = null,
-        DateTimeOffset? AcquisitionTime = null);
+        DateTimeOffset? AcquisitionTime = null,
+        double? SpacingX = null,
+        double? SpacingY = null,
+        double? SpacingZ = null);
 
     public sealed record VolumeSliceOrderingResult(
         IReadOnlyList<VolumeSliceDescriptor> Slices,
@@ -197,7 +200,10 @@ namespace ImageViewer.Services
                         path,
                         TryGetDouble(root, "zPosition") ?? TryGetDouble(root, "position") ?? TryGetDouble(root, "z"),
                         TryGetInt(root, "instanceNumber") ?? TryGetInt(root, "instance"),
-                        TryGetDateTime(root, "acquisitionTime") ?? TryGetDateTime(root, "acquiredAt"));
+                        TryGetDateTime(root, "acquisitionTime") ?? TryGetDateTime(root, "acquiredAt"),
+                        TryGetPositiveDouble(root, "spacingX") ?? TryGetPositiveDouble(root, "pixelSpacingX"),
+                        TryGetPositiveDouble(root, "spacingY") ?? TryGetPositiveDouble(root, "pixelSpacingY"),
+                        TryGetPositiveDouble(root, "spacingZ") ?? TryGetPositiveDouble(root, "sliceSpacing") ?? TryGetPositiveDouble(root, "pixelSpacingZ"));
                 }
                 catch (JsonException)
                 {
@@ -233,6 +239,12 @@ namespace ImageViewer.Services
             if (!element.TryGetProperty(name, out JsonElement value)) return null;
             if (value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out double number) && double.IsFinite(number)) return number;
             return value.ValueKind == JsonValueKind.String && double.TryParse(value.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out number) && double.IsFinite(number) ? number : null;
+        }
+
+        private static double? TryGetPositiveDouble(JsonElement element, string name)
+        {
+            double? value = TryGetDouble(element, name);
+            return value is { } number && number > 0 ? number : null;
         }
 
         private static int? TryGetInt(JsonElement element, string name)

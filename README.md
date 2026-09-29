@@ -72,7 +72,7 @@ dotnet add package ImageViewerControl --version 0.1.0
 
 | 目录 | 用途 |
 | --- | --- |
-| [ImageViewer.Core](ImageViewer.Core/) | 不依赖 WPF 的测量统计与可复用核心契约。 |
+| [ImageViewer.Core](ImageViewer.Core/) | 不依赖 WPF 的几何值类型、几何算法、测量统计与可复用核心契约。 |
 | [ImageViewerControl](ImageViewerControl/) | WPF 控件、ROI 模型、渲染、菜单、对话框、分析、导出和宿主服务。 |
 | [ImageViewerDemo](ImageViewerDemo/) | 演示应用，用于手动验证与集成参考。 |
 | [ImageViewer.Core.Tests](ImageViewer.Core.Tests/) | Core 层的跨平台单元测试与覆盖率门槛。 |

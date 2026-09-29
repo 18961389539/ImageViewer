@@ -1,3 +1,5 @@
+#pragma warning disable CS1591
+
 namespace ImageViewer.Models
 {
     /// <summary>
@@ -14,3 +16,5 @@ namespace ImageViewer.Models
         RectD BoundingBox
     );
 }
+
+#pragma warning restore CS1591

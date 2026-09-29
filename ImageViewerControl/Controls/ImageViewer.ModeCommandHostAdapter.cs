@@ -4,31 +4,31 @@ namespace ImageViewer.Controls
 {
     internal sealed class ImageViewerModeCommandHostAdapter : IImageViewerModeCommandHost
     {
-        private readonly ImageViewerModeCommandDependencies _dependencies;
+        private readonly ImageViewer _owner;
 
-        public ImageViewerModeCommandHostAdapter(ImageViewerModeCommandDependencies dependencies)
+        public ImageViewerModeCommandHostAdapter(ImageViewer owner)
         {
-            _dependencies = dependencies ?? throw new ArgumentNullException(nameof(dependencies));
+            _owner = owner ?? throw new ArgumentNullException(nameof(owner));
         }
 
-        public void StartRectangleMode() => _dependencies.StartRectangleMode();
+        public void StartRectangleMode() => _owner.StartRoiMode();
 
-        public void StartEllipseMode() => _dependencies.StartEllipseMode();
+        public void StartEllipseMode() => _owner.StartEllipseRoiMode();
 
-        public void StartCircleMode() => _dependencies.StartCircleMode();
+        public void StartCircleMode() => _owner.StartCircleRoiMode();
 
-        public void StartPolygonMode() => _dependencies.StartPolygonMode();
+        public void StartPolygonMode() => _owner.StartPolygonRoiMode();
 
-        public void StartPolylineMode() => _dependencies.StartPolylineMode();
+        public void StartPolylineMode() => _owner.StartPolylineRoiMode(freehand: false);
 
-        public void StartFreehandMode() => _dependencies.StartFreehandMode();
+        public void StartFreehandMode() => _owner.StartPolylineRoiMode(freehand: true);
 
-        public void StartPointAnnotationMode() => _dependencies.StartPointAnnotationMode();
+        public void StartPointAnnotationMode() => _owner.StartPointAnnotationMode();
 
-        public void StartTextAnnotationMode() => _dependencies.StartTextAnnotationMode();
+        public void StartTextAnnotationMode() => _owner.StartTextAnnotationMode();
 
-        public void StartLineMeasureMode() => _dependencies.StartLineMeasureMode();
+        public void StartLineMeasureMode() => _owner.StartLineMeasureMode();
 
-        public void StartAngleMeasureMode() => _dependencies.StartAngleMeasureMode();
+        public void StartAngleMeasureMode() => _owner.StartAngleMeasureMode();
     }
 }

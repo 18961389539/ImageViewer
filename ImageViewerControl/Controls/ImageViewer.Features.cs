@@ -2,6 +2,9 @@ using System;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Media.Imaging;
+using CoreCircularDetectionResult = ImageViewer.Core.Analysis.CircularCaliperDetectionResult;
+using CoreLineCaliperDetectionResult = ImageViewer.Core.Analysis.LineCaliperDetectionResult;
+using CoreLineMeasureDetectionResult = ImageViewer.Core.Analysis.LineMeasureGradientDetectionResult;
 using ImageViewer.Localization;
 using ImageViewer.Models;
 using ImageViewer.Services;
@@ -23,31 +26,31 @@ namespace ImageViewer.Controls
 
         private bool TryApplyCaliperDetection(CaliperMeasureRoi line)
         {
-            return TryApplyBitmapAnalysisCore<CaliperMeasureRoi, LineMeasureGradientDetectionResult>(
+            return TryApplyBitmapAnalysisCore<CaliperMeasureRoi, CoreLineMeasureDetectionResult>(
                 line,
                 static roi => roi.EnsureCaliperRegion(),
                 static roi => roi.ClearDetectedEdges(),
-                (BitmapSource bitmap, CaliperMeasureRoi roi, out LineMeasureGradientDetectionResult result) => ImageAnalysisService.TryDetectLineMeasureEdges(bitmap, roi, out result, QualityProfile),
+                (BitmapSource bitmap, CaliperMeasureRoi roi, out CoreLineMeasureDetectionResult result) => ImageAnalysisService.TryDetectLineMeasureEdgesCore(bitmap, roi, out result, QualityProfile),
                 RoiDetectionResultMapper.Apply);
         }
 
         private bool TryApplyLineCaliperDetection(LineCaliperMeasureRoi line)
         {
-            return TryApplyBitmapAnalysisCore<LineCaliperMeasureRoi, LineCaliperDetectionResult>(
+            return TryApplyBitmapAnalysisCore<LineCaliperMeasureRoi, CoreLineCaliperDetectionResult>(
                 line,
                 prepare: null,
                 static roi => roi.ClearDetectedLine(),
-                (BitmapSource bitmap, LineCaliperMeasureRoi roi, out LineCaliperDetectionResult result) => ImageAnalysisService.TryDetectLineCaliperEdges(bitmap, roi, out result, QualityProfile),
+                (BitmapSource bitmap, LineCaliperMeasureRoi roi, out CoreLineCaliperDetectionResult result) => ImageAnalysisService.TryDetectLineCaliperEdgesCore(bitmap, roi, out result, QualityProfile),
                 RoiDetectionResultMapper.Apply);
         }
 
         private bool TryApplyCircularCaliperDetection(CircularCaliperMeasureRoi caliper)
         {
-            bool success = TryApplyBitmapAnalysisCore<CircularCaliperMeasureRoi, CircularCaliperDetectionResult>(
+            bool success = TryApplyBitmapAnalysisCore<CircularCaliperMeasureRoi, CoreCircularDetectionResult>(
                 caliper,
                 prepare: null,
                 static roi => roi.ClearDetectedEdges(),
-                (BitmapSource bitmap, CircularCaliperMeasureRoi roi, out CircularCaliperDetectionResult result) => ImageAnalysisService.TryDetectCircularCaliperEdges(bitmap, roi, out result, QualityProfile),
+                (BitmapSource bitmap, CircularCaliperMeasureRoi roi, out CoreCircularDetectionResult result) => ImageAnalysisService.TryDetectCircularCaliperEdgesCore(bitmap, roi, out result, QualityProfile),
                 (roi, result) => RoiDetectionResultMapper.Apply(roi, result, QualityProfile));
             if (!success && caliper is not ArcCaliperMeasureRoi)
             {

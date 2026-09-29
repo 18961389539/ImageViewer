@@ -118,6 +118,7 @@
   <data name="EmptyStateBackgroundRetry" xml:space="preserve"><value>后台重试</value></data>
   <data name="EmptyStateTiledRendering" xml:space="preserve"><value>大图分块</value></data>
   <data name="MenuFitToView" xml:space="preserve"><value>适应窗口</value></data>
+  <data name="MenuFillToView" xml:space="preserve"><value>填充窗口</value></data>
   <data name="MenuActualSize" xml:space="preserve"><value>实际大小（100%）</value></data>
   <data name="MenuZoomToSelectedRoi" xml:space="preserve"><value>缩放到所选 ROI</value></data>
   <data name="MenuResetView" xml:space="preserve"><value>重置视图</value></data>
@@ -126,6 +127,14 @@
   <data name="MenuFlipHorizontal" xml:space="preserve"><value>水平翻转</value></data>
   <data name="MenuFlipVertical" xml:space="preserve"><value>垂直翻转</value></data>
   <data name="RoiListTitle" xml:space="preserve"><value>ROI 列表</value></data>
+  <data name="RoiListFilterTooltip" xml:space="preserve"><value>按 ROI 类型或标签筛选</value></data>
+  <data name="RoiListFilterAccessibleName" xml:space="preserve"><value>筛选 ROI 列表</value></data>
+  <data name="RoiListZoomButton" xml:space="preserve"><value>缩放到选中</value></data>
+  <data name="RoiListZoomTooltip" xml:space="preserve"><value>将视图缩放到选中的 ROI</value></data>
+  <data name="RoiListDeleteButton" xml:space="preserve"><value>删除</value></data>
+  <data name="RoiListDeleteTooltip" xml:space="preserve"><value>删除选中的 ROI，可用 Ctrl+Z 撤销</value></data>
+  <data name="FloatingPanelsToggleTooltip" xml:space="preserve"><value>收起或展开右侧浮动面板，减少对图像区域的遮挡</value></data>
+  <data name="FloatingPanelsToggleAccessibleName" xml:space="preserve"><value>收起或展开浮动面板</value></data>
   <data name="RoiListToggleVisible" xml:space="preserve"><value>显示</value></data>
   <data name="RoiListToggleVisibleTooltip" xml:space="preserve"><value>切换标注显示状态
 勾上就显示，不勾就隐藏。
@@ -663,6 +672,9 @@
   <data name="Status2DViewReset" xml:space="preserve"><value>2D 视图已重置。</value></data>
   <data name="Status2DViewResetFirstSlice" xml:space="preserve"><value>2D 视图已重置到第一张切片。</value></data>
   <data name="StatusCancelRequested" xml:space="preserve"><value>已请求取消操作。</value></data>
+  <data name="AdaptiveGestureImage" xml:space="preserve"><value>手势：滚轮缩放；中键拖拽平移；左键拖动 ROI 主体或控制点编辑；空白处右键打开菜单，ROI 上右键查看属性。</value></data>
+  <data name="AdaptiveGestureVolume" xml:space="preserve"><value>手势：滚轮切换切片；Shift+滚轮快速跳层；Ctrl+滚轮缩放；中键拖拽平移；左键编辑 ROI。</value></data>
+  <data name="AdaptiveGesture3D" xml:space="preserve"><value>手势：滚轮缩放相机；左键旋转；中键平移；右键打开功能菜单。</value></data>
   <data name="StatusAutoSaveFailed" xml:space="preserve"><value>自动保存失败，请检查磁盘空间或写入权限。</value></data>
   <data name="ErrorUiOperationFailedTitle" xml:space="preserve"><value>操作失败</value></data>
   <data name="ErrorUiOperationFailedMessage" xml:space="preserve"><value>操作“{0}”失败，请查看诊断信息。</value></data>
@@ -670,7 +682,7 @@
   <data name="StatusBarImageSizeOnly" xml:space="preserve"><value>{0} × {1}</value></data>
   <data name="ViewerAccessibleName" xml:space="preserve"><value>图像查看器</value></data>
   <data name="ImageDisplayAreaName" xml:space="preserve"><value>图像显示区域</value></data>
-  <data name="ImageDisplayAreaHelpText" xml:space="preserve"><value>支持缩放、平移、标注绘制与测量操作；可拖入图像文件打开。</value></data>
+  <data name="ImageDisplayAreaHelpText" xml:space="preserve"><value>滚轮缩放；中键拖拽平移；左键拖动已选 ROI 的主体或控制点进行编辑；空白处右键打开功能菜单，ROI 上右键查看属性，多边形或折线顶点右键可删除；可拖入图像文件打开。</value></data>
   <data name="RoiListAccessibleName" xml:space="preserve"><value>标注列表</value></data>
   <data name="ZoomLevelDisplayAccessibleName" xml:space="preserve"><value>当前缩放比例</value></data>
   <data name="ToolbarOpenImageTooltip" xml:space="preserve"><value>打开图像文件
@@ -688,6 +700,8 @@
   <data name="ToolbarFitToViewTooltip" xml:space="preserve"><value>适应窗口
 自动调整缩放和平移，让整幅图像完整显示在窗口内。
 按 Ctrl+F 可快速执行。</value></data>
+  <data name="ToolbarFillToViewTooltip" xml:space="preserve"><value>填充窗口
+放大图像至覆盖整个视口，可能裁剪边缘，适合重点查看局部细节。</value></data>
   <data name="ToolbarActualSizeTooltip" xml:space="preserve"><value>实际大小
 按 100% 原始像素尺寸显示图像。
 适合需要逐像素核对的场景。</value></data>
@@ -709,7 +723,12 @@
   <data name="ToolbarToggleRoiListTooltip" xml:space="preserve"><value>显示 ROI 列表
 在右上角列出当前所有标注，可快速选中、切换显隐或锁定。
 再次点击可隐藏。</value></data>
+  <data name="ToolbarCalibratePixelsTooltip" xml:space="preserve"><value>像素/物理尺寸校准
+先选中一条线段或卡尺，再输入它对应的实际长度和单位。
+完成后长度、面积和底部标定状态会使用物理单位。</value></data>
   <data name="ToolbarCompactHint" xml:space="preserve"><value>窗口较窄，工具栏已收起；点击打开命令菜单</value></data>
+  <data name="ToolbarCommandMenuButton" xml:space="preserve"><value>工具栏</value></data>
+  <data name="ToolbarRestoreButton" xml:space="preserve"><value>恢复工具栏</value></data>
   <data name="ToolbarRestoreHint" xml:space="preserve"><value>工具栏已隐藏；点击此处恢复工具栏</value></data>
   <data name="ToolbarHideButton" xml:space="preserve"><value>隐藏工具栏</value></data>
   <data name="ToolbarHideHint" xml:space="preserve"><value>隐藏当前工具栏；可点击左上角按钮或从右键菜单“显示工具栏”重新打开</value></data>
@@ -719,6 +738,7 @@
   <data name="StatusFlippedHorizontal" xml:space="preserve"><value>已水平翻转</value></data>
   <data name="StatusFlippedVertical" xml:space="preserve"><value>已垂直翻转</value></data>
   <data name="StatusFitToView" xml:space="preserve"><value>已适应窗口</value></data>
+  <data name="StatusFillToView" xml:space="preserve"><value>已填充窗口</value></data>
   <data name="StatusActualSize" xml:space="preserve"><value>已按实际大小显示</value></data>
   <data name="StatusResetViewDone" xml:space="preserve"><value>已重置视图</value></data>
   <data name="StatusShowFullImage" xml:space="preserve"><value>已显示全图</value></data>
@@ -728,6 +748,7 @@
   <data name="StatusUnsavedAccessibleName" xml:space="preserve"><value>存在未保存更改</value></data>
   <data name="CalibrationBadgeAccessibleName" xml:space="preserve"><value>当前标定状态</value></data>
   <data name="CalibrationBadgeText" xml:space="preserve"><value>✓ 已标定 · 1 px = {0:F4} {1}</value></data>
+  <data name="CalibrationBadgeUncalibratedText" xml:space="preserve"><value>未标定 · 选中线段后点击“像素/物理尺寸校准”</value></data>
   <data name="CalibrationBadgeDistortionSuffix" xml:space="preserve"><value>· 畸变已校正</value></data>
   <data name="RecoveryBannerText" xml:space="preserve"><value>发现上次未完成的自动保存内容</value></data>
   <data name="RecoveryRestoreButton" xml:space="preserve"><value>恢复</value></data>

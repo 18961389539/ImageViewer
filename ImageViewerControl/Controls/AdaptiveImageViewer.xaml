@@ -63,6 +63,12 @@
                     <Button x:Name="segmentButton" Content="{localization:UiText AdaptiveSegment}" Click="OnSegmentClick" Margin="0,0,6,0" ToolTip="{localization:UiText AdaptiveSegmentTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
                     <Button x:Name="cancelButton" Content="{localization:UiText AdaptiveCancel}" Click="OnCancelClick" Style="{StaticResource AdaptiveBarButtonStyle}" ToolTip="{localization:UiText AdaptiveCancelTooltip}" />
                 </WrapPanel>
+                <TextBlock x:Name="gestureHintText"
+                           Margin="0,7,0,0"
+                           Foreground="#AAB5C3"
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           AutomationProperties.LiveSetting="Polite" />
             <Border x:Name="mprSliceBar"
                     Margin="0,8,0,0"
                     Padding="8,5"

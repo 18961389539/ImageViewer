@@ -49,24 +49,8 @@ namespace ImageViewer.Controls
             {
                 return new ImageViewerAnalysisCommandController(
                     new ImageViewerAnalysisCommandHostAdapter(
-                        new ImageViewerAnalysisCommandDependencies
-                        {
-                            RuntimeOptions = _owner.RuntimeOptions,
-                            GetEnableGpuRendering = () => _owner.EnableGpuRendering,
-                            SetEnableGpuRendering = value => _owner.EnableGpuRendering = value,
-                            UpdateRenderedImage = _owner.UpdateRenderedImage,
-                            RefreshAnalysis = analysisController.HandleRefreshAnalysisRequested,
-                            ClearAnalysisCache = analysisController.HandleClearAnalysisCacheRequested,
-                            ResetPyramidToBaseLevel = () =>
-                            {
-                                analysisController.ClearRenderCache();
-                                _owner._analysisState.ResetPyramidToBaseLevel();
-                            },
-                            RebuildPyramidIfNeeded = _owner.RebuildPyramidIfNeeded,
-                            SetPseudoColorPalette = value => _owner.PseudoColorPalette = value,
-                            ShowSmartDisplaySuggestion = () => _owner.ShowSmartDisplaySuggestion(dialogWorkflowService),
-                            ShowRenderStatus = () => dialogWorkflowService.ShowReadOnlyText(UiText.Get("DialogRenderStatusTitle"), _owner.BuildRenderStatusSummary())
-                        }));
+                        new ImageViewerAnalysisOptionsAdapter(_owner),
+                        new ImageViewerAnalysisOperationsAdapter(_owner, analysisController, dialogWorkflowService)));
             }
         }
     }

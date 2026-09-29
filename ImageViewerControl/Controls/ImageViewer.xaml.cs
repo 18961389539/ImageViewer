@@ -75,26 +75,26 @@ namespace ImageViewer.Controls
 
         private void ResetView() => _viewCommandController.Execute(ImageViewerViewCommand.ResetView);
 
-        private void RotateImageLeft()
+        internal void RotateImageLeft()
         {
             SetImageRotation(_imageRotation - 90);
             ShowStatusHint(UiText.Get("StatusRotatedLeft"), StatusHintKind.Success);
         }
 
-        private void RotateImageRight()
+        internal void RotateImageRight()
         {
             SetImageRotation(_imageRotation + 90);
             ShowStatusHint(UiText.Get("StatusRotatedRight"), StatusHintKind.Success);
         }
 
-        private void FlipImageHorizontal()
+        internal void FlipImageHorizontal()
         {
             _flipImageHorizontally = !_flipImageHorizontally;
             ApplyImageOrientation();
             ShowStatusHint(UiText.Get("StatusFlippedHorizontal"), StatusHintKind.Success);
         }
 
-        private void FlipImageVertical()
+        internal void FlipImageVertical()
         {
             _flipImageVertically = !_flipImageVertically;
             ApplyImageOrientation();
@@ -107,7 +107,7 @@ namespace ImageViewer.Controls
             ApplyImageOrientation();
         }
 
-        private void ResetImageOrientation()
+        internal void ResetImageOrientation()
         {
             _imageRotation = 0;
             _flipImageHorizontally = false;
@@ -158,6 +158,14 @@ namespace ImageViewer.Controls
             _controlComposition.SessionController.MarkDirty();
         }
 
+        /// <summary>
+        /// Marks the currently displayed document as the clean baseline for a host-provided initial load.
+        /// </summary>
+        public void MarkDocumentClean()
+        {
+            _controlComposition.SessionController.MarkClean();
+        }
+
         internal void SetImageLoadState(bool isLoading, string statusText, double progress, bool canRetry)
         {
             IsImageLoading = isLoading;
@@ -168,6 +176,12 @@ namespace ImageViewer.Controls
         }
 
         public Task RetryLastImageLoadAsync() => _controlComposition.DialogWorkflowService.RetryLastImageLoadAsync();
+
+        /// <summary>
+        /// 请求宿主保存当前会话；用户取消保存对话框时任务仍会正常完成，宿主可通过
+        /// <see cref="IsDirty"/> 判断是否允许继续关闭窗口。
+        /// </summary>
+        public Task SaveSessionAsync() => _fileMenuCommandController.ExecuteAsync(ImageViewerFileMenuCommand.SaveSession);
 
         public void Dispose()
         {

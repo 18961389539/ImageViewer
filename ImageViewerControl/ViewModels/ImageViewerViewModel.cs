@@ -1,13 +1,12 @@
 using System.Collections.ObjectModel;
-using System.Collections.Specialized;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Media;
 using ImageViewer.Abstractions;
 using ImageViewer.Common;
+using ImageViewer.Core.Analysis;
 using ImageViewer.Models;
 using ImageViewer.Plugins;
-using ImageViewer.Services;
 
 namespace ImageViewer.ViewModels
 {
@@ -20,7 +19,7 @@ namespace ImageViewer.ViewModels
         /// </summary>
 
         private ImageSource? _imageSource;
-        private readonly Dictionary<Type, object> _roiCollections = new();
+        private readonly RoiCollectionStore _roiState;
         private double _scale = 1.0;
         private double _offsetX;
         private double _offsetY;
@@ -32,8 +31,6 @@ namespace ImageViewer.ViewModels
         private readonly UndoRedoManager _undoRedoManager = new UndoRedoManager();
         private readonly ISelectedRoiDetectionService _selectedRoiDetectionService;
         private RoiPluginRegistry _pluginRegistry;
-        private bool _isRebuildingAllRois;
-        private bool _isSynchronizingAllRois;
         private ImageAnalysisQualityProfile _qualityProfile = ImageAnalysisQualityProfile.Default;
 
         /// <summary>
@@ -62,9 +59,10 @@ namespace ImageViewer.ViewModels
 
         public ImageViewerViewModel(RoiPluginRegistry? pluginRegistry = null, ISelectedRoiDetectionService? selectedRoiDetectionService = null)
         {
-            _selectedRoiDetectionService = selectedRoiDetectionService ?? SelectedRoiDetectionService.Default;
+            _selectedRoiDetectionService = selectedRoiDetectionService ?? ImageViewer.Services.SelectedRoiDetectionService.Default;
             _pluginRegistry = pluginRegistry ?? throw new ArgumentNullException(nameof(pluginRegistry));
-            RebuildAllRois();
+            _roiState = new RoiCollectionStore(EnumerateRois);
+            _roiState.RebuildAllRois();
         }
 
         public RoiPluginRegistry PluginRegistry
@@ -79,7 +77,7 @@ namespace ImageViewer.ViewModels
                 }
 
                 _pluginRegistry = value;
-                RebuildAllRois();
+                _roiState.RebuildAllRois();
             }
         }
 
@@ -157,19 +155,11 @@ namespace ImageViewer.ViewModels
             set => SetProperty(ref _infoText, value);
         }
 
-        public ObservableCollection<RoiBase> AllRois { get; } = new ObservableCollection<RoiBase>();
+        public ObservableCollection<RoiBase> AllRois => _roiState.AllRois;
 
         public ObservableCollection<T> GetRoiCollection<T>() where T : RoiBase
         {
-            if (_roiCollections.TryGetValue(typeof(T), out var existingCollection))
-            {
-                return (ObservableCollection<T>)existingCollection;
-            }
-
-            var collection = new ObservableCollection<T>();
-            AttachCollection(collection);
-            _roiCollections.Add(typeof(T), collection);
-            return collection;
+            return _roiState.Get<T>();
         }
 
         public bool AddRoi(RoiBase roi)
@@ -186,131 +176,28 @@ namespace ImageViewer.ViewModels
 
         public void ClearAllRois()
         {
-            _isRebuildingAllRois = true;
-            try
+            _roiState.RunBatch(() =>
             {
                 ClearTypedCollections();
                 SelectedRoi = null;
-            }
-            finally
-            {
-                _isRebuildingAllRois = false;
-            }
-
-            RebuildAllRois();
+            });
         }
 
         public void ReplaceAllRois(IEnumerable<RoiBase> rois)
         {
-            _isRebuildingAllRois = true;
-            try
+            ArgumentNullException.ThrowIfNull(rois);
+            RoiBase[] materializedRois = rois.ToArray();
+            _roiState.RunBatch(() =>
             {
                 ClearTypedCollections();
 
-                foreach (var roi in rois)
+                foreach (RoiBase roi in materializedRois)
                 {
                     AddRoiToTypedCollection(roi);
                 }
 
                 SelectedRoi = null;
-            }
-            finally
-            {
-                _isRebuildingAllRois = false;
-            }
-
-            RebuildAllRois();
-        }
-
-        private void AttachCollection<T>(ObservableCollection<T> collection) where T : RoiBase
-        {
-            collection.CollectionChanged += OnRoiCollectionChanged;
-        }
-
-        private void OnRoiCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
-        {
-            if (_isRebuildingAllRois || _isSynchronizingAllRois)
-            {
-                return;
-            }
-
-            switch (e.Action)
-            {
-                case NotifyCollectionChangedAction.Add:
-                    AppendAllRois(e.NewItems);
-                    break;
-                case NotifyCollectionChangedAction.Remove:
-                    RemoveAllRois(e.OldItems);
-                    break;
-                default:
-                    RebuildAllRois();
-                    break;
-            }
-        }
-
-        private void RebuildAllRois(IEnumerable<RoiBase>? orderedRois = null)
-        {
-            _isSynchronizingAllRois = true;
-            try
-            {
-                AllRois.Clear();
-                foreach (var roi in orderedRois ?? EnumerateRois())
-                {
-                    AllRois.Add(roi);
-                }
-            }
-            finally
-            {
-                _isSynchronizingAllRois = false;
-            }
-        }
-
-        private void AppendAllRois(System.Collections.IList? items)
-        {
-            if (items == null)
-            {
-                return;
-            }
-
-            _isSynchronizingAllRois = true;
-            try
-            {
-                foreach (var item in items)
-                {
-                    if (item is RoiBase roi && !AllRois.Contains(roi))
-                    {
-                        AllRois.Add(roi);
-                    }
-                }
-            }
-            finally
-            {
-                _isSynchronizingAllRois = false;
-            }
-        }
-
-        private void RemoveAllRois(System.Collections.IList? items)
-        {
-            if (items == null)
-            {
-                return;
-            }
-
-            _isSynchronizingAllRois = true;
-            try
-            {
-                foreach (var item in items)
-                {
-                    if (item is RoiBase roi)
-                    {
-                        AllRois.Remove(roi);
-                    }
-                }
-            }
-            finally
-            {
-                _isSynchronizingAllRois = false;
-            }
+            });
         }
 
         private IEnumerable<RoiBase> EnumerateRois()

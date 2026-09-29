@@ -24,6 +24,7 @@ namespace ImageViewer.Controls
                 [ImageViewerViewCommand.ToggleSnapGrid] = () => Host.ShowSnapGrid = !Host.ShowSnapGrid,
                 [ImageViewerViewCommand.ToggleSnapToGrid] = () => Host.EnableSnapToGrid = !Host.EnableSnapToGrid,
                 [ImageViewerViewCommand.FitToView] = Host.FitToView,
+                [ImageViewerViewCommand.FillToView] = Host.FillToView,
                 [ImageViewerViewCommand.ActualSize] = Host.SetActualSize,
                 [ImageViewerViewCommand.ZoomIn] = Host.ZoomIn,
                 [ImageViewerViewCommand.ZoomOut] = Host.ZoomOut,

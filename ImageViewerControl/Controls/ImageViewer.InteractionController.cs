@@ -238,7 +238,8 @@ namespace ImageViewer.Controls
 
             _selectionInteractionFlow.ClearSelection();
             _host.DrawRois();
-            _pointerInteractionFlow.BeginCanvasPan(e.GetPosition(_host.RootElement));
+            // 空白画布左键只负责清除选择。画布平移统一使用中键拖拽，避免
+            // “点击空白处选择”与“拖动画布”抢夺同一个手势。
         }
 
         public void HandleMouseMove(MouseEventArgs e)

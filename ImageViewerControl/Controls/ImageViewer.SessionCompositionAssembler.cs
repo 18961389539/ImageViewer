@@ -104,13 +104,9 @@ namespace ImageViewer.Controls
 
                 return new ImageViewerFileMenuCommandController(
                     new ImageViewerFileMenuCommandHostAdapter(
-                        new ImageViewerFileMenuCommandDependencies
-                        {
-                            ShowOpenImageDialogAsync = dialogWorkflowService.OpenImageAsync,
-                            SessionController = sessionController,
-                            RoiPersistenceController = roiPersistenceController,
-                            UpdateContextMenuState = _owner.UpdateContextMenuState
-                        }));
+                        new ImageViewerFileDialogCapability(dialogWorkflowService),
+                        new ImageViewerFileOperationsCapability(sessionController, roiPersistenceController),
+                        new ImageViewerContextMenuCapability(_owner)));
             }
         }
     }

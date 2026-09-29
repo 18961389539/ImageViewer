@@ -1,3 +1,5 @@
+#pragma warning disable CS1591
+
 namespace ImageViewer.Models
 {
     /// <summary>
@@ -49,3 +51,5 @@ namespace ImageViewer.Models
         }
     }
 }
+
+#pragma warning restore CS1591

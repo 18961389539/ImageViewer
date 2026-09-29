@@ -1,5 +1,8 @@
 using System;
 using System.Windows;
+using CoreCircularResult = ImageViewer.Core.Analysis.CircularCaliperDetectionResult;
+using CoreLineResult = ImageViewer.Core.Analysis.LineCaliperDetectionResult;
+using CoreDualLineResult = ImageViewer.Core.Analysis.LineMeasureGradientDetectionResult;
 using ImageViewer.Models;
 using ImageViewer.Services;
 using ImageViewer.Utils;
@@ -8,7 +11,7 @@ namespace ImageViewer.Rendering
 {
     internal static class CaliperDetectionDisplayStateFactory
     {
-        public static DualEdgeCaliperDetectionDisplayState Create(CaliperMeasureRoi roi, LineMeasureGradientDetectionResult detectionResult)
+        public static DualEdgeCaliperDetectionDisplayState Create(CaliperMeasureRoi roi, CoreDualLineResult detectionResult)
         {
             ArgumentNullException.ThrowIfNull(roi);
 
@@ -27,22 +30,22 @@ namespace ImageViewer.Rendering
                 Edge2End = edge2Geometry.SegmentEnd,
                 RegionSegments = CaliperOverlayGeometryHelper.BuildDualEdgeCaliperRegionSegments(roi),
                 CaliperBars = CaliperOverlayGeometryHelper.BuildDualEdgeCaliperBars(roi),
-                InvalidCaliperMarkers = CaliperOverlayGeometryHelper.BuildLinearMarkers(detectionResult.InvalidCaliperCenters, markerDirection, markerHalfLength),
-                Edge1Markers = CaliperOverlayGeometryHelper.BuildLinearMarkers(detectionResult.Edge1Points, markerDirection, markerHalfLength),
-                Edge2Markers = CaliperOverlayGeometryHelper.BuildLinearMarkers(detectionResult.Edge2Points, markerDirection, markerHalfLength),
-                RejectedEdge1Markers = CaliperOverlayGeometryHelper.BuildLinearMarkers(detectionResult.RejectedEdge1Points, markerDirection, markerHalfLength),
-                RejectedEdge2Markers = CaliperOverlayGeometryHelper.BuildLinearMarkers(detectionResult.RejectedEdge2Points, markerDirection, markerHalfLength),
+                InvalidCaliperMarkers = CaliperOverlayGeometryHelper.BuildLinearMarkers(detectionResult.InvalidCaliperCenters.ToWpfPointArray(), markerDirection, markerHalfLength),
+                Edge1Markers = CaliperOverlayGeometryHelper.BuildLinearMarkers(detectionResult.Edge1Points.ToWpfPointArray(), markerDirection, markerHalfLength),
+                Edge2Markers = CaliperOverlayGeometryHelper.BuildLinearMarkers(detectionResult.Edge2Points.ToWpfPointArray(), markerDirection, markerHalfLength),
+                RejectedEdge1Markers = CaliperOverlayGeometryHelper.BuildLinearMarkers(detectionResult.RejectedEdge1Points.ToWpfPointArray(), markerDirection, markerHalfLength),
+                RejectedEdge2Markers = CaliperOverlayGeometryHelper.BuildLinearMarkers(detectionResult.RejectedEdge2Points.ToWpfPointArray(), markerDirection, markerHalfLength),
                 ScoreOverlays = CaliperOverlayGeometryHelper.BuildDualEdgeScoreOverlays(
-                    detectionResult.InvalidCaliperCenters,
-                    detectionResult.Edge1Points,
-                    detectionResult.Edge2Points,
+                    detectionResult.InvalidCaliperCenters.ToWpfPointArray(),
+                    detectionResult.Edge1Points.ToWpfPointArray(),
+                    detectionResult.Edge2Points.ToWpfPointArray(),
                     detectionResult.Edge1Scores,
                     detectionResult.Edge2Scores,
-                    detectionResult.RejectedEdge1Points,
-                    detectionResult.RejectedEdge2Points,
+                    detectionResult.RejectedEdge1Points.ToWpfPointArray(),
+                    detectionResult.RejectedEdge2Points.ToWpfPointArray(),
                     measurementDirection),
-                Edge1Points = [.. detectionResult.Edge1Points.ToPointDs()],
-                Edge2Points = [.. detectionResult.Edge2Points.ToPointDs()],
+                Edge1Points = [.. detectionResult.Edge1Points],
+                Edge2Points = [.. detectionResult.Edge2Points],
                 Edge1AverageScore = detectionResult.Edge1AverageScore,
                 Edge2AverageScore = detectionResult.Edge2AverageScore,
                 Edge1ResidualRms = detectionResult.Edge1ResidualRms,
@@ -57,11 +60,11 @@ namespace ImageViewer.Rendering
             };
         }
 
-        public static SingleEdgeCaliperDetectionDisplayState Create(LineCaliperMeasureRoi roi, LineCaliperDetectionResult detectionResult)
+        public static SingleEdgeCaliperDetectionDisplayState Create(LineCaliperMeasureRoi roi, CoreLineResult detectionResult)
         {
             ArgumentNullException.ThrowIfNull(roi);
 
-            Vector lineDirection = detectionResult.ReferenceP2 - detectionResult.ReferenceP1;
+            Vector lineDirection = detectionResult.ReferenceP2.ToWpfPoint() - detectionResult.ReferenceP1.ToWpfPoint();
             if (lineDirection.LengthSquared < 1e-6)
             {
                 lineDirection = new Vector(1, 0);
@@ -74,18 +77,18 @@ namespace ImageViewer.Rendering
             return new SingleEdgeCaliperDetectionDisplayState
             {
                 HasDetection = true,
-                RegionSegments = CaliperOverlayGeometryHelper.BuildLineCaliperRegionSegments(detectionResult.ReferenceP1, detectionResult.ReferenceP2, roi.CaliperSearchRange),
-                CaliperBars = CaliperOverlayGeometryHelper.BuildLineCaliperBars(detectionResult.ReferenceP1, detectionResult.ReferenceP2, roi.CaliperSearchRange, roi.CaliperCount),
-                InvalidCaliperMarkers = CaliperOverlayGeometryHelper.BuildLinearMarkers(detectionResult.InvalidSamplePoints, lineDirection, markerHalfLength),
-                EdgeMarkers = CaliperOverlayGeometryHelper.BuildLinearMarkers(detectionResult.EdgePoints, lineDirection, markerHalfLength),
-                RejectedEdgeMarkers = CaliperOverlayGeometryHelper.BuildLinearMarkers(detectionResult.RejectedEdgePoints, lineDirection, markerHalfLength),
+                RegionSegments = CaliperOverlayGeometryHelper.BuildLineCaliperRegionSegments(detectionResult.ReferenceP1.ToWpfPoint(), detectionResult.ReferenceP2.ToWpfPoint(), roi.CaliperSearchRange),
+                CaliperBars = CaliperOverlayGeometryHelper.BuildLineCaliperBars(detectionResult.ReferenceP1.ToWpfPoint(), detectionResult.ReferenceP2.ToWpfPoint(), roi.CaliperSearchRange, roi.CaliperCount),
+                InvalidCaliperMarkers = CaliperOverlayGeometryHelper.BuildLinearMarkers(detectionResult.InvalidSamplePoints.ToWpfPointArray(), lineDirection, markerHalfLength),
+                EdgeMarkers = CaliperOverlayGeometryHelper.BuildLinearMarkers(detectionResult.EdgePoints.ToWpfPointArray(), lineDirection, markerHalfLength),
+                RejectedEdgeMarkers = CaliperOverlayGeometryHelper.BuildLinearMarkers(detectionResult.RejectedEdgePoints.ToWpfPointArray(), lineDirection, markerHalfLength),
                 ScoreOverlays = CaliperOverlayGeometryHelper.BuildLinearScoreOverlays(
-                    detectionResult.InvalidSamplePoints,
-                    detectionResult.EdgePoints,
+                    detectionResult.InvalidSamplePoints.ToWpfPointArray(),
+                    detectionResult.EdgePoints.ToWpfPointArray(),
                     detectionResult.EdgeScores,
-                    detectionResult.RejectedEdgePoints,
+                    detectionResult.RejectedEdgePoints.ToWpfPointArray(),
                     measurementDirection),
-                EdgePoints = [.. detectionResult.EdgePoints.ToPointDs()],
+                EdgePoints = [.. detectionResult.EdgePoints],
                 AverageScore = detectionResult.AverageScore,
                 ResidualRms = detectionResult.ResidualRms,
                 ResidualMax = detectionResult.ResidualMax,
@@ -94,33 +97,33 @@ namespace ImageViewer.Rendering
             };
         }
 
-        public static SingleEdgeCaliperDetectionDisplayState Create(CircularCaliperMeasureRoi roi, CircularCaliperDetectionResult detectionResult)
+        public static SingleEdgeCaliperDetectionDisplayState Create(CircularCaliperMeasureRoi roi, CoreCircularResult detectionResult)
         {
             ArgumentNullException.ThrowIfNull(roi);
 
             double markerHalfLength = Math.Max(roi.CaliperSamplingHalfWidth + 1, 3);
             LineSegmentOverlay[] regionSegments = roi is ArcCaliperMeasureRoi arcCaliper
-                ? CaliperOverlayGeometryHelper.BuildArcCaliperRegionSegments(detectionResult.ReferenceCenter, detectionResult.ReferenceRadius, arcCaliper.CaliperSearchRange, arcCaliper.CaliperCount, arcCaliper.StartAngle, arcCaliper.SweepAngle)
-                : CaliperOverlayGeometryHelper.BuildCircularCaliperRegionSegments(detectionResult.ReferenceCenter, detectionResult.ReferenceRadius, roi.CaliperSearchRange, roi.CaliperCount);
+                ? CaliperOverlayGeometryHelper.BuildArcCaliperRegionSegments(detectionResult.ReferenceCenter.ToWpfPoint(), detectionResult.ReferenceRadius, arcCaliper.CaliperSearchRange, arcCaliper.CaliperCount, arcCaliper.StartAngle, arcCaliper.SweepAngle)
+                : CaliperOverlayGeometryHelper.BuildCircularCaliperRegionSegments(detectionResult.ReferenceCenter.ToWpfPoint(), detectionResult.ReferenceRadius, roi.CaliperSearchRange, roi.CaliperCount);
             LineSegmentOverlay[] caliperBars = roi is ArcCaliperMeasureRoi arcRoi
-                ? CaliperOverlayGeometryHelper.BuildArcCaliperBars(detectionResult.ReferenceCenter, detectionResult.ReferenceRadius, arcRoi.CaliperSearchRange, arcRoi.CaliperCount, arcRoi.StartAngle, arcRoi.SweepAngle)
-                : CaliperOverlayGeometryHelper.BuildCircularCaliperBars(detectionResult.ReferenceCenter, detectionResult.ReferenceRadius, roi.CaliperSearchRange, roi.CaliperCount);
+                ? CaliperOverlayGeometryHelper.BuildArcCaliperBars(detectionResult.ReferenceCenter.ToWpfPoint(), detectionResult.ReferenceRadius, arcRoi.CaliperSearchRange, arcRoi.CaliperCount, arcRoi.StartAngle, arcRoi.SweepAngle)
+                : CaliperOverlayGeometryHelper.BuildCircularCaliperBars(detectionResult.ReferenceCenter.ToWpfPoint(), detectionResult.ReferenceRadius, roi.CaliperSearchRange, roi.CaliperCount);
 
             return new SingleEdgeCaliperDetectionDisplayState
             {
                 HasDetection = true,
                 RegionSegments = regionSegments,
                 CaliperBars = caliperBars,
-                InvalidCaliperMarkers = CaliperOverlayGeometryHelper.BuildCircularMarkers(detectionResult.InvalidSamplePoints, detectionResult.ReferenceCenter, markerHalfLength),
-                EdgeMarkers = CaliperOverlayGeometryHelper.BuildCircularMarkers(detectionResult.EdgePoints, detectionResult.ReferenceCenter, markerHalfLength),
-                RejectedEdgeMarkers = CaliperOverlayGeometryHelper.BuildCircularMarkers(detectionResult.RejectedEdgePoints, detectionResult.ReferenceCenter, markerHalfLength),
+                InvalidCaliperMarkers = CaliperOverlayGeometryHelper.BuildCircularMarkers(detectionResult.InvalidSamplePoints.ToWpfPointArray(), detectionResult.ReferenceCenter.ToWpfPoint(), markerHalfLength),
+                EdgeMarkers = CaliperOverlayGeometryHelper.BuildCircularMarkers(detectionResult.EdgePoints.ToWpfPointArray(), detectionResult.ReferenceCenter.ToWpfPoint(), markerHalfLength),
+                RejectedEdgeMarkers = CaliperOverlayGeometryHelper.BuildCircularMarkers(detectionResult.RejectedEdgePoints.ToWpfPointArray(), detectionResult.ReferenceCenter.ToWpfPoint(), markerHalfLength),
                 ScoreOverlays = CaliperOverlayGeometryHelper.BuildCircularScoreOverlays(
-                    detectionResult.InvalidSamplePoints,
-                    detectionResult.EdgePoints,
+                    detectionResult.InvalidSamplePoints.ToWpfPointArray(),
+                    detectionResult.EdgePoints.ToWpfPointArray(),
                     detectionResult.EdgeScores,
-                    detectionResult.RejectedEdgePoints,
-                    detectionResult.ReferenceCenter),
-                EdgePoints = [.. detectionResult.EdgePoints.ToPointDs()],
+                    detectionResult.RejectedEdgePoints.ToWpfPointArray(),
+                    detectionResult.ReferenceCenter.ToWpfPoint()),
+                EdgePoints = [.. detectionResult.EdgePoints],
                 AverageScore = detectionResult.AverageScore,
                 ResidualRms = detectionResult.ResidualRms,
                 ResidualMax = detectionResult.ResidualMax,

@@ -1,0 +1,25 @@
+using System.Runtime.CompilerServices;
+using ImageViewer.Models;
+using ImageViewer.Plugins;
+
+[assembly: TypeForwardedTo(typeof(PointD))]
+[assembly: TypeForwardedTo(typeof(RectD))]
+[assembly: TypeForwardedTo(typeof(VectorD))]
+[assembly: TypeForwardedTo(typeof(DetectedLineSegment))]
+[assembly: TypeForwardedTo(typeof(LineFitGeometry))]
+[assembly: TypeForwardedTo(typeof(MeasurementTolerance))]
+[assembly: TypeForwardedTo(typeof(RoiPersistenceData))]
+[assembly: TypeForwardedTo(typeof(RoiPersistenceCommonData))]
+[assembly: TypeForwardedTo(typeof(RoiPersistenceGeometryData))]
+[assembly: TypeForwardedTo(typeof(RoiPersistenceMeasurementData))]
+[assembly: TypeForwardedTo(typeof(RoiPersistenceOptionsData))]
+[assembly: TypeForwardedTo(typeof(RoiPersistencePoint))]
+[assembly: TypeForwardedTo(typeof(ImageAnalysisQualityProfile))]
+[assembly: TypeForwardedTo(typeof(RoiDetectionStatus))]
+[assembly: TypeForwardedTo(typeof(RoiSpecificationStatus))]
+[assembly: TypeForwardedTo(typeof(RoiInspectionResult))]
+[assembly: TypeForwardedTo(typeof(RoiStatistics))]
+[assembly: TypeForwardedTo(typeof(BlobFeature))]
+[assembly: TypeForwardedTo(typeof(CameraCalibration))]
+[assembly: TypeForwardedTo(typeof(VolumeSliceProvenance))]
+[assembly: TypeForwardedTo(typeof(VolumeSliceOrderMetadata))]

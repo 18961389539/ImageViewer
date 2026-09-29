@@ -7,8 +7,8 @@
     <IsPackable>true</IsPackable>
     <PackageId>ImageViewer.Core</PackageId>
     <Authors>ImageViewer contributors</Authors>
-    <Description>Framework-neutral measurement contracts and statistics for ImageViewer.</Description>
-    <PackageTags>image-analysis;measurement;computer-vision;geometry</PackageTags>
+    <Description>Framework-neutral geometry, measurement contracts and statistics for ImageViewer.</Description>
+    <PackageTags>image-analysis;measurement;computer-vision;geometry;contracts</PackageTags>
     <RepositoryUrl>https://github.com/18961389539/ImageViewer</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>

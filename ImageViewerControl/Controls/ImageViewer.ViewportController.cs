@@ -61,6 +61,23 @@ namespace ImageViewer.Controls
             ApplyViewportState(new ImageViewerViewportState(1.0, translateX, translateY));
         }
 
+        public void FillToView()
+        {
+            if (!TryGetImageSize(out var imageSize)
+                || _host.ViewportSize.Width <= 0
+                || _host.ViewportSize.Height <= 0)
+            {
+                return;
+            }
+
+            double scale = Math.Max(
+                _host.ViewportSize.Width / imageSize.Width,
+                _host.ViewportSize.Height / imageSize.Height);
+            double translateX = (_host.ViewportSize.Width - imageSize.Width * scale) / 2;
+            double translateY = (_host.ViewportSize.Height - imageSize.Height * scale) / 2;
+            ApplyViewportState(new ImageViewerViewportState(scale, translateX, translateY), allowBelowMinScale: true);
+        }
+
         public void ZoomToSelection()
         {
             if (_host.SelectedRoi == null)

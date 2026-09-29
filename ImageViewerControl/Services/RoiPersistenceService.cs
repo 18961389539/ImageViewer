@@ -44,7 +44,7 @@ namespace ImageViewer.Services
         public static string Serialize(IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, RoiPluginRegistry? pluginRegistry = null, ImageAnalysisQualityProfile? qualityProfile = null)
         {
             var roiPlugins = pluginRegistry ?? throw new ArgumentNullException(nameof(pluginRegistry));
-            return JsonSerializer.Serialize(CreateDocument(rois, pixelSize, physicalUnit, roiPlugins, qualityProfile: qualityProfile), ImageViewerJsonSerializationContext.Default.RoiDocument);
+            return JsonSerializer.Serialize(CreateDocument(rois, pixelSize, physicalUnit, roiPlugins, qualityProfile: qualityProfile), ImageViewer.Persistence.ImageViewerCoreJsonSerializationContext.Default.RoiDocument);
         }
 
         /// <summary>
@@ -105,7 +105,7 @@ namespace ImageViewer.Services
             ArgumentNullException.ThrowIfNull(json);
             var roiPlugins = pluginRegistry ?? throw new ArgumentNullException(nameof(pluginRegistry));
 
-            var document = JsonSerializer.Deserialize(json, ImageViewerJsonSerializationContext.Default.RoiDocument) ?? new RoiDocument();
+            var document = JsonSerializer.Deserialize(json, ImageViewer.Persistence.ImageViewerCoreJsonSerializationContext.Default.RoiDocument) ?? new RoiDocument();
             return CreateRois(document, roiPlugins);
         }
 

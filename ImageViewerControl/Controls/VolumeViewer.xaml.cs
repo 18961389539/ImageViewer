@@ -94,7 +94,14 @@ namespace ImageViewer.Controls
                 return;
             }
 
-            int step = Keyboard.Modifiers.HasFlag(ModifierKeys.Control) ? 5 : 1;
+            // 所有 2D 视图统一使用 Ctrl+滚轮缩放；普通滚轮在轴位体数据中切片，
+            // Shift 可一次跳过 5 层，便于快速浏览厚体数据。
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+            {
+                return;
+            }
+
+            int step = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) ? 5 : 1;
             int direction = e.Delta > 0 ? 1 : -1;
             int target = Math.Clamp(CurrentSliceIndex + direction * step, 0, _volume.Depth - 1);
             if (target != CurrentSliceIndex)

@@ -86,6 +86,7 @@ namespace ImageViewer.Controls
         public static ImageViewerViewMenuCommandTag ToggleSnapGrid { get; } = new(ImageViewerViewCommand.ToggleSnapGrid);
         public static ImageViewerViewMenuCommandTag ToggleSnapToGrid { get; } = new(ImageViewerViewCommand.ToggleSnapToGrid);
         public static ImageViewerViewMenuCommandTag FitToView { get; } = new(ImageViewerViewCommand.FitToView);
+        public static ImageViewerViewMenuCommandTag FillToView { get; } = new(ImageViewerViewCommand.FillToView);
         public static ImageViewerViewMenuCommandTag ActualSize { get; } = new(ImageViewerViewCommand.ActualSize);
         public static ImageViewerViewMenuCommandTag ZoomIn { get; } = new(ImageViewerViewCommand.ZoomIn);
         public static ImageViewerViewMenuCommandTag ZoomOut { get; } = new(ImageViewerViewCommand.ZoomOut);
