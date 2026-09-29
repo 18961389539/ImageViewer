@@ -53,12 +53,12 @@ namespace ImageViewer.Services
         /// </summary>
         public static Point? GetMeasurementCenter(RoiBase roi) => roi switch
         {
-            CaliperMeasureRoi caliper => Midpoint(caliper.P1.ToWpfPoint(), caliper.P2.ToWpfPoint()),
-            LineCaliperMeasureRoi lineCaliper => Midpoint(lineCaliper.P1.ToWpfPoint(), lineCaliper.P2.ToWpfPoint()),
+            CaliperMeasureRoi caliper => Midpoint(caliper.MeasurementP1.ToWpfPoint(), caliper.MeasurementP2.ToWpfPoint()),
+            LineCaliperMeasureRoi lineCaliper => Midpoint(lineCaliper.MeasurementP1.ToWpfPoint(), lineCaliper.MeasurementP2.ToWpfPoint()),
             ArrowAnnotationRoi arrow => Midpoint(arrow.P1.ToWpfPoint(), arrow.P2.ToWpfPoint()),
             LineMeasureRoi line => Midpoint(line.P1.ToWpfPoint(), line.P2.ToWpfPoint()),
-            ArcCaliperMeasureRoi arcCaliper => arcCaliper.Center.ToWpfPoint(),
-            CircularCaliperMeasureRoi circular => circular.Center.ToWpfPoint(),
+            ArcCaliperMeasureRoi arcCaliper => arcCaliper.MeasurementCenter.ToWpfPoint(),
+            CircularCaliperMeasureRoi circular => circular.MeasurementCenter.ToWpfPoint(),
             BlobAnalysisRoi blob => blob.Center.ToWpfPoint(),
             RotatedRect rect => rect.Center.ToWpfPoint(),
             FittedEllipseRoi fittedEllipse => fittedEllipse.Center.ToWpfPoint(),
@@ -90,6 +90,14 @@ namespace ImageViewer.Services
                 case ArrowAnnotationRoi arrow:
                     start = arrow.P1;
                     end = arrow.P2;
+                    return true;
+                case CaliperMeasureRoi caliper:
+                    start = caliper.MeasurementP1;
+                    end = caliper.MeasurementP2;
+                    return true;
+                case LineCaliperMeasureRoi lineCaliper:
+                    start = lineCaliper.MeasurementP1;
+                    end = lineCaliper.MeasurementP2;
                     return true;
                 case LineMeasureRoi line:
                     start = line.P1;

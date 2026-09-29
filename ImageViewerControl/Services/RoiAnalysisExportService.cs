@@ -284,15 +284,15 @@ namespace ImageViewer.Services
                 EllipseRoi ellipse => ($"RadiusX={ellipse.RadiusX * correction * pixelSize:F2} {unit}", $"RadiusY={ellipse.RadiusY * correction * pixelSize:F2} {unit}", $"Angle={ellipse.Angle:F1}°"),
                 CaliperMeasureRoi caliper => GetDualEdgeCaliperMetrics(caliper, correction, pixelSize, unit),
                 LineCaliperMeasureRoi lineCaliper => (
-                    $"Length={GeometryUtils.Distance(lineCaliper.P1.ToWpfPoint(), lineCaliper.P2.ToWpfPoint()) * correction * pixelSize:F2} {unit}",
+                    $"Length={GeometryUtils.Distance(lineCaliper.MeasurementP1.ToWpfPoint(), lineCaliper.MeasurementP2.ToWpfPoint()) * correction * pixelSize:F2} {unit}",
                     $"Angle={lineCaliper.AngleDegrees:F2}°",
                     $"Confidence={lineCaliper.Confidence:F3};RMS={lineCaliper.ResidualRms * correction:F3};Valid={lineCaliper.ValidCaliperCount}"),
                 ArcCaliperMeasureRoi arcCaliper => (
-                    $"Radius={arcCaliper.Radius * correction * pixelSize:F2} {unit}",
+                    $"Radius={arcCaliper.MeasurementRadius * correction * pixelSize:F2} {unit}",
                     $"Arc={arcCaliper.SweepAngle:F1}°",
                     $"Confidence={arcCaliper.Confidence:F3};RMS={arcCaliper.ResidualRms * correction:F3};Valid={arcCaliper.ValidCaliperCount}"),
                 CircularCaliperMeasureRoi circular => (
-                    $"Radius={circular.Radius * correction * pixelSize:F2} {unit}",
+                    $"Radius={circular.MeasurementRadius * correction * pixelSize:F2} {unit}",
                     $"Quality={circular.QualityStatus}",
                     $"QualityReason={circular.QualityReason};Confidence={circular.Confidence:F3};Coverage={circular.QualityAngularCoverageDegrees:F1};RMS={circular.ResidualRms:F3}"),
                 CircleRoi circle => ($"Radius={circle.Radius * correction * pixelSize:F2} {unit}", string.Empty, string.Empty),

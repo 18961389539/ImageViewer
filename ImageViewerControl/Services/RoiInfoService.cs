@@ -80,7 +80,7 @@ namespace ImageViewer.Services
                     AppendSingleEdgeCaliperInfoLines(
                         lines,
                         UiText.Get("InfoTitleLineCaliper"),
-                        $"Distance:{FormatLength(GeometryUtils.Distance(lineCaliper.P1.ToWpfPoint(), lineCaliper.P2.ToWpfPoint()) * correction, pixelSize, physicalUnit)}",
+                        $"Distance:{FormatLength(GeometryUtils.Distance(lineCaliper.MeasurementP1.ToWpfPoint(), lineCaliper.MeasurementP2.ToWpfPoint()) * correction, pixelSize, physicalUnit)}",
                         lineCaliper,
                         pixelSize,
                         physicalUnit,
@@ -91,23 +91,23 @@ namespace ImageViewer.Services
                     AppendSingleEdgeCaliperInfoLines(
                         lines,
                         UiText.Get("InfoTitleArcCaliper"),
-                        UiText.FormatInvariant("InfoLineArcCaliperGeometry", FormatLength(arcCaliper.Radius * correction, pixelSize, physicalUnit), arcCaliper.SweepAngle),
+                        UiText.FormatInvariant("InfoLineArcCaliperGeometry", FormatLength(arcCaliper.MeasurementRadius * correction, pixelSize, physicalUnit), arcCaliper.SweepAngle),
                         arcCaliper,
                         pixelSize,
                         physicalUnit,
                         correction,
-                        UiText.FormatInvariant("InfoLineArcCaliperDetail", arcCaliper.Center.X, arcCaliper.Center.Y, arcCaliper.StartAngle));
+                        UiText.FormatInvariant("InfoLineArcCaliperDetail", arcCaliper.MeasurementCenter.X, arcCaliper.MeasurementCenter.Y, arcCaliper.StartAngle));
                     break;
                 case CircularCaliperMeasureRoi circularCaliper:
                     AppendSingleEdgeCaliperInfoLines(
                         lines,
                         UiText.Get("InfoTitleCircularCaliper"),
-                        $"Radius:{FormatLength(circularCaliper.Radius * correction, pixelSize, physicalUnit)}",
+                        $"Radius:{FormatLength(circularCaliper.MeasurementRadius * correction, pixelSize, physicalUnit)}",
                         circularCaliper,
                         pixelSize,
                         physicalUnit,
                         correction,
-                        UiText.FormatInvariant("InfoLineCircularCaliperDetail", circularCaliper.Center.X, circularCaliper.Center.Y));
+                        UiText.FormatInvariant("InfoLineCircularCaliperDetail", circularCaliper.MeasurementCenter.X, circularCaliper.MeasurementCenter.Y));
                     break;
                 case RotatedRect rect:
                     lines.Add(UiText.FormatInvariant("InfoLineRectDimensions", FormatLength(rect.Width * correction, pixelSize, physicalUnit), FormatLength(rect.Height * correction, pixelSize, physicalUnit)));
@@ -295,7 +295,7 @@ namespace ImageViewer.Services
 
         private static void AppendDualEdgeCaliperInfoLines(List<string> lines, CaliperMeasureRoi caliper, double pixelSize, string? physicalUnit, double correction)
         {
-            lines.Add(UiText.FormatInvariant("InfoLineCaliperMeasure", FormatLength(GeometryUtils.Distance(caliper.P1.ToWpfPoint(), caliper.P2.ToWpfPoint()) * correction, pixelSize, physicalUnit)));
+            lines.Add(UiText.FormatInvariant("InfoLineCaliperMeasure", FormatLength(GeometryUtils.Distance(caliper.MeasurementP1.ToWpfPoint(), caliper.MeasurementP2.ToWpfPoint()) * correction, pixelSize, physicalUnit)));
             lines.Add(UiText.FormatInvariant("InfoLineRegionSearch", FormatLength(caliper.GetResolvedCaliperRegionLength() * correction, pixelSize, physicalUnit), FormatLength(caliper.CaliperSearchRange * 2 * correction, pixelSize, physicalUnit)));
             AppendCaliperParameterLine(lines, caliper);
             if (!caliper.HasDetectedEdges)

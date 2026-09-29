@@ -116,6 +116,8 @@ namespace ImageViewer.Rendering
             return new SingleEdgeCaliperDetectionDisplayState
             {
                 HasDetection = true,
+                DetectedCenter = detectionResult.DetectedCenter,
+                DetectedRadius = detectionResult.DetectedRadius,
                 RegionSegments = regionSegments,
                 CaliperBars = caliperBars,
                 InvalidCaliperMarkers = CaliperOverlayGeometryHelper.BuildCircularMarkers(detectionResult.InvalidSamplePoints.ToWpfPointArray(), detectionResult.ReferenceCenter.ToWpfPoint(), markerHalfLength),

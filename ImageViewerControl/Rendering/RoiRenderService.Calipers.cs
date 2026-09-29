@@ -53,6 +53,20 @@ namespace ImageViewer.Rendering
 
                 context.DrawEllipseOutline(caliper.Center.ToWpfPoint(), caliper.Radius, caliper.Radius, 0, brush, (isSelected ? 3 : caliper.StrokeThickness) / context.Scale);
 
+                bool hasDetectedGeometry = caliper.HasDetectedEdges && caliper.DetectedRadius > 0;
+                Point displayedCenter = caliper.MeasurementCenter.ToWpfPoint();
+                double displayedRadius = caliper.MeasurementRadius;
+                if (hasDetectedGeometry)
+                {
+                    context.DrawEllipseOutline(
+                        displayedCenter,
+                        displayedRadius,
+                        displayedRadius,
+                        0,
+                        Brushes.LimeGreen,
+                        2.4 / context.Scale);
+                }
+
                 if (isSelected)
                 {
                     StandardRoiLayoutHelper.DrawCircleHandles(context, caliper.Center.ToWpfPoint(), caliper.Radius);
@@ -60,8 +74,8 @@ namespace ImageViewer.Rendering
 
                 if (showDetails)
                 {
-                    string info = SingleEdgeCaliperRenderHelper.BuildSummaryText(caliper, $"半径：{context.FormatLength(caliper.Radius)}", "圆形边缘测量", context.ShowCaliperScores);
-                    context.DrawInfoText(info, StandardRoiLayoutHelper.GetTopInfoAnchor(caliper.Center.ToWpfPoint(), caliper.Radius, context), Brushes.White, true);
+                    string info = SingleEdgeCaliperRenderHelper.BuildSummaryText(caliper, $"半径：{context.FormatLength(displayedRadius)}", "圆形边缘测量", context.ShowCaliperScores);
+                    context.DrawInfoText(info, StandardRoiLayoutHelper.GetTopInfoAnchor(displayedCenter, displayedRadius, context), Brushes.White, true);
                 }
             }
         }
@@ -109,6 +123,15 @@ namespace ImageViewer.Rendering
                 context.DrawArc(caliper.Center.ToWpfPoint(), caliper.Radius, caliper.StartAngle, caliper.SweepAngle, brush, (isSelected ? 3 : caliper.StrokeThickness) / context.Scale);
                 DrawArcEndpoints(context, caliper, brush, (isSelected ? 3 : caliper.StrokeThickness) / context.Scale);
 
+                bool hasDetectedGeometry = caliper.HasDetectedEdges && caliper.DetectedRadius > 0;
+                Point displayedCenter = caliper.MeasurementCenter.ToWpfPoint();
+                double displayedRadius = caliper.MeasurementRadius;
+                if (hasDetectedGeometry)
+                {
+                    context.DrawArc(displayedCenter, displayedRadius, caliper.StartAngle, caliper.SweepAngle, Brushes.LimeGreen, 2.4 / context.Scale);
+                    DrawArcEndpoints(context, displayedCenter, displayedRadius, caliper.StartAngle, caliper.SweepAngle, Brushes.LimeGreen, 2.4 / context.Scale);
+                }
+
                 if (isSelected)
                 {
                     StandardRoiLayoutHelper.DrawCircleHandles(context, caliper.Center.ToWpfPoint(), caliper.Radius);
@@ -116,19 +139,24 @@ namespace ImageViewer.Rendering
 
                 if (showDetails)
                 {
-                    string info = SingleEdgeCaliperRenderHelper.BuildSummaryText(caliper, $"半径：{context.FormatLength(caliper.Radius)} 弧角：{caliper.SweepAngle:F0}°", "弧形边缘测量", context.ShowCaliperScores);
-                    context.DrawInfoText(info, StandardRoiLayoutHelper.GetTopInfoAnchor(caliper.Center.ToWpfPoint(), caliper.Radius, context), Brushes.White, true);
+                    string info = SingleEdgeCaliperRenderHelper.BuildSummaryText(caliper, $"半径：{context.FormatLength(displayedRadius)} 弧角：{caliper.SweepAngle:F0}°", "弧形边缘测量", context.ShowCaliperScores);
+                    context.DrawInfoText(info, StandardRoiLayoutHelper.GetTopInfoAnchor(displayedCenter, displayedRadius, context), Brushes.White, true);
                 }
             }
 
             private static void DrawArcEndpoints(RoiRenderContext context, ArcCaliperMeasureRoi caliper, Brush brush, double thickness)
             {
-                double startRadians = caliper.StartAngle * Math.PI / 180.0;
-                double endRadians = (caliper.StartAngle + caliper.SweepAngle) * Math.PI / 180.0;
-                Point start = new(caliper.Center.X + Math.Cos(startRadians) * caliper.Radius, caliper.Center.Y + Math.Sin(startRadians) * caliper.Radius);
-                Point end = new(caliper.Center.X + Math.Cos(endRadians) * caliper.Radius, caliper.Center.Y + Math.Sin(endRadians) * caliper.Radius);
-                context.DrawLineSegment(caliper.Center.ToWpfPoint(), start, brush, thickness * 0.6);
-                context.DrawLineSegment(caliper.Center.ToWpfPoint(), end, brush, thickness * 0.6);
+                DrawArcEndpoints(context, caliper.Center.ToWpfPoint(), caliper.Radius, caliper.StartAngle, caliper.SweepAngle, brush, thickness);
+            }
+
+            private static void DrawArcEndpoints(RoiRenderContext context, Point center, double radius, double startAngle, double sweepAngle, Brush brush, double thickness)
+            {
+                double startRadians = startAngle * Math.PI / 180.0;
+                double endRadians = (startAngle + sweepAngle) * Math.PI / 180.0;
+                Point start = new(center.X + Math.Cos(startRadians) * radius, center.Y + Math.Sin(startRadians) * radius);
+                Point end = new(center.X + Math.Cos(endRadians) * radius, center.Y + Math.Sin(endRadians) * radius);
+                context.DrawLineSegment(center, start, brush, thickness * 0.6);
+                context.DrawLineSegment(center, end, brush, thickness * 0.6);
             }
         }
 
@@ -197,12 +225,8 @@ namespace ImageViewer.Rendering
 
                 if (showDetails)
                 {
-                    PointD measurementP1 = line.HasDetectedLine && (line.DetectedP1 != default || line.DetectedP2 != default)
-                        ? line.DetectedP1
-                        : line.P1;
-                    PointD measurementP2 = line.HasDetectedLine && (line.DetectedP1 != default || line.DetectedP2 != default)
-                        ? line.DetectedP2
-                        : line.P2;
+                    PointD measurementP1 = line.MeasurementP1;
+                    PointD measurementP2 = line.MeasurementP2;
                     string info = SingleEdgeCaliperRenderHelper.BuildSummaryText(line, $"边缘距离：{context.FormatLength(GeometryUtils.Distance(measurementP1.ToWpfPoint(), measurementP2.ToWpfPoint()))}", "单边缘测量", context.ShowCaliperScores);
                     context.DrawInfoText(info, new Point((line.P1.X + line.P2.X) / 2, (line.P1.Y + line.P2.Y) / 2), Brushes.White, true);
                 }

@@ -126,10 +126,10 @@ namespace ImageViewer.Services
                     => caliper.WidthMeasurement.CenterDistance,
                 CaliperMeasureRoi => null,
                 LineCaliperMeasureRoi lineCaliper when lineCaliper.HasDetectedLine && IsDetectionAcceptableForMeasurement(detectionStatus)
-                    => GeometryUtils.Distance(lineCaliper.P1.ToWpfPoint(), lineCaliper.P2.ToWpfPoint()),
+                    => GeometryUtils.Distance(lineCaliper.MeasurementP1.ToWpfPoint(), lineCaliper.MeasurementP2.ToWpfPoint()),
                 LineCaliperMeasureRoi => null,
                 CircularCaliperMeasureRoi circular when circular.HasDetectedEdges && IsDetectionAcceptableForMeasurement(detectionStatus)
-                    => circular.Radius,
+                    => circular.MeasurementRadius,
                 CircularCaliperMeasureRoi => null,
                 LineMeasureRoi line => GeometryUtils.Distance(line.P1.ToWpfPoint(), line.P2.ToWpfPoint()),
                 ArcMeasureRoi arc when arc.IsValid => arc.Radius,

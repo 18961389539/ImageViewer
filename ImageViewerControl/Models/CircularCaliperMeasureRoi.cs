@@ -128,6 +128,17 @@ namespace ImageViewer.Models
             set => SetProperty(ref _caliperSamplingHalfWidth, Math.Max(0, value));
         }
 
+        /// <summary>
+        /// 检测器拟合出的最终圆几何。Center/Radius 始终保留操作员手动画出的参考圆。
+        /// </summary>
+        public PointD DetectedCenter => DetectionDisplayState.DetectedCenter;
+
+        public double DetectedRadius => DetectionDisplayState.DetectedRadius;
+
+        public PointD MeasurementCenter => HasDetectedEdges && DetectedRadius > 0 ? DetectedCenter : Center;
+
+        public double MeasurementRadius => HasDetectedEdges && DetectedRadius > 0 ? DetectedRadius : Radius;
+
         public double CaliperEdgeSigma
         {
             get => _caliperEdgeSigma;
@@ -261,6 +272,12 @@ namespace ImageViewer.Models
                 0,
                 0,
                 CircularCaliperQualityReason.NotMeasured));
+        }
+
+        internal void SetDetectedCircle(PointD center, double radius)
+        {
+            SetDetectionDisplayStateValue(DetectionDisplayState.DetectedCenter, center, static (state, value) => state.DetectedCenter = value);
+            SetDetectionDisplayStateValue(DetectionDisplayState.DetectedRadius, radius, static (state, value) => state.DetectedRadius = value);
         }
 
         public void SetCaliperVisualization(

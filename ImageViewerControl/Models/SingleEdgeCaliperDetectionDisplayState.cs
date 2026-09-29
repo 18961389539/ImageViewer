@@ -12,6 +12,12 @@ namespace ImageViewer.Models
 
         public PointD DetectedP2 { get; set; }
 
+        // Circular-caliper results are kept separate from the hand-drawn
+        // center/radius for the same reason as line-caliper results above.
+        public PointD DetectedCenter { get; set; }
+
+        public double DetectedRadius { get; set; }
+
         public LineSegmentOverlay[] RegionSegments { get; set; } = [];
 
         public LineSegmentOverlay[] CaliperBars { get; set; } = [];
@@ -45,6 +51,8 @@ namespace ImageViewer.Models
                 HasDetection = roi.HasDetection,
                 DetectedP1 = roi is LineCaliperMeasureRoi ? ((LineCaliperMeasureRoi)roi).DetectedP1 : default,
                 DetectedP2 = roi is LineCaliperMeasureRoi ? ((LineCaliperMeasureRoi)roi).DetectedP2 : default,
+                DetectedCenter = roi is CircularCaliperMeasureRoi ? ((CircularCaliperMeasureRoi)roi).DetectedCenter : default,
+                DetectedRadius = roi is CircularCaliperMeasureRoi ? ((CircularCaliperMeasureRoi)roi).DetectedRadius : 0,
                 RegionSegments = [.. roi.RegionSegments],
                 CaliperBars = [.. roi.CaliperBars],
                 InvalidCaliperMarkers = [.. roi.InvalidCaliperMarkers],
@@ -106,7 +114,26 @@ namespace ImageViewer.Models
 
         public SingleEdgeCaliperDetectionDisplayState Clone()
         {
-            return Capture(new DetectionDisplayStateAdapter(this));
+            return new SingleEdgeCaliperDetectionDisplayState
+            {
+                HasDetection = HasDetection,
+                DetectedP1 = DetectedP1,
+                DetectedP2 = DetectedP2,
+                DetectedCenter = DetectedCenter,
+                DetectedRadius = DetectedRadius,
+                RegionSegments = [.. RegionSegments],
+                CaliperBars = [.. CaliperBars],
+                InvalidCaliperMarkers = [.. InvalidCaliperMarkers],
+                EdgeMarkers = [.. EdgeMarkers],
+                RejectedEdgeMarkers = [.. RejectedEdgeMarkers],
+                ScoreOverlays = [.. ScoreOverlays],
+                EdgePoints = [.. EdgePoints],
+                AverageScore = AverageScore,
+                ResidualRms = ResidualRms,
+                ResidualMax = ResidualMax,
+                ValidCaliperCount = ValidCaliperCount,
+                Confidence = Confidence
+            };
         }
 
         public void ApplyTo(ISingleEdgeCaliperDetectionDisplayStateOwner roi)
@@ -115,6 +142,10 @@ namespace ImageViewer.Models
             if (roi is LineCaliperMeasureRoi line)
             {
                 line.SetDetectedLine(DetectedP1, DetectedP2);
+            }
+            else if (roi is CircularCaliperMeasureRoi circular)
+            {
+                circular.SetDetectedCircle(DetectedCenter, DetectedRadius);
             }
             roi.RegionSegments = [.. RegionSegments];
             roi.CaliperBars = [.. CaliperBars];
@@ -130,28 +161,5 @@ namespace ImageViewer.Models
             roi.Confidence = Confidence;
         }
 
-        private sealed class DetectionDisplayStateAdapter : ISingleEdgeCaliperDetectionDisplayStateOwner
-        {
-            private readonly SingleEdgeCaliperDetectionDisplayState _state;
-
-            public DetectionDisplayStateAdapter(SingleEdgeCaliperDetectionDisplayState state)
-            {
-                _state = state;
-            }
-
-            public bool HasDetection { get => _state.HasDetection; set => _state.HasDetection = value; }
-            public LineSegmentOverlay[] RegionSegments { get => _state.RegionSegments; set => _state.RegionSegments = value; }
-            public LineSegmentOverlay[] CaliperBars { get => _state.CaliperBars; set => _state.CaliperBars = value; }
-            public LineSegmentOverlay[] InvalidCaliperMarkers { get => _state.InvalidCaliperMarkers; set => _state.InvalidCaliperMarkers = value; }
-            public LineSegmentOverlay[] EdgeMarkers { get => _state.EdgeMarkers; set => _state.EdgeMarkers = value; }
-            public LineSegmentOverlay[] RejectedEdgeMarkers { get => _state.RejectedEdgeMarkers; set => _state.RejectedEdgeMarkers = value; }
-            public CaliperScoreOverlay[] ScoreOverlays { get => _state.ScoreOverlays; set => _state.ScoreOverlays = value; }
-            public PointD[] EdgePoints { get => _state.EdgePoints; set => _state.EdgePoints = value; }
-            public double AverageScore { get => _state.AverageScore; set => _state.AverageScore = value; }
-            public double ResidualRms { get => _state.ResidualRms; set => _state.ResidualRms = value; }
-            public double ResidualMax { get => _state.ResidualMax; set => _state.ResidualMax = value; }
-            public int ValidCaliperCount { get => _state.ValidCaliperCount; set => _state.ValidCaliperCount = value; }
-            public double Confidence { get => _state.Confidence; set => _state.Confidence = value; }
-        }
     }
 }

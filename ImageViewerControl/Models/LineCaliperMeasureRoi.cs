@@ -107,6 +107,10 @@ namespace ImageViewer.Models
 
         public PointD DetectedP2 => DetectionDisplayState.DetectedP2;
 
+        public PointD MeasurementP1 => HasDetectedLine && (DetectedP1 != default || DetectedP2 != default) ? DetectedP1 : P1;
+
+        public PointD MeasurementP2 => HasDetectedLine && (DetectedP1 != default || DetectedP2 != default) ? DetectedP2 : P2;
+
         public double CaliperEdgeSigma
         {
             get => _caliperEdgeSigma;

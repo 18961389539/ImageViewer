@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
+using ImageViewer.Localization;
 using ImageViewer.Models;
 using ImageViewer.Plugins;
 using Xunit;
@@ -362,6 +363,42 @@ namespace ImageViewerControl.Tests
             string[] expectedHeaders = ["Beta", "Alpha", "Gamma", "Zulu"];
 
             Assert.Equal(expectedHeaders, headers);
+        }
+
+        [Fact]
+        public void BuiltInMeasurementToolsUsePracticalOrder()
+        {
+            RoiPluginRegistry registry = RoiPluginRegistry.CreateBuiltIn();
+
+            string[] actual = registry.GetDrawingTools()
+                .Where(static tool => tool.IsMeasurement)
+                .Select(static tool => tool.Header)
+                .ToArray();
+            string[] expected =
+            [
+                UiText.Get("ToolPointCoordinate"),
+                UiText.Get("ToolLineMeasure"),
+                UiText.Get("ToolCaliperMeasure"),
+                UiText.Get("ToolAngleMeasure"),
+                UiText.Get("ToolArcMeasure"),
+                UiText.Get("ToolAreaMeasure"),
+                UiText.Get("ToolPolylineMeasure"),
+                UiText.Get("ToolThreePointCircle"),
+                UiText.Get("ToolFittedEllipse"),
+                UiText.Get("ToolLineCaliper"),
+                UiText.Get("ToolCircularCaliper"),
+                UiText.Get("ToolArcCaliper"),
+                UiText.Get("ToolAutomaticCircle"),
+                UiText.Get("ToolAutomaticEdgePoint"),
+                UiText.Get("ToolPointToLineDistance"),
+                UiText.Get("ToolPointToCircleDistance"),
+                UiText.Get("ToolParallelism"),
+                UiText.Get("ToolPerpendicularity"),
+                UiText.Get("ToolConcentricity"),
+                UiText.Get("ToolCenterDistance")
+            ];
+
+            Assert.Equal(expected, actual);
         }
 
         [Fact]

@@ -91,7 +91,7 @@ namespace ImageViewer.Plugins
                     hitTestOrder: 89,
                     drawingTools:
                     [
-                        new RoiToolDescriptor(UiText.Get("ToolFittedEllipse"), BuiltInDrawControllers.FittedEllipse, 25, CreateFittedEllipseIcon, isMeasurement: true)
+                        new RoiToolDescriptor(UiText.Get("ToolFittedEllipse"), BuiltInDrawControllers.FittedEllipse, 75, CreateFittedEllipseIcon, isMeasurement: true)
                     ],
                     persistence: CreateCenterEllipsePersistence(
                         data => new FittedEllipseRoi
@@ -133,7 +133,7 @@ namespace ImageViewer.Plugins
                     drawingTools:
                     [
                         new RoiToolDescriptor(UiText.Get("ToolPolygon"), BuiltInDrawControllers.Polygon, 30, CreatePolygonIcon),
-                        new RoiToolDescriptor(UiText.Get("ToolAreaMeasure"), BuiltInDrawControllers.Polygon, 65, CreatePolygonIcon, isMeasurement: true)
+                        new RoiToolDescriptor(UiText.Get("ToolAreaMeasure"), BuiltInDrawControllers.Polygon, 60, CreatePolygonIcon, isMeasurement: true)
                     ],
                     persistence: CreatePointsPersistence(
                         data => new PolygonRoi
@@ -185,7 +185,7 @@ namespace ImageViewer.Plugins
                     [
                         new RoiToolDescriptor(UiText.Get("ToolPolyline"), BuiltInDrawControllers.Polyline, 50, CreatePolylineIcon),
                         new RoiToolDescriptor(UiText.Get("ToolFreehand"), BuiltInDrawControllers.FreehandPolyline, 60, CreateFreehandIcon),
-                        new RoiToolDescriptor(UiText.Get("ToolPolylineMeasure"), BuiltInDrawControllers.Polyline, 66, CreatePolylineIcon, isMeasurement: true)
+                        new RoiToolDescriptor(UiText.Get("ToolPolylineMeasure"), BuiltInDrawControllers.Polyline, 65, CreatePolylineIcon, isMeasurement: true)
                     ],
                     persistence: CreatePointsPersistence(
                         data => new PolylineRoi

@@ -25,8 +25,6 @@ namespace ImageViewer.Services
 
         public static void Apply(CircularCaliperMeasureRoi caliper, CoreCircularDetectionResult detectionResult, ImageAnalysisQualityProfile? profile = null)
         {
-            caliper.Center = detectionResult.DetectedCenter;
-            caliper.Radius = detectionResult.DetectedRadius;
             caliper.SetDetectionVisualization(CaliperDetectionDisplayStateFactory.Create(caliper, detectionResult));
             if (caliper is not ArcCaliperMeasureRoi)
             {

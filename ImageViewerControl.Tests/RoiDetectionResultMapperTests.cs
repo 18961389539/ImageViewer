@@ -1,6 +1,7 @@
 using ImageViewer.Models;
 using ImageViewer.Services;
 using Xunit;
+using CoreCircularDetectionResult = ImageViewer.Core.Analysis.CircularCaliperDetectionResult;
 using CoreLineCaliperDetectionResult = ImageViewer.Core.Analysis.LineCaliperDetectionResult;
 using CoreLineMeasureGradientDetectionResult = ImageViewer.Core.Analysis.LineMeasureGradientDetectionResult;
 
@@ -80,6 +81,37 @@ namespace ImageViewerControl.Tests
             Assert.Equal(new PointD(90, 20), roi.P2);
             Assert.Equal(new PointD(20, 20), roi.DetectedP1);
             Assert.Equal(new PointD(80, 20), roi.DetectedP2);
+        }
+
+        [Fact]
+        public void Apply_CircularCaliperKeepsManualReferenceAndStoresDetectedCircleSeparately()
+        {
+            var roi = new CircularCaliperMeasureRoi
+            {
+                Center = new PointD(50, 50),
+                Radius = 20
+            };
+            var result = new CoreCircularDetectionResult(
+                ReferenceCenter: new PointD(50, 50),
+                ReferenceRadius: 20,
+                DetectedCenter: new PointD(54, 48),
+                DetectedRadius: 24,
+                InvalidSamplePoints: [],
+                EdgePoints: [],
+                RejectedEdgePoints: [],
+                EdgeScores: [],
+                AverageScore: 1,
+                ResidualRms: 0,
+                ResidualMax: 0,
+                ValidCaliperCount: 12,
+                Confidence: 1);
+
+            RoiDetectionResultMapper.Apply(roi, result);
+
+            Assert.Equal(new PointD(50, 50), roi.Center);
+            Assert.Equal(20, roi.Radius);
+            Assert.Equal(new PointD(54, 48), roi.DetectedCenter);
+            Assert.Equal(24, roi.DetectedRadius);
         }
     }
 }

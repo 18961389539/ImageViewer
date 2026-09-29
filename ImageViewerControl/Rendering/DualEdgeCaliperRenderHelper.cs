@@ -119,11 +119,7 @@ namespace ImageViewer.Rendering
         {
             // Older in-memory ROIs may only set HasDetectedEdges and P1/P2.
             // Fall back to the reference segment when no separate result segment exists.
-            bool hasSeparateResult = caliper.HasDetectedEdges
-                && (caliper.DetectedP1 != default || caliper.DetectedP2 != default);
-            return hasSeparateResult
-                ? (caliper.DetectedP1, caliper.DetectedP2)
-                : (caliper.P1, caliper.P2);
+            return (caliper.MeasurementP1, caliper.MeasurementP2);
         }
     }
 }
