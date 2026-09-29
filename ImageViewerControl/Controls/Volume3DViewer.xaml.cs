@@ -1,7 +1,11 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Threading;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
 using HelixToolkit.Geometry;
@@ -29,6 +33,9 @@ namespace ImageViewer.Controls
         private bool _showCoronalPlane;
         private bool _showSagittalPlane;
         private bool _isDisposed;
+        private TextBox? _menuSearchBox;
+        private TextBlock? _menuSearchMatchCountText;
+        private TextBlock? _menuSearchNoResultsText;
 
         public event EventHandler? SwitchToAxialSliceRequested;
         public event EventHandler<VolumeVoxelPickedEventArgs>? VoxelPicked;
@@ -308,6 +315,293 @@ namespace ImageViewer.Controls
         private void OnSideViewClick(object sender, RoutedEventArgs e) => ShowSideView();
         private void OnOppositeSideViewClick(object sender, RoutedEventArgs e) => ShowOppositeSideView();
         private void OnIsometricViewClick(object sender, RoutedEventArgs e) => ShowIsometricView();
+
+        private static IEnumerable<MenuItem> EnumerateMenuItems(ItemsControl itemsControl)
+        {
+            foreach (object item in itemsControl.Items)
+            {
+                if (item is not MenuItem menuItem)
+                {
+                    continue;
+                }
+
+                yield return menuItem;
+                foreach (MenuItem child in EnumerateMenuItems(menuItem))
+                {
+                    yield return child;
+                }
+            }
+        }
+
+        private void EnsureMenuSearchTemplateParts()
+        {
+            if (_menuSearchBox is not null)
+            {
+                return;
+            }
+
+            threeDContextMenu.ApplyTemplate();
+            _menuSearchBox = threeDContextMenu.Template?.FindName("PART_MenuSearchBox", threeDContextMenu) as TextBox
+                ?? throw new InvalidOperationException("3D 菜单搜索框模板部件缺失。");
+            _menuSearchMatchCountText = threeDContextMenu.Template?.FindName("PART_MenuSearchMatchCount", threeDContextMenu) as TextBlock
+                ?? throw new InvalidOperationException("3D 菜单搜索结果模板部件缺失。");
+            _menuSearchNoResultsText = threeDContextMenu.Template?.FindName("PART_MenuSearchNoResults", threeDContextMenu) as TextBlock
+                ?? throw new InvalidOperationException("3D 菜单无结果模板部件缺失。");
+        }
+
+        private void OnThreeDContextMenuOpened(object sender, RoutedEventArgs e)
+        {
+            EnsureMenuSearchTemplateParts();
+            menuSearchBox.Clear();
+            menuSearchBox.Dispatcher.BeginInvoke(
+                () => menuSearchBox.Focus(),
+                DispatcherPriority.Input);
+        }
+
+        private TextBox menuSearchBox
+        {
+            get
+            {
+                EnsureMenuSearchTemplateParts();
+                return _menuSearchBox!;
+            }
+        }
+
+        private TextBlock menuSearchMatchCountText
+        {
+            get
+            {
+                EnsureMenuSearchTemplateParts();
+                return _menuSearchMatchCountText!;
+            }
+        }
+
+        private TextBlock menuSearchNoResultsText
+        {
+            get
+            {
+                EnsureMenuSearchTemplateParts();
+                return _menuSearchNoResultsText!;
+            }
+        }
+
+        private void OnThreeDMenuSearchTextChanged(object sender, TextChangedEventArgs e)
+        {
+            string[] words = menuSearchBox.Text.Trim().Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries);
+            if (words.Length == 0)
+            {
+                foreach (MenuItem menuItem in EnumerateMenuItems(threeDContextMenu))
+                {
+                    menuItem.Visibility = Visibility.Visible;
+                }
+
+                foreach (object item in threeDContextMenu.Items)
+                {
+                    if (item is Separator separator)
+                    {
+                        separator.Visibility = Visibility.Visible;
+                    }
+                }
+
+                menuSearchMatchCountText.Visibility = Visibility.Collapsed;
+                menuSearchNoResultsText.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            bool hasMatch = false;
+            int matchCount = 0;
+            foreach (object item in threeDContextMenu.Items)
+            {
+                if (item is MenuItem menuItem)
+                {
+                    bool itemMatch = UpdateMenuSearchVisibility(menuItem, words);
+                    hasMatch |= itemMatch;
+                    if (itemMatch)
+                    {
+                        matchCount += CountMatchingLeafMenuItems(menuItem, words);
+                    }
+                }
+                else if (item is Separator separator)
+                {
+                    separator.Visibility = Visibility.Collapsed;
+                }
+            }
+
+            menuSearchMatchCountText.Text = UiText.Format("MenuSearchMatchCount", matchCount);
+            menuSearchMatchCountText.Visibility = hasMatch ? Visibility.Visible : Visibility.Collapsed;
+            menuSearchNoResultsText.Visibility = hasMatch ? Visibility.Collapsed : Visibility.Visible;
+            UpdateMenuSeparatorVisibility(threeDContextMenu);
+        }
+
+        private void OnThreeDMenuSearchPreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Escape)
+            {
+                if (!string.IsNullOrEmpty(menuSearchBox.Text))
+                {
+                    menuSearchBox.Clear();
+                }
+                else
+                {
+                    threeDContextMenu.IsOpen = false;
+                }
+
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Key == Key.Down && TryFocusFirstVisibleMenuItem())
+            {
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Key == Key.Enter && TryInvokeSingleVisibleMenuItem())
+            {
+                e.Handled = true;
+            }
+        }
+
+        private bool TryFocusFirstVisibleMenuItem()
+        {
+            foreach (MenuItem menuItem in EnumerateMenuItems(threeDContextMenu))
+            {
+                if (menuItem.Items.Count == 0 && menuItem.Visibility == Visibility.Visible && menuItem.IsEnabled)
+                {
+                    menuItem.Focus();
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool TryInvokeSingleVisibleMenuItem()
+        {
+            if (string.IsNullOrWhiteSpace(menuSearchBox.Text))
+            {
+                return false;
+            }
+
+            List<MenuItem> matches = EnumerateMenuItems(threeDContextMenu)
+                .Where(item => item.Items.Count == 0 && item.Visibility == Visibility.Visible && item.IsEnabled)
+                .Take(2)
+                .ToList();
+            if (matches.Count != 1)
+            {
+                return false;
+            }
+
+            matches[0].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            return true;
+        }
+
+        private static bool UpdateMenuSearchVisibility(MenuItem menuItem, string[] words)
+        {
+            bool childMatch = false;
+            foreach (object child in menuItem.Items)
+            {
+                if (child is MenuItem childMenuItem)
+                {
+                    childMatch |= UpdateMenuSearchVisibility(childMenuItem, words);
+                }
+            }
+
+            bool ownMatch = menuItem.Items.Count == 0 && MatchesOwnSearchTerms(menuItem, words);
+            bool visible = ownMatch || childMatch;
+            menuItem.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            return visible;
+        }
+
+        private static int CountMatchingLeafMenuItems(MenuItem menuItem, string[] words)
+        {
+            int count = 0;
+            foreach (object child in menuItem.Items)
+            {
+                if (child is MenuItem childMenuItem)
+                {
+                    count += CountMatchingLeafMenuItems(childMenuItem, words);
+                }
+            }
+
+            if (menuItem.Items.Count == 0 && menuItem.Visibility == Visibility.Visible && MatchesOwnSearchTerms(menuItem, words))
+            {
+                count++;
+            }
+
+            return count;
+        }
+
+        private static void UpdateMenuSeparatorVisibility(ItemsControl itemsControl)
+        {
+            for (int index = 0; index < itemsControl.Items.Count; index++)
+            {
+                if (itemsControl.Items[index] is not Separator separator)
+                {
+                    continue;
+                }
+
+                bool before = FindVisibleMenuItem(itemsControl, index, -1);
+                bool after = FindVisibleMenuItem(itemsControl, index, 1);
+                separator.Visibility = before && after ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            foreach (object item in itemsControl.Items)
+            {
+                if (item is MenuItem menuItem)
+                {
+                    UpdateMenuSeparatorVisibility(menuItem);
+                }
+            }
+        }
+
+        private static bool FindVisibleMenuItem(ItemsControl itemsControl, int separatorIndex, int direction)
+        {
+            for (int index = separatorIndex + direction; index >= 0 && index < itemsControl.Items.Count; index += direction)
+            {
+                if (itemsControl.Items[index] is MenuItem menuItem)
+                {
+                    return menuItem.Visibility == Visibility.Visible;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool MatchesAllWords(string? text, string[] words)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return false;
+            }
+
+            string normalized = NormalizeSearchText(text);
+            return words.All(word => normalized.Contains(NormalizeSearchText(word), StringComparison.Ordinal));
+        }
+
+        private static bool MatchesOwnSearchTerms(MenuItem menuItem, string[] words)
+        {
+            return MatchesAllWords(menuItem.Header?.ToString(), words)
+                || MatchesAllWords(menuItem.InputGestureText, words)
+                || MatchesAllWords(menuItem.ToolTip?.ToString(), words);
+        }
+
+        private static string NormalizeSearchText(string text)
+        {
+            Span<char> buffer = text.Length <= 256 ? stackalloc char[text.Length] : new char[text.Length];
+            int count = 0;
+            foreach (char c in text)
+            {
+                if (char.IsWhiteSpace(c) || c is '+' or '-' or '.' or '/' or '\\' or '(' or ')' or '（' or '）')
+                {
+                    continue;
+                }
+
+                buffer[count++] = char.ToLowerInvariant(c);
+            }
+
+            return count == text.Length ? text.ToLowerInvariant() : new string(buffer[..count]);
+        }
 
         private void OnCoordinateSystemClick(object sender, RoutedEventArgs e)
         {

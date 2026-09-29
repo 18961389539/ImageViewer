@@ -8,7 +8,7 @@
     automation:AutomationProperties.Name="{localization:UiText Volume3DViewerName}">
     <Grid Background="#0A0F16">
         <Grid.ContextMenu>
-            <ContextMenu x:Name="threeDContextMenu" x:FieldModifier="internal">
+            <ContextMenu x:Name="threeDContextMenu" x:FieldModifier="internal" Opened="OnThreeDContextMenuOpened">
                 <ContextMenu.Resources>
                     <Style TargetType="ContextMenu">
                         <Setter Property="Background" Value="#18212E" />
@@ -20,7 +20,42 @@
                             <Setter.Value>
                                 <ControlTemplate TargetType="ContextMenu">
                                     <Border Background="#18212E" BorderBrush="#314158" BorderThickness="1" CornerRadius="6" Padding="2" SnapsToDevicePixels="True">
-                                        <ItemsPresenter SnapsToDevicePixels="True" />
+                                        <DockPanel LastChildFill="True">
+                                            <StackPanel DockPanel.Dock="Top">
+                                                <TextBlock Margin="8,6,8,0"
+                                                           Foreground="#AAB5C3"
+                                                           FontSize="11"
+                                                           Text="{localization:UiText MenuSearch}" />
+                                                <TextBox x:Name="PART_MenuSearchBox"
+                                                         Margin="4"
+                                                         Padding="8,5"
+                                                         HorizontalAlignment="Stretch"
+                                                         Background="#111824"
+                                                         Foreground="#F5F8FC"
+                                                         BorderBrush="#314158"
+                                                         CaretBrush="#F5F8FC"
+                                                         SelectionBrush="#69AFFF"
+                                                         ToolTip="{localization:UiText MenuSearch}"
+                                                         automation:AutomationProperties.Name="{localization:UiText MenuSearch}"
+                                                         automation:AutomationProperties.HelpText="{localization:UiText MenuSearch}"
+                                                         TextChanged="OnThreeDMenuSearchTextChanged"
+                                                         PreviewKeyDown="OnThreeDMenuSearchPreviewKeyDown" />
+                                                <TextBlock x:Name="PART_MenuSearchMatchCount"
+                                                           Margin="12,4,12,2"
+                                                           Foreground="#69AFFF"
+                                                           Text="{localization:UiText MenuSearchMatchCount}"
+                                                           automation:AutomationProperties.LiveSetting="Polite"
+                                                           Visibility="Collapsed" />
+                                                <TextBlock x:Name="PART_MenuSearchNoResults"
+                                                           Margin="12,4,12,8"
+                                                           Foreground="#AAB5C3"
+                                                           Text="{localization:UiText MenuSearchNoResults}"
+                                                           automation:AutomationProperties.LiveSetting="Polite"
+                                                           Visibility="Collapsed" />
+                                                <Separator />
+                                            </StackPanel>
+                                            <ItemsPresenter SnapsToDevicePixels="True" />
+                                        </DockPanel>
                                     </Border>
                                 </ControlTemplate>
                             </Setter.Value>
@@ -72,7 +107,10 @@
                                             <Setter TargetName="menuItemBorder" Property="Background" Value="#243245" />
                                         </Trigger>
                                         <Trigger Property="IsEnabled" Value="False">
+                                            <Setter TargetName="menuItemBorder" Property="Background" Value="Transparent" />
                                             <Setter Property="Foreground" Value="#5A6B7D" />
+                                            <Setter TargetName="shortcutText" Property="Foreground" Value="#536172" />
+                                            <Setter TargetName="submenuArrow" Property="Stroke" Value="#536172" />
                                         </Trigger>
                                         <Trigger Property="IsChecked" Value="True">
                                             <Setter TargetName="checkGlyph" Property="Visibility" Value="Visible" />
@@ -94,6 +132,13 @@
                                 </ControlTemplate>
                             </Setter.Value>
                         </Setter>
+                    </Style>
+                    <Style TargetType="TextBox">
+                        <Setter Property="Background" Value="#111824" />
+                        <Setter Property="Foreground" Value="#F5F8FC" />
+                        <Setter Property="BorderBrush" Value="#314158" />
+                        <Setter Property="CaretBrush" Value="#F5F8FC" />
+                        <Setter Property="SelectionBrush" Value="#69AFFF" />
                     </Style>
                 </ContextMenu.Resources>
                 <MenuItem Header="{localization:UiText Menu3DResetCamera}" ToolTip="{localization:UiText Menu3DResetCameraTooltip}" Click="OnResetCameraClick" />

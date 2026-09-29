@@ -48,6 +48,7 @@ namespace ImageViewer.Controls
                 ? Visibility.Visible
                 : Visibility.Collapsed;
             _owner.infoPanel.Visibility = isVisible ? Visibility.Collapsed : (_owner.ShowInfoPanel ? Visibility.Visible : Visibility.Collapsed);
+            _owner.UpdateInteractionModeVisuals();
         }
 
         public void ApplyCaliperDetection(CaliperMeasureRoi roi)

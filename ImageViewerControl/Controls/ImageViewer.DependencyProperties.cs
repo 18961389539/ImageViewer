@@ -31,6 +31,10 @@ namespace ImageViewer.Controls
             DependencyProperty.Register(nameof(ImageLoadHasError), typeof(bool), typeof(ImageViewer),
                 new PropertyMetadata(false));
 
+        public static readonly DependencyProperty CanCancelImageLoadProperty =
+            DependencyProperty.Register(nameof(CanCancelImageLoad), typeof(bool), typeof(ImageViewer),
+                new PropertyMetadata(false));
+
         public static readonly DependencyProperty HasDiagnosticErrorProperty =
             DependencyProperty.Register(nameof(HasDiagnosticError), typeof(bool), typeof(ImageViewer),
                 new PropertyMetadata(false));
@@ -49,6 +53,14 @@ namespace ImageViewer.Controls
 
         public static readonly DependencyProperty ActiveToolNameProperty =
             DependencyProperty.Register(nameof(ActiveToolName), typeof(string), typeof(ImageViewer),
+                new PropertyMetadata(string.Empty));
+
+        public static readonly DependencyProperty InteractionModeTextProperty =
+            DependencyProperty.Register(nameof(InteractionModeText), typeof(string), typeof(ImageViewer),
+                new PropertyMetadata(string.Empty));
+
+        public static readonly DependencyProperty InteractionModeHintProperty =
+            DependencyProperty.Register(nameof(InteractionModeHint), typeof(string), typeof(ImageViewer),
                 new PropertyMetadata(string.Empty));
 
         public static readonly DependencyProperty ShowPixelGridProperty =
@@ -163,6 +175,12 @@ namespace ImageViewer.Controls
             set => SetValue(ImageLoadHasErrorProperty, value);
         }
 
+        public bool CanCancelImageLoad
+        {
+            get => (bool)GetValue(CanCancelImageLoadProperty);
+            private set => SetValue(CanCancelImageLoadProperty, value);
+        }
+
         public bool HasDiagnosticError
         {
             get => (bool)GetValue(HasDiagnosticErrorProperty);
@@ -194,6 +212,18 @@ namespace ImageViewer.Controls
         {
             get => (string)GetValue(ActiveToolNameProperty);
             private set => SetValue(ActiveToolNameProperty, value);
+        }
+
+        public string InteractionModeText
+        {
+            get => (string)GetValue(InteractionModeTextProperty);
+            private set => SetValue(InteractionModeTextProperty, value);
+        }
+
+        public string InteractionModeHint
+        {
+            get => (string)GetValue(InteractionModeHintProperty);
+            private set => SetValue(InteractionModeHintProperty, value);
         }
 
         public bool ShowPixelGrid

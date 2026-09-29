@@ -37,7 +37,7 @@ namespace ImageViewer.Controls
                 RedoEnabled: input.CanRedo,
                 DeleteSelectedEnabled: input.HasSelection,
                 ClearAllEnabled: input.HasRois,
-                DrawRoiEnabled: input.HasDrawingTools,
+                DrawRoiEnabled: input.HasDrawingTools && input.HasImage,
                 EditPropertiesEnabled: input.HasEditableProperties,
                 SetLabelEnabled: input.HasSelection,
                 SetColorEnabled: input.HasSelection,

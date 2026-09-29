@@ -34,7 +34,7 @@
   <data name="MenuCalibratePixels" xml:space="preserve"><value>像素/物理尺寸校准...</value></data>
   <data name="MenuEditCaliperSettings" xml:space="preserve"><value>卡尺参数...</value></data>
   <data name="MenuGradientAlignCaliper" xml:space="preserve"><value>梯度检测对齐（卡尺）</value></data>
-  <data name="MenuFileAndProjects" xml:space="preserve"><value>文件</value></data>
+  <data name="MenuFileAndProjects" xml:space="preserve"><value>文件与项目</value></data>
   <data name="MenuOpenImageFile" xml:space="preserve"><value>打开图像文件...</value></data>
   <data name="MenuSaveRois" xml:space="preserve"><value>保存 ROI...</value></data>
   <data name="MenuLoadRois" xml:space="preserve"><value>加载 ROI...</value></data>
@@ -43,7 +43,7 @@
   <data name="MenuRecentProjects" xml:space="preserve"><value>最近项目</value></data>
   <data name="MenuExportProjectPackage" xml:space="preserve"><value>导出项目包...</value></data>
   <data name="MenuAutoSave" xml:space="preserve"><value>自动保存</value></data>
-  <data name="MenuAnalysisAndExport" xml:space="preserve"><value>分析与结果</value></data>
+  <data name="MenuAnalysisAndExport" xml:space="preserve"><value>分析与导出</value></data>
   <data name="MenuExportCurrentViewPng" xml:space="preserve"><value>导出当前视图为 PNG...</value></data>
   <data name="MenuExportAnalysisCsv" xml:space="preserve"><value>导出分析结果为 CSV...</value></data>
   <data name="MenuExportBatchAnalysisCsv" xml:space="preserve"><value>批量分析并导出 CSV...</value></data>
@@ -55,25 +55,25 @@
   <data name="MenuPauseRealtimeProfile" xml:space="preserve"><value>暂停实时剖面图</value></data>
   <data name="MenuRefreshAnalysis" xml:space="preserve"><value>立即刷新分析</value></data>
   <data name="MenuLargeImageAndPerformance" xml:space="preserve"><value>性能与渲染</value></data>
-  <data name="MenuEnableImagePyramid" xml:space="preserve"><value>启用分级金字塔</value></data>
-  <data name="MenuAutoSelectPyramidLevel" xml:space="preserve"><value>自动切换分辨率</value></data>
+  <data name="MenuEnableImagePyramid" xml:space="preserve"><value>启用大图多分辨率渲染</value></data>
+  <data name="MenuAutoSelectPyramidLevel" xml:space="preserve"><value>自动选择图像分辨率</value></data>
   <data name="MenuAdvancedPerformance" xml:space="preserve"><value>高级渲染性能</value></data>
-  <data name="MenuEnableTiledRendering" xml:space="preserve"><value>启用分块渲染</value></data>
-  <data name="MenuPrefetchAdjacentTiles" xml:space="preserve"><value>预取相邻分块</value></data>
-  <data name="MenuEnableGpuViewportCache" xml:space="preserve"><value>启用 GPU 视口缓存</value></data>
-  <data name="MenuClearPyramidCache" xml:space="preserve"><value>清空多分辨率缓存</value></data>
+  <data name="MenuEnableTiledRendering" xml:space="preserve"><value>启用大图分块渲染</value></data>
+  <data name="MenuPrefetchAdjacentTiles" xml:space="preserve"><value>预取邻近图像区域</value></data>
+  <data name="MenuEnableGpuViewportCache" xml:space="preserve"><value>启用 GPU 加速缓存</value></data>
+  <data name="MenuClearPyramidCache" xml:space="preserve"><value>清空大图渲染缓存</value></data>
   <data name="MenuClearAnalysisCache" xml:space="preserve"><value>清空分析缓存</value></data>
   <data name="MenuSmartDisplaySuggestion" xml:space="preserve"><value>智能显示建议...</value></data>
-  <data name="MenuPseudoColorStrategy" xml:space="preserve"><value>伪彩色策略</value></data>
-  <data name="MenuPreferShaderPseudoColor" xml:space="preserve"><value>优先使用 ShaderEffect 伪彩色</value></data>
-  <data name="MenuAllowCpuFallback" xml:space="preserve"><value>ShaderEffect 失败时回退到 CPU</value></data>
+  <data name="MenuPseudoColorStrategy" xml:space="preserve"><value>伪彩色处理方式</value></data>
+  <data name="MenuPreferShaderPseudoColor" xml:space="preserve"><value>优先使用 GPU 伪彩色</value></data>
+  <data name="MenuAllowCpuFallback" xml:space="preserve"><value>GPU 伪彩色失败时使用 CPU</value></data>
   <data name="MenuPseudoColor" xml:space="preserve"><value>伪彩色</value></data>
-  <data name="MenuPseudoColorOriginal" xml:space="preserve"><value>原始</value></data>
-  <data name="MenuPseudoColorHot" xml:space="preserve"><value>Hot</value></data>
-  <data name="MenuPseudoColorJet" xml:space="preserve"><value>Jet</value></data>
-  <data name="MenuPseudoColorViridis" xml:space="preserve"><value>Viridis</value></data>
+  <data name="MenuPseudoColorOriginal" xml:space="preserve"><value>原始灰度</value></data>
+  <data name="MenuPseudoColorHot" xml:space="preserve"><value>Hot（热度）</value></data>
+  <data name="MenuPseudoColorJet" xml:space="preserve"><value>Jet（彩虹）</value></data>
+  <data name="MenuPseudoColorViridis" xml:space="preserve"><value>Viridis（感知均匀）</value></data>
   <data name="MenuShowRenderStatus" xml:space="preserve"><value>显示渲染状态...</value></data>
-  <data name="LargeImageProfileStandard" xml:space="preserve"><value>已启用大图优化：分级金字塔与分块渲染</value></data>
+  <data name="LargeImageProfileStandard" xml:space="preserve"><value>已启用大图优化：多分辨率与分块渲染</value></data>
   <data name="LargeImageProfileLarge" xml:space="preserve"><value>已启用大图优化：增强分块缓存与分级渲染</value></data>
   <data name="LargeImageProfileVeryLarge" xml:space="preserve"><value>已启用超大图优化：扩大缓存并启用分级渲染</value></data>
   <data name="DialogSmartDisplaySuggestionTitle" xml:space="preserve"><value>智能显示建议</value></data>
@@ -168,6 +168,8 @@
   <data name="ImageLoadStatusRetrying" xml:space="preserve"><value>加载失败，正在重试...</value></data>
   <data name="ImageLoadStatusFailed" xml:space="preserve"><value>加载失败，点击重试。</value></data>
   <data name="ImageLoadStatusReady" xml:space="preserve"><value>图像已加载</value></data>
+  <data name="ImageLoadStatusCanceled" xml:space="preserve"><value>已取消加载</value></data>
+  <data name="ImageLoadCancel" xml:space="preserve"><value>取消加载</value></data>
   <data name="ImageLoadRetry" xml:space="preserve"><value>重试</value></data>
   <data name="EmptyStateTitle" xml:space="preserve"><value>尚未加载图像</value></data>
   <data name="EmptyStateDescription" xml:space="preserve"><value>拖放图像到窗口，使用上方的打开按钮，或按 Ctrl+O 导入。</value></data>
@@ -375,7 +377,7 @@
   <data name="InfoLineArcCaliperDetail" xml:space="preserve"><value>圆心:({0:F1}, {1:F1}) 起点:{2:F1}°</value></data>
   <data name="InfoLineCircularCaliperDetail" xml:space="preserve"><value>圆心:({0:F1}, {1:F1})</value></data>
   <data name="RenderStatusNotAvailable" xml:space="preserve"><value>n/a</value></data>
-  <data name="RenderStatusModeShaderEffect" xml:space="preserve"><value>ShaderEffect</value></data>
+  <data name="RenderStatusModeShaderEffect" xml:space="preserve"><value>GPU 伪彩色</value></data>
   <data name="RenderStatusModeOriginal" xml:space="preserve"><value>Original</value></data>
   <data name="RenderStatusModeCpuFallback" xml:space="preserve"><value>CPU fallback</value></data>
   <data name="RenderStatusLineImage" xml:space="preserve"><value>Image: {0}</value></data>
@@ -672,9 +674,15 @@
   <data name="Status2DViewReset" xml:space="preserve"><value>2D 视图已重置。</value></data>
   <data name="Status2DViewResetFirstSlice" xml:space="preserve"><value>2D 视图已重置到第一张切片。</value></data>
   <data name="StatusCancelRequested" xml:space="preserve"><value>已请求取消操作。</value></data>
-  <data name="AdaptiveGestureImage" xml:space="preserve"><value>手势：滚轮缩放；中键拖拽平移；左键拖动 ROI 主体或控制点编辑；空白处右键打开菜单，ROI 上右键查看属性。</value></data>
-  <data name="AdaptiveGestureVolume" xml:space="preserve"><value>手势：滚轮切换切片；Shift+滚轮快速跳层；Ctrl+滚轮缩放；中键拖拽平移；左键编辑 ROI。</value></data>
-  <data name="AdaptiveGesture3D" xml:space="preserve"><value>手势：滚轮缩放相机；左键旋转；中键平移；右键打开功能菜单。</value></data>
+  <data name="AdaptiveGestureImage" xml:space="preserve"><value>2D 手势：滚轮缩放；中键平移；左键选择或编辑 ROI；空白处右键打开菜单，ROI 上右键查看属性。</value></data>
+  <data name="AdaptiveGestureVolume" xml:space="preserve"><value>MPR 手势：滚轮切换切片；Shift+滚轮快速跳层；Ctrl+滚轮缩放；中键平移；左键选择或编辑 ROI；右键打开菜单或属性。</value></data>
+  <data name="AdaptiveGesture3D" xml:space="preserve"><value>3D 手势：滚轮缩放相机；左键旋转；中键平移；右键打开菜单。</value></data>
+  <data name="InteractionModeBrowse" xml:space="preserve"><value>浏览模式</value></data>
+  <data name="InteractionModeDraw" xml:space="preserve"><value>绘制模式</value></data>
+  <data name="InteractionModeEdit" xml:space="preserve"><value>编辑模式</value></data>
+  <data name="InteractionHintBrowse" xml:space="preserve"><value>浏览模式：左键选择 ROI；中键平移；滚轮缩放；右键打开菜单。</value></data>
+  <data name="InteractionHintDraw" xml:space="preserve"><value>绘制模式：按当前工具提示完成 ROI；右键结束，Esc 取消。</value></data>
+  <data name="InteractionHintEdit" xml:space="preserve"><value>编辑模式：拖动 ROI 或控制点调整；方向键微调；右键查看属性。</value></data>
   <data name="StatusAutoSaveFailed" xml:space="preserve"><value>自动保存失败，请检查磁盘空间或写入权限。</value></data>
   <data name="ErrorUiOperationFailedTitle" xml:space="preserve"><value>操作失败</value></data>
   <data name="ErrorUiOperationFailedMessage" xml:space="preserve"><value>操作“{0}”失败，请查看诊断信息。</value></data>

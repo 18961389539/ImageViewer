@@ -349,6 +349,9 @@ namespace ImageViewer.Controls
         private TextBox? _menuSearchBox;
         private TextBlock? _menuSearchMatchCountText;
         private TextBlock? _menuSearchNoResultsText;
+        private readonly Dictionary<UIElement, MenuSearchVisibilitySnapshot> _menuSearchVisibilitySnapshots = new();
+
+        private sealed record MenuSearchVisibilitySnapshot(BindingBase? Binding, Visibility Value);
 
         private void EnsureMenuSearchTemplateParts()
         {
@@ -396,6 +399,7 @@ namespace ImageViewer.Controls
 
         private void OnContextMenuOpened(object sender, RoutedEventArgs e)
         {
+            RestoreMenuSearchVisibility();
             menuSearchBox.Text = string.Empty;
             _contextMenuController.HandleOpened();
             menuSearchBox.Dispatcher.BeginInvoke(
@@ -407,6 +411,16 @@ namespace ImageViewer.Controls
         {
             string rawQuery = menuSearchBox.Text.Trim();
             string[] words = rawQuery.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries);
+
+            if (words.Length == 0)
+            {
+                RestoreMenuSearchVisibility();
+                menuSearchMatchCountText.Visibility = Visibility.Collapsed;
+                menuSearchNoResultsText.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            CaptureMenuSearchVisibility(mainContextMenu);
             bool hasMatch = false;
             int matchCount = 0;
             foreach (object item in mainContextMenu.Items)
@@ -423,14 +437,14 @@ namespace ImageViewer.Controls
                 }
                 else if (item is Separator separator)
                 {
-                    separator.Visibility = words.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+                    separator.Visibility = Visibility.Collapsed;
                 }
             }
 
-            bool isSearching = words.Length > 0;
             menuSearchMatchCountText.Text = UiText.Format("MenuSearchMatchCount", matchCount);
-            menuSearchMatchCountText.Visibility = isSearching && hasMatch ? Visibility.Visible : Visibility.Collapsed;
-            menuSearchNoResultsText.Visibility = isSearching && !hasMatch ? Visibility.Visible : Visibility.Collapsed;
+            menuSearchMatchCountText.Visibility = hasMatch ? Visibility.Visible : Visibility.Collapsed;
+            menuSearchNoResultsText.Visibility = hasMatch ? Visibility.Collapsed : Visibility.Visible;
+            UpdateMenuSeparatorVisibility(mainContextMenu);
         }
 
         private void OnMenuSearchPreviewKeyDown(object sender, KeyEventArgs e)
@@ -443,6 +457,12 @@ namespace ImageViewer.Controls
             }
 
             if (e.Key == Key.Down && TryFocusFirstVisibleMenuItem())
+            {
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Key == Key.Enter && TryInvokeSingleVisibleMenuItem())
             {
                 e.Handled = true;
             }
@@ -461,9 +481,9 @@ namespace ImageViewer.Controls
 
         private bool TryFocusFirstVisibleMenuItem()
         {
-            foreach (object item in mainContextMenu.Items)
+            foreach (MenuItem menuItem in EnumerateMenuItems(mainContextMenu))
             {
-                if (item is MenuItem { Visibility: Visibility.Visible, IsEnabled: true } menuItem)
+                if (menuItem.Items.Count == 0 && menuItem.Visibility == Visibility.Visible && menuItem.IsEnabled)
                 {
                     menuItem.Focus();
                     return true;
@@ -473,7 +493,27 @@ namespace ImageViewer.Controls
             return false;
         }
 
-        private static bool UpdateMenuSearchVisibility(MenuItem menuItem, string[] words)
+        private bool TryInvokeSingleVisibleMenuItem()
+        {
+            if (string.IsNullOrWhiteSpace(menuSearchBox.Text))
+            {
+                return false;
+            }
+
+            List<MenuItem> matches = EnumerateMenuItems(mainContextMenu)
+                .Where(item => item.Items.Count == 0 && item.Visibility == Visibility.Visible && item.IsEnabled)
+                .Take(2)
+                .ToList();
+            if (matches.Count != 1)
+            {
+                return false;
+            }
+
+            matches[0].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            return true;
+        }
+
+        private bool UpdateMenuSearchVisibility(MenuItem menuItem, string[] words)
         {
             bool childMatch = false;
             foreach (object child in menuItem.Items)
@@ -484,8 +524,10 @@ namespace ImageViewer.Controls
                 }
             }
 
-            bool ownMatch = MatchesOwnSearchTerms(menuItem, words);
-            bool visible = ownMatch || childMatch;
+            // 搜索父级分类名称时不显示空的子菜单；只有叶子命令参与命中。
+            bool ownMatch = menuItem.Items.Count == 0 && MatchesOwnSearchTerms(menuItem, words);
+            bool visible = GetMenuSearchBaseVisibility(menuItem) != Visibility.Collapsed
+                && (ownMatch || childMatch);
             menuItem.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
             return visible;
         }
@@ -504,10 +546,99 @@ namespace ImageViewer.Controls
 
             if (menuItem.Items.Count == 0 && MatchesOwnSearchTerms(menuItem, words))
             {
-                count++;
+                count += menuItem.Visibility == Visibility.Visible ? 1 : 0;
             }
 
             return count;
+        }
+
+        private void CaptureMenuSearchVisibility(ItemsControl itemsControl)
+        {
+            foreach (object item in itemsControl.Items)
+            {
+                if (item is MenuItem menuItem)
+                {
+                    CaptureMenuSearchVisibility(menuItem);
+                }
+                else if (item is Separator separator)
+                {
+                    CaptureMenuSearchVisibility(separator);
+                }
+            }
+        }
+
+        private void CaptureMenuSearchVisibility(DependencyObject element)
+        {
+            if (!_menuSearchVisibilitySnapshots.ContainsKey((UIElement)element))
+            {
+                _menuSearchVisibilitySnapshots[(UIElement)element] = new(
+                    BindingOperations.GetBindingBase(element, UIElement.VisibilityProperty),
+                    ((UIElement)element).Visibility);
+            }
+        }
+
+        private Visibility GetMenuSearchBaseVisibility(UIElement element)
+        {
+            return _menuSearchVisibilitySnapshots.TryGetValue(element, out MenuSearchVisibilitySnapshot? snapshot)
+                ? snapshot.Value
+                : element.Visibility;
+        }
+
+        private void RestoreMenuSearchVisibility()
+        {
+            foreach ((UIElement element, MenuSearchVisibilitySnapshot snapshot) in _menuSearchVisibilitySnapshots)
+            {
+                if (snapshot.Binding is not null)
+                {
+                    BindingOperations.SetBinding(element, UIElement.VisibilityProperty, snapshot.Binding);
+                }
+                else
+                {
+                    element.SetCurrentValue(UIElement.VisibilityProperty, snapshot.Value);
+                }
+            }
+
+            _menuSearchVisibilitySnapshots.Clear();
+        }
+
+        private void UpdateMenuSeparatorVisibility(ItemsControl itemsControl)
+        {
+            for (int index = 0; index < itemsControl.Items.Count; index++)
+            {
+                if (itemsControl.Items[index] is not Separator separator)
+                {
+                    continue;
+                }
+
+                bool hasVisibleBefore = FindVisibleMenuItem(itemsControl, index, -1);
+                bool hasVisibleAfter = FindVisibleMenuItem(itemsControl, index, 1);
+                separator.Visibility = GetMenuSearchBaseVisibility(separator) != Visibility.Collapsed
+                    && hasVisibleBefore
+                    && hasVisibleAfter
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+            }
+
+            foreach (object item in itemsControl.Items)
+            {
+                if (item is MenuItem menuItem)
+                {
+                    UpdateMenuSeparatorVisibility(menuItem);
+                }
+            }
+        }
+
+        private static bool FindVisibleMenuItem(ItemsControl itemsControl, int separatorIndex, int direction)
+        {
+            for (int index = separatorIndex + direction; index >= 0 && index < itemsControl.Items.Count; index += direction)
+            {
+                if (itemsControl.Items[index] is MenuItem menuItem)
+                {
+                    return menuItem.Visibility == Visibility.Visible;
+                }
+            }
+
+            return false;
         }
 
         private static bool MatchesOwnSearchTerms(MenuItem menuItem, string[] words)
@@ -813,6 +944,11 @@ namespace ImageViewer.Controls
         private async void OnRetryImageLoadClick(object sender, RoutedEventArgs e)
         {
             await RunUiOperationAsync("重试加载图像", RetryLastImageLoadAsync);
+        }
+
+        private void OnCancelImageLoadClick(object sender, RoutedEventArgs e)
+        {
+            CancelImageLoad();
         }
 
         private void OnDismissDiagnosticErrorClick(object sender, RoutedEventArgs e)

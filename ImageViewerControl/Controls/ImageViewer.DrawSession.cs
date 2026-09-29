@@ -96,6 +96,7 @@ namespace ImageViewer.Controls
         private void UpdateActiveToolVisuals()
         {
             bool isActive = IsToolInteractionActive;
+            UpdateInteractionModeVisuals();
             if (activeToolBanner is not null)
             {
                 activeToolNameTextBlock.Text = isActive
@@ -116,6 +117,21 @@ namespace ImageViewer.Controls
                     button.IsChecked = isActive && string.Equals(tool.ToolName, ActiveToolName, StringComparison.Ordinal);
                 }
             }
+        }
+
+        internal void UpdateInteractionModeVisuals()
+        {
+            bool isDrawing = IsToolInteractionActive;
+            bool isEditing = !isDrawing && ViewerState.SelectedRoi != null;
+            string textKey = isDrawing
+                ? "InteractionModeDraw"
+                : isEditing ? "InteractionModeEdit" : "InteractionModeBrowse";
+            string hintKey = isDrawing
+                ? "InteractionHintDraw"
+                : isEditing ? "InteractionHintEdit" : "InteractionHintBrowse";
+
+            InteractionModeText = UiText.Get(textKey);
+            InteractionModeHint = UiText.Get(hintKey);
         }
 
         private void LeaveInteractionMode()

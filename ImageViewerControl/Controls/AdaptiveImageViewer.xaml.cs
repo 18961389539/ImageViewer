@@ -286,7 +286,8 @@ namespace ImageViewer.Controls
                 }
 
                 _pendingSegmentation = segmentation
-                    with { SliceIndex = sliceIndex };
+                    with
+                { SliceIndex = sliceIndex };
                 segmentationText.Text = UiText.Format("StatusSegmentationCandidates", _pendingSegmentation.Blobs.Count);
                 statusText.Text = UiText.Get("StatusSegmentationComplete");
                 UpdateDataQualityPanelVisibility();

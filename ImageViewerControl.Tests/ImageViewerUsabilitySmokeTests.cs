@@ -306,6 +306,57 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
+        public void InteractionModeIndicator_TracksBrowseDrawAndEditStates()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                using var viewer = new ImageViewer.Controls.ImageViewer();
+                WpfTestRunner.DrainDispatcher();
+
+                Assert.Equal(UiText.Get("InteractionModeBrowse"), viewer.InteractionModeText);
+
+                viewer.ViewerState.SelectedRoi = new CircleRoi
+                {
+                    Center = new PointD(4, 4),
+                    Radius = 2
+                };
+                WpfTestRunner.DrainDispatcher();
+                Assert.Equal(UiText.Get("InteractionModeEdit"), viewer.InteractionModeText);
+
+                viewer.StartLineMeasureMode();
+                WpfTestRunner.DrainDispatcher();
+                Assert.Equal(UiText.Get("InteractionModeDraw"), viewer.InteractionModeText);
+
+                viewer.ExitCurrentMode();
+                viewer.ViewerState.SelectedRoi = null;
+                WpfTestRunner.DrainDispatcher();
+                Assert.Equal(UiText.Get("InteractionModeBrowse"), viewer.InteractionModeText);
+            });
+        }
+
+        [Fact]
+        public void UnsavedMarker_TracksDocumentChangesAndCleanBaseline()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                using var viewer = new ImageViewer.Controls.ImageViewer();
+                viewer.SetImage(CreateBitmap(9));
+                viewer.MarkDocumentClean();
+                Assert.False(viewer.IsDirty);
+
+                Assert.True(viewer.AddRoi(new CircleRoi
+                {
+                    Center = new PointD(4, 4),
+                    Radius = 2
+                }));
+                Assert.True(viewer.IsDirty);
+
+                viewer.MarkDocumentClean();
+                Assert.False(viewer.IsDirty);
+            });
+        }
+
+        [Fact]
         public void ToolbarQuickTool_StaysHighlightedWhileActive()
         {
             WpfTestRunner.Run(() =>

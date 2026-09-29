@@ -172,10 +172,16 @@ namespace ImageViewer.Controls
             ImageLoadStatusText = statusText;
             ImageLoadProgress = Math.Clamp(progress, 0, 100);
             CanRetryImageLoad = canRetry;
+            CanCancelImageLoad = isLoading && !canRetry;
             ImageLoadHasError = canRetry && isLoading;
         }
 
         public Task RetryLastImageLoadAsync() => _controlComposition.DialogWorkflowService.RetryLastImageLoadAsync();
+
+        /// <summary>
+        /// 取消当前图像加载，不影响当前已经显示的图像。
+        /// </summary>
+        public void CancelImageLoad() => _controlComposition.DialogWorkflowService.CancelImageLoad();
 
         /// <summary>
         /// 请求宿主保存当前会话；用户取消保存对话框时任务仍会正常完成，宿主可通过
@@ -185,6 +191,7 @@ namespace ImageViewer.Controls
 
         public void Dispose()
         {
+            CancelImageLoad();
             _controlComposition.SessionController.StateChanged -= OnSessionStateChanged;
             _lifetime.Dispose();
             _ownedHost?.Dispose();
@@ -193,6 +200,7 @@ namespace ImageViewer.Controls
 
         public async ValueTask DisposeAsync()
         {
+            CancelImageLoad();
             _controlComposition.SessionController.StateChanged -= OnSessionStateChanged;
             _lifetime.Dispose();
             if (_ownedHost != null)

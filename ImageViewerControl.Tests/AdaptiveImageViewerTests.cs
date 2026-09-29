@@ -4,6 +4,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using ImageViewer.Controls;
+using ImageViewer.Localization;
 using ImageViewer.Models;
 using Xunit;
 using ImageViewerControl2D = ImageViewer.Controls.ImageViewer;
@@ -105,6 +106,28 @@ namespace ImageViewerControl.Tests
                 viewer.StepMprSlice(1);
 
                 Assert.Equal(1, viewer.Volume3DViewer.CurrentSagittalSliceIndex);
+            });
+        }
+
+        [Fact]
+        public void GestureHint_UsesModeSpecificConventionsFor2D_MprAnd3D()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                using var viewer = new AdaptiveImageViewer
+                {
+                    ImageSource = CreateBitmap(9),
+                    Volume = new VolumeData([CreateBitmap(9), CreateBitmap(18)])
+                };
+
+                viewer.DisplayMode = AdaptiveDisplayMode.TwoDimensional;
+                Assert.Equal(UiText.Get("AdaptiveGestureImage"), viewer.gestureHintText.Text);
+
+                viewer.DisplayMode = AdaptiveDisplayMode.Coronal;
+                Assert.Equal(UiText.Get("AdaptiveGestureVolume"), viewer.gestureHintText.Text);
+
+                viewer.DisplayMode = AdaptiveDisplayMode.ThreeDimensional;
+                Assert.Equal(UiText.Get("AdaptiveGesture3D"), viewer.gestureHintText.Text);
             });
         }
 

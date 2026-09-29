@@ -1,10 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
 using ImageViewer.Abstractions;
 using ImageViewer.Controls;
+using ImageViewer.Localization;
 using ImageViewer.Models;
 using ImageViewer.Plugins;
 using ImageViewer.ViewModels;
@@ -73,6 +76,33 @@ namespace ImageViewerControl.Tests
             }
         }
 
+        [Fact]
+        public async Task CancelImageLoad_StopsRetryAndPublishesCanceledState()
+        {
+            string imagePath = Path.Combine(Path.GetTempPath(), $"imageviewer-missing-{Guid.NewGuid():N}.png");
+            var state = new WorkflowState
+            {
+                ImageLoadRetryCount = 2,
+                ImageLoadRetryDelayMilliseconds = 5000,
+                RetryStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously)
+            };
+            var service = new ImageViewerDialogWorkflowService(
+                CreateDependencies(state),
+                new FakeDialogWorkflowAdapter { OpenImageResult = imagePath });
+
+            Task load = service.OpenImageAsync();
+            await state.RetryStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+            service.CancelImageLoad();
+            await load;
+
+            Assert.NotNull(state.LastLoadState);
+            Assert.False(state.LastLoadState!.Value.IsLoading);
+            Assert.Equal(UiText.Get("ImageLoadStatusCanceled"), state.LastLoadState.Value.StatusText);
+            Assert.False(state.LastLoadState.Value.CanRetry);
+            Assert.Empty(state.Errors);
+        }
+
         private static ImageViewerDialogWorkflowDependencies CreateDependencies(WorkflowState state)
         {
             return new ImageViewerDialogWorkflowDependencies
@@ -82,7 +112,14 @@ namespace ImageViewerControl.Tests
                     GetRetryCount = () => state.ImageLoadRetryCount,
                     GetRetryDelayMilliseconds = () => state.ImageLoadRetryDelayMilliseconds,
                     SetImage = source => state.LastImage = source,
-                    SetImageLoadState = (isLoading, statusText, progress, canRetry) => state.LastLoadState = (isLoading, statusText, progress, canRetry),
+                    SetImageLoadState = (isLoading, statusText, progress, canRetry) =>
+                    {
+                        state.LastLoadState = (isLoading, statusText, progress, canRetry);
+                        if (statusText == UiText.Get("ImageLoadStatusRetrying"))
+                        {
+                            state.RetryStarted?.TrySetResult(true);
+                        }
+                    },
                     FitToView = () => state.FitToViewCount++,
                     ClearUndoHistory = () => state.ClearUndoHistoryCount++,
                     ShowNonCriticalError = (title, message, ex) => state.Errors.Add((title, message, ex))
@@ -144,6 +181,8 @@ namespace ImageViewerControl.Tests
             public ImageSource? LastImage { get; set; }
 
             public (bool IsLoading, string StatusText, double Progress, bool CanRetry)? LastLoadState { get; set; }
+
+            public TaskCompletionSource<bool>? RetryStarted { get; set; }
 
             public int FitToViewCount { get; set; }
 
