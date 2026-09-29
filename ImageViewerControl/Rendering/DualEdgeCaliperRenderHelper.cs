@@ -33,5 +33,24 @@ namespace ImageViewer.Rendering
             string geometryText = $"D:{context.FormatLength(GeometryUtils.Distance(caliper.P1.ToWpfPoint(), caliper.P2.ToWpfPoint()))}";
             return SingleEdgeCaliperRenderHelper.BuildSummaryText(caliper, geometryText, "Caliper", context.ShowCaliperScores);
         }
+
+        /// <summary>
+        /// Returns the anchor for the dual-edge summary label.
+        /// The detected endpoints can move away from the original ROI center, so the label must follow
+        /// the measured segment once detection has completed.
+        /// </summary>
+        public static Point GetSummaryAnchor(CaliperMeasureRoi caliper)
+        {
+            ArgumentNullException.ThrowIfNull(caliper);
+
+            if (caliper.HasDetectedEdges)
+            {
+                return new Point(
+                    (caliper.P1.X + caliper.P2.X) / 2,
+                    (caliper.P1.Y + caliper.P2.Y) / 2);
+            }
+
+            return caliper.CaliperCenter.ToWpfPoint();
+        }
     }
 }

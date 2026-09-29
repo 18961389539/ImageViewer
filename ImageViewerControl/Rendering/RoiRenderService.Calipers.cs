@@ -235,7 +235,11 @@ namespace ImageViewer.Rendering
                     DrawResizeHandles(context, caliper);
                 }
 
-                context.DrawInfoText(DualEdgeCaliperRenderHelper.BuildSummaryText(context, caliper), caliper.CaliperCenter.ToWpfPoint(), brush, true);
+                context.DrawInfoText(
+                    DualEdgeCaliperRenderHelper.BuildSummaryText(context, caliper),
+                    DualEdgeCaliperRenderHelper.GetSummaryAnchor(caliper),
+                    brush,
+                    true);
             }
 
             private static void DrawResizeHandles(RoiRenderContext context, CaliperMeasureRoi caliper)

@@ -2,6 +2,8 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows;
 using ImageViewer.Services;
+using ImageViewer.Models;
+using ImageViewer.Rendering;
 using Xunit;
 
 namespace ImageViewerControl.Tests
@@ -11,6 +13,37 @@ namespace ImageViewerControl.Tests
     [Trait("Category", "Wpf")]
     public class ImageViewerRenderServiceTests
     {
+        [Fact]
+        public void DualEdgeCaliperSummaryAnchor_FollowsDetectedSegmentMidpoint()
+        {
+            var caliper = new CaliperMeasureRoi
+            {
+                CaliperCenter = new PointD(100, 100),
+                P1 = new PointD(10, 20),
+                P2 = new PointD(30, 40),
+                HasDetectedEdges = true
+            };
+
+            Point anchor = DualEdgeCaliperRenderHelper.GetSummaryAnchor(caliper);
+
+            Assert.Equal(new Point(20, 30), anchor);
+        }
+
+        [Fact]
+        public void DualEdgeCaliperSummaryAnchor_UsesRoiCenterBeforeDetection()
+        {
+            var caliper = new CaliperMeasureRoi
+            {
+                CaliperCenter = new PointD(100, 100),
+                P1 = new PointD(10, 20),
+                P2 = new PointD(30, 40)
+            };
+
+            Point anchor = DualEdgeCaliperRenderHelper.GetSummaryAnchor(caliper);
+
+            Assert.Equal(new Point(100, 100), anchor);
+        }
+
         [Fact]
         public void BuildRenderFrame_ReusesCachedTileForRepeatedRequests()
         {
