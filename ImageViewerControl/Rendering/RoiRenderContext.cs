@@ -271,19 +271,7 @@ namespace ImageViewer.Rendering
 
         public void DrawInfoText(string text, Point pos, Brush brush, bool centerAlign = false)
         {
-            var textBlock = new TextBlock
-            {
-                Text = text,
-                Foreground = brush,
-                FontSize = 12,
-                FontWeight = FontWeights.Bold,
-                Background = new SolidColorBrush(Color.FromArgb(128, 0, 0, 0)),
-                Padding = new Thickness(2),
-                SnapsToDevicePixels = true,
-                IsHitTestVisible = false
-            };
-            TextOptions.SetTextFormattingMode(textBlock, TextFormattingMode.Display);
-            TextOptions.SetTextRenderingMode(textBlock, TextRenderingMode.ClearType);
+            TextBlock textBlock = CreateInfoTextBlock(text, brush);
 
             textBlock.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
             Point screenPos = ImageToScreen(pos);
@@ -293,6 +281,36 @@ namespace ImageViewer.Rendering
             Canvas.SetLeft(textBlock, Math.Round(screenPos.X + offsetX));
             Canvas.SetTop(textBlock, Math.Round(screenPos.Y + offsetY));
             ScreenOverlayCanvas.Children.Add(textBlock);
+        }
+
+        /// <summary>
+        /// Measures the screen-space size used by an overlay label.
+        /// Chinese: 用于计算标签与测量线之间的安全间距，避免文字框覆盖测量线。
+        /// English: Returns the screen-space size of an overlay label so callers can keep it clear of a measurement line.
+        /// </summary>
+        public static Size MeasureInfoText(string text)
+        {
+            TextBlock textBlock = CreateInfoTextBlock(text, Brushes.White);
+            textBlock.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            return textBlock.DesiredSize;
+        }
+
+        private static TextBlock CreateInfoTextBlock(string text, Brush brush)
+        {
+            var textBlock = new TextBlock
+            {
+                Text = text,
+                Foreground = brush,
+                FontSize = 12,
+                FontWeight = FontWeights.Bold,
+                Background = new SolidColorBrush(Color.FromArgb(160, 0, 0, 0)),
+                Padding = new Thickness(3, 2, 3, 2),
+                SnapsToDevicePixels = true,
+                IsHitTestVisible = false
+            };
+            TextOptions.SetTextFormattingMode(textBlock, TextFormattingMode.Display);
+            TextOptions.SetTextRenderingMode(textBlock, TextRenderingMode.ClearType);
+            return textBlock;
         }
 
         public void DrawAngleArc(Point center, Point p1, Point p2, double radius, Brush brush)

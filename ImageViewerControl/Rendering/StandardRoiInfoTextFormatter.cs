@@ -94,7 +94,7 @@ namespace ImageViewer.Rendering
 
         public static string BuildLineMeasureText(LineMeasureRoi line, RoiRenderContext context)
         {
-            return BuildInline(line.Label, $"D:{context.FormatLength(GeometryUtils.Distance(line.P1.ToWpfPoint(), line.P2.ToWpfPoint()))}");
+            return BuildInline(line.Label, $"长度：{context.FormatLength(GeometryUtils.Distance(line.P1.ToWpfPoint(), line.P2.ToWpfPoint()))}");
         }
 
         public static string BuildAngleMeasureText(AngleMeasureRoi angle, double angleValue)
@@ -148,7 +148,7 @@ namespace ImageViewer.Rendering
 
         public static string BuildCenterDistanceText(CenterDistanceMeasureRoi roi, RoiRenderContext context)
         {
-            return BuildInline(roi.Label, $"Center D:{context.FormatLength(roi.CenterDistance)}");
+            return BuildInline(roi.Label, $"中心距离：{context.FormatLength(roi.CenterDistance)}");
         }
 
         public static string BuildThreePointCircleText(ThreePointCircleMeasureRoi roi, RoiRenderContext context)

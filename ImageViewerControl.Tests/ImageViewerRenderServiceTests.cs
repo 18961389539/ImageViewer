@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using ImageViewer.Services;
 using ImageViewer.Models;
+using ImageViewer.Plugins;
 using ImageViewer.Rendering;
 using Xunit;
 
@@ -63,6 +64,27 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
+        public void DualEdgeCaliperSummaryAnchor_LeavesFullLabelWidthBesideVerticalSegment()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                var caliper = new CaliperMeasureRoi
+                {
+                    P1 = new PointD(50, 10),
+                    P2 = new PointD(50, 110),
+                    HasDetectedEdges = true
+                };
+                var context = CreateRenderContext(new Canvas(), new Canvas());
+                string summary = DualEdgeCaliperRenderHelper.BuildSummaryText(context, caliper);
+                Point anchor = DualEdgeCaliperRenderHelper.GetSummaryAnchor(context, caliper, summary);
+                Size labelSize = RoiRenderContext.MeasureInfoText(summary);
+
+                Assert.True(anchor.X + labelSize.Width / 2 + 5 <= 50, $"Label right edge {anchor.X + labelSize.Width / 2} should remain left of x=50.");
+                Assert.Equal("宽度：100.00 px", summary);
+            });
+        }
+
+        [Fact]
         public void DualEdgeCaliperSummaryAnchor_UsesRoiCenterBeforeDetection()
         {
             var caliper = new CaliperMeasureRoi
@@ -75,6 +97,51 @@ namespace ImageViewerControl.Tests
             Point anchor = DualEdgeCaliperRenderHelper.GetSummaryAnchor(caliper);
 
             Assert.Equal(new Point(100, 100), anchor);
+        }
+
+        [Fact]
+        public void NonSelectedDualEdgeCaliper_HidesSamplingRegionAndEdgeMarkersButKeepsDetectedResult()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                var caliper = new CaliperMeasureRoi
+                {
+                    P1 = new PointD(10, 20),
+                    P2 = new PointD(30, 20),
+                    HasDetectedEdges = true,
+                    Edge1Start = new PointD(10, 10),
+                    Edge1End = new PointD(10, 30),
+                    Edge2Start = new PointD(30, 10),
+                    Edge2End = new PointD(30, 30),
+                    RegionSegments = [new LineSegmentOverlay(new PointD(0, 0), new PointD(40, 0))],
+                    CaliperBars = [new LineSegmentOverlay(new PointD(0, 5), new PointD(0, 15))],
+                    Edge1Markers = [new LineSegmentOverlay(new PointD(9, 9), new PointD(11, 11))]
+                };
+                var context = CreateRenderContext(new Canvas(), new Canvas());
+                new RoiRenderService(RoiPluginRegistry.CreateBuiltIn()).Render(caliper, context, null, isSelected: false);
+
+                System.Windows.Shapes.Line[] lines = context.ScreenOverlayCanvas.Children.OfType<System.Windows.Shapes.Line>().ToArray();
+                Assert.Equal(3, lines.Length);
+                Assert.Contains(lines, line => line.Stroke == Brushes.LimeGreen);
+            });
+        }
+
+        private static RoiRenderContext CreateRenderContext(Canvas overlayCanvas, Canvas screenOverlayCanvas)
+        {
+            return new RoiRenderContext(
+                overlayCanvas,
+                screenOverlayCanvas,
+                static point => point,
+                scale: 1,
+                pixelSize: 1,
+                physicalUnit: "px",
+                showCaliperScores: false,
+                handleSize: 8,
+                infoTextOffset: 20,
+                angleArcRadius: 20,
+                pointAnnotationSize: 10,
+                polygonResizeHandlePadding: 4,
+                polygonCloseHighlightPadding: 6);
         }
 
         [Fact]

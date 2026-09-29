@@ -9,29 +9,34 @@ namespace ImageViewer.Rendering
     {
         public static void DrawDetectionMarkers(RoiRenderContext context, CaliperMeasureRoi caliper, Brush invalidBrush, Brush rejectedBrush)
         {
-            SingleEdgeCaliperRenderHelper.DrawEdgeMarkers(context, caliper.InvalidCaliperMarkers, invalidBrush);
-            SingleEdgeCaliperRenderHelper.DrawEdgeMarkers(context, caliper.RejectedEdge1Markers, rejectedBrush);
-            SingleEdgeCaliperRenderHelper.DrawEdgeMarkers(context, caliper.RejectedEdge2Markers, rejectedBrush);
-            SingleEdgeCaliperRenderHelper.DrawEdgeMarkers(context, caliper.Edge1Markers, Brushes.Cyan);
-            SingleEdgeCaliperRenderHelper.DrawEdgeMarkers(context, caliper.Edge2Markers, Brushes.Orange);
+            SingleEdgeCaliperRenderHelper.DrawEdgeMarkers(context, caliper.InvalidCaliperMarkers, invalidBrush, opacity: 0.45);
+            SingleEdgeCaliperRenderHelper.DrawEdgeMarkers(context, caliper.RejectedEdge1Markers, rejectedBrush, opacity: 0.55);
+            SingleEdgeCaliperRenderHelper.DrawEdgeMarkers(context, caliper.RejectedEdge2Markers, rejectedBrush, opacity: 0.55);
+            SingleEdgeCaliperRenderHelper.DrawEdgeMarkers(context, caliper.Edge1Markers, Brushes.Cyan, opacity: 0.6);
+            SingleEdgeCaliperRenderHelper.DrawEdgeMarkers(context, caliper.Edge2Markers, Brushes.Orange, opacity: 0.6);
             SingleEdgeCaliperRenderHelper.DrawScoreOverlays(context, caliper.ScoreOverlays);
         }
 
-        public static void DrawLegend(RoiRenderContext context, CaliperMeasureRoi caliper, Brush invalidBrush, Brush rejectedBrush)
+        public static void DrawLegend(RoiRenderContext context, CaliperMeasureRoi caliper, Brush measurementBrush, Brush invalidBrush, Brush rejectedBrush)
         {
-            if (!context.ShowCaliperScores)
+            if (!caliper.HasDetectedEdges)
             {
                 return;
             }
 
             Point anchor = new(caliper.CaliperCenter.X + 10 / context.Scale, caliper.CaliperCenter.Y - 28 / context.Scale);
-            SingleEdgeCaliperRenderHelper.DrawLegend(context, anchor, invalidBrush, rejectedBrush, showDiagnostics: true);
+            DrawLegendItem(context, anchor, measurementBrush, "宽度");
+            DrawLegendItem(context, new Point(anchor.X, anchor.Y + 12 / context.Scale), Brushes.LimeGreen, "最终拟合线");
+            if (context.ShowCaliperScores)
+            {
+                SingleEdgeCaliperRenderHelper.DrawLegend(context, new Point(anchor.X, anchor.Y + 24 / context.Scale), invalidBrush, rejectedBrush, showDiagnostics: true);
+            }
         }
 
         public static string BuildSummaryText(RoiRenderContext context, CaliperMeasureRoi caliper)
         {
-            string geometryText = $"D:{context.FormatLength(GeometryUtils.Distance(caliper.P1.ToWpfPoint(), caliper.P2.ToWpfPoint()))}";
-            return SingleEdgeCaliperRenderHelper.BuildSummaryText(caliper, geometryText, "Caliper", context.ShowCaliperScores);
+            string geometryText = $"宽度：{context.FormatLength(GeometryUtils.Distance(caliper.P1.ToWpfPoint(), caliper.P2.ToWpfPoint()))}";
+            return SingleEdgeCaliperRenderHelper.BuildSummaryText(caliper, geometryText, "宽度测量", context.ShowCaliperScores);
         }
 
         /// <summary>
@@ -47,11 +52,13 @@ namespace ImageViewer.Rendering
         }
 
         /// <summary>
-        /// Returns the summary anchor offset from the measured segment so the label does not cover it.
-        /// The side with the smaller screen Y coordinate is chosen to keep the label visually above the line
-        /// even when the image is zoomed or translated.
+        /// Returns a summary anchor far enough from the measured segment to keep the complete label clear.
+        /// A horizontal measurement places the label above the segment; a vertical measurement places it to a side.
         /// </summary>
         public static Point GetSummaryAnchor(RoiRenderContext context, CaliperMeasureRoi caliper)
+            => GetSummaryAnchor(context, caliper, summaryText: null);
+
+        public static Point GetSummaryAnchor(RoiRenderContext context, CaliperMeasureRoi caliper, string? summaryText)
         {
             ArgumentNullException.ThrowIfNull(context);
             ArgumentNullException.ThrowIfNull(caliper);
@@ -70,10 +77,30 @@ namespace ImageViewer.Rendering
 
             direction.Normalize();
             Vector normal = new(-direction.Y, direction.X);
-            double offset = Math.Max(12, context.InfoTextOffset) / Math.Max(context.Scale, 1e-6);
+            double screenOffset = Math.Max(12, context.InfoTextOffset);
+            if (!string.IsNullOrWhiteSpace(summaryText))
+            {
+                Size labelSize = RoiRenderContext.MeasureInfoText(summaryText);
+                Vector screenNormal = context.ToScreenPoint(midpoint + normal) - context.ToScreenPoint(midpoint);
+                if (screenNormal.LengthSquared > 1e-6)
+                {
+                    screenNormal.Normalize();
+                    double halfExtent = Math.Abs(screenNormal.X) * labelSize.Width / 2
+                        + Math.Abs(screenNormal.Y) * labelSize.Height / 2;
+                    screenOffset = Math.Max(screenOffset, halfExtent + 6);
+                }
+            }
+
+            double offset = screenOffset / Math.Max(context.Scale, 1e-6);
             Point first = midpoint + normal * offset;
             Point second = midpoint - normal * offset;
             return context.ToScreenPoint(first).Y <= context.ToScreenPoint(second).Y ? first : second;
+        }
+
+        private static void DrawLegendItem(RoiRenderContext context, Point start, Brush brush, string text)
+        {
+            context.DrawLineSegment(start, new Point(start.X + 10 / context.Scale, start.Y), brush, 2 / context.Scale);
+            context.DrawInfoText(text, new Point(start.X + 14 / context.Scale, start.Y - 5 / context.Scale), Brushes.White);
         }
 
         private static Point GetMeasuredSegmentMidpoint(CaliperMeasureRoi caliper)

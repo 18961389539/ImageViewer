@@ -47,8 +47,8 @@ namespace ImageViewer.Controls
             InitializeComponent();
             Loaded += OnLoaded;
             _imageViewer = new ImageViewer();
-            // 自适应宿主面向演示和快速浏览，默认显示常用工具、测量结果和 ROI 列表。
-            _imageViewer.ShowToolbar = true;
+            // 自适应宿主默认收起工具栏，把画布留给图像；点击左上角“工具栏”入口即可打开完整命令面板。
+            _imageViewer.ShowToolbar = false;
             _volumeViewer = new VolumeViewer();
             _volume3DViewer = new Volume3DViewer();
             _volume3DViewer.SwitchToAxialSliceRequested += OnSwitchToAxialSliceRequested;

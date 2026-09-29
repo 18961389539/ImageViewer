@@ -947,10 +947,12 @@
                 HorizontalAlignment="Left"
                 VerticalAlignment="Top"
                 Margin="16"
+                Width="460"
+                MaxHeight="540"
                 Panel.ZIndex="100"
                 Visibility="Collapsed"
                 Style="{StaticResource ViewerFloatingPanelStyle}">
-            <StackPanel Width="Auto">
+            <StackPanel Width="440">
                 <Grid Margin="0,0,0,2">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -973,7 +975,7 @@
                             FontSize="11"
                             Style="{StaticResource ViewerToolbarButtonStyle}" />
                 </Grid>
-                <WrapPanel MaxWidth="460">
+                <WrapPanel MaxWidth="420">
                     <Button Content="{localization:UiText MenuOpenImageFile}"
                             Click="OnToolbarFileCommandClick"
                             Tag="{x:Static controls:ImageViewerFileMenuTags.OpenImage}"
@@ -1023,7 +1025,7 @@
                 </WrapPanel>
 
                 <TextBlock Text="{localization:UiText MenuAnalysisAndExport}" Style="{StaticResource ViewerSectionTitleStyle}" Margin="0,4,0,8" />
-                <WrapPanel MaxWidth="460">
+                <WrapPanel MaxWidth="420">
                     <Button Content="{localization:UiText MenuCalibratePixels}"
                             Click="OnRoiMenuCommandClick"
                             Tag="{x:Static controls:ImageViewerRoiMenuTags.CalibratePixels}"
@@ -1051,7 +1053,7 @@
                 </WrapPanel>
 
                 <TextBlock Text="{localization:UiText MenuQuickTools}" Style="{StaticResource ViewerSectionTitleStyle}" Margin="0,4,0,8" />
-                <WrapPanel x:Name="quickToolsPanel" />
+                <WrapPanel x:Name="quickToolsPanel" MaxWidth="420" />
 
                 <TextBlock Text="{localization:UiText MenuViewControl}" Style="{StaticResource ViewerSectionTitleStyle}" Margin="0,4,0,8" />
                 <WrapPanel>

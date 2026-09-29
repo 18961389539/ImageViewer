@@ -343,7 +343,7 @@
   <data name="InfoLineBlobItem" xml:space="preserve"><value>斑点#{0}  面积:{1} 宽:{2} 高:{3} 中心:({4:F1}, {5:F1})</value></data>
   <data name="InfoLineBlobBox" xml:space="preserve"><value>边界框: X:{0:F1} Y:{1:F1} 宽:{2} 高:{3}</value></data>
   <data name="InfoLineBlobRemaining" xml:space="preserve"><value>... 其余 {0} 个斑点未展开显示</value></data>
-  <data name="InfoLineCaliperMeasure" xml:space="preserve"><value>宽度测量  距离:{0}</value></data>
+  <data name="InfoLineCaliperMeasure" xml:space="preserve"><value>宽度测量  宽度：{0}</value></data>
   <data name="InfoLineCaliperDetectedWidth" xml:space="preserve"><value>检测宽度  中心:{0} 均值:{1} 中位数:{2}</value></data>
   <data name="InfoLineCaliperWidthSpread" xml:space="preserve"><value>宽度范围:{0}–{1} 极差:{2} 标准差:{3} 样本:{4}</value></data>
   <data name="InfoLineRegionSearch" xml:space="preserve"><value>区域:{0} 搜索:{1}</value></data>

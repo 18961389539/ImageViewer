@@ -9,11 +9,11 @@ namespace ImageViewer.Rendering
 {
     internal static class SingleEdgeCaliperRenderHelper
     {
-        public static void DrawEdgeMarkers(RoiRenderContext context, IReadOnlyList<LineSegmentOverlay> markers, Brush brush)
+        public static void DrawEdgeMarkers(RoiRenderContext context, IReadOnlyList<LineSegmentOverlay> markers, Brush brush, double opacity = 1.0)
         {
             foreach (LineSegmentOverlay marker in markers)
             {
-                context.DrawLineSegment(marker.Start.ToWpfPoint(), marker.End.ToWpfPoint(), brush, 1.4 / context.Scale);
+                context.DrawLineSegment(marker.Start.ToWpfPoint(), marker.End.ToWpfPoint(), brush, 1.4 / context.Scale, opacity: opacity);
             }
         }
 

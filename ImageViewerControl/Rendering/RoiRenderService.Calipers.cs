@@ -23,6 +23,7 @@ namespace ImageViewer.Rendering
                 Brush barBrush = Brushes.Gold;
                 Brush invalidBrush = Brushes.Gray;
                 Brush rejectedBrush = Brushes.IndianRed;
+                bool showDetails = isSelected || ReferenceEquals(strokeOverride, Brushes.Orange);
 
                 IEnumerable<LineSegmentOverlay> previewSegments = caliper.RegionSegments.Length > 0
                     ? caliper.RegionSegments
@@ -31,21 +32,24 @@ namespace ImageViewer.Rendering
                     ? caliper.CaliperBars
                     : CaliperOverlayGeometryHelper.BuildCircularCaliperBars(caliper);
 
-                foreach (LineSegmentOverlay segment in previewSegments)
+                if (showDetails)
                 {
-                    context.DrawLineSegment(segment.Start.ToWpfPoint(), segment.End.ToWpfPoint(), barBrush, 1.1 / context.Scale, new DoubleCollection { 3, 2 });
-                }
+                    foreach (LineSegmentOverlay segment in previewSegments)
+                    {
+                        context.DrawLineSegment(segment.Start.ToWpfPoint(), segment.End.ToWpfPoint(), barBrush, 1.1 / context.Scale, new DoubleCollection { 3, 2 }, opacity: 0.32);
+                    }
 
-                foreach (LineSegmentOverlay segment in previewBars)
-                {
-                    context.DrawLineSegment(segment.Start.ToWpfPoint(), segment.End.ToWpfPoint(), barBrush, 0.8 / context.Scale, opacity: 0.7);
-                }
+                    foreach (LineSegmentOverlay segment in previewBars)
+                    {
+                        context.DrawLineSegment(segment.Start.ToWpfPoint(), segment.End.ToWpfPoint(), barBrush, 0.8 / context.Scale, opacity: 0.32);
+                    }
 
-                SingleEdgeCaliperRenderHelper.DrawEdgeMarkers(context, caliper.InvalidCaliperMarkers, invalidBrush);
-                SingleEdgeCaliperRenderHelper.DrawEdgeMarkers(context, caliper.RejectedEdgeMarkers, rejectedBrush);
-                SingleEdgeCaliperRenderHelper.DrawEdgeMarkers(context, caliper.EdgeMarkers, Brushes.Cyan);
-                SingleEdgeCaliperRenderHelper.DrawScoreOverlays(context, caliper.ScoreOverlays);
-                SingleEdgeCaliperRenderHelper.DrawLegend(context, new Point(caliper.Center.X + caliper.Radius / 2, caliper.Center.Y - caliper.Radius / 2), invalidBrush, rejectedBrush, context.ShowCaliperScores);
+                    SingleEdgeCaliperRenderHelper.DrawEdgeMarkers(context, caliper.InvalidCaliperMarkers, invalidBrush, opacity: 0.45);
+                    SingleEdgeCaliperRenderHelper.DrawEdgeMarkers(context, caliper.RejectedEdgeMarkers, rejectedBrush, opacity: 0.55);
+                    SingleEdgeCaliperRenderHelper.DrawEdgeMarkers(context, caliper.EdgeMarkers, Brushes.Cyan, opacity: 0.6);
+                    SingleEdgeCaliperRenderHelper.DrawScoreOverlays(context, caliper.ScoreOverlays);
+                    SingleEdgeCaliperRenderHelper.DrawLegend(context, new Point(caliper.Center.X + caliper.Radius / 2, caliper.Center.Y - caliper.Radius / 2), invalidBrush, rejectedBrush, context.ShowCaliperScores);
+                }
 
                 context.DrawEllipseOutline(caliper.Center.ToWpfPoint(), caliper.Radius, caliper.Radius, 0, brush, (isSelected ? 3 : caliper.StrokeThickness) / context.Scale);
 
@@ -54,8 +58,11 @@ namespace ImageViewer.Rendering
                     StandardRoiLayoutHelper.DrawCircleHandles(context, caliper.Center.ToWpfPoint(), caliper.Radius);
                 }
 
-                string info = SingleEdgeCaliperRenderHelper.BuildSummaryText(caliper, $"R:{context.FormatLength(caliper.Radius)}", "Circular Caliper", context.ShowCaliperScores);
-                context.DrawInfoText(info, StandardRoiLayoutHelper.GetTopInfoAnchor(caliper.Center.ToWpfPoint(), caliper.Radius, context), brush, true);
+                if (showDetails)
+                {
+                    string info = SingleEdgeCaliperRenderHelper.BuildSummaryText(caliper, $"半径：{context.FormatLength(caliper.Radius)}", "圆形边缘测量", context.ShowCaliperScores);
+                    context.DrawInfoText(info, StandardRoiLayoutHelper.GetTopInfoAnchor(caliper.Center.ToWpfPoint(), caliper.Radius, context), Brushes.White, true);
+                }
             }
         }
 
@@ -72,6 +79,7 @@ namespace ImageViewer.Rendering
                 Brush barBrush = Brushes.Gold;
                 Brush invalidBrush = Brushes.Gray;
                 Brush rejectedBrush = Brushes.IndianRed;
+                bool showDetails = isSelected || ReferenceEquals(strokeOverride, Brushes.Orange);
 
                 IEnumerable<LineSegmentOverlay> previewSegments = caliper.RegionSegments.Length > 0
                     ? caliper.RegionSegments
@@ -80,20 +88,23 @@ namespace ImageViewer.Rendering
                     ? caliper.CaliperBars
                     : CaliperOverlayGeometryHelper.BuildArcCaliperBars(caliper);
 
-                foreach (LineSegmentOverlay segment in previewSegments)
+                if (showDetails)
                 {
-                    context.DrawLineSegment(segment.Start.ToWpfPoint(), segment.End.ToWpfPoint(), barBrush, 1.1 / context.Scale, new DoubleCollection { 3, 2 });
-                }
+                    foreach (LineSegmentOverlay segment in previewSegments)
+                    {
+                        context.DrawLineSegment(segment.Start.ToWpfPoint(), segment.End.ToWpfPoint(), barBrush, 1.1 / context.Scale, new DoubleCollection { 3, 2 }, opacity: 0.32);
+                    }
 
-                foreach (LineSegmentOverlay segment in previewBars)
-                {
-                    context.DrawLineSegment(segment.Start.ToWpfPoint(), segment.End.ToWpfPoint(), barBrush, 0.8 / context.Scale, opacity: 0.7);
-                }
+                    foreach (LineSegmentOverlay segment in previewBars)
+                    {
+                        context.DrawLineSegment(segment.Start.ToWpfPoint(), segment.End.ToWpfPoint(), barBrush, 0.8 / context.Scale, opacity: 0.32);
+                    }
 
-                SingleEdgeCaliperRenderHelper.DrawEdgeMarkers(context, caliper.InvalidCaliperMarkers, invalidBrush);
-                SingleEdgeCaliperRenderHelper.DrawEdgeMarkers(context, caliper.RejectedEdgeMarkers, rejectedBrush);
-                SingleEdgeCaliperRenderHelper.DrawEdgeMarkers(context, caliper.EdgeMarkers, Brushes.Cyan);
-                SingleEdgeCaliperRenderHelper.DrawScoreOverlays(context, caliper.ScoreOverlays);
+                    SingleEdgeCaliperRenderHelper.DrawEdgeMarkers(context, caliper.InvalidCaliperMarkers, invalidBrush, opacity: 0.45);
+                    SingleEdgeCaliperRenderHelper.DrawEdgeMarkers(context, caliper.RejectedEdgeMarkers, rejectedBrush, opacity: 0.55);
+                    SingleEdgeCaliperRenderHelper.DrawEdgeMarkers(context, caliper.EdgeMarkers, Brushes.Cyan, opacity: 0.6);
+                    SingleEdgeCaliperRenderHelper.DrawScoreOverlays(context, caliper.ScoreOverlays);
+                }
 
                 context.DrawArc(caliper.Center.ToWpfPoint(), caliper.Radius, caliper.StartAngle, caliper.SweepAngle, brush, (isSelected ? 3 : caliper.StrokeThickness) / context.Scale);
                 DrawArcEndpoints(context, caliper, brush, (isSelected ? 3 : caliper.StrokeThickness) / context.Scale);
@@ -103,8 +114,11 @@ namespace ImageViewer.Rendering
                     StandardRoiLayoutHelper.DrawCircleHandles(context, caliper.Center.ToWpfPoint(), caliper.Radius);
                 }
 
-                string info = SingleEdgeCaliperRenderHelper.BuildSummaryText(caliper, $"R:{context.FormatLength(caliper.Radius)} Arc:{caliper.SweepAngle:F0}°", "Arc Caliper", context.ShowCaliperScores);
-                context.DrawInfoText(info, StandardRoiLayoutHelper.GetTopInfoAnchor(caliper.Center.ToWpfPoint(), caliper.Radius, context), brush, true);
+                if (showDetails)
+                {
+                    string info = SingleEdgeCaliperRenderHelper.BuildSummaryText(caliper, $"半径：{context.FormatLength(caliper.Radius)} 弧角：{caliper.SweepAngle:F0}°", "弧形边缘测量", context.ShowCaliperScores);
+                    context.DrawInfoText(info, StandardRoiLayoutHelper.GetTopInfoAnchor(caliper.Center.ToWpfPoint(), caliper.Radius, context), Brushes.White, true);
+                }
             }
 
             private static void DrawArcEndpoints(RoiRenderContext context, ArcCaliperMeasureRoi caliper, Brush brush, double thickness)
@@ -132,6 +146,7 @@ namespace ImageViewer.Rendering
                 Brush barBrush = Brushes.Gold;
                 Brush invalidBrush = Brushes.Gray;
                 Brush rejectedBrush = Brushes.IndianRed;
+                bool showDetails = isSelected || ReferenceEquals(strokeOverride, Brushes.Orange);
 
                 LineSegmentOverlay[] previewSegments = line.RegionSegments.Length > 0
                     ? line.RegionSegments
@@ -140,21 +155,24 @@ namespace ImageViewer.Rendering
                     ? line.CaliperBars
                     : CaliperOverlayGeometryHelper.BuildLineCaliperBars(line);
 
-                foreach (LineSegmentOverlay segment in previewSegments)
+                if (showDetails)
                 {
-                    context.DrawLineSegment(segment.Start.ToWpfPoint(), segment.End.ToWpfPoint(), barBrush, 1.2 / context.Scale, new DoubleCollection { 3, 2 });
-                }
+                    foreach (LineSegmentOverlay segment in previewSegments)
+                    {
+                        context.DrawLineSegment(segment.Start.ToWpfPoint(), segment.End.ToWpfPoint(), barBrush, 1.2 / context.Scale, new DoubleCollection { 3, 2 }, opacity: 0.32);
+                    }
 
-                foreach (LineSegmentOverlay segment in previewBars)
-                {
-                    context.DrawLineSegment(segment.Start.ToWpfPoint(), segment.End.ToWpfPoint(), barBrush, 0.8 / context.Scale, opacity: 0.7);
-                }
+                    foreach (LineSegmentOverlay segment in previewBars)
+                    {
+                        context.DrawLineSegment(segment.Start.ToWpfPoint(), segment.End.ToWpfPoint(), barBrush, 0.8 / context.Scale, opacity: 0.32);
+                    }
 
-                SingleEdgeCaliperRenderHelper.DrawEdgeMarkers(context, line.InvalidCaliperMarkers, invalidBrush);
-                SingleEdgeCaliperRenderHelper.DrawEdgeMarkers(context, line.RejectedEdgeMarkers, rejectedBrush);
-                SingleEdgeCaliperRenderHelper.DrawEdgeMarkers(context, line.EdgeMarkers, edgeBrush);
-                SingleEdgeCaliperRenderHelper.DrawScoreOverlays(context, line.ScoreOverlays);
-                SingleEdgeCaliperRenderHelper.DrawLegend(context, new Point((line.P1.X + line.P2.X) / 2 + 10 / context.Scale, (line.P1.Y + line.P2.Y) / 2 - 28 / context.Scale), invalidBrush, rejectedBrush, context.ShowCaliperScores);
+                    SingleEdgeCaliperRenderHelper.DrawEdgeMarkers(context, line.InvalidCaliperMarkers, invalidBrush, opacity: 0.45);
+                    SingleEdgeCaliperRenderHelper.DrawEdgeMarkers(context, line.RejectedEdgeMarkers, rejectedBrush, opacity: 0.55);
+                    SingleEdgeCaliperRenderHelper.DrawEdgeMarkers(context, line.EdgeMarkers, edgeBrush, opacity: 0.6);
+                    SingleEdgeCaliperRenderHelper.DrawScoreOverlays(context, line.ScoreOverlays);
+                    SingleEdgeCaliperRenderHelper.DrawLegend(context, new Point((line.P1.X + line.P2.X) / 2 + 10 / context.Scale, (line.P1.Y + line.P2.Y) / 2 - 28 / context.Scale), invalidBrush, rejectedBrush, context.ShowCaliperScores);
+                }
 
                 context.DrawLineSegment(
                     line.P1.ToWpfPoint(),
@@ -167,8 +185,11 @@ namespace ImageViewer.Rendering
                 context.DrawHandle(line.P1.ToWpfPoint(), isSelected ? ResizeHandle.P1 : ResizeHandle.None, handleSize, false, brush);
                 context.DrawHandle(line.P2.ToWpfPoint(), isSelected ? ResizeHandle.P2 : ResizeHandle.None, handleSize, false, brush);
 
-                string info = SingleEdgeCaliperRenderHelper.BuildSummaryText(line, $"D:{context.FormatLength(GeometryUtils.Distance(line.P1.ToWpfPoint(), line.P2.ToWpfPoint()))}", "Line Caliper", context.ShowCaliperScores);
-                context.DrawInfoText(info, new Point((line.P1.X + line.P2.X) / 2, (line.P1.Y + line.P2.Y) / 2), brush, true);
+                if (showDetails)
+                {
+                    string info = SingleEdgeCaliperRenderHelper.BuildSummaryText(line, $"边缘距离：{context.FormatLength(GeometryUtils.Distance(line.P1.ToWpfPoint(), line.P2.ToWpfPoint()))}", "单边缘测量", context.ShowCaliperScores);
+                    context.DrawInfoText(info, new Point((line.P1.X + line.P2.X) / 2, (line.P1.Y + line.P2.Y) / 2), Brushes.White, true);
+                }
             }
         }
 
@@ -183,10 +204,11 @@ namespace ImageViewer.Rendering
 
                 caliper.EnsureCaliperRegion();
                 Brush brush = RoiRenderContext.ResolveStroke(strokeOverride, caliper.StrokeColor);
-                Brush edgeBrush = Brushes.Lime;
+                Brush edgeBrush = Brushes.LimeGreen;
                 Brush barBrush = Brushes.Gold;
                 Brush invalidBrush = Brushes.Gray;
                 Brush rejectedBrush = Brushes.IndianRed;
+                bool showDetails = isSelected || ReferenceEquals(strokeOverride, Brushes.Orange);
 
                 LineSegmentOverlay[] previewSegments = caliper.RegionSegments.Length > 0
                     ? caliper.RegionSegments
@@ -195,18 +217,21 @@ namespace ImageViewer.Rendering
                     ? caliper.CaliperBars
                     : CaliperOverlayGeometryHelper.BuildDualEdgeCaliperBars(caliper);
 
-                foreach (LineSegmentOverlay segment in previewSegments)
+                if (showDetails)
                 {
-                    context.DrawLineSegment(segment.Start.ToWpfPoint(), segment.End.ToWpfPoint(), barBrush, 1.2 / context.Scale, new DoubleCollection { 3, 2 });
-                }
+                    foreach (LineSegmentOverlay segment in previewSegments)
+                    {
+                        context.DrawLineSegment(segment.Start.ToWpfPoint(), segment.End.ToWpfPoint(), barBrush, 1.2 / context.Scale, new DoubleCollection { 3, 2 }, opacity: 0.32);
+                    }
 
-                foreach (LineSegmentOverlay segment in previewBars)
-                {
-                    context.DrawLineSegment(segment.Start.ToWpfPoint(), segment.End.ToWpfPoint(), barBrush, 0.8 / context.Scale, opacity: 0.7);
-                }
+                    foreach (LineSegmentOverlay segment in previewBars)
+                    {
+                        context.DrawLineSegment(segment.Start.ToWpfPoint(), segment.End.ToWpfPoint(), barBrush, 0.8 / context.Scale, opacity: 0.32);
+                    }
 
-                DualEdgeCaliperRenderHelper.DrawDetectionMarkers(context, caliper, invalidBrush, rejectedBrush);
-                DualEdgeCaliperRenderHelper.DrawLegend(context, caliper, invalidBrush, rejectedBrush);
+                    DualEdgeCaliperRenderHelper.DrawDetectionMarkers(context, caliper, invalidBrush, rejectedBrush);
+                    DualEdgeCaliperRenderHelper.DrawLegend(context, caliper, brush, invalidBrush, rejectedBrush);
+                }
 
                 if (caliper.HasDetectedEdges)
                 {
@@ -220,13 +245,13 @@ namespace ImageViewer.Rendering
                         caliper.Edge1Start.ToWpfPoint(),
                         caliper.Edge1End.ToWpfPoint(),
                         edgeBrush,
-                        1.8 / context.Scale,
+                        2.4 / context.Scale,
                         snapToDevicePixels: false);
                     context.DrawLineSegment(
                         caliper.Edge2Start.ToWpfPoint(),
                         caliper.Edge2End.ToWpfPoint(),
                         edgeBrush,
-                        1.8 / context.Scale,
+                        2.4 / context.Scale,
                         snapToDevicePixels: false);
                 }
 
@@ -235,11 +260,15 @@ namespace ImageViewer.Rendering
                     DrawResizeHandles(context, caliper);
                 }
 
-                context.DrawInfoText(
-                    DualEdgeCaliperRenderHelper.BuildSummaryText(context, caliper),
-                    DualEdgeCaliperRenderHelper.GetSummaryAnchor(context, caliper),
-                    brush,
-                    true);
+                if (showDetails)
+                {
+                    string summary = DualEdgeCaliperRenderHelper.BuildSummaryText(context, caliper);
+                    context.DrawInfoText(
+                        summary,
+                        DualEdgeCaliperRenderHelper.GetSummaryAnchor(context, caliper, summary),
+                        Brushes.White,
+                        true);
+                }
             }
 
             private static void DrawResizeHandles(RoiRenderContext context, CaliperMeasureRoi caliper)
