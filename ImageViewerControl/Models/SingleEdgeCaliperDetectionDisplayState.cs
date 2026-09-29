@@ -5,6 +5,13 @@ namespace ImageViewer.Models
     {
         public bool HasDetection { get; set; }
 
+        // Line-caliper results are kept separate from the hand-drawn reference
+        // segment.  The reference segment is the ROI's P1/P2; these points are
+        // the projected result returned by the detector.
+        public PointD DetectedP1 { get; set; }
+
+        public PointD DetectedP2 { get; set; }
+
         public LineSegmentOverlay[] RegionSegments { get; set; } = [];
 
         public LineSegmentOverlay[] CaliperBars { get; set; } = [];
@@ -36,6 +43,8 @@ namespace ImageViewer.Models
             return new SingleEdgeCaliperDetectionDisplayState
             {
                 HasDetection = roi.HasDetection,
+                DetectedP1 = roi is LineCaliperMeasureRoi ? ((LineCaliperMeasureRoi)roi).DetectedP1 : default,
+                DetectedP2 = roi is LineCaliperMeasureRoi ? ((LineCaliperMeasureRoi)roi).DetectedP2 : default,
                 RegionSegments = [.. roi.RegionSegments],
                 CaliperBars = [.. roi.CaliperBars],
                 InvalidCaliperMarkers = [.. roi.InvalidCaliperMarkers],
@@ -103,6 +112,10 @@ namespace ImageViewer.Models
         public void ApplyTo(ISingleEdgeCaliperDetectionDisplayStateOwner roi)
         {
             roi.HasDetection = HasDetection;
+            if (roi is LineCaliperMeasureRoi line)
+            {
+                line.SetDetectedLine(DetectedP1, DetectedP2);
+            }
             roi.RegionSegments = [.. RegionSegments];
             roi.CaliperBars = [.. CaliperBars];
             roi.InvalidCaliperMarkers = [.. InvalidCaliperMarkers];

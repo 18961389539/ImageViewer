@@ -190,6 +190,13 @@ namespace ImageViewer.Models
             set => SetProperty(ref _caliperSamplingHalfWidth, Math.Max(0, value));
         }
 
+        /// <summary>
+        /// 检测器得到的最终测量线端点。P1/P2 保留操作员手动画出的参考线。
+        /// </summary>
+        public PointD DetectedP1 => DetectionDisplayState.DetectedP1;
+
+        public PointD DetectedP2 => DetectionDisplayState.DetectedP2;
+
         public double CaliperEdgeSigma
         {
             get => _caliperEdgeSigma;
@@ -334,6 +341,12 @@ namespace ImageViewer.Models
         {
             this.ClearDetection();
             ApplyWidthMeasurement(CaliperWidthMeasurementResult.Empty);
+        }
+
+        internal void SetDetectedMeasurementLine(PointD p1, PointD p2)
+        {
+            SetDetectionDisplayStateValue(DetectionDisplayState.DetectedP1, p1, static (state, value) => state.DetectedP1 = value);
+            SetDetectionDisplayStateValue(DetectionDisplayState.DetectedP2, p2, static (state, value) => state.DetectedP2 = value);
         }
 
         public void SyncCaliperRegionFromMeasurementLine(bool updateSearchRange = true)

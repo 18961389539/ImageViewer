@@ -4,6 +4,10 @@ namespace ImageViewer.Models
     internal sealed class DualEdgeCaliperDetectionDisplayState
     {
         public bool HasDetection { get; set; }
+        // P1/P2 remain the hand-drawn measurement reference.  These are the
+        // detected intersections used for the final width result.
+        public PointD DetectedP1 { get; set; }
+        public PointD DetectedP2 { get; set; }
         public PointD Edge1Start { get; set; }
         public PointD Edge1End { get; set; }
         public PointD Edge2Start { get; set; }
@@ -37,6 +41,8 @@ namespace ImageViewer.Models
             return new DualEdgeCaliperDetectionDisplayState
             {
                 HasDetection = roi.HasDetectedEdges,
+                DetectedP1 = roi.DetectedP1,
+                DetectedP2 = roi.DetectedP2,
                 Edge1Start = roi.Edge1Start,
                 Edge1End = roi.Edge1End,
                 Edge2Start = roi.Edge2Start,
@@ -103,6 +109,7 @@ namespace ImageViewer.Models
         public void ApplyTo(CaliperMeasureRoi roi)
         {
             roi.HasDetectedEdges = HasDetection;
+            roi.SetDetectedMeasurementLine(DetectedP1, DetectedP2);
             roi.Edge1Start = Edge1Start;
             roi.Edge1End = Edge1End;
             roi.Edge2Start = Edge2Start;

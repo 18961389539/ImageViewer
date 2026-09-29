@@ -25,7 +25,7 @@ namespace ImageViewer.Rendering
             }
 
             Point anchor = new(caliper.CaliperCenter.X + 10 / context.Scale, caliper.CaliperCenter.Y - 28 / context.Scale);
-            DrawLegendItem(context, anchor, measurementBrush, "宽度");
+            DrawLegendItem(context, anchor, measurementBrush, "手动参考线");
             DrawLegendItem(context, new Point(anchor.X, anchor.Y + 12 / context.Scale), Brushes.LimeGreen, "最终拟合线");
             if (context.ShowCaliperScores)
             {
@@ -35,7 +35,8 @@ namespace ImageViewer.Rendering
 
         public static string BuildSummaryText(RoiRenderContext context, CaliperMeasureRoi caliper)
         {
-            string geometryText = $"宽度：{context.FormatLength(GeometryUtils.Distance(caliper.P1.ToWpfPoint(), caliper.P2.ToWpfPoint()))}";
+            (PointD p1, PointD p2) = GetMeasuredSegmentPoints(caliper);
+            string geometryText = $"宽度：{context.FormatLength(GeometryUtils.Distance(p1.ToWpfPoint(), p2.ToWpfPoint()))}";
             return SingleEdgeCaliperRenderHelper.BuildSummaryText(caliper, geometryText, "宽度测量", context.ShowCaliperScores);
         }
 
@@ -105,14 +106,24 @@ namespace ImageViewer.Rendering
 
         private static Point GetMeasuredSegmentMidpoint(CaliperMeasureRoi caliper)
         {
+            (PointD p1, PointD p2) = GetMeasuredSegmentPoints(caliper);
             if (caliper.HasDetectedEdges)
             {
-                return new Point(
-                    (caliper.P1.X + caliper.P2.X) / 2,
-                    (caliper.P1.Y + caliper.P2.Y) / 2);
+                return new Point((p1.X + p2.X) / 2, (p1.Y + p2.Y) / 2);
             }
 
             return caliper.CaliperCenter.ToWpfPoint();
+        }
+
+        private static (PointD P1, PointD P2) GetMeasuredSegmentPoints(CaliperMeasureRoi caliper)
+        {
+            // Older in-memory ROIs may only set HasDetectedEdges and P1/P2.
+            // Fall back to the reference segment when no separate result segment exists.
+            bool hasSeparateResult = caliper.HasDetectedEdges
+                && (caliper.DetectedP1 != default || caliper.DetectedP2 != default);
+            return hasSeparateResult
+                ? (caliper.DetectedP1, caliper.DetectedP2)
+                : (caliper.P1, caliper.P2);
         }
     }
 }

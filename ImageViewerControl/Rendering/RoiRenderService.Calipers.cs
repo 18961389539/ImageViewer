@@ -181,13 +181,29 @@ namespace ImageViewer.Rendering
                     (isSelected ? 3 : line.StrokeThickness) / context.Scale,
                     snapToDevicePixels: false);
 
+                if (line.HasDetectedLine && (line.DetectedP1 != default || line.DetectedP2 != default))
+                {
+                    context.DrawLineSegment(
+                        line.DetectedP1.ToWpfPoint(),
+                        line.DetectedP2.ToWpfPoint(),
+                        Brushes.LimeGreen,
+                        2.4 / context.Scale,
+                        snapToDevicePixels: false);
+                }
+
                 double handleSize = context.HandleSize / context.Scale;
                 context.DrawHandle(line.P1.ToWpfPoint(), isSelected ? ResizeHandle.P1 : ResizeHandle.None, handleSize, false, brush);
                 context.DrawHandle(line.P2.ToWpfPoint(), isSelected ? ResizeHandle.P2 : ResizeHandle.None, handleSize, false, brush);
 
                 if (showDetails)
                 {
-                    string info = SingleEdgeCaliperRenderHelper.BuildSummaryText(line, $"边缘距离：{context.FormatLength(GeometryUtils.Distance(line.P1.ToWpfPoint(), line.P2.ToWpfPoint()))}", "单边缘测量", context.ShowCaliperScores);
+                    PointD measurementP1 = line.HasDetectedLine && (line.DetectedP1 != default || line.DetectedP2 != default)
+                        ? line.DetectedP1
+                        : line.P1;
+                    PointD measurementP2 = line.HasDetectedLine && (line.DetectedP1 != default || line.DetectedP2 != default)
+                        ? line.DetectedP2
+                        : line.P2;
+                    string info = SingleEdgeCaliperRenderHelper.BuildSummaryText(line, $"边缘距离：{context.FormatLength(GeometryUtils.Distance(measurementP1.ToWpfPoint(), measurementP2.ToWpfPoint()))}", "单边缘测量", context.ShowCaliperScores);
                     context.DrawInfoText(info, new Point((line.P1.X + line.P2.X) / 2, (line.P1.Y + line.P2.Y) / 2), Brushes.White, true);
                 }
             }
@@ -233,14 +249,26 @@ namespace ImageViewer.Rendering
                     DualEdgeCaliperRenderHelper.DrawLegend(context, caliper, brush, invalidBrush, rejectedBrush);
                 }
 
+                // Always keep the operator's reference line visible. Detection adds a
+                // separate green result line instead of replacing this geometry.
+                context.DrawLineSegment(
+                    caliper.P1.ToWpfPoint(),
+                    caliper.P2.ToWpfPoint(),
+                    brush,
+                    (isSelected ? 3 : caliper.StrokeThickness) / context.Scale,
+                    snapToDevicePixels: false);
+
                 if (caliper.HasDetectedEdges)
                 {
-                    context.DrawLineSegment(
-                        caliper.P1.ToWpfPoint(),
-                        caliper.P2.ToWpfPoint(),
-                        brush,
-                        (isSelected ? 3 : caliper.StrokeThickness) / context.Scale,
-                        snapToDevicePixels: false);
+                    if (caliper.DetectedP1 != default || caliper.DetectedP2 != default)
+                    {
+                        context.DrawLineSegment(
+                            caliper.DetectedP1.ToWpfPoint(),
+                            caliper.DetectedP2.ToWpfPoint(),
+                            Brushes.LimeGreen,
+                            2.4 / context.Scale,
+                            snapToDevicePixels: false);
+                    }
                     context.DrawLineSegment(
                         caliper.Edge1Start.ToWpfPoint(),
                         caliper.Edge1End.ToWpfPoint(),

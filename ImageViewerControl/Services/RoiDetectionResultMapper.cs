@@ -11,8 +11,6 @@ namespace ImageViewer.Services
     {
         public static void Apply(CaliperMeasureRoi line, CoreLineMeasureDetectionResult detectionResult)
         {
-            line.P1 = detectionResult.DetectedP1;
-            line.P2 = detectionResult.DetectedP2;
             line.SetDetectionVisualization(CaliperDetectionDisplayStateFactory.Create(line, detectionResult));
             line.ApplyWidthMeasurement(new CaliperWidthMeasurementResult(
                 detectionResult.WidthSamples,
@@ -21,8 +19,6 @@ namespace ImageViewer.Services
 
         public static void Apply(LineCaliperMeasureRoi line, CoreLineCaliperDetectionResult detectionResult)
         {
-            line.P1 = detectionResult.DetectedP1;
-            line.P2 = detectionResult.DetectedP2;
             line.SetDetectionVisualization(CaliperDetectionDisplayStateFactory.Create(line, detectionResult));
             line.AngleDegrees = detectionResult.AngleDegrees;
         }

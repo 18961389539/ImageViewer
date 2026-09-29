@@ -24,6 +24,8 @@ namespace ImageViewer.Rendering
             return new DualEdgeCaliperDetectionDisplayState
             {
                 HasDetection = true,
+                DetectedP1 = detectionResult.DetectedP1,
+                DetectedP2 = detectionResult.DetectedP2,
                 Edge1Start = edge1Geometry.SegmentStart,
                 Edge1End = edge1Geometry.SegmentEnd,
                 Edge2Start = edge2Geometry.SegmentStart,
@@ -77,6 +79,8 @@ namespace ImageViewer.Rendering
             return new SingleEdgeCaliperDetectionDisplayState
             {
                 HasDetection = true,
+                DetectedP1 = detectionResult.DetectedP1,
+                DetectedP2 = detectionResult.DetectedP2,
                 RegionSegments = CaliperOverlayGeometryHelper.BuildLineCaliperRegionSegments(detectionResult.ReferenceP1.ToWpfPoint(), detectionResult.ReferenceP2.ToWpfPoint(), roi.CaliperSearchRange),
                 CaliperBars = CaliperOverlayGeometryHelper.BuildLineCaliperBars(detectionResult.ReferenceP1.ToWpfPoint(), detectionResult.ReferenceP2.ToWpfPoint(), roi.CaliperSearchRange, roi.CaliperCount),
                 InvalidCaliperMarkers = CaliperOverlayGeometryHelper.BuildLinearMarkers(detectionResult.InvalidSamplePoints.ToWpfPointArray(), lineDirection, markerHalfLength),
