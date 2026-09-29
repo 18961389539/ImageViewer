@@ -1,6 +1,7 @@
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows;
+using System.Windows.Controls;
 using ImageViewer.Services;
 using ImageViewer.Models;
 using ImageViewer.Rendering;
@@ -27,6 +28,38 @@ namespace ImageViewerControl.Tests
             Point anchor = DualEdgeCaliperRenderHelper.GetSummaryAnchor(caliper);
 
             Assert.Equal(new Point(20, 30), anchor);
+        }
+
+        [Fact]
+        public void DualEdgeCaliperSummaryAnchor_IsOffsetAboveMeasuredSegment()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                var caliper = new CaliperMeasureRoi
+                {
+                    P1 = new PointD(10, 100),
+                    P2 = new PointD(90, 100),
+                    HasDetectedEdges = true
+                };
+                var context = new RoiRenderContext(
+                    new Canvas(),
+                    new Canvas(),
+                    static point => point,
+                    scale: 1,
+                    pixelSize: 1,
+                    physicalUnit: "px",
+                    showCaliperScores: false,
+                    handleSize: 8,
+                    infoTextOffset: 20,
+                    angleArcRadius: 20,
+                    pointAnnotationSize: 10,
+                    polygonResizeHandlePadding: 4,
+                    polygonCloseHighlightPadding: 6);
+
+                Point anchor = DualEdgeCaliperRenderHelper.GetSummaryAnchor(context, caliper);
+
+                Assert.Equal(new Point(50, 80), anchor);
+            });
         }
 
         [Fact]

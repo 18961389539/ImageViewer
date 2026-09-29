@@ -43,6 +43,41 @@ namespace ImageViewer.Rendering
         {
             ArgumentNullException.ThrowIfNull(caliper);
 
+            return GetMeasuredSegmentMidpoint(caliper);
+        }
+
+        /// <summary>
+        /// Returns the summary anchor offset from the measured segment so the label does not cover it.
+        /// The side with the smaller screen Y coordinate is chosen to keep the label visually above the line
+        /// even when the image is zoomed or translated.
+        /// </summary>
+        public static Point GetSummaryAnchor(RoiRenderContext context, CaliperMeasureRoi caliper)
+        {
+            ArgumentNullException.ThrowIfNull(context);
+            ArgumentNullException.ThrowIfNull(caliper);
+
+            Point midpoint = GetMeasuredSegmentMidpoint(caliper);
+            if (!caliper.HasDetectedEdges)
+            {
+                return midpoint;
+            }
+
+            Vector direction = caliper.P2.ToWpfPoint() - caliper.P1.ToWpfPoint();
+            if (direction.LengthSquared < 1e-6)
+            {
+                return midpoint;
+            }
+
+            direction.Normalize();
+            Vector normal = new(-direction.Y, direction.X);
+            double offset = Math.Max(12, context.InfoTextOffset) / Math.Max(context.Scale, 1e-6);
+            Point first = midpoint + normal * offset;
+            Point second = midpoint - normal * offset;
+            return context.ToScreenPoint(first).Y <= context.ToScreenPoint(second).Y ? first : second;
+        }
+
+        private static Point GetMeasuredSegmentMidpoint(CaliperMeasureRoi caliper)
+        {
             if (caliper.HasDetectedEdges)
             {
                 return new Point(

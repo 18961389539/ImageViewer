@@ -237,7 +237,7 @@ namespace ImageViewer.Rendering
 
                 context.DrawInfoText(
                     DualEdgeCaliperRenderHelper.BuildSummaryText(context, caliper),
-                    DualEdgeCaliperRenderHelper.GetSummaryAnchor(caliper),
+                    DualEdgeCaliperRenderHelper.GetSummaryAnchor(context, caliper),
                     brush,
                     true);
             }
