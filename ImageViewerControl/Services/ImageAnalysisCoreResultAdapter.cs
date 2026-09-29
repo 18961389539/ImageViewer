@@ -19,7 +19,7 @@ namespace ImageViewer.Services
             ImageAnalysisQualityProfile? profile = null)
         {
             bool success = TryDetectLineMeasureEdges(bitmap, line, out LineMeasureGradientDetectionResult legacy, profile);
-            result = legacy.ToCore();
+            result = success ? legacy.ToCore() : default;
             return success;
         }
 
@@ -30,7 +30,7 @@ namespace ImageViewer.Services
             ImageAnalysisQualityProfile? profile = null)
         {
             bool success = TryDetectLineCaliperEdges(bitmap, line, out LineCaliperDetectionResult legacy, profile);
-            result = legacy.ToCore();
+            result = success ? legacy.ToCore() : default;
             return success;
         }
 
@@ -41,7 +41,7 @@ namespace ImageViewer.Services
             ImageAnalysisQualityProfile? profile = null)
         {
             bool success = TryDetectCircularCaliperEdges(bitmap, caliper, out CircularCaliperDetectionResult legacy, profile);
-            result = legacy.ToCore();
+            result = success ? legacy.ToCore() : default;
             return success;
         }
     }

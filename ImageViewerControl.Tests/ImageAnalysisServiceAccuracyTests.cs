@@ -86,6 +86,21 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
+        public void TryDetectLineMeasureEdgesCore_WhenDetectionFails_DoesNotConvertDefaultResult()
+        {
+            BitmapSource bitmap = CreateBgraBitmap(12, [.. Enumerable.Repeat(Colors.Gray, 12 * 12)]);
+            var line = new CaliperMeasureRoi
+            {
+                P1 = new PointD(4, 4),
+                P2 = new PointD(4, 4)
+            };
+
+            bool success = ImageAnalysisService.TryDetectLineMeasureEdgesCore(bitmap, line, out _);
+
+            Assert.False(success);
+        }
+
+        [Fact]
         public void FitLine_ClippingChangesFitButProjectsOriginalContourEndpoints()
         {
             Point[] contour =
