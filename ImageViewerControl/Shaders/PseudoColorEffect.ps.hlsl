@@ -1,64 +1,31 @@
+// 伪彩色着色器。
+// Chinese: 调色板不再在这里定义——hot / jet / viridis 的取值只有一份，在 C# 侧的 256 项 LUT
+// （ImageViewerDisplaySourceService.CreatePaletteLut）里；本着色器只做两件事：
+//   ① 用与 CPU 路径相同的权重把输入换算成强度；
+//   ② 按 texel 中心采样那张 LUT。
+// 这样 CPU 回退路径与 Shader 路径的结果在构造上一致，不会各自漂移。
+// English: The palette is defined once, in the C# LUT; this shader only converts the input to an intensity with the same
+// weights as the CPU path and samples that LUT at texel centers, so both paths agree by construction.
 sampler2D Input : register(s0);
+sampler2D PaletteLut : register(s1);
 float PaletteIndex : register(c0);
-
-float luminance(float3 rgb)
-{
-    return dot(rgb, float3(0.299, 0.587, 0.114));
-}
-
-float3 hotPalette(float t)
-{
-    return saturate(float3(t * 3.0, t * 3.0 - 1.0, t * 3.0 - 2.0));
-}
-
-float3 jetPalette(float t)
-{
-    float r = saturate(1.5 - abs(4.0 * t - 3.0));
-    float g = saturate(1.5 - abs(4.0 * t - 2.0));
-    float b = saturate(1.5 - abs(4.0 * t - 1.0));
-    return float3(r, g, b);
-}
-
-float3 viridisSegment(float t, float startT, float endT, float3 startColor, float3 endColor)
-{
-    float amount = saturate((t - startT) / (endT - startT));
-    return lerp(startColor, endColor, amount);
-}
-
-float3 viridisPalette(float t)
-{
-    if (t < 0.33)
-    {
-        return viridisSegment(t, 0.0, 0.33, float3(0.2667, 0.0039, 0.3294), float3(0.2314, 0.3216, 0.5451));
-    }
-
-    if (t < 0.66)
-    {
-        return viridisSegment(t, 0.33, 0.66, float3(0.2314, 0.3216, 0.5451), float3(0.1294, 0.5686, 0.5490));
-    }
-
-    return viridisSegment(t, 0.66, 1.0, float3(0.1294, 0.5686, 0.5490), float3(0.9922, 0.9059, 0.1451));
-}
 
 float4 main(float2 uv : TEXCOORD) : COLOR
 {
     float4 inputColor = tex2D(Input, uv);
-    float intensity = saturate(luminance(inputColor.rgb));
 
     if (PaletteIndex < 0.5)
     {
         return inputColor;
     }
 
-    if (PaletteIndex < 1.5)
-    {
-        return float4(hotPalette(intensity), inputColor.a);
-    }
+    // 与 ImageViewerPixelAccess.ReadIntensity 同一组权重。
+    float intensity = saturate(dot(inputColor.rgb, float3(0.299, 0.587, 0.114)));
 
-    if (PaletteIndex < 2.5)
-    {
-        return float4(jetPalette(intensity), inputColor.a);
-    }
+    // 采样 texel 中心（LUT 宽 256）：落在与 CPU 整数索引同一格上，避免线性过滤在相邻色阶之间插值。
+    float lutU = (intensity * 255.0 + 0.5) / 256.0;
+    float3 color = tex2D(PaletteLut, float2(lutU, 0.5)).rgb;
 
-    return float4(viridisPalette(intensity), inputColor.a);
+    // 保留输入 alpha：透明 PNG 在 CPU 与 GPU 路径上都保持透明。
+    return float4(color, inputColor.a);
 }

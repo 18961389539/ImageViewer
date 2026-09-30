@@ -2,7 +2,7 @@ using System;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace ImageViewer.Services
+namespace ImageViewer.Core.Persistence
 {
     /// <summary>
     /// 会话文档中 ROI 载荷的读写转换器。
@@ -17,18 +17,18 @@ namespace ImageViewer.Services
         {
             if (reader.TokenType != JsonTokenType.String)
             {
-                return JsonSerializer.Deserialize(ref reader, ImageViewer.Persistence.ImageViewerCoreJsonSerializationContext.Default.RoiDocument);
+                return JsonSerializer.Deserialize(ref reader, ImageViewer.Core.Persistence.ImageViewerCoreJsonSerializationContext.Default.RoiDocument);
             }
 
             string? legacyJson = reader.GetString();
             return string.IsNullOrWhiteSpace(legacyJson)
                 ? null
-                : JsonSerializer.Deserialize(legacyJson, ImageViewer.Persistence.ImageViewerCoreJsonSerializationContext.Default.RoiDocument);
+                : JsonSerializer.Deserialize(legacyJson, ImageViewer.Core.Persistence.ImageViewerCoreJsonSerializationContext.Default.RoiDocument);
         }
 
         public override void Write(Utf8JsonWriter writer, RoiDocument value, JsonSerializerOptions options)
         {
-            JsonSerializer.Serialize(writer, value, ImageViewer.Persistence.ImageViewerCoreJsonSerializationContext.Default.RoiDocument);
+            JsonSerializer.Serialize(writer, value, ImageViewer.Core.Persistence.ImageViewerCoreJsonSerializationContext.Default.RoiDocument);
         }
     }
 }

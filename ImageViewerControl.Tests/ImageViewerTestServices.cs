@@ -68,5 +68,24 @@ namespace ImageViewerControl.Tests
                 .UseHostServices(hostServices)
                 .Build();
         }
+
+        /// <summary>
+        /// Creates a host that owns the supplied runtime services; the host releases them with its last viewer.
+        /// </summary>
+        public static ImageViewerHost CreateOwningHost(
+            RoiPluginRegistry pluginRegistry,
+            ImageViewerRuntimeServices runtimeServices,
+            ImageViewerHostServices hostServices)
+        {
+            ArgumentNullException.ThrowIfNull(pluginRegistry);
+            ArgumentNullException.ThrowIfNull(runtimeServices);
+            ArgumentNullException.ThrowIfNull(hostServices);
+
+            return new ImageViewerHostBuilder()
+                .UsePluginRegistry(pluginRegistry)
+                .UseRuntimeServices(runtimeServices, ownsRuntimeServices: true)
+                .UseHostServices(hostServices)
+                .Build();
+        }
     }
 }

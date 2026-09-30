@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -18,7 +19,15 @@ namespace ImageViewer.Controls
         /// </summary>
         private readonly ImageViewerInteractionManipulationState _interactionManipulationState = new();
         private readonly ImageViewerHostState _hostState;
-        private readonly ImageViewerHost? _ownedHost;
+
+        /// <summary>
+        /// 宿主租约：viewer 与创建它的宿主之间唯一的生命周期连接。
+        /// Chinese: 无论走 DI 还是手工构造，viewer 都只在 <see cref="ReleaseHostLease"/> 归还租约一次；
+        /// 拥有 runtime 的宿主在最后一个租约归还时才释放 runtime。
+        /// English: The single lifetime link between a viewer and the host that created it, returned exactly once.
+        /// </summary>
+        private ImageViewerHost? _hostLease;
+
         private const double MinScale = 0.1;
         private const double MaxScale = 100;
         internal readonly ImageViewerControlComposition _controlComposition;
@@ -35,12 +44,25 @@ namespace ImageViewer.Controls
         {
         }
 
-        private ImageViewer(ImageViewerHost host)
-            : this(host.Dependencies)
+        /// <summary>
+        /// 由宿主创建 viewer 的唯一构造函数。
+        /// Chinese: 建立宿主租约（登记一个 viewer），因此必须与 <see cref="ReleaseHostLease"/> 成对出现。
+        /// English: The only constructor that establishes a host lease; always paired with <see cref="ReleaseHostLease"/>.
+        /// </summary>
+        internal ImageViewer(ImageViewerHost host)
+            : this((host ?? throw new ArgumentNullException(nameof(host))).Dependencies)
         {
-            _ownedHost = host ?? throw new ArgumentNullException(nameof(host));
+            host.RegisterViewer();
+            _hostLease = host;
         }
 
+        /// <summary>
+        /// 用现成的依赖集直接构造 viewer。
+        /// Chinese: 这条路径不建立宿主租约：调用方创建了依赖集，就由调用方负责释放其中的 runtime services。
+        /// 只要不是自己创建依赖集，请改用 <see cref="ImageViewerHost.CreateViewer"/> 或容器解析。
+        /// English: This overload creates no host lease: the caller that built the dependencies also owns the release
+        /// of their runtime services. Prefer <see cref="ImageViewerHost.CreateViewer"/> unless you built the dependencies yourself.
+        /// </summary>
         public ImageViewer(ImageViewerDependencies dependencies)
         {
             ArgumentNullException.ThrowIfNull(dependencies);
@@ -193,22 +215,34 @@ namespace ImageViewer.Controls
         {
             CancelImageLoad();
             _controlComposition.SessionController.StateChanged -= OnSessionStateChanged;
-            _lifetime.Dispose();
-            _ownedHost?.Dispose();
-            GC.SuppressFinalize(this);
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            CancelImageLoad();
-            _controlComposition.SessionController.StateChanged -= OnSessionStateChanged;
-            _lifetime.Dispose();
-            if (_ownedHost != null)
+            try
             {
-                await _ownedHost.DisposeAsync().ConfigureAwait(false);
+                _lifetime.Dispose();
+            }
+            finally
+            {
+                ReleaseHostLease();
             }
 
             GC.SuppressFinalize(this);
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            Dispose();
+            GC.SuppressFinalize(this);
+            return default;
+        }
+
+        /// <summary>
+        /// 归还宿主租约，且只归还一次。
+        /// Chinese: 拥有 runtime 的宿主在这里放行最后一个 viewer 后释放 runtime；借用 runtime 的宿主在这里什么也不做。
+        /// English: Returns the host lease exactly once. An owning host releases its runtime services when the last lease returns.
+        /// </summary>
+        private void ReleaseHostLease()
+        {
+            ImageViewerHost? host = Interlocked.Exchange(ref _hostLease, null);
+            host?.ReleaseViewer();
         }
 
         private void OnSessionStateChanged(object? sender, EventArgs e)

@@ -16,7 +16,7 @@ namespace ImageViewer.Services
     {
         private readonly RoiPluginRegistry _pluginRegistry;
 
-        public RoiInteractionService(RoiPluginRegistry? pluginRegistry = null)
+        public RoiInteractionService(RoiPluginRegistry pluginRegistry)
         {
             _pluginRegistry = pluginRegistry ?? throw new ArgumentNullException(nameof(pluginRegistry));
         }

@@ -12,7 +12,7 @@ namespace ImageViewer.Services
 {
     public static class RoiInfoService
     {
-        public static string BuildInfo(RoiBase roi, BitmapSource? bitmap, double pixelSize, string? physicalUnit, RoiPluginRegistry? pluginRegistry = null, bool includeStatistics = true, CameraCalibration? calibration = null)
+        public static string BuildInfo(RoiBase roi, BitmapSource? bitmap, double pixelSize, string? physicalUnit, RoiPluginRegistry pluginRegistry, bool includeStatistics = true, CameraCalibration? calibration = null)
         {
             ArgumentNullException.ThrowIfNull(roi);
             ImageViewerValidation.ValidatePixelSize(pixelSize);

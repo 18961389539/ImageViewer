@@ -16,7 +16,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Shaders\PseudoColorEffect.ps.hlsl" />
+    <!-- 用 Resource 而不是 EmbeddedResource：WPF 工程会忽略非 XAML 的 EmbeddedResource，
+         于是着色器源码根本进不了程序集（PseudoColorShaderCompiler 一直找不到它，GPU 伪彩路径静默失效）。
+         Resource 会把它并进 <Assembly>.g.resources，键是小写化的相对路径。 -->
+    <Resource Include="Shaders\PseudoColorEffect.ps.hlsl" />
   </ItemGroup>
 
   <ItemGroup>
@@ -29,15 +32,6 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="HelixToolkit.Wpf.SharpDX" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Content Include="..\third_party\JLVision\Libs\JLVisionCore.dll"
-             Link="JLVisionCore.dll"
-             CopyToOutputDirectory="PreserveNewest"
-             CopyToPublishDirectory="PreserveNewest"
-             Pack="true"
-             PackagePath="lib\$(TargetFramework)" />
   </ItemGroup>
 
   <ItemGroup>

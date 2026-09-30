@@ -359,6 +359,232 @@ namespace ImageViewerControl.Tests
             });
         }
 
+        [Fact]
+        public void RenderTileCache_PrefetchIsBoundedAndClearCancelsIt()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                using var cache = new ImageViewerRenderTileCache();
+                BitmapSource source = CreateFrozenLargeBitmap();
+                Func<BitmapSource, BitmapSource> palette = tile =>
+                    ImageViewerDisplaySourceService.ApplyPseudoColor(tile, PseudoColorPalette.Hot);
+                Int32Rect[] rects = BuildInBoundsTileRects();
+
+                cache.Prefetch(source, rects, PseudoColorPalette.Hot, palette);
+
+                // 待处理上限：投机预取不允许无上限排队（候选 rect 数远大于上限，入队数必须被截断）。
+                int queued = cache.PendingPrefetchCount;
+                Assert.True(queued > 0);
+                Assert.True(queued < rects.Length, $"全部 {rects.Length} 个 rect 都入了队，说明预取没有上限。");
+                Assert.True(queued <= 64, $"待处理预取数 {queued} 超过上限。");
+
+                cache.Clear();
+
+                // 等到每个已入队的任务都结束（成功/取消/异常都算结束）再断言，否则读到的是"还没轮到取消"的中间态。
+                Assert.True(
+                    WaitForPrefetchCompletion(cache, queued),
+                    $"预取任务未全部结束：finished={cache.FinishedPrefetchCount}，expected={queued}。");
+
+                // 清缓存要让在途/排队的预取停下来，而不是让它们跑完再丢弃结果。
+                Assert.Equal(0, cache.FailedPrefetchCount);
+                Assert.True(cache.CancelledPrefetchCount > 0, "Clear 之后仍有排队的预取在跑。");
+                Assert.InRange(cache.MaxObservedConcurrentPrefetches, 1, 2);
+                Assert.Equal(0, cache.CurrentBytes);
+            });
+        }
+
+        [Fact]
+        public void RenderTileCache_DerivesCropsFromTheTileEntryWithoutSeparateEntries()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                var cache = new ImageViewerRenderTileCache();
+                BitmapSource source = CreateFrozenLargeBitmap();
+                Int32Rect tileRect = new(0, 0, 512, 512);
+                var factoryCalls = 0;
+                Func<BitmapSource, BitmapSource> palette = tile =>
+                {
+                    factoryCalls++;
+                    return ImageViewerDisplaySourceService.ApplyPseudoColor(tile, PseudoColorPalette.Hot);
+                };
+
+                Int32Rect viewRect = new(10, 10, 400, 300);
+                BitmapSource first = cache.GetOrCreateTileView(source, tileRect, PseudoColorPalette.Hot, viewRect, palette);
+                BitmapSource repeated = cache.GetOrCreateTileView(source, tileRect, PseudoColorPalette.Hot, viewRect, palette);
+                BitmapSource other = cache.GetOrCreateTileView(source, tileRect, PseudoColorPalette.Hot, new Int32Rect(50, 20, 100, 100), palette);
+
+                // 派生视图按 (tile, 视图矩形) 复用：重复帧拿到同一实例（WPF 不会每帧重传纹理）。
+                Assert.Same(first, repeated);
+                Assert.NotSame(first, other);
+
+                // 着色只做一次；多个可见 crop 共用同一个 tile 条目——可见 crop 不再单独入账。
+                Assert.Equal(1, factoryCalls);
+                Assert.Equal(1, cache.EntryCount);
+
+                // 预算记的是条目真正持有的像素：整块已着色 tile（BGRA32），不是 crop 面积。
+                Assert.Equal((long)tileRect.Width * tileRect.Height * 4, cache.CurrentBytes);
+            });
+        }
+
+        [Fact]
+        public void RenderTileCache_EvictingTheTileAlsoReleasesItsDerivedViews()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                var cache = new ImageViewerRenderTileCache();
+                BitmapSource source = CreateFrozenLargeBitmap();
+                Int32Rect tileRect = new(0, 0, 512, 512);
+                var factoryCalls = 0;
+                Func<BitmapSource, BitmapSource> palette = tile =>
+                {
+                    factoryCalls++;
+                    return ImageViewerDisplaySourceService.ApplyPseudoColor(tile, PseudoColorPalette.Hot);
+                };
+
+                cache.SetMaximumBytes(1);
+                cache.GetOrCreateTileView(source, tileRect, PseudoColorPalette.Hot, new Int32Rect(10, 10, 400, 300), palette);
+                cache.GetOrCreateTileView(source, tileRect, PseudoColorPalette.Hot, new Int32Rect(10, 10, 400, 300), palette);
+
+                // 条目被预算淘汰后不留下任何账外内存：视图是挂在条目上的，条目没了视图也没了。
+                Assert.Equal(0, cache.CurrentBytes);
+                Assert.Equal(0, cache.EntryCount);
+                Assert.Equal(2, factoryCalls);
+            });
+        }
+
+        [Fact]
+        public void RenderTileCache_PrefetchUsesTheSameKeyAndTransformAsTheVisiblePath()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                var failures = new List<Exception>();
+                using var cache = new ImageViewerRenderTileCache(failures.Add);
+                BitmapSource source = CreateFrozenLargeBitmap();
+                Int32Rect tileRect = new(0, 0, 512, 512);
+                Func<BitmapSource, BitmapSource> palette = tile =>
+                    ImageViewerDisplaySourceService.ApplyPseudoColor(tile, PseudoColorPalette.Hot);
+
+                cache.Prefetch(source, [tileRect], PseudoColorPalette.Hot, palette);
+                Assert.True(WaitForPrefetchCompletion(cache, 1), "预取任务未在预期时间内结束。");
+                Assert.Empty(failures);
+
+                Assert.True(cache.TryGet(source, tileRect, PseudoColorPalette.Hot, out BitmapSource? prefetched));
+                Assert.Equal(PixelFormats.Bgra32, prefetched!.Format);
+
+                // 未着色的键下不能有"半成品"：否则可见路径会把它当成已着色结果直接显示。
+                Assert.False(cache.TryGet(source, tileRect, PseudoColorPalette.None, out _));
+            });
+        }
+
+        [Fact]
+        public void BuildFrame_NonTiledPath_WithPalette_ReusesTheColorizedInstance()
+        {
+            // 非 tiled 路径也要"着色一次、实例复用"：之前每帧全量重着色（4MP ≈ 15MB 拷贝）并让 WPF 重传纹理。
+            WpfTestRunner.Run(() =>
+            {
+                using var service = new ImageViewerRenderService();
+                BitmapSource source = CreateFrozenLargeBitmap();
+                var pyramid = new[] { new ImagePyramidLevel(source, 1.0) };
+
+                ImageViewerRenderFrame first = service.BuildRenderFrame(
+                    source, pyramid, new Size(512, 512), 1.0, new Point(0, 0), PseudoColorPalette.Hot,
+                    enableTiledRendering: false, autoSelectPyramidLevel: true, prefetchAdjacentTiles: false,
+                    tileCacheMaximumMegabytes: 64, tilePrefetchRadius: 0);
+                ImageViewerRenderFrame second = service.BuildRenderFrame(
+                    source, pyramid, new Size(512, 512), 1.0, new Point(0, 0), PseudoColorPalette.Hot,
+                    enableTiledRendering: false, autoSelectPyramidLevel: true, prefetchAdjacentTiles: false,
+                    tileCacheMaximumMegabytes: 64, tilePrefetchRadius: 0);
+
+                Assert.Equal(PixelFormats.Bgra32, Assert.IsAssignableFrom<BitmapSource>(first.Source).Format);
+                Assert.Same(first.Source, second.Source);
+            });
+        }
+
+        [Fact]
+        public void BuildFrame_NonTiledPath_WithoutPalette_ReturnsTheSource()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                using var service = new ImageViewerRenderService();
+                BitmapSource source = CreateFrozenLargeBitmap();
+                var pyramid = new[] { new ImagePyramidLevel(source, 1.0) };
+
+                ImageViewerRenderFrame frame = service.BuildRenderFrame(
+                    source, pyramid, new Size(512, 512), 1.0, new Point(0, 0), PseudoColorPalette.None,
+                    enableTiledRendering: false, autoSelectPyramidLevel: true, prefetchAdjacentTiles: false,
+                    tileCacheMaximumMegabytes: 64, tilePrefetchRadius: 0);
+
+                Assert.Same(source, frame.Source);
+            });
+        }
+
+        [Fact]
+        public void BuildRenderFrame_WithPalette_ReusesTheColorizedTileAndItsDerivedView()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                var service = new ImageViewerRenderService();
+                BitmapSource source = CreateLargeBitmap();
+                var pyramid = new[] { new ImagePyramidLevel(source, 1.0) };
+
+                ImageViewerRenderFrame first = service.BuildRenderFrame(
+                    source, pyramid, new Size(512, 512), 1.0, new Point(0, 0), PseudoColorPalette.Hot,
+                    enableTiledRendering: true, autoSelectPyramidLevel: true, prefetchAdjacentTiles: false,
+                    tileCacheMaximumMegabytes: 64, tilePrefetchRadius: 0);
+                ImageViewerRenderFrame second = service.BuildRenderFrame(
+                    source, pyramid, new Size(512, 512), 1.0, new Point(0, 0), PseudoColorPalette.Hot,
+                    enableTiledRendering: true, autoSelectPyramidLevel: true, prefetchAdjacentTiles: false,
+                    tileCacheMaximumMegabytes: 64, tilePrefetchRadius: 0);
+
+                Assert.Equal(PixelFormats.Bgra32, Assert.IsAssignableFrom<BitmapSource>(first.Source).Format);
+                Assert.Same(first.Source, second.Source);
+            });
+        }
+
+        /// <summary>
+        /// 与生产一致：分析位图在进入渲染前一定是冻结的（<c>GetAnalysisBitmap</c> 保证），
+        /// 未冻结的位图是线程亲和对象，预取在线程池上读它会抛跨线程异常。
+        /// </summary>
+        private static BitmapSource CreateFrozenLargeBitmap()
+        {
+            BitmapSource bitmap = CreateLargeBitmap();
+            bitmap.Freeze();
+            return bitmap;
+        }
+
+        /// <summary>
+        /// 生成远多于预取上限的、全部落在图像范围内的候选 rect，用来验证"待处理队列有上限"。
+        /// </summary>
+        private static Int32Rect[] BuildInBoundsTileRects()
+        {
+            const int size = 128;
+            var rects = new List<Int32Rect>();
+            for (int y = 0; y + size <= 2001; y += size)
+            {
+                for (int x = 0; x + size <= 2001; x += size)
+                {
+                    rects.Add(new Int32Rect(x, y, size, size));
+                }
+            }
+
+            return [.. rects];
+        }
+
+        private static bool WaitForPrefetchCompletion(ImageViewerRenderTileCache cache, int expectedCount)
+        {
+            for (int attempt = 0; attempt < 300; attempt++)
+            {
+                if (cache.FinishedPrefetchCount >= expectedCount)
+                {
+                    return true;
+                }
+
+                Thread.Sleep(10);
+            }
+
+            return cache.FinishedPrefetchCount >= expectedCount;
+        }
+
         private static BitmapSource CreateLargeBitmap()
         {
             int width = 2001;

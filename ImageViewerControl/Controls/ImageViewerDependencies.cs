@@ -104,13 +104,5 @@ namespace ImageViewer.Controls
             ArgumentNullException.ThrowIfNull(owner);
             return CompositionHooks.ControlCompositionFactory(owner, this);
         }
-
-        public static ImageViewerDependencies CreateDefault(RoiPluginRegistry? pluginRegistry = null)
-        {
-            return new ImageViewerHostBuilder()
-                .UsePluginRegistry(ImageViewerPluginRegistryBootstrap.Resolve(pluginRegistry))
-                .Build()
-                .Dependencies;
-        }
     }
 }

@@ -1,6 +1,6 @@
+#pragma warning disable CS1591
 using System;
 using ImageViewer.Common;
-using ImageViewer.Localization;
 
 namespace ImageViewer.Models
 {
@@ -34,7 +34,12 @@ namespace ImageViewer.Models
 
         public virtual string RoiTypeName => GetType().Name;
 
-        public string DisplayTypeName => RoiDisplayNameLocalizer.GetDisplayName(this);
+        /// <summary>
+        /// 本地化显示名。
+        /// Chinese: 由 UI 层通过 <see cref="RoiDisplayNameResolver"/> 安装；无 UI（例如 Core 单测）时回退到类型名。
+        /// English: Resolved through <see cref="RoiDisplayNameResolver"/>, which the UI layer installs; falls back to the type name.
+        /// </summary>
+        public string DisplayTypeName => RoiDisplayNameResolver.GetDisplayName(this);
 
         public virtual string DisplayName => string.IsNullOrWhiteSpace(Label) ? DisplayTypeName : $"{DisplayTypeName}: {Label}";
 
@@ -110,13 +115,16 @@ namespace ImageViewer.Models
             set => SetProperty(ref _tolerance, value);
         }
 
-        public abstract RoiBase Clone();
-        public abstract void ApplyFrom(RoiBase source);
         /// <summary>
-        /// 克隆当前 ROI 的方法（深拷贝或值拷贝依具体实现而定）。
-        /// Chinese: 返回一个表示当前对象状态的副本，供撤销/重做与状态保存使用。
-        /// English: Creates and returns a copy of the ROI instance for undo/redo or state snapshots.
+        /// 克隆当前 ROI。
+        /// Chinese: 返回一个表示当前对象状态的副本，供撤销/重做与状态保存使用；深拷贝或值拷贝依具体实现而定。
+        /// English: Creates a copy of the ROI instance for undo/redo or state snapshots. Whether it is a deep or
+        /// value copy is up to the concrete implementation.
         /// </summary>
         /// <returns>返回 RoiBase 的副本 / A copy of the RoiBase instance.</returns>
+        public abstract RoiBase Clone();
+
+        public abstract void ApplyFrom(RoiBase source);
     }
 }
+#pragma warning restore CS1591

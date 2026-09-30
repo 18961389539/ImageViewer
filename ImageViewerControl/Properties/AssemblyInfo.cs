@@ -1,4 +1,7 @@
+global using ImageViewer.Core.Persistence;
+global using ImageViewer.Core.Volume;
 using System.Runtime.CompilerServices;
+using ImageViewer.Common;
 using ImageViewer.Models;
 using ImageViewer.Plugins;
 
@@ -23,3 +26,14 @@ using ImageViewer.Plugins;
 [assembly: TypeForwardedTo(typeof(CameraCalibration))]
 [assembly: TypeForwardedTo(typeof(VolumeSliceProvenance))]
 [assembly: TypeForwardedTo(typeof(VolumeSliceOrderMetadata))]
+
+// 2026-09-30 下沉到 ImageViewer.Core 的 ROI 领域基础类型。
+// Chinese: 外部插件程序集是按程序集限定名引用这些类型的，改程序集后必须保留转发，
+// 否则已编译的第三方插件会在加载时抛 TypeLoadException。
+// English: External plugin assemblies reference these by assembly-qualified name, so the moves to Core keep
+// forwarders here; without them already-compiled third-party plugins would fail with TypeLoadException.
+[assembly: TypeForwardedTo(typeof(BaseViewModel))]
+[assembly: TypeForwardedTo(typeof(RoiColor))]
+[assembly: TypeForwardedTo(typeof(RoiColors))]
+[assembly: TypeForwardedTo(typeof(RoiBase))]
+[assembly: TypeForwardedTo(typeof(RoiDisplayNameResolver))]

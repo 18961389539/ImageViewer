@@ -1,3 +1,4 @@
+#pragma warning disable CS1591
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -48,3 +49,4 @@ namespace ImageViewer.Common
         }
     }
 }
+#pragma warning restore CS1591

@@ -75,15 +75,16 @@ namespace ImageViewerControl.Tests
                 string packagePath = Path.Combine(rootPath, "round-trip.ivproject");
                 var service = CreateService(rootPath);
                 var registry = RoiPluginRegistry.CreateBuiltIn();
-                var snapshot = new ImageViewerPersistenceSnapshot(
+                var snapshot = CreateSnapshot(
                     null,
                     [new CircleRoi { Label = "packaged", Center = new PointD(12, 34), Radius = 5 }],
-                    0.5,
-                    "mm",
-                    1.25,
-                    24,
-                    -12,
-                    null);
+                    pixelSize: 0.5,
+                    physicalUnit: "mm") with
+                {
+                    Scale = 1.25,
+                    TranslateX = 24,
+                    TranslateY = -12
+                };
 
                 await service.ExportAsync(packagePath, snapshot, registry);
                 ImageViewerSessionData result = await service.LoadAsync(packagePath, registry);
@@ -119,6 +120,13 @@ namespace ImageViewerControl.Tests
                 string packagePath = Path.Combine(rootPath, "legacy.ivproject");
                 using (ZipArchive archive = ZipFile.Open(packagePath, ZipArchiveMode.Create))
                 {
+                    // 旧会话引用了 assets/source.png：新校验要求引用的资产真实存在于包内（应用生成的包总是如此）。
+                    ZipArchiveEntry assetEntry = archive.CreateEntry("assets/source.png");
+                    using (Stream assetStream = assetEntry.Open())
+                    {
+                        assetStream.Write([1, 2, 3, 4]);
+                    }
+
                     ZipArchiveEntry sessionEntry = archive.CreateEntry("session.ivsession");
                     using Stream stream = sessionEntry.Open();
                     using var writer = new StreamWriter(stream);
@@ -241,9 +249,120 @@ namespace ImageViewerControl.Tests
             }
         }
 
-        private static ImageViewerPersistenceSnapshot CreateSnapshot(string? imagePath, IReadOnlyList<RoiBase> rois)
+        [Fact]
+        public async Task LoadAsync_CaseVariantImagePath_IsRejected()
         {
-            return new ImageViewerPersistenceSnapshot(imagePath, rois, 1.0, "px", 1.0, 0, 0, null);
+            // 反序列化大小写不敏感，而校验曾是大小写敏感的：小写 imagepath 能绕过 assets/ 限制加载包外文件。
+            string rootPath = CreateTempRoot();
+            try
+            {
+                string packagePath = Path.Combine(rootPath, "evil.ivproject");
+                using (ZipArchive archive = ZipFile.Open(packagePath, ZipArchiveMode.Create))
+                {
+                    WriteSessionEntry(archive, """
+                        { "SessionName": "evil", "imagepath": "../../secret.png" }
+                        """);
+                }
+
+                var service = CreateService(rootPath);
+
+                await Assert.ThrowsAsync<InvalidDataException>(() =>
+                    service.LoadAsync(packagePath, RoiPluginRegistry.CreateBuiltIn()));
+            }
+            finally
+            {
+                DeleteTempRoot(rootPath);
+            }
+        }
+
+        [Fact]
+        public async Task LoadAsync_ImagePathMissingFromPackage_IsRejected()
+        {
+            string rootPath = CreateTempRoot();
+            try
+            {
+                string packagePath = Path.Combine(rootPath, "missing-asset.ivproject");
+                using (ZipArchive archive = ZipFile.Open(packagePath, ZipArchiveMode.Create))
+                {
+                    WriteSessionEntry(archive, """
+                        { "ImagePath": "assets/ghost.png" }
+                        """);
+                }
+
+                var service = CreateService(rootPath);
+
+                await Assert.ThrowsAsync<InvalidDataException>(() =>
+                    service.LoadAsync(packagePath, RoiPluginRegistry.CreateBuiltIn()));
+            }
+            finally
+            {
+                DeleteTempRoot(rootPath);
+            }
+        }
+
+        [Fact]
+        public async Task LoadAsync_SamePathDifferentContent_DoesNotReuseStaleAssets()
+        {
+            string rootPath = CreateTempRoot();
+            try
+            {
+                string packagePath = Path.Combine(rootPath, "sample.ivproject");
+                var service = CreateService(rootPath);
+                var registry = RoiPluginRegistry.CreateBuiltIn();
+
+                // 第一个包：assets/a.png 内容为 "AAA"。
+                string imageA = Path.Combine(rootPath, "a.png");
+                await File.WriteAllTextAsync(imageA, "AAA");
+                await service.ExportAsync(packagePath, CreateSnapshot(imageA, []), registry);
+                ImageViewerSessionData first = await service.LoadAsync(packagePath, registry);
+                Assert.EndsWith("a.png", first.ImagePath, StringComparison.Ordinal);
+                Assert.Equal("AAA", await File.ReadAllTextAsync(first.ImagePath!));
+
+                // 同一路径写入内容不同的第二个包：缓存键随内容变化，旧残留不得参与加载。
+                string imageB = Path.Combine(rootPath, "b.png");
+                await File.WriteAllTextAsync(imageB, "BBB");
+                await service.ExportAsync(packagePath, CreateSnapshot(imageB, []), registry);
+                ImageViewerSessionData second = await service.LoadAsync(packagePath, registry);
+                Assert.EndsWith("b.png", second.ImagePath, StringComparison.Ordinal);
+                Assert.Equal("BBB", await File.ReadAllTextAsync(second.ImagePath!));
+                Assert.NotEqual(
+                    Path.GetDirectoryName(first.ImagePath),
+                    Path.GetDirectoryName(second.ImagePath));
+            }
+            finally
+            {
+                DeleteTempRoot(rootPath);
+            }
+        }
+
+        private static void WriteSessionEntry(ZipArchive archive, string sessionJson)
+        {
+            ZipArchiveEntry entry = archive.CreateEntry("session.ivsession");
+            using Stream stream = entry.Open();
+            using var writer = new StreamWriter(stream);
+            writer.Write(sessionJson);
+        }
+
+        /// <summary>
+        /// 构造快照时先完成 ROI→DTO 转换，与 ImageViewerSessionPersistenceWorkflow.CaptureSnapshot 一致。
+        /// </summary>
+        private static ImageViewerPersistenceSnapshot CreateSnapshot(
+            string? imagePath,
+            IReadOnlyList<RoiBase> rois,
+            double pixelSize = 1.0,
+            string physicalUnit = "px")
+        {
+            return new ImageViewerPersistenceSnapshot(
+                imagePath,
+                RoiPersistenceService.CreateDocument(
+                    rois,
+                    pixelSize,
+                    physicalUnit,
+                    RoiPluginRegistry.CreateBuiltIn()),
+                1.0,
+                0,
+                0,
+                null);
         }
 
         private static ImageViewerProjectPackageService CreateService(string rootPath)

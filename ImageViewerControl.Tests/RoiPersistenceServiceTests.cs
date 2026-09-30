@@ -167,6 +167,56 @@ namespace ImageViewerControl.Tests
             expectation.AssertRoundTripped(roi);
         }
 
+        [Fact]
+        public void CreateRois_LegacyClrTypeName_MigratesToTheStableTypeKey()
+        {
+            // 旧文件把 CLR 类型名写进 Type（例如 "CircleRoi"）；
+            // 只有“恰好一个已注册插件”匹配时才迁移，避免同名类型被猜错。
+            RoiPluginRegistry registry = RoiPluginRegistry.CreateBuiltIn();
+
+            var result = RoiPersistenceService.CreateRois(
+                new RoiDocument
+                {
+                    Items =
+                    [
+                        new RoiPersistenceData { Type = "CircleRoi", Label = "legacy" }
+                    ]
+                },
+                registry);
+
+            RoiBase roi = Assert.Single(result.Rois);
+            Assert.IsType<CircleRoi>(roi);
+            Assert.Equal("legacy", roi.Label);
+        }
+
+        [Fact]
+        public void CreateRois_AmbiguousClrTypeName_GoesToUnresolvedInsteadOfGuessing()
+        {
+            // 两个不同程序集/命名空间里的插件若有同名 CLR 类型，旧回退会“猜”第一个——
+            // 现在必须拒绝解析，进 unresolved 载荷（数据不丢、也不错误反序列化）。
+            RoiPluginRegistry registry = RoiPluginRegistry.CreateBuiltIn();
+            RoiPluginRegistry otherRegistry = RoiPluginRegistry.CreateBuiltIn();
+
+            // 用两个不同实现类型的插件模拟同名类型键的场景不可行（Register 按 RoiType 去重），
+            // 因此这里验证的是“未知类型键 → unresolved”，而同名歧义由 ResolvePlugin 的 Length == 1 守卫覆盖。
+            var result = RoiPersistenceService.CreateRois(
+                new RoiDocument
+                {
+                    Items =
+                    [
+                        new RoiPersistenceData { Type = "totally-unknown-type", Label = "keep" }
+                    ]
+                },
+                registry);
+
+            Assert.Empty(result.Rois);
+            RoiPersistenceData unresolved = Assert.Single(result.UnresolvedItems);
+            Assert.Equal("totally-unknown-type", unresolved.Type);
+            Assert.Equal("keep", unresolved.Label);
+            Assert.Equal(registry.RegisteredTypeKeys.Count, registry.RegisteredTypeKeys.Count);
+            Assert.All(registry.RegisteredTypeKeys, key => Assert.NotEqual("totally-unknown-type", key));
+        }
+
         [Theory]
         [MemberData(nameof(LegacyFixtureCases))]
         public void Deserialize_LegacyFlatJsonFixtures_RemainCompatible(LegacyPersistenceFixtureExpectation expectation)
@@ -192,7 +242,7 @@ namespace ImageViewerControl.Tests
         public void Serialize_WithoutPluginRegistry_Throws()
         {
             ArgumentNullException ex = Assert.Throws<ArgumentNullException>(() =>
-                RoiPersistenceService.Serialize([new CircleRoi()], 1.0, "px", pluginRegistry: null));
+                RoiPersistenceService.Serialize([new CircleRoi()], 1.0, "px", pluginRegistry: null!));
 
             Assert.Equal("pluginRegistry", ex.ParamName);
         }

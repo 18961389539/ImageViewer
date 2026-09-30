@@ -24,6 +24,9 @@ namespace ImageViewer.Controls
 
         ImageAnalysisQualityProfile QualityProfile { get; set; }
 
+        /// <summary>把无法识别的 ROI 载荷交给会话的未识别通道。</summary>
+        void AppendUnresolvedRois(IReadOnlyList<RoiPersistenceData> payloads);
+
         void ReplaceAllRois(IReadOnlyList<RoiBase> rois);
 
         void RefreshAllCaliperDetections();
@@ -90,6 +93,7 @@ namespace ImageViewer.Controls
                 _host.RefreshSelectedRoiPropertyPanel();
                 _host.ClearUndoHistory();
                 _host.ShowStatusHint(UiText.Format("StatusLoadRoiSuccess", result.Rois.Count), StatusHintKind.Success);
+                _host.AppendUnresolvedRois(result.UnresolvedItems);
                 ReportUnresolvedRois(result.UnresolvedItems);
             }
             catch (Exception ex)

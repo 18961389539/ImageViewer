@@ -78,6 +78,74 @@ namespace ImageViewerControl.Tests
             });
         }
 
+        [Fact]
+        public void UpdateSnapGrid_OnlyCreatesLinesInsideTheVisibleRegion()
+        {
+            // 图像 4000×4000、间距 8 → 整幅图需要 501+501 条线；视口 320×240 只需要 41+31 条。
+            WpfTestRunner.Run(() =>
+            {
+                var host = new FakeImageViewStateHost
+                {
+                    ShowSnapGrid = true,
+                    GridSpacing = 8,
+                    ImageSource = CreateBitmap(4000, 4000),
+                    ViewerSize = new Size(320, 240),
+                    Scale = 1.0,
+                    TranslateX = 0,
+                    TranslateY = 0
+                };
+                var controller = new ImageViewStateController(host, minScale: 0.1);
+
+                controller.HandleShowSnapGridChanged();
+
+                // 可视区域 x∈[0,320]、y∈[0,240]：41 条竖线 + 31 条横线（允许 ±2 的取整误差）。
+                Assert.InRange(host.SnapGridCanvas.Children.Count, 41 + 31 - 2, 41 + 31 + 2);
+            });
+        }
+
+        [Fact]
+        public void UpdateSnapGrid_PanningAwayFromTheImage_CreatesNoLines()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                var host = new FakeImageViewStateHost
+                {
+                    ShowSnapGrid = true,
+                    GridSpacing = 8,
+                    ImageSource = CreateBitmap(4000, 4000),
+                    ViewerSize = new Size(320, 240),
+                    Scale = 1.0,
+                    TranslateX = -50000,
+                    TranslateY = -50000
+                };
+                var controller = new ImageViewStateController(host, minScale: 0.1);
+
+                controller.HandleShowSnapGridChanged();
+
+                Assert.Empty(host.SnapGridCanvas.Children);
+            });
+        }
+
+        [Fact]
+        public void UpdateSnapGrid_WhenHidden_CreatesNoLines()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                var host = new FakeImageViewStateHost
+                {
+                    ShowSnapGrid = false,
+                    GridSpacing = 8,
+                    ImageSource = CreateBitmap(4000, 4000),
+                    ViewerSize = new Size(320, 240)
+                };
+                var controller = new ImageViewStateController(host, minScale: 0.1);
+
+                controller.HandleShowSnapGridChanged();
+
+                Assert.Empty(host.SnapGridCanvas.Children);
+            });
+        }
+
         private static BitmapSource CreateBitmap(int pixelWidth, int pixelHeight)
         {
             byte[] pixels = new byte[pixelWidth * pixelHeight];
@@ -101,6 +169,10 @@ namespace ImageViewerControl.Tests
             public bool ShowSnapGrid { get; set; }
 
             public double Scale { get; set; } = 1.0;
+
+            public double TranslateX { get; set; }
+
+            public double TranslateY { get; set; }
 
             public double GridSpacing { get; set; } = 8;
 

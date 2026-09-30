@@ -1,3 +1,4 @@
+#pragma warning disable CS1591
 using System.Globalization;
 
 namespace ImageViewer.Models
@@ -81,3 +82,4 @@ namespace ImageViewer.Models
         }
     }
 }
+#pragma warning restore CS1591

@@ -1,9 +1,8 @@
 #pragma warning disable CS1591
 using System.Collections.Generic;
 using ImageViewer.Models;
-using ImageViewer.Plugins;
 
-namespace ImageViewer.Services
+namespace ImageViewer.Core.Persistence
 {
     /// <summary>Portable ROI persistence payload embedded in a session document.</summary>
     public sealed class RoiDocument

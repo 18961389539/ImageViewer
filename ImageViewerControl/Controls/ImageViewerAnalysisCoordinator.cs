@@ -101,19 +101,22 @@ namespace ImageViewer.Controls
         private readonly IImageViewerAnalysisPipeline _analysisPipeline;
         internal readonly IImageViewerAnalysisErrorSink _errorSink;
         private ImageViewerBackgroundOperationObserver? _backgroundOperationObserver;
+        private readonly TimeSpan _asyncAnalysisDebounce;
 
         public ImageViewerAnalysisCoordinator(
             IImageViewerAnalysisHost host,
             IImageViewerAnalysisUiFacade uiFacade,
             IImageViewerProfileTargetResolver profileTargetResolver,
             IImageViewerAnalysisErrorSink errorSink,
-            IImageViewerAnalysisPipeline? analysisPipeline = null)
+            IImageViewerAnalysisPipeline? analysisPipeline = null,
+            TimeSpan? asyncAnalysisDebounce = null)
         {
             _host = host;
             _uiFacade = uiFacade;
             _profileTargetResolver = profileTargetResolver;
             _analysisPipeline = analysisPipeline ?? new ImageViewerAnalysisPipeline();
             _errorSink = errorSink;
+            _asyncAnalysisDebounce = asyncAnalysisDebounce ?? TimeSpan.FromMilliseconds(120);
         }
 
         public void UpdateRenderedImage()
@@ -173,31 +176,52 @@ namespace ImageViewer.Controls
         public async Task PrepareAnalysisResourcesAsync(ImageSource? source)
         {
             _host.RenderService.ClearTileCache();
-            _host.AnalysisState.ResetForSource(_host.RenderService.GetAnalysisBitmap(source));
+
+            // ResetForSource cancels every in-flight request and bumps the source generation,
+            // so nothing computed for the previous image can be committed afterwards.
+            BitmapSource? analysisBitmap = _host.RenderService.GetAnalysisBitmap(source);
+            _host.AnalysisState.ResetForSource(analysisBitmap);
+            ClearAnalysisDisplays();
             UpdateRenderedImage();
 
-            if (_host.AnalysisState.AnalysisBitmapSource == null || !_host.EnableImagePyramid)
+            if (analysisBitmap == null || !_host.EnableImagePyramid)
             {
                 await RefreshAnalysisDisplaysAsync();
                 return;
             }
 
-            var cancellationTokenSource = new CancellationTokenSource();
-            _host.AnalysisState.PyramidBuildCancellationTokenSource = cancellationTokenSource;
+            ImageViewerAnalysisTicket ticket = _host.AnalysisState.BeginPyramidTicket();
+            long generation = _host.AnalysisState.SourceGeneration;
             var stopwatch = Stopwatch.StartNew();
 
             try
             {
-                IReadOnlyList<ImagePyramidLevel> pyramidLevels = await _host.RenderService.BuildPyramidAsync(_host.AnalysisState.AnalysisBitmapSource, cancellationTokenSource.Token);
-                if (!cancellationTokenSource.IsCancellationRequested)
+                IReadOnlyList<ImagePyramidLevel> pyramidLevels = await _host.RenderService.BuildPyramidAsync(analysisBitmap, ticket.Token);
+                if (!_host.AnalysisState.IsCurrentPyramidTicket(ticket))
                 {
-                    _host.AnalysisState.SetPyramidLevels(pyramidLevels, stopwatch.Elapsed);
-                    UpdateRenderedImage();
-                    await RefreshAnalysisDisplaysAsync();
+                    return;
                 }
+
+                if (!_host.AnalysisState.SetPyramidLevels(generation, pyramidLevels, stopwatch.Elapsed))
+                {
+                    return;
+                }
+
+                UpdateRenderedImage();
+                await RefreshAnalysisDisplaysAsync();
             }
             catch (OperationCanceledException)
             {
+            }
+            catch
+            {
+                if (_host.AnalysisState.IsCurrentPyramidTicket(ticket))
+                {
+                    _host.AnalysisState.ClearPyramidBuildWork();
+                    ClearAnalysisDisplays();
+                }
+
+                throw;
             }
         }
 
@@ -233,11 +257,17 @@ namespace ImageViewer.Controls
             _ = BackgroundOperationObserver.ObserveAsync(RefreshAnalysisDisplaysAsync(force: true), "Refresh analysis after cache clear");
         }
 
+        /// <summary>
+        /// 调色板变化。
+        /// Chinese: 只需要重绘图像。直方图与剖面的**计算**基于原始强度图（`request.Bitmap`），**绘制**用固定颜色
+        /// （直方图半透明灰、剖面 Gray/Cyan），都与调色板无关——原先的两处刷新是纯浪费。
+        /// 若将来柱状/曲线改成跟随调色板着色，正确做法是"重新呈现上一次的输出"，仍然不重算。
+        /// English: Only the rendered image needs refreshing. Histogram/profile computation uses the raw intensity bitmap and
+        /// their drawing uses fixed colors, so neither depends on the palette.
+        /// </summary>
         public void HandlePseudoColorPaletteChanged()
         {
             UpdateRenderedImage();
-            _ = BackgroundOperationObserver.ObserveAsync(UpdateHistogram(), "Refresh histogram after palette changed");
-            _ = BackgroundOperationObserver.ObserveAsync(UpdateProfile(), "Refresh profile after palette changed");
         }
 
         public void HandleRenderingOptionChanged()
@@ -293,11 +323,9 @@ namespace ImageViewer.Controls
 
         public async Task UpdateHistogram(bool force = false)
         {
-            _host.AnalysisState.HistogramUpdateCancellationTokenSource?.Cancel();
-            _host.AnalysisState.HistogramUpdateCancellationTokenSource?.Dispose();
-
             if (!_host.ShowHistogram || _host.AnalysisState.AnalysisBitmapSource is not BitmapSource bitmap)
             {
+                _host.AnalysisState.CancelHistogramWork();
                 _uiFacade.PresentHistogram(null);
                 return;
             }
@@ -307,14 +335,26 @@ namespace ImageViewer.Controls
                 return;
             }
 
+            // Registered after the visibility/pause gates so that a suppressed refresh does not spawn work,
+            // but registered before anything is awaited so that any later refresh supersedes this one.
+            ImageViewerAnalysisTicket ticket = _host.AnalysisState.BeginHistogramTicket();
+
             if (!_host.EnableAsyncAnalysis)
             {
                 try
                 {
                     var stopwatch = Stopwatch.StartNew();
-                    int[] histogram = await _analysisPipeline.CreateHistogramAsync(bitmap, _host.HistogramBinCount);
+                    int[] histogram = await _analysisPipeline.CreateHistogramAsync(bitmap, _host.HistogramBinCount, ticket.Token);
+                    if (!_host.AnalysisState.IsCurrentHistogramTicket(ticket))
+                    {
+                        return;
+                    }
+
                     _host.AnalysisState.LastHistogramDuration = stopwatch.Elapsed;
                     _uiFacade.PresentHistogram(new ImageViewerHistogramOutput(histogram, _host.HistogramBinCount));
+                }
+                catch (OperationCanceledException)
+                {
                 }
                 catch (Exception ex)
                 {
@@ -325,15 +365,12 @@ namespace ImageViewer.Controls
                 return;
             }
 
-            var cancellationTokenSource = new CancellationTokenSource();
-            _host.AnalysisState.HistogramUpdateCancellationTokenSource = cancellationTokenSource;
-
             try
             {
-                await Task.Delay(120, cancellationTokenSource.Token);
+                await Task.Delay(_asyncAnalysisDebounce, ticket.Token);
                 var stopwatch = Stopwatch.StartNew();
-                int[]? histogram = await _host.RenderService.CreateHistogramAsync(bitmap, _host.HistogramBinCount, cancellationTokenSource.Token);
-                if (cancellationTokenSource.IsCancellationRequested || histogram == null)
+                int[]? histogram = await _host.RenderService.CreateHistogramAsync(bitmap, _host.HistogramBinCount, ticket.Token);
+                if (histogram == null || !_host.AnalysisState.IsCurrentHistogramTicket(ticket))
                 {
                     return;
                 }
@@ -355,8 +392,13 @@ namespace ImageViewer.Controls
         {
             if (!_host.ShowProfile)
             {
+                _host.AnalysisState.CancelProfileWork();
                 return;
             }
+
+            // Registered before the target-line lookup so that losing the line (or switching the async mode)
+            // supersedes any request that is still in flight instead of racing with it.
+            ImageViewerAnalysisTicket ticket = _host.AnalysisState.BeginProfileTicket();
 
             LineMeasureRoi? targetLine = _profileTargetResolver.GetProfileTargetLine();
             if (targetLine == null)
@@ -381,9 +423,21 @@ namespace ImageViewer.Controls
                 try
                 {
                     var stopwatch = Stopwatch.StartNew();
-                    ushort[] profileData = await _analysisPipeline.CreateProfile16Async(bitmap, targetLine.P1.ToWpfPoint(), targetLine.P2.ToWpfPoint());
+                    ushort[] profileData = await _analysisPipeline.CreateProfile16Async(
+                        bitmap,
+                        targetLine.P1.ToWpfPoint(),
+                        targetLine.P2.ToWpfPoint(),
+                        ticket.Token);
+                    if (!_host.AnalysisState.IsCurrentProfileTicket(ticket))
+                    {
+                        return;
+                    }
+
                     _host.AnalysisState.LastProfileDuration = stopwatch.Elapsed;
                     _uiFacade.PresentProfile(new ImageViewerProfileOutput(profileData, GetProfileMaximum(bitmap)));
+                }
+                catch (OperationCanceledException)
+                {
                 }
                 catch (Exception ex)
                 {
@@ -394,30 +448,26 @@ namespace ImageViewer.Controls
                 return;
             }
 
-            _host.AnalysisState.ProfileUpdateCancellationTokenSource?.Cancel();
-            _host.AnalysisState.ProfileUpdateCancellationTokenSource?.Dispose();
-            var cancellationTokenSource = new CancellationTokenSource();
-            _host.AnalysisState.ProfileUpdateCancellationTokenSource = cancellationTokenSource;
-
             try
             {
-                await Task.Delay(120, cancellationTokenSource.Token);
+                await Task.Delay(_asyncAnalysisDebounce, ticket.Token);
                 var stopwatch = Stopwatch.StartNew();
                 ImageViewerAnalysisRequest request = new(bitmap, targetLine.P1.ToWpfPoint(), targetLine.P2.ToWpfPoint());
                 ushort[]? profileData;
                 ushort maximumValue;
                 if (_host.RenderService is IImageViewerHighBitDepthAnalysisRenderService highBitDepthService)
                 {
-                    profileData = await highBitDepthService.CreateProfile16Async(request, cancellationTokenSource.Token);
+                    profileData = await highBitDepthService.CreateProfile16Async(request, ticket.Token);
                     maximumValue = GetProfileMaximum(bitmap);
                 }
                 else
                 {
-                    byte[]? legacyProfile = await _host.RenderService.CreateProfileAsync(request, cancellationTokenSource.Token);
+                    byte[]? legacyProfile = await _host.RenderService.CreateProfileAsync(request, ticket.Token);
                     profileData = ConvertLegacyProfile(legacyProfile);
                     maximumValue = byte.MaxValue;
                 }
-                if (cancellationTokenSource.IsCancellationRequested || profileData == null)
+
+                if (profileData == null || !_host.AnalysisState.IsCurrentProfileTicket(ticket))
                 {
                     return;
                 }
@@ -474,6 +524,11 @@ namespace ImageViewer.Controls
         public void ClearAnalysisCaches()
         {
             _host.AnalysisState.ClearAnalysisCaches();
+            ClearAnalysisDisplays();
+        }
+
+        private void ClearAnalysisDisplays()
+        {
             _uiFacade.PresentHistogram(null);
             _uiFacade.PresentProfile(null);
         }

@@ -1,35 +1,28 @@
-using System.Collections.Generic;
 using ImageViewer.Models;
-using ImageViewer.Plugins;
+using ImageViewer.Services;
 
 namespace ImageViewer.Abstractions
 {
     /// <summary>
     /// 保存会话 / 项目包时需要落盘的一整份状态。
-    /// Chinese: 把原先在多个方法签名与调用点里逐参数透传的散装状态收敛成一个不可变载荷。
-    /// English: A single immutable payload carrying everything a session or project package needs to persist,
-    /// replacing the previously duplicated long parameter lists.
+    /// Chinese: 引用不可变（positional record，属性只读），并且 <see cref="RoiDocument"/> 是调用方在 UI 线程上
+    /// 一次性构建出来的**脱离 UI 的纯数据图**——它不再引用 <c>ViewerState.AllRois</c> 这个活集合，也不再引用任何可变的
+    /// <c>RoiBase</c>。因此拿到快照后，序列化可以安全地放到后台线程：UI 上继续拖拽/增删 ROI 不会让落盘内容出现半新半旧的
+    /// 几何，也不会出现"枚举过程中集合被修改"。
+    /// English: Reference-immutable, and <see cref="RoiDocument"/> is a detached plain-data graph built on the UI thread.
+    /// It shares nothing with the live ROI collection, so callers may serialize it off the UI thread without racing the editor.
+    /// Chinese: 注意 <see cref="RoiDocument"/> 本身是序列化契约类型（属性可写、条目是 List）：这里说的"不可变"是指引用不再
+    /// 指向活对象，不是语言层面的 immutable。构建完成后不要再改写它。
+    /// English: The document type is a mutable serialization contract; "immutable" here means the reference no longer points at
+    /// live objects. Treat the built document as frozen.
     /// </summary>
     public sealed record ImageViewerPersistenceSnapshot(
         string? ImagePath,
-        IReadOnlyList<RoiBase> Rois,
-        double PixelSize,
-        string? PhysicalUnit,
+        RoiDocument RoiDocument,
         double Scale,
         double TranslateX,
         double TranslateY,
         CameraCalibration? Calibration)
     {
-        /// <summary>
-        /// 加载时未能识别的 ROI 载荷，保存时原样回写。
-        /// Chinese: 缺插件导致无法还原的标注不会被"保存即抹掉"，重新获得插件后仍可正常打开。
-        /// English: ROI payloads that could not be resolved on load, written back verbatim so a save never erases them.
-        /// </summary>
-        public IReadOnlyList<RoiPersistenceData> UnresolvedRois { get; init; } = [];
-
-        /// <summary>
-        /// 当前项目使用的检测质量门限；保存后重新打开项目仍使用同一组门限。
-        /// </summary>
-        public ImageAnalysisQualityProfile QualityProfile { get; init; } = ImageAnalysisQualityProfile.Default;
     }
 }

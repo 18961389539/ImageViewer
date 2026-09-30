@@ -82,25 +82,27 @@ namespace ImageViewer.Controls
 
         /// <summary>
         /// 采集当前需要落盘的一整份状态。
-        /// Chinese: 供保存会话 / 导出项目包复用，避免在每个调用点重复逐参数拼装。
-        /// English: Captures the full state to persist so every call site stops reassembling the same parameter list.
+        /// Chinese: 供保存会话 / 导出项目包复用。ROI→DTO 的转换必须在这里（UI 线程）一次完成，
+        /// 之后序列化可以在后台线程跑而不与编辑器竞争：快照不再引用活 ROI 集合。
+        /// English: Captures the full state to persist. The ROI-to-DTO conversion happens here, on the UI thread,
+        /// so the serialization step can run off-thread without racing the editor.
         /// </summary>
         public ImageViewerPersistenceSnapshot CaptureSnapshot()
         {
             ImageViewerViewportState viewportState = GetCurrentViewportState();
             return new ImageViewerPersistenceSnapshot(
                 TryGetCurrentImagePath(),
-                GetAllRois(),
-                GetPixelSize(),
-                GetPhysicalUnit(),
+                RoiPersistenceService.CreateDocument(
+                    GetAllRois(),
+                    GetPixelSize(),
+                    GetPhysicalUnit(),
+                    GetPluginRegistry(),
+                    UnresolvedRois,
+                    GetQualityProfile()),
                 viewportState.Scale,
                 viewportState.TranslateX,
                 viewportState.TranslateY,
-                GetCalibration())
-            {
-                UnresolvedRois = UnresolvedRois,
-                QualityProfile = GetQualityProfile()
-            };
+                GetCalibration());
         }
     }
 
@@ -139,25 +141,25 @@ namespace ImageViewer.Controls
 
         /// <summary>
         /// 采集当前需要落盘的一整份状态。
-        /// Chinese: 自动保存与手动保存共用同一份载荷契约。
-        /// English: Auto save and manual save share the same payload contract.
+        /// Chinese: 自动保存与手动保存共用同一份载荷契约；同样在 UI 线程上完成 ROI→DTO 转换。
+        /// English: Auto save and manual save share the same payload contract; the ROI-to-DTO conversion also happens here.
         /// </summary>
         public ImageViewerPersistenceSnapshot CaptureSnapshot()
         {
             ImageViewerViewportState viewportState = GetCurrentViewportState();
             return new ImageViewerPersistenceSnapshot(
                 TryGetCurrentImagePath(),
-                GetAllRois(),
-                GetPixelSize(),
-                GetPhysicalUnit(),
+                RoiPersistenceService.CreateDocument(
+                    GetAllRois(),
+                    GetPixelSize(),
+                    GetPhysicalUnit(),
+                    GetPluginRegistry(),
+                    UnresolvedRois,
+                    GetQualityProfile()),
                 viewportState.Scale,
                 viewportState.TranslateX,
                 viewportState.TranslateY,
-                GetCalibration())
-            {
-                UnresolvedRois = UnresolvedRois,
-                QualityProfile = GetQualityProfile()
-            };
+                GetCalibration());
         }
     }
 
@@ -574,6 +576,25 @@ namespace ImageViewer.Controls
         /// English: Surfaces unresolved ROI payloads (missing plugin / renamed type key) with a status hint and keeps
         /// them on the save path so the next save writes them back verbatim instead of erasing them.
         /// </summary>
+        /// <summary>
+        /// 追加未识别 ROI 载荷（不替换已有载荷）。
+        /// Chinese: 插件卸载会把被移除的 ROI 序列化成 unresolved 载荷追加到这里；加载会话时 ReportUnresolvedRois
+        /// 是整体替换，两者语义不同——替换会抹掉之前追加的载荷。
+        /// English: Appends payloads without discarding the ones already carried from the last load.
+        /// </summary>
+        internal void AppendUnresolvedRois(IReadOnlyList<RoiPersistenceData> payloads)
+        {
+            if (payloads.Count == 0)
+            {
+                return;
+            }
+
+            var merged = new List<RoiPersistenceData>(_persistence.UnresolvedRois);
+            merged.AddRange(payloads);
+            _persistence.UnresolvedRois = merged;
+            _autoSave.UnresolvedRois = merged;
+        }
+
         private void ReportUnresolvedRois(IReadOnlyList<RoiPersistenceData> unresolvedRois)
         {
             _persistence.UnresolvedRois = unresolvedRois;

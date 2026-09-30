@@ -30,6 +30,12 @@ namespace ImageViewer.Services
             _tileRenderService.ClearTileCache();
         }
 
+        /// <summary>
+        /// True once the tile cache backing this render service has been released.
+        /// Chinese: 用于验证生命周期闭合（runtime/容器释放后应为 true），本身不参与渲染逻辑。
+        /// </summary>
+        internal bool IsDisposed => _tileRenderService.IsDisposed;
+
         public void Dispose() => _tileRenderService.Dispose();
 
         public ValueTask DisposeAsync() => _tileRenderService.DisposeAsync();
@@ -71,6 +77,7 @@ namespace ImageViewer.Services
             return _tileRenderService.BuildFrame(
                 workingSource,
                 pyramid ?? [],
+                palette,
                 viewport,
                 scale,
                 translation,

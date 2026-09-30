@@ -23,6 +23,8 @@ namespace ImageViewer.Plugins
         private readonly List<IRoiPlugin> _plugins = new();
         private readonly Dictionary<Type, IRoiPlugin> _pluginsByType = new();
         private readonly Dictionary<string, IRoiPlugin> _pluginsByTypeKey = new(StringComparer.OrdinalIgnoreCase);
+        private int _updateDepth;
+        private bool _hasPendingChange;
 
         [Obsolete("Prefer passing an explicit registry instance.")]
         public static RoiPluginRegistry Default { get; } = CreateBuiltIn();
@@ -36,6 +38,35 @@ namespace ImageViewer.Plugins
                     return [.. _plugins];
                 }
             }
+        }
+
+        /// <summary>
+        /// 可用类型集合发生变化时触发。
+        /// Chinese: Register / Unregister 都是**就地**修改同一个实例，调用方靠引用比较发现不了变化；
+        /// 宿主也需要据此刷新绘制菜单、并把新注册表不再认识的 ROI 从视图状态里清掉。
+        /// 事件在锁外、于**调用方线程**触发：处理器可以安全地回调注册表，但**必须自行调度到 UI 线程**
+        /// （事件链上的迁移会修改 ObservableCollection 并刷新 WPF 视觉）。控件侧通过注入的调度器完成这一步。
+        /// English: Raised outside the lock on the caller's thread. Handlers may re-enter the registry but must marshal
+        /// to the UI thread themselves; the control injects a scheduler for that.
+        /// </summary>
+        public event EventHandler? Changed;
+
+        /// <summary>
+        /// 把多次 Register / Unregister 合并成一次 <see cref="Changed"/>。
+        /// Chinese: 模块通常一次注册多个插件；不合并的话每次注册都会触发一次完整的状态迁移
+        /// （N 个插件 = N 次迁移与 N 次菜单刷新），而且中间态是"部分类型已注册"，容易误判可迁移性。
+        /// English: Coalesces several Register/Unregister calls into a single <see cref="Changed"/>. A module typically
+        /// registers several plugins at once, and per-call notifications would migrate state N times with a partial
+        /// "some types registered" intermediate state.
+        /// </summary>
+        public IDisposable BeginUpdate()
+        {
+            lock (_gate)
+            {
+                _updateDepth++;
+            }
+
+            return new UpdateScope(this);
         }
 
         public IReadOnlyCollection<string> RegisteredTypeKeys
@@ -71,6 +102,8 @@ namespace ImageViewer.Plugins
                 _pluginsByType.Add(plugin.RoiType, plugin);
                 _pluginsByTypeKey.Add(plugin.TypeKey, plugin);
             }
+
+            NotifyChanged();
         }
 
         public IRoiPlugin? FindByRoi(RoiBase roi)
@@ -103,6 +136,7 @@ namespace ImageViewer.Plugins
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(typeKey);
 
+            bool removed;
             lock (_gate)
             {
                 if (!_pluginsByTypeKey.TryGetValue(typeKey, out var plugin))
@@ -113,7 +147,76 @@ namespace ImageViewer.Plugins
                 _plugins.Remove(plugin);
                 _pluginsByType.Remove(plugin.RoiType);
                 _pluginsByTypeKey.Remove(typeKey);
-                return true;
+                removed = true;
+            }
+
+            if (removed)
+            {
+                NotifyChanged();
+            }
+
+            return removed;
+        }
+
+        /// <summary>
+        /// 触发一次变更通知；批量更新期间只记标记，由最外层 <see cref="BeginUpdate"/> 结束时统一触发。
+        /// </summary>
+        private void NotifyChanged()
+        {
+            bool shouldRaise;
+            lock (_gate)
+            {
+                _hasPendingChange = true;
+                shouldRaise = _updateDepth == 0;
+                if (shouldRaise)
+                {
+                    _hasPendingChange = false;
+                }
+            }
+
+            if (shouldRaise)
+            {
+                Changed?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        private void EndUpdate()
+        {
+            bool shouldRaise;
+            lock (_gate)
+            {
+                if (_updateDepth > 0)
+                {
+                    _updateDepth--;
+                }
+
+                shouldRaise = _updateDepth == 0 && _hasPendingChange;
+                if (shouldRaise)
+                {
+                    _hasPendingChange = false;
+                }
+            }
+
+            if (shouldRaise)
+            {
+                Changed?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        private sealed class UpdateScope : IDisposable
+        {
+            private RoiPluginRegistry? _registry;
+
+            public UpdateScope(RoiPluginRegistry registry)
+            {
+                _registry = registry;
+            }
+
+            public void Dispose()
+            {
+                RoiPluginRegistry? registry = _registry;
+                _registry = null;
+                registry?.EndUpdate();
             }
         }
 

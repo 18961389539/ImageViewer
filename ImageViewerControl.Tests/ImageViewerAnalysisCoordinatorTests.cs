@@ -109,7 +109,7 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
-        public void HandlePseudoColorPaletteChanged_RefreshesHistogramAndProfile()
+        public void HandlePseudoColorPaletteChanged_RefreshesOnlyTheRenderedImage()
         {
             WpfTestRunner.Run(() =>
             {
@@ -118,15 +118,28 @@ namespace ImageViewerControl.Tests
                 var host = CreateHost(renderService, bitmap);
                 host.ShowHistogram = true;
                 host.ShowProfile = true;
+                host.EnableAsyncAnalysis = true;
                 host.PseudoColorPalette = PseudoColorPalette.Hot;
                 var uiFacade = new FakeAnalysisUiFacade();
-                var coordinator = CreateCoordinator(host, uiFacade, new FakeProfileTargetResolver { TargetLine = CreateProfileLine() });
+                uiFacade.LastHistogramOutput = new ImageViewerHistogramOutput([1, 2, 3], 3);
+                uiFacade.LastProfileOutput = new ImageViewerProfileOutput([1, 2, 3]);
+                var coordinator = CreateCoordinator(host, uiFacade, new FakeProfileTargetResolver { TargetLine = CreateProfileLine() }, TimeSpan.Zero);
 
                 coordinator.HandlePseudoColorPaletteChanged();
 
+                // 图像必须重绘。
                 Assert.Equal(1, renderService.BuildRenderFrameCallCount);
+
+                // 直方图/剖面的计算基于原始强度图、绘制用固定颜色，都与调色板无关 → 不得重算，已呈现的输出保持不变。
+                Assert.Equal(0, renderService.CreateHistogramAsyncCallCount);
+                Assert.Equal(0, renderService.CreateProfileAsyncCallCount);
                 Assert.NotNull(uiFacade.LastHistogramOutput);
                 Assert.NotNull(uiFacade.LastProfileOutput);
+
+                // 对照组：显式刷新确实会算——证明上面两个计数是有效观测点，而不是碰巧为 0。
+                coordinator.RefreshAnalysisDisplays(force: true).GetAwaiter().GetResult();
+                Assert.Equal(1, renderService.CreateHistogramAsyncCallCount);
+                Assert.Equal(1, renderService.CreateProfileAsyncCallCount);
             });
         }
 
@@ -173,16 +186,15 @@ namespace ImageViewerControl.Tests
             {
                 BitmapSource bitmap = CreateBitmap();
                 var host = CreateHost(new FakeRenderService(), bitmap);
-                var histogramWork = new CancellationTokenSource();
-                host.AnalysisState.HistogramUpdateCancellationTokenSource = histogramWork;
+                ImageViewerAnalysisTicket histogramTicket = host.AnalysisState.BeginHistogramTicket();
                 var uiFacade = new FakeAnalysisUiFacade();
                 uiFacade.LastHistogramOutput = new ImageViewerHistogramOutput([1, 2, 3], 3);
                 var coordinator = CreateCoordinator(host, uiFacade, new FakeProfileTargetResolver());
 
                 coordinator.HandleHistogramVisibilityChanged(false);
 
-                Assert.True(histogramWork.IsCancellationRequested);
-                Assert.Null(host.AnalysisState.HistogramUpdateCancellationTokenSource);
+                Assert.True(histogramTicket.IsCancellationRequested);
+                Assert.Null(host.AnalysisState.HistogramTicket);
                 Assert.Null(uiFacade.LastHistogramOutput);
                 Assert.False(uiFacade.IsHistogramPanelVisible);
             });
@@ -244,24 +256,81 @@ namespace ImageViewerControl.Tests
                     ]
                 };
                 var host = CreateHost(renderService, bitmap);
-                var oldHistogramWork = new CancellationTokenSource();
-                var oldProfileWork = new CancellationTokenSource();
-                var oldPyramidWork = new CancellationTokenSource();
-                host.AnalysisState.HistogramUpdateCancellationTokenSource = oldHistogramWork;
-                host.AnalysisState.ProfileUpdateCancellationTokenSource = oldProfileWork;
-                host.AnalysisState.PyramidBuildCancellationTokenSource = oldPyramidWork;
+                ImageViewerAnalysisTicket oldHistogramTicket = host.AnalysisState.BeginHistogramTicket();
+                ImageViewerAnalysisTicket oldProfileTicket = host.AnalysisState.BeginProfileTicket();
+                ImageViewerAnalysisTicket oldPyramidTicket = host.AnalysisState.BeginPyramidTicket();
                 var coordinator = CreateCoordinator(host, new FakeAnalysisUiFacade(), new FakeProfileTargetResolver());
 
                 coordinator.PrepareAnalysisResourcesAsync(bitmap).GetAwaiter().GetResult();
 
-                Assert.True(oldHistogramWork.IsCancellationRequested);
-                Assert.True(oldProfileWork.IsCancellationRequested);
-                Assert.True(oldPyramidWork.IsCancellationRequested);
+                Assert.True(oldHistogramTicket.IsCancellationRequested);
+                Assert.True(oldProfileTicket.IsCancellationRequested);
+                Assert.True(oldPyramidTicket.IsCancellationRequested);
+                Assert.Null(host.AnalysisState.HistogramTicket);
+                Assert.Null(host.AnalysisState.ProfileTicket);
+                Assert.NotSame(oldPyramidTicket, host.AnalysisState.PyramidTicket);
                 Assert.Equal(1, renderService.ClearTileCacheCallCount);
                 Assert.Same(bitmap, host.AnalysisState.AnalysisBitmapSource);
                 Assert.Equal(2, host.AnalysisState.PyramidLevels.Count);
                 Assert.Equal(1, renderService.BuildPyramidAsyncCallCount);
                 Assert.Equal(2, renderService.BuildRenderFrameCallCount);
+            });
+        }
+
+        [Fact]
+        public void PrepareAnalysisResourcesAsync_ClearsExistingAnalysisOutputsBeforePyramidCompletes()
+        {
+            WpfTestRunner.RunAsync(async () =>
+            {
+                BitmapSource bitmap = CreateBitmap();
+                var pyramidGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                var renderService = new FakeRenderService
+                {
+                    AnalysisBitmap = bitmap,
+                    PyramidGate = pyramidGate
+                };
+                var host = CreateHost(renderService, bitmap);
+                var uiFacade = new FakeAnalysisUiFacade
+                {
+                    LastHistogramOutput = new ImageViewerHistogramOutput([1, 2, 3], 3),
+                    LastProfileOutput = new ImageViewerProfileOutput([4, 5, 6])
+                };
+                var coordinator = CreateCoordinator(host, uiFacade, new FakeProfileTargetResolver());
+
+                Task prepareTask = coordinator.PrepareAnalysisResourcesAsync(bitmap);
+
+                Assert.Null(uiFacade.LastHistogramOutput);
+                Assert.Null(uiFacade.LastProfileOutput);
+
+                pyramidGate.SetResult(true);
+                await prepareTask;
+            });
+        }
+
+        [Fact]
+        public void PrepareAnalysisResourcesAsync_ClearsAnalysisOutputsWhenPyramidBuildFails()
+        {
+            WpfTestRunner.RunAsync(async () =>
+            {
+                BitmapSource bitmap = CreateBitmap();
+                var renderService = new FakeRenderService
+                {
+                    AnalysisBitmap = bitmap,
+                    PyramidException = new InvalidOperationException("pyramid failed")
+                };
+                var host = CreateHost(renderService, bitmap);
+                var uiFacade = new FakeAnalysisUiFacade
+                {
+                    LastHistogramOutput = new ImageViewerHistogramOutput([1, 2, 3], 3),
+                    LastProfileOutput = new ImageViewerProfileOutput([4, 5, 6])
+                };
+                var coordinator = CreateCoordinator(host, uiFacade, new FakeProfileTargetResolver());
+
+                await Assert.ThrowsAsync<InvalidOperationException>(() => coordinator.PrepareAnalysisResourcesAsync(bitmap));
+
+                Assert.Null(uiFacade.LastHistogramOutput);
+                Assert.Null(uiFacade.LastProfileOutput);
+                Assert.Null(host.AnalysisState.PyramidTicket);
             });
         }
 
@@ -272,10 +341,8 @@ namespace ImageViewerControl.Tests
             {
                 BitmapSource bitmap = CreateBitmap();
                 var host = CreateHost(new FakeRenderService(), bitmap);
-                var histogramWork = new CancellationTokenSource();
-                var profileWork = new CancellationTokenSource();
-                host.AnalysisState.HistogramUpdateCancellationTokenSource = histogramWork;
-                host.AnalysisState.ProfileUpdateCancellationTokenSource = profileWork;
+                ImageViewerAnalysisTicket histogramTicket = host.AnalysisState.BeginHistogramTicket();
+                ImageViewerAnalysisTicket profileTicket = host.AnalysisState.BeginProfileTicket();
                 var uiFacade = new FakeAnalysisUiFacade();
                 uiFacade.LastHistogramOutput = new ImageViewerHistogramOutput([1, 2, 3], 3);
                 uiFacade.LastProfileOutput = new ImageViewerProfileOutput([0, 127, 255]);
@@ -283,11 +350,76 @@ namespace ImageViewerControl.Tests
 
                 coordinator.ClearAnalysisCaches();
 
-                Assert.True(histogramWork.IsCancellationRequested);
-                Assert.True(profileWork.IsCancellationRequested);
-                Assert.Null(host.AnalysisState.HistogramUpdateCancellationTokenSource);
-                Assert.Null(host.AnalysisState.ProfileUpdateCancellationTokenSource);
+                Assert.True(histogramTicket.IsCancellationRequested);
+                Assert.True(profileTicket.IsCancellationRequested);
+                Assert.Null(host.AnalysisState.HistogramTicket);
+                Assert.Null(host.AnalysisState.ProfileTicket);
                 Assert.Null(uiFacade.LastHistogramOutput);
+                Assert.Null(uiFacade.LastProfileOutput);
+            });
+        }
+
+        [Fact]
+        public void UpdateProfile_WhenAsyncRequestIsSupersededBySyncRefresh_DoesNotCommitStaleResult()
+        {
+            WpfTestRunner.RunAsync(async () =>
+            {
+                BitmapSource bitmap = CreateBitmap();
+                var gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                var renderService = new FakeRenderService
+                {
+                    ProfileGate = gate,
+                    ProfileResult = [9, 9, 9]
+                };
+                var host = CreateHost(renderService, bitmap);
+                host.ShowProfile = true;
+                host.EnableAsyncAnalysis = true;
+                var uiFacade = new FakeAnalysisUiFacade();
+                var resolver = new FakeProfileTargetResolver { TargetLine = CreateProfileLine() };
+                var coordinator = CreateCoordinator(host, uiFacade, resolver, TimeSpan.Zero);
+
+                Task inFlight = coordinator.UpdateProfile();
+                Assert.Equal(1, renderService.CreateProfileAsyncCallCount);
+
+                // Turning the async mode off forces a synchronous refresh while the first request is still in flight.
+                host.EnableAsyncAnalysis = false;
+                await coordinator.UpdateProfile(force: true);
+
+                Assert.NotNull(uiFacade.LastProfileOutput);
+
+                uiFacade.LastProfileOutput = null;
+                gate.SetResult(true);
+                await inFlight;
+
+                Assert.Null(uiFacade.LastProfileOutput);
+            });
+        }
+
+        [Fact]
+        public void UpdateProfile_WhenTargetLineDisappears_DiscardsInFlightResult()
+        {
+            WpfTestRunner.RunAsync(async () =>
+            {
+                BitmapSource bitmap = CreateBitmap();
+                var gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                var renderService = new FakeRenderService { ProfileGate = gate, IgnoreProfileCancellation = true };
+                var host = CreateHost(renderService, bitmap);
+                host.ShowProfile = true;
+                host.EnableAsyncAnalysis = true;
+                var uiFacade = new FakeAnalysisUiFacade();
+                var resolver = new FakeProfileTargetResolver { TargetLine = CreateProfileLine() };
+                var coordinator = CreateCoordinator(host, uiFacade, resolver, TimeSpan.Zero);
+
+                Task inFlight = coordinator.UpdateProfile();
+
+                resolver.TargetLine = null;
+                await coordinator.UpdateProfile();
+
+                Assert.Null(uiFacade.LastProfileOutput);
+
+                gate.SetResult(true);
+                await inFlight;
+
                 Assert.Null(uiFacade.LastProfileOutput);
             });
         }
@@ -295,9 +427,10 @@ namespace ImageViewerControl.Tests
         private static ImageViewerAnalysisCoordinator CreateCoordinator(
             FakeAnalysisHost host,
             FakeAnalysisUiFacade uiFacade,
-            FakeProfileTargetResolver profileTargetResolver)
+            FakeProfileTargetResolver profileTargetResolver,
+            TimeSpan? asyncAnalysisDebounce = null)
         {
-            return new ImageViewerAnalysisCoordinator(host, uiFacade, profileTargetResolver, new FakeErrorSink());
+            return new ImageViewerAnalysisCoordinator(host, uiFacade, profileTargetResolver, new FakeErrorSink(), asyncAnalysisDebounce: asyncAnalysisDebounce);
         }
 
         private static FakeAnalysisHost CreateHost(FakeRenderService renderService, BitmapSource bitmap)
@@ -307,8 +440,7 @@ namespace ImageViewerControl.Tests
                 ImageSource = bitmap
             };
 
-            host.AnalysisState.AnalysisBitmapSource = bitmap;
-            host.AnalysisState.PyramidLevels = [new ImagePyramidLevel(bitmap, 1.0)];
+            host.AnalysisState.ResetForSource(bitmap);
             return host;
         }
 
@@ -463,11 +595,29 @@ namespace ImageViewerControl.Tests
 
             public IReadOnlyList<ImagePyramidLevel> PyramidLevelsResult { get; set; } = [];
 
+            public TaskCompletionSource<bool>? PyramidGate { get; set; }
+
+            public Exception? PyramidException { get; set; }
+
             public int BuildRenderFrameCallCount { get; private set; }
 
             public int BuildPyramidAsyncCallCount { get; private set; }
 
             public int ClearTileCacheCallCount { get; private set; }
+
+            public int CreateProfileAsyncCallCount { get; private set; }
+
+            public int CreateHistogramAsyncCallCount { get; private set; }
+
+            public TaskCompletionSource<bool>? ProfileGate { get; set; }
+
+            public byte[]? ProfileResult { get; set; } = [0, 127, 255];
+
+            /// <summary>
+            /// Simulates a service that ignores the cancellation token, so only the ticket identity guard can keep
+            /// a superseded result out of the UI.
+            /// </summary>
+            public bool IgnoreProfileCancellation { get; set; }
 
             public PseudoColorPalette LastBuildRenderFramePalette { get; private set; }
 
@@ -495,10 +645,20 @@ namespace ImageViewerControl.Tests
                 return PseudoColorEffect;
             }
 
-            public Task<IReadOnlyList<ImagePyramidLevel>> BuildPyramidAsync(BitmapSource? source, CancellationToken cancellationToken)
+            public async Task<IReadOnlyList<ImagePyramidLevel>> BuildPyramidAsync(BitmapSource? source, CancellationToken cancellationToken)
             {
                 BuildPyramidAsyncCallCount++;
-                return Task.FromResult(PyramidLevelsResult);
+                if (PyramidGate != null)
+                {
+                    await PyramidGate.Task;
+                }
+
+                if (PyramidException != null)
+                {
+                    throw PyramidException;
+                }
+
+                return PyramidLevelsResult;
             }
 
             public ImageViewerRenderFrame BuildRenderFrame(BitmapSource? source, IReadOnlyList<ImagePyramidLevel>? pyramid, Size viewport, double scale, Point translation, PseudoColorPalette palette, bool enableTiledRendering, bool autoSelectPyramidLevel, bool prefetchAdjacentTiles, int tileCacheMaximumMegabytes, int tilePrefetchRadius)
@@ -510,6 +670,7 @@ namespace ImageViewerControl.Tests
 
             public Task<int[]?> CreateHistogramAsync(BitmapSource? source, int binCount, CancellationToken cancellationToken)
             {
+                CreateHistogramAsyncCallCount++;
                 int[] histogram = new int[binCount];
                 Array.Fill(histogram, 1);
                 return Task.FromResult<int[]?>(histogram);
@@ -517,7 +678,23 @@ namespace ImageViewerControl.Tests
 
             public Task<byte[]?> CreateProfileAsync(ImageViewerAnalysisRequest request, CancellationToken cancellationToken)
             {
-                return Task.FromResult<byte[]?>([0, 127, 255]);
+                CreateProfileAsyncCallCount++;
+                return CreateProfileCoreAsync(cancellationToken);
+            }
+
+            private async Task<byte[]?> CreateProfileCoreAsync(CancellationToken cancellationToken)
+            {
+                if (ProfileGate != null)
+                {
+                    await ProfileGate.Task.ConfigureAwait(false);
+                }
+
+                if (!IgnoreProfileCancellation)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+
+                return ProfileResult;
             }
         }
     }

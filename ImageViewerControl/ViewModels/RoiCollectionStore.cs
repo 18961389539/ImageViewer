@@ -58,6 +58,42 @@ namespace ImageViewer.ViewModels
             RebuildAllRois();
         }
 
+        /// <summary>
+        /// 丢弃全部按类型缓存的集合与总列表。
+        /// Chinese: 供插件注册表变更使用。必须断开每个缓存集合的 CollectionChanged 订阅——否则仍然持有旧插件引用的
+        /// 代码一旦改动这些集合，OnTypedCollectionChanged 就会把已经失效的 ROI 重新注入 AllRois
+        /// （现象是"换了插件之后过一会儿旧标注又回来了"）。
+        /// English: Drops every cached typed collection and the aggregate list. Unsubscribing matters: a stale reference
+        /// that still mutates one of these collections would otherwise re-inject dropped ROIs into <see cref="AllRois"/>.
+        /// </summary>
+        public void Reset()
+        {
+            foreach (object collection in _typedCollections.Values)
+            {
+                DetachTypedCollection(collection);
+            }
+
+            _typedCollections.Clear();
+
+            _isSynchronizing = true;
+            try
+            {
+                _allRois.Clear();
+            }
+            finally
+            {
+                _isSynchronizing = false;
+            }
+        }
+
+        private void DetachTypedCollection(object collection)
+        {
+            if (collection is INotifyCollectionChanged notifying)
+            {
+                notifying.CollectionChanged -= OnTypedCollectionChanged;
+            }
+        }
+
         public void RebuildAllRois(IEnumerable<RoiBase>? orderedRois = null)
         {
             _isSynchronizing = true;

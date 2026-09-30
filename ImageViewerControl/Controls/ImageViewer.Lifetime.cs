@@ -10,6 +10,17 @@ namespace ImageViewer.Controls
             ArgumentNullException.ThrowIfNull(controlComposition);
 
             var registrations = new ImageViewerLifetimeRegistrationCollection();
+
+            // Cleanups run in reverse registration order, so the host lease is registered first in order to be
+            // released last: the control tears itself down before the runtime it borrows can be disposed, and an
+            // exception thrown by an earlier cleanup cannot strand the lease.
+            registrations.AddCleanup(ReleaseHostLease);
+
+            // 注册表可能被多个 viewer 共享：释放时断订阅，否则注册表会一直持有本控件的 ViewModel 与可视树。
+            registrations.AddCleanup(_hostState.DetachPluginRegistry);
+            registrations.AddAttachment(
+                () => _hostState.RoiStateMigrated += OnRoiStateMigrated,
+                () => _hostState.RoiStateMigrated -= OnRoiStateMigrated);
             registrations.AddAttachment(
                 () =>
                 {

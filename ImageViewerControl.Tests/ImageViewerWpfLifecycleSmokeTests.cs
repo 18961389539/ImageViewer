@@ -15,6 +15,7 @@ using ImageViewer.Models;
 using ImageViewer.Plugins;
 using ImageViewer.Services;
 using ImageViewer.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace ImageViewerControl.Tests
@@ -353,6 +354,179 @@ namespace ImageViewerControl.Tests
                 RecordingLatestTaskScheduler scheduler = Assert.IsType<RecordingLatestTaskScheduler>(latestTaskSchedulerFactory.Scheduler);
                 Assert.Collection(scheduler.DelayRequests, delay => Assert.Equal(35, delay));
                 Assert.Equal(1, scheduler.CancelCallCount);
+            });
+        }
+
+        [Fact]
+        public void CreateViewer_OwnedHost_ReleasesRuntimeServicesWithLastViewerLease()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                ImageViewerRuntimeServices runtimeServices = ImageViewerTestServices.CreateRuntimeServices();
+                ImageViewerHost host = ImageViewerTestServices.CreateOwningHost(
+                    RoiPluginRegistry.CreateBuiltIn(),
+                    runtimeServices,
+                    ImageViewerTestServices.CreateHostServices(
+                        new RecordingDispatcherTimerFactory(),
+                        new RecordingRefreshSchedulerFactory(),
+                        new RecordingLatestTaskSchedulerFactory(),
+                        new RecordingPeriodicTaskSchedulerFactory(),
+                        new RecordingAnalysisDiagnostics()));
+
+                ImageViewer.Controls.ImageViewer first = host.CreateViewer();
+                ImageViewer.Controls.ImageViewer second = host.CreateViewer();
+
+                Assert.Equal(2, host.ActiveViewerCount);
+                Assert.Same(runtimeServices, first.RuntimeServices);
+                Assert.Same(runtimeServices, second.RuntimeServices);
+
+                first.Dispose();
+
+                Assert.False(runtimeServices.IsDisposed);
+                Assert.False(((ImageViewerRenderService)runtimeServices.RenderService).IsDisposed);
+
+                second.Dispose();
+
+                Assert.Equal(0, host.ActiveViewerCount);
+                Assert.True(runtimeServices.IsDisposed);
+                Assert.True(((ImageViewerRenderService)runtimeServices.RenderService).IsDisposed);
+            });
+        }
+
+        [Fact]
+        public void CreateViewer_OwnedHost_RejectsNewViewersAfterTheRuntimeWasReleased()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                ImageViewerRuntimeServices runtimeServices = ImageViewerTestServices.CreateRuntimeServices();
+                ImageViewerHost host = ImageViewerTestServices.CreateOwningHost(
+                    RoiPluginRegistry.CreateBuiltIn(),
+                    runtimeServices,
+                    ImageViewerTestServices.CreateHostServices(
+                        new RecordingDispatcherTimerFactory(),
+                        new RecordingRefreshSchedulerFactory(),
+                        new RecordingLatestTaskSchedulerFactory(),
+                        new RecordingPeriodicTaskSchedulerFactory(),
+                        new RecordingAnalysisDiagnostics()));
+
+                host.CreateViewer().Dispose();
+
+                Assert.True(runtimeServices.IsDisposed);
+                Assert.Throws<ObjectDisposedException>(() => host.CreateViewer());
+            });
+        }
+
+        [Fact]
+        public void CreateViewer_BorrowedRuntimeServices_SurviveViewerDisposal()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                ImageViewerRuntimeServices runtimeServices = ImageViewerTestServices.CreateRuntimeServices();
+                ImageViewerHost host = ImageViewerTestServices.CreateHost(
+                    RoiPluginRegistry.CreateBuiltIn(),
+                    runtimeServices,
+                    ImageViewerTestServices.CreateHostServices(
+                        new RecordingDispatcherTimerFactory(),
+                        new RecordingRefreshSchedulerFactory(),
+                        new RecordingLatestTaskSchedulerFactory(),
+                        new RecordingPeriodicTaskSchedulerFactory(),
+                        new RecordingAnalysisDiagnostics()));
+
+                using (host.CreateViewer())
+                {
+                }
+
+                Assert.False(host.OwnsRuntimeServices);
+                Assert.Equal(0, host.ActiveViewerCount);
+                Assert.False(runtimeServices.IsDisposed);
+
+                // A borrowing host never disposes what it does not own, so it can keep serving new viewers.
+                using var second = host.CreateViewer();
+                Assert.Same(runtimeServices, second.RuntimeServices);
+
+                runtimeServices.Dispose();
+            });
+        }
+
+        [Fact]
+        public void Dispose_ReturnsHostLeaseOnlyOnce()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                ImageViewerRuntimeServices runtimeServices = ImageViewerTestServices.CreateRuntimeServices();
+                ImageViewerHost host = ImageViewerTestServices.CreateOwningHost(
+                    RoiPluginRegistry.CreateBuiltIn(),
+                    runtimeServices,
+                    ImageViewerTestServices.CreateHostServices(
+                        new RecordingDispatcherTimerFactory(),
+                        new RecordingRefreshSchedulerFactory(),
+                        new RecordingLatestTaskSchedulerFactory(),
+                        new RecordingPeriodicTaskSchedulerFactory(),
+                        new RecordingAnalysisDiagnostics()));
+
+                ImageViewer.Controls.ImageViewer viewer = host.CreateViewer();
+                viewer.Dispose();
+                viewer.Dispose();
+
+                Assert.Equal(0, host.ActiveViewerCount);
+                Assert.True(runtimeServices.IsDisposed);
+            });
+        }
+
+        [Fact]
+        public void CreateViewer_WhenHostIsDisposedWithLiveViewer_DefersRuntimeReleaseToTheViewer()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                ImageViewerRuntimeServices runtimeServices = ImageViewerTestServices.CreateRuntimeServices();
+                ImageViewerHost host = ImageViewerTestServices.CreateOwningHost(
+                    RoiPluginRegistry.CreateBuiltIn(),
+                    runtimeServices,
+                    ImageViewerTestServices.CreateHostServices(
+                        new RecordingDispatcherTimerFactory(),
+                        new RecordingRefreshSchedulerFactory(),
+                        new RecordingLatestTaskSchedulerFactory(),
+                        new RecordingPeriodicTaskSchedulerFactory(),
+                        new RecordingAnalysisDiagnostics()));
+
+                ImageViewer.Controls.ImageViewer viewer = host.CreateViewer();
+                host.Dispose();
+
+                Assert.True(host.IsDisposed);
+                Assert.False(runtimeServices.IsDisposed);
+
+                viewer.Dispose();
+
+                Assert.True(runtimeServices.IsDisposed);
+            });
+        }
+
+        [Fact]
+        public void ServiceProviderScope_ViewerSharesHostRuntimeAndReturnsItsLease()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                using ServiceProvider serviceProvider = new ServiceCollection()
+                    .AddImageViewerHost()
+                    .BuildServiceProvider();
+                IServiceScope scope = serviceProvider.CreateScope();
+                ImageViewerHost host = scope.ServiceProvider.GetRequiredService<ImageViewerHost>();
+                ImageViewerRuntimeServices runtimeServices = scope.ServiceProvider.GetRequiredService<ImageViewerRuntimeServices>();
+                ImageViewer.Controls.ImageViewer viewer = scope.ServiceProvider.GetRequiredService<ImageViewer.Controls.ImageViewer>();
+
+                Assert.Equal(1, host.ActiveViewerCount);
+                Assert.Same(runtimeServices, viewer.RuntimeServices);
+                Assert.Same(scope.ServiceProvider.GetRequiredService<IImageViewerRenderService>(), runtimeServices.RenderService);
+
+                // The viewer hands its lease back, but the scope — not the viewer — owns the runtime services here.
+                viewer.Dispose();
+
+                Assert.Equal(0, host.ActiveViewerCount);
+                Assert.False(runtimeServices.IsDisposed);
+
+                scope.Dispose();
+
+                Assert.True(runtimeServices.IsDisposed);
             });
         }
 

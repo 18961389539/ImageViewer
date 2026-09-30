@@ -2,6 +2,8 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Collections;
+using System.Resources;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Media.Effects;
@@ -11,6 +13,9 @@ namespace ImageViewer.Rendering
     internal static class PseudoColorShaderCompiler
     {
         private const uint D3DCompileOptimizationLevel3 = 1u << 15;
+
+        /// <summary>着色器源码在资源容器里的键后缀（小写化的相对路径）。</summary>
+        private const string ShaderResourceKeySuffix = "shaders/pseudocoloreffect.ps.hlsl";
         private static readonly Lazy<PixelShader> Shader = new(CreatePixelShader, isThreadSafe: true);
 
         public static PixelShader GetPixelShader() => Shader.Value;
@@ -60,15 +65,48 @@ namespace ImageViewer.Rendering
             }
         }
 
+        /// <summary>
+        /// 读取着色器源码。
+        /// Chinese: WPF 工程的 &lt;Resource&gt; 项会被并进 <c>&lt;程序集&gt;.g.resources</c> 容器，键是小写化的相对路径
+        /// （`shaders/pseudocoloreffect.ps.hlsl`），既不是顶层清单资源、也不会以小写形式出现在程序集里。
+        /// 这里两种形式都支持：先找容器条目，再退回顶层清单资源。
+        /// English: WPF merges &lt;Resource&gt; items into the <c>&lt;assembly&gt;.g.resources</c> container under a lowercased
+        /// relative path, so look there first and fall back to a plain manifest resource.
+        /// </summary>
         private static byte[] LoadShaderSource()
         {
             Assembly assembly = typeof(PseudoColorShaderCompiler).Assembly;
+            string? containerName = assembly.GetManifestResourceNames()
+                .FirstOrDefault(name => name.EndsWith(".g.resources", StringComparison.OrdinalIgnoreCase));
+
+            if (containerName != null)
+            {
+                using Stream containerStream = assembly.GetManifestResourceStream(containerName)!;
+                using var reader = new ResourceReader(containerStream);
+                foreach (DictionaryEntry entry in reader)
+                {
+                    if (entry.Key is string key &&
+                        key.EndsWith(ShaderResourceKeySuffix, StringComparison.OrdinalIgnoreCase) &&
+                        entry.Value is Stream shaderStream)
+                    {
+                        using (shaderStream)
+                        using (var buffer = new MemoryStream())
+                        {
+                            shaderStream.CopyTo(buffer);
+                            return buffer.ToArray();
+                        }
+                    }
+                }
+            }
+
             string? resourceName = assembly.GetManifestResourceNames()
-                .FirstOrDefault(name => name.EndsWith("Shaders.PseudoColorEffect.ps.hlsl", StringComparison.OrdinalIgnoreCase));
+                .FirstOrDefault(name => name.EndsWith(ShaderResourceKeySuffix, StringComparison.OrdinalIgnoreCase));
 
             if (resourceName == null)
             {
-                throw new InvalidOperationException("Pseudo-color shader source resource was not found.");
+                throw new InvalidOperationException(
+                    $"Pseudo-color shader source '{ShaderResourceKeySuffix}' was not found in '{assembly.GetName().Name}'. "
+                    + "It must be declared as <Resource> (or <EmbeddedResource>) in the project file.");
             }
 
             using Stream stream = assembly.GetManifestResourceStream(resourceName)

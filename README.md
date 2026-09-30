@@ -54,7 +54,7 @@ dotnet run --project ImageViewerDemo/ImageViewerDemo.csproj
 
 ### NuGet 包
 
-控件库和无 WPF 的 Core 层分别发布为 `ImageViewerControl` 与 `ImageViewer.Core`。在 `net10.0-windows` WPF 宿主中安装控件包即可，Core 包会作为项目依赖自动安装：
+控件库、无 WPF 的 Core 层和原生视觉运行时分别发布为 `ImageViewerControl`、`ImageViewer.Core` 与 `JLVisionLib`。在 `net10.0-windows` WPF 宿主中安装控件包即可，Core 和 JLVisionLib 会作为项目依赖自动安装；`JLVisionCore.dll` 只由 JLVisionLib 在 `runtimes/win-x64/native` 提供：
 
 ```powershell
 dotnet add package ImageViewerControl --version 0.1.0
@@ -66,7 +66,7 @@ dotnet add package ImageViewerControl --version 0.1.0
 ./build/pack.ps1 -Version 0.1.0-rc.1
 ```
 
-包输出到 `artifacts/packages`，同时生成 `.nupkg` 和 `.snupkg`。`.github/workflows/nuget-publish.yml` 支持两种发布方式：创建 `v0.1.0` 形式的 Git 标签自动打包并发布；手动运行工作流时可先将 `publish` 设为 `false` 只验证包，确认后再用 `publish=true` 推送。推送前需要在 GitHub 的 `nuget` environment 中配置 `NUGET_API_KEY`。
+包输出到 `artifacts/packages`，同时生成三个包各自的 `.nupkg` 和 `.snupkg`。`.github/workflows/nuget-publish.yml` 支持两种发布方式：创建 `v0.1.0` 形式的 Git 标签自动打包并发布；手动运行工作流时可先将 `publish` 设为 `false` 只验证包，确认后再用 `publish=true` 推送。推送前需要在 GitHub 的 `nuget` environment 中配置 `NUGET_API_KEY`。
 
 ## 仓库结构
 
@@ -81,7 +81,8 @@ dotnet add package ImageViewerControl --version 0.1.0
 
 ## 嵌入宿主应用
 
-使用 `Microsoft.Extensions.DependencyInjection` 的 WPF 宿主可注册 `ImageViewerHost` 和 `ImageViewer`：
+使用 `Microsoft.Extensions.DependencyInjection` 的 WPF 宿主可注册 `ImageViewerHost`、`ImageViewerRuntimeServices`、`ImageViewerRenderService` 与 `ImageViewer`。
+它们都是 **scoped**（与窗口/对话框同寿命），必须在窗口级作用域内解析：
 
 ```csharp
 using ImageViewer.Controls;
@@ -90,9 +91,24 @@ using Microsoft.Extensions.DependencyInjection;
 var services = new ServiceCollection();
 services.AddImageViewerHost();
 
-using ServiceProvider serviceProvider = services.BuildServiceProvider();
-ImageViewer viewer = serviceProvider.GetRequiredService<ImageViewer>();
+using ServiceProvider serviceProvider = services.BuildServiceProvider(new ServiceProviderOptions
+{
+    ValidateScopes = true
+});
+
+using IServiceScope windowScope = serviceProvider.CreateScope();
+ImageViewer viewer = windowScope.ServiceProvider.GetRequiredService<ImageViewer>();
 ```
+
+生命周期契约只有三层：
+
+| 生命周期 | 注册项 | 释放责任 |
+| --- | --- | --- |
+| Singleton | 插件注册表、对话框/文件对话框/视口/会话/最近项目/项目包服务、调度器工厂、遥测与分析诊断、`ImageViewerHostServices` | 容器（进程级） |
+| Scoped | `ImageViewerHost`、`ImageViewerRuntimeServices`、`ImageViewerRenderService`（含 4 个接口别名）、`ImageViewer`、`IImageViewerFactory` | 容器在作用域销毁时释放 |
+| 无 Transient | —— | 控件与 runtime 都是可释放资源，不再注册为 transient，否则容器会长期持有引用并把释放推迟到容器销毁 |
+
+所有权规则只有一条：**谁创建 runtime services，谁负责释放**。`ImageViewerHost.OwnsRuntimeServices` 为 `true` 时（宿主自己创建，典型是手工 `new ImageViewer()` 或 `ImageViewerHost.CreateDefault()`），宿主在最后一个 viewer 归还租约时释放 runtime；为 `false` 时（容器或调用方提供）宿主从不释放，由所有者负责。
 
 通过 `AddImageViewerHost(builder => { ... })` 可配置宿主构建器；也可以在注册前替换以下服务以接入现有应用基础设施：
 
@@ -111,7 +127,7 @@ ImageViewer viewer = serviceProvider.GetRequiredService<ImageViewer>();
 | `.ivsession` | 图像路径、ROI、标定与视图状态 | 继续本地工作。 |
 | `.ivpkg` | 会话和可选图像资产的 ZIP 容器 | 归档或向他人交付完整项目。 |
 
-导出 `.ivpkg` 时先生成同目录临时文件，成功后才替换目标文件。加载项目包会校验路径、条目数量和解压后大小，以防止 Zip Slip 和异常归档消耗过多资源：最多 `1,024` 个条目、单条目最多 `256 MiB`、总解压内容最多 `512 MiB`。
+导出 `.ivpkg` 时先生成同目录临时文件，成功后才替换目标文件。加载项目包会限制条目结构并校验路径、条目数量和解压后大小，以防止 Zip Slip、包外文件引用和异常归档消耗过多资源：只能包含一个 `session.ivsession` 和 `assets/` 下的资产，最多 `1,024` 个条目，会话条目最多 `8 MiB`，单条目最多 `256 MiB`，总解压内容最多 `512 MiB`。
 
 详细格式见 [docs/project-file-format.md](docs/project-file-format.md)，导入导出兼容性见 [docs/import-export-conventions.md](docs/import-export-conventions.md)。
 

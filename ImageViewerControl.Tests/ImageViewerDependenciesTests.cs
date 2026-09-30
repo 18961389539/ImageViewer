@@ -112,17 +112,76 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
-        public void AddImageViewerHost_CreatesIsolatedRuntimeRenderServices()
+        public void AddImageViewerHost_SharesRuntimeServicesInsideScopeAndIsolatesAcrossScopes()
         {
             using ServiceProvider serviceProvider = new ServiceCollection()
                 .AddImageViewerHost()
                 .BuildServiceProvider();
+            using IServiceScope firstScope = serviceProvider.CreateScope();
+            using IServiceScope secondScope = serviceProvider.CreateScope();
 
-            ImageViewerRuntimeServices first = serviceProvider.GetRequiredService<ImageViewerRuntimeServices>();
-            ImageViewerRuntimeServices second = serviceProvider.GetRequiredService<ImageViewerRuntimeServices>();
+            ImageViewerRuntimeServices first = firstScope.ServiceProvider.GetRequiredService<ImageViewerRuntimeServices>();
+            ImageViewerRuntimeServices firstAgain = firstScope.ServiceProvider.GetRequiredService<ImageViewerRuntimeServices>();
+            ImageViewerRuntimeServices second = secondScope.ServiceProvider.GetRequiredService<ImageViewerRuntimeServices>();
 
+            Assert.Same(first, firstAgain);
             Assert.NotSame(first, second);
             Assert.NotSame(first.RenderService, second.RenderService);
+        }
+
+        [Fact]
+        public void AddImageViewerHost_ResolvesEveryRenderServiceFacadeToTheSameScopeInstance()
+        {
+            using ServiceProvider serviceProvider = new ServiceCollection()
+                .AddImageViewerHost()
+                .BuildServiceProvider();
+            using IServiceScope scope = serviceProvider.CreateScope();
+
+            ImageViewerRenderService concrete = scope.ServiceProvider.GetRequiredService<ImageViewerRenderService>();
+            ImageViewerRuntimeServices runtimeServices = scope.ServiceProvider.GetRequiredService<ImageViewerRuntimeServices>();
+
+            Assert.Same(concrete, scope.ServiceProvider.GetRequiredService<IImageViewerRenderService>());
+            Assert.Same(concrete, scope.ServiceProvider.GetRequiredService<IImageViewerDisplayRenderService>());
+            Assert.Same(concrete, scope.ServiceProvider.GetRequiredService<IImageViewerFrameRenderService>());
+            Assert.Same(concrete, scope.ServiceProvider.GetRequiredService<IImageViewerAnalysisRenderService>());
+            Assert.Same(concrete, runtimeServices.RenderService);
+        }
+
+        [Fact]
+        public void AddImageViewerHost_BorrowsContainerOwnedRuntimeServicesAndRenderService()
+        {
+            using ServiceProvider serviceProvider = new ServiceCollection()
+                .AddImageViewerHost()
+                .BuildServiceProvider();
+            using IServiceScope scope = serviceProvider.CreateScope();
+            ImageViewerRuntimeServices runtimeServices = scope.ServiceProvider.GetRequiredService<ImageViewerRuntimeServices>();
+
+            ImageViewerHost host = scope.ServiceProvider.GetRequiredService<ImageViewerHost>();
+
+            Assert.False(host.OwnsRuntimeServices);
+            Assert.False(runtimeServices.OwnsRenderService);
+        }
+
+        [Fact]
+        public void AddImageViewerHost_ScopeDisposalReleasesContainerOwnedRuntimeServices()
+        {
+            using ServiceProvider serviceProvider = new ServiceCollection()
+                .AddImageViewerHost()
+                .BuildServiceProvider();
+            ImageViewerRuntimeServices runtimeServices;
+            ImageViewerRenderService renderService;
+
+            using (IServiceScope scope = serviceProvider.CreateScope())
+            {
+                runtimeServices = scope.ServiceProvider.GetRequiredService<ImageViewerRuntimeServices>();
+                renderService = scope.ServiceProvider.GetRequiredService<ImageViewerRenderService>();
+
+                Assert.False(runtimeServices.IsDisposed);
+                Assert.False(renderService.IsDisposed);
+            }
+
+            Assert.True(runtimeServices.IsDisposed);
+            Assert.True(renderService.IsDisposed);
         }
 
         [Fact]

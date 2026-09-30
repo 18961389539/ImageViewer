@@ -16,7 +16,7 @@ namespace ImageViewer.Services
         // Version 1 = ROI payload embedded as an escaped string; version 2 = ROI payload is a nested object.
         private const int CurrentSessionVersion = 2;
 
-        public void SaveToFile(string filePath, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry? pluginRegistry = null)
+        public void SaveToFile(string filePath, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry pluginRegistry)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
             ArgumentNullException.ThrowIfNull(snapshot);
@@ -27,19 +27,38 @@ namespace ImageViewer.Services
                 SerializeSession(Path.GetFileNameWithoutExtension(filePath), snapshot, pluginRegistry));
         }
 
-        public Task SaveToFileAsync(string filePath, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry? pluginRegistry = null, CancellationToken cancellationToken = default)
+        /// <summary>
+        /// 异步保存会话。
+        /// Chinese: 序列化本身也在后台线程执行——快照里的 ROI 载荷已在 UI 线程构建成脱离 UI 的纯数据图，
+        /// 因此这里可以安全 offload，避免在 UI 线程上把整份标注文档转成 JSON。
+        /// English: Serialization runs off the UI thread too. The snapshot already carries a detached ROI payload
+        /// built on the UI thread, so offloading here cannot race the editor.
+        /// </summary>
+        public async Task SaveToFileAsync(string filePath, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry pluginRegistry, CancellationToken cancellationToken = default)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
             ArgumentNullException.ThrowIfNull(snapshot);
             ArgumentNullException.ThrowIfNull(pluginRegistry);
 
-            return ImageViewerAtomicFile.WriteAllTextAsync(
+            string sessionName = Path.GetFileNameWithoutExtension(filePath);
+            string sessionJson = await Task.Run(
+                () => SerializeSession(sessionName, snapshot, pluginRegistry),
+                cancellationToken).ConfigureAwait(false);
+
+            await ImageViewerAtomicFile.WriteAllTextAsync(
                 filePath,
-                SerializeSession(Path.GetFileNameWithoutExtension(filePath), snapshot, pluginRegistry),
-                cancellationToken: cancellationToken);
+                sessionJson,
+                cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
-        public string SerializeSession(string? sessionName, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry? pluginRegistry = null)
+        /// <summary>
+        /// 把快照映射成会话文档并序列化。
+        /// Chinese: 只做字段拷贝，不再构造 ROI 文档、也不再访问 <see cref="RoiBase"/> 或插件注册表；
+        /// <paramref name="pluginRegistry"/> 保留用于 API 兼容与空值校验（ROI→DTO 的解析已在 CaptureSnapshot 完成）。
+        /// English: Pure field mapping; it no longer builds the ROI document or touches <see cref="RoiBase"/>.
+        /// The registry parameter is kept for API compatibility and null checking only.
+        /// </summary>
+        public string SerializeSession(string? sessionName, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry pluginRegistry)
         {
             ArgumentNullException.ThrowIfNull(snapshot);
             ArgumentNullException.ThrowIfNull(pluginRegistry);
@@ -50,42 +69,36 @@ namespace ImageViewer.Services
                 SessionName = sessionName,
                 SavedAtUtc = DateTimeOffset.UtcNow,
                 ImagePath = snapshot.ImagePath,
-                RoiDocument = RoiPersistenceService.CreateDocument(
-                    snapshot.Rois,
-                    snapshot.PixelSize,
-                    snapshot.PhysicalUnit,
-                    pluginRegistry,
-                    snapshot.UnresolvedRois,
-                    snapshot.QualityProfile),
+                RoiDocument = snapshot.RoiDocument,
                 Scale = snapshot.Scale,
                 TranslateX = snapshot.TranslateX,
                 TranslateY = snapshot.TranslateY,
                 Calibration = snapshot.Calibration
             };
 
-            return JsonSerializer.Serialize(session, ImageViewer.Persistence.ImageViewerCoreJsonSerializationContext.Default.ImageViewerSessionDocument);
+            return JsonSerializer.Serialize(session, ImageViewer.Core.Persistence.ImageViewerCoreJsonSerializationContext.Default.ImageViewerSessionDocument);
         }
 
-        public ImageViewerSessionData LoadFromFile(string filePath, RoiPluginRegistry? pluginRegistry = null)
+        public ImageViewerSessionData LoadFromFile(string filePath, RoiPluginRegistry pluginRegistry)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
             ArgumentNullException.ThrowIfNull(pluginRegistry);
 
-            return LoadFromJson(File.ReadAllText(filePath), Path.GetDirectoryName(Path.GetFullPath(filePath)), pluginRegistry);
+            return LoadFromJson(File.ReadAllText(filePath), pluginRegistry, Path.GetDirectoryName(Path.GetFullPath(filePath)));
         }
 
-        public async Task<ImageViewerSessionData> LoadFromFileAsync(string filePath, RoiPluginRegistry? pluginRegistry = null, CancellationToken cancellationToken = default)
+        public async Task<ImageViewerSessionData> LoadFromFileAsync(string filePath, RoiPluginRegistry pluginRegistry, CancellationToken cancellationToken = default)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
             ArgumentNullException.ThrowIfNull(pluginRegistry);
 
-            return LoadFromJson(await File.ReadAllTextAsync(filePath, cancellationToken).ConfigureAwait(false), Path.GetDirectoryName(Path.GetFullPath(filePath)), pluginRegistry);
+            return LoadFromJson(await File.ReadAllTextAsync(filePath, cancellationToken).ConfigureAwait(false), pluginRegistry, Path.GetDirectoryName(Path.GetFullPath(filePath)));
         }
 
-        public ImageViewerSessionData LoadFromJson(string sessionJson, string? sessionBaseDirectory = null, RoiPluginRegistry? pluginRegistry = null)
+        public ImageViewerSessionData LoadFromJson(string sessionJson, RoiPluginRegistry pluginRegistry, string? sessionBaseDirectory = null)
         {
             ArgumentNullException.ThrowIfNull(pluginRegistry);
-            var session = JsonSerializer.Deserialize(sessionJson, ImageViewer.Persistence.ImageViewerCoreJsonSerializationContext.Default.ImageViewerSessionDocument)
+            var session = JsonSerializer.Deserialize(sessionJson, ImageViewer.Core.Persistence.ImageViewerCoreJsonSerializationContext.Default.ImageViewerSessionDocument)
                 ?? new ImageViewerSessionDocument();
             ValidateSessionVersion(session.Version);
             var roiData = RoiPersistenceService.CreateRois(session.RoiDocument ?? new RoiDocument(), pluginRegistry);

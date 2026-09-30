@@ -3,7 +3,7 @@ using System;
 using System.Text.Json.Serialization;
 using ImageViewer.Models;
 
-namespace ImageViewer.Services
+namespace ImageViewer.Core.Persistence
 {
     /// <summary>Portable session envelope shared by persistence and UI hosts.</summary>
     public sealed class ImageViewerSessionDocument

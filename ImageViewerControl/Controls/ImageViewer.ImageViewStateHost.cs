@@ -74,6 +74,10 @@ namespace ImageViewer.Controls
         public bool ShowScaleBar => _owner.ShowScaleBar;
         public bool ShowSnapGrid => _owner.ShowSnapGrid;
         public double Scale => _owner.Scale;
+
+        public double TranslateX => _owner.ViewerState.OffsetX;
+
+        public double TranslateY => _owner.ViewerState.OffsetY;
         public double GridSpacing => _owner.GridSpacing;
         public ImageSource? ImageSource => _owner.ImageSource;
         public FrameworkElement ImageContainer => _imageContainer;

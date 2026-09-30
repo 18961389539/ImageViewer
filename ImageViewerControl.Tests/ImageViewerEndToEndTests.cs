@@ -141,7 +141,13 @@ namespace ImageViewerControl.Tests
                 string recoveryPath = Path.Combine(policy.AutoSaveDirectory, "autosave.ivsession");
                 new ImageViewerSessionService().SaveToFile(
                     recoveryPath,
-                    new ImageViewerPersistenceSnapshot(null, [recoveredRoi], 0.5, "mm", 1.25, 4, 6, null),
+                    new ImageViewerPersistenceSnapshot(
+                        null,
+                        RoiPersistenceService.CreateDocument([recoveredRoi], 0.5, "mm", registry),
+                        1.25,
+                        4,
+                        6,
+                        null),
                     registry);
 
                 var defaultHostServices = ImageViewerHostDefaults.CreateHostServices();

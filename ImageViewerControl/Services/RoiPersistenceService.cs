@@ -15,7 +15,7 @@ namespace ImageViewer.Services
         private const int CurrentDocumentVersion = 1;
         
 
-        public static void SaveToFile(string filePath, IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, RoiPluginRegistry? pluginRegistry = null, ImageAnalysisQualityProfile? qualityProfile = null)
+        public static void SaveToFile(string filePath, IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, RoiPluginRegistry pluginRegistry, ImageAnalysisQualityProfile? qualityProfile = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
             ArgumentNullException.ThrowIfNull(rois);
@@ -24,27 +24,39 @@ namespace ImageViewer.Services
             ImageViewerAtomicFile.WriteAllText(filePath, Serialize(rois, pixelSize, physicalUnit, pluginRegistry, qualityProfile));
         }
 
-        public static Task SaveToFileAsync(string filePath, IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, RoiPluginRegistry? pluginRegistry = null, CancellationToken cancellationToken = default)
+        public static Task SaveToFileAsync(string filePath, IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, RoiPluginRegistry pluginRegistry, CancellationToken cancellationToken = default)
         {
             return SaveToFileAsync(filePath, rois, pixelSize, physicalUnit, pluginRegistry, qualityProfile: null, cancellationToken);
         }
 
-        public static Task SaveToFileAsync(string filePath, IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, RoiPluginRegistry? pluginRegistry, ImageAnalysisQualityProfile? qualityProfile, CancellationToken cancellationToken = default)
+        /// <summary>
+        /// 异步保存 ROI 文档。
+        /// Chinese: ROI→DTO 在调用线程（UI）完成，纯序列化与写盘放到后台——与会话保存保持同一约定，
+        /// 避免在 UI 线程上把整份标注文档转成 JSON。
+        /// English: The ROI-to-DTO conversion runs on the calling (UI) thread; serialization and the file write
+        /// are offloaded, matching the session save convention.
+        /// </summary>
+        public static async Task SaveToFileAsync(string filePath, IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, RoiPluginRegistry pluginRegistry, ImageAnalysisQualityProfile? qualityProfile, CancellationToken cancellationToken = default)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
             ArgumentNullException.ThrowIfNull(rois);
             ArgumentNullException.ThrowIfNull(pluginRegistry);
 
-            return ImageViewerAtomicFile.WriteAllTextAsync(
+            RoiDocument document = CreateDocument(rois, pixelSize, physicalUnit, pluginRegistry, qualityProfile: qualityProfile);
+            string json = await Task.Run(
+                () => JsonSerializer.Serialize(document, ImageViewer.Core.Persistence.ImageViewerCoreJsonSerializationContext.Default.RoiDocument),
+                cancellationToken).ConfigureAwait(false);
+
+            await ImageViewerAtomicFile.WriteAllTextAsync(
                 filePath,
-                Serialize(rois, pixelSize, physicalUnit, pluginRegistry, qualityProfile),
-                cancellationToken: cancellationToken);
+                json,
+                cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
-        public static string Serialize(IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, RoiPluginRegistry? pluginRegistry = null, ImageAnalysisQualityProfile? qualityProfile = null)
+        public static string Serialize(IEnumerable<RoiBase> rois, double pixelSize, string? physicalUnit, RoiPluginRegistry pluginRegistry, ImageAnalysisQualityProfile? qualityProfile = null)
         {
             var roiPlugins = pluginRegistry ?? throw new ArgumentNullException(nameof(pluginRegistry));
-            return JsonSerializer.Serialize(CreateDocument(rois, pixelSize, physicalUnit, roiPlugins, qualityProfile: qualityProfile), ImageViewer.Persistence.ImageViewerCoreJsonSerializationContext.Default.RoiDocument);
+            return JsonSerializer.Serialize(CreateDocument(rois, pixelSize, physicalUnit, roiPlugins, qualityProfile: qualityProfile), ImageViewer.Core.Persistence.ImageViewerCoreJsonSerializationContext.Default.RoiDocument);
         }
 
         /// <summary>
@@ -84,7 +96,7 @@ namespace ImageViewer.Services
             };
         }
 
-        public static RoiDocumentLoadResult LoadFromFile(string filePath, RoiPluginRegistry? pluginRegistry = null)
+        public static RoiDocumentLoadResult LoadFromFile(string filePath, RoiPluginRegistry pluginRegistry)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
             ArgumentNullException.ThrowIfNull(pluginRegistry);
@@ -92,7 +104,7 @@ namespace ImageViewer.Services
             return Deserialize(File.ReadAllText(filePath), pluginRegistry);
         }
 
-        public static async Task<RoiDocumentLoadResult> LoadFromFileAsync(string filePath, RoiPluginRegistry? pluginRegistry = null, CancellationToken cancellationToken = default)
+        public static async Task<RoiDocumentLoadResult> LoadFromFileAsync(string filePath, RoiPluginRegistry pluginRegistry, CancellationToken cancellationToken = default)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
             ArgumentNullException.ThrowIfNull(pluginRegistry);
@@ -100,12 +112,12 @@ namespace ImageViewer.Services
             return Deserialize(await File.ReadAllTextAsync(filePath, cancellationToken).ConfigureAwait(false), pluginRegistry);
         }
 
-        public static RoiDocumentLoadResult Deserialize(string json, RoiPluginRegistry? pluginRegistry = null)
+        public static RoiDocumentLoadResult Deserialize(string json, RoiPluginRegistry pluginRegistry)
         {
             ArgumentNullException.ThrowIfNull(json);
             var roiPlugins = pluginRegistry ?? throw new ArgumentNullException(nameof(pluginRegistry));
 
-            var document = JsonSerializer.Deserialize(json, ImageViewer.Persistence.ImageViewerCoreJsonSerializationContext.Default.RoiDocument) ?? new RoiDocument();
+            var document = JsonSerializer.Deserialize(json, ImageViewer.Core.Persistence.ImageViewerCoreJsonSerializationContext.Default.RoiDocument) ?? new RoiDocument();
             return CreateRois(document, roiPlugins);
         }
 
@@ -199,8 +211,20 @@ namespace ImageViewer.Services
                 return null;
             }
 
-            return roiPlugins.FindByTypeKey(item.Type)
-                ?? roiPlugins.Plugins.FirstOrDefault(plugin => string.Equals(plugin.RoiType.Name, item.Type, StringComparison.OrdinalIgnoreCase));
+            // 稳定 TypeKey 优先。
+            if (roiPlugins.FindByTypeKey(item.Type) is { } byStableKey)
+            {
+                return byStableKey;
+            }
+
+            // 迁移：v1 时代的旧文件把 CLR 类型名写进了 Type。只有“恰好一个已注册插件”的 CLR 类型名
+            // 与之匹配时才迁移——两个插件同名（不同程序集/命名空间）时拒绝解析（进 unresolved 载荷），
+            // 宁可让用户看到“未知标注”也不猜。
+            IRoiPlugin[] legacyMatches = roiPlugins.Plugins
+                .Where(plugin => string.Equals(plugin.RoiType.Name, item.Type, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+
+            return legacyMatches.Length == 1 ? legacyMatches[0] : null;
         }
 
     }

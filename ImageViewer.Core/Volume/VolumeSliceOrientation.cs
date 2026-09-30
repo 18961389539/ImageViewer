@@ -1,4 +1,4 @@
-namespace ImageViewer.Services;
+namespace ImageViewer.Core.Volume;
 
 /// <summary>Coordinate orientation used by 2D slice, MPR, and 3D plane projections.</summary>
 public enum VolumeSliceOrientation

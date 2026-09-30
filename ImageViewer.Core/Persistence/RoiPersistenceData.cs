@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using ImageViewer.Models;
 
-namespace ImageViewer.Plugins
+namespace ImageViewer.Core.Persistence
 {
     public sealed class RoiPersistenceData
     {

@@ -7,8 +7,8 @@ namespace ImageViewer.Abstractions
 {
     public interface IImageViewerProjectPackageService
     {
-        Task ExportAsync(string packagePath, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry? pluginRegistry = null, CancellationToken cancellationToken = default);
+        Task ExportAsync(string packagePath, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry pluginRegistry, CancellationToken cancellationToken = default);
 
-        Task<ImageViewerSessionData> LoadAsync(string packagePath, RoiPluginRegistry? pluginRegistry = null, CancellationToken cancellationToken = default);
+        Task<ImageViewerSessionData> LoadAsync(string packagePath, RoiPluginRegistry pluginRegistry, CancellationToken cancellationToken = default);
     }
 }

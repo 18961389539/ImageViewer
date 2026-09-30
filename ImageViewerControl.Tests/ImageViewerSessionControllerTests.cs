@@ -415,6 +415,63 @@ namespace ImageViewerControl.Tests
                 new LocalAppDataImageViewerSessionStoragePolicy(rootPath, TimeSpan.FromSeconds(5)));
         }
 
+        [Fact]
+        public void CaptureSnapshot_DetachesRoiPayloadFromTheLiveCollection()
+        {
+            var liveRois = new List<RoiBase> { new CircleRoi { Label = "live", Center = new PointD(1, 2), Radius = 3 } };
+            var host = new RecordingSessionHost(
+                new RecordingSessionService(),
+                new RecordingRecentProjectService(),
+                new RecordingProjectPackageService())
+            {
+                AllRois = liveRois,
+                PixelSize = 0.5,
+                PhysicalUnit = "mm",
+                CurrentImagePath = "source.png"
+            };
+            ImageViewerSessionControllerDependencies dependencies = CreateDependencies(host);
+
+            ImageViewerPersistenceSnapshot snapshot = dependencies.Persistence.CaptureSnapshot();
+
+            RoiPersistenceData captured = Assert.Single(snapshot.RoiDocument.Items);
+            Assert.Equal("circle", captured.Type);
+            Assert.Equal("live", captured.Label);
+
+            // 快照之后编辑器继续改动活集合：新增一个 ROI，并改掉已有的半径。
+            liveRois.Add(new CircleRoi { Label = "added-later" });
+            ((CircleRoi)liveRois[0]).Radius = 42;
+
+            Assert.Single(snapshot.RoiDocument.Items);
+            Assert.Equal("live", snapshot.RoiDocument.Items[0].Label);
+
+            // 重新采集才会看到新增项——说明差异来自真正的采集，而不是快照还引用着活集合。
+            ImageViewerPersistenceSnapshot second = dependencies.Persistence.CaptureSnapshot();
+            Assert.Equal(2, second.RoiDocument.Items.Count);
+        }
+
+        [Fact]
+        public void CaptureSnapshot_BakesMeasurementContextIntoTheDocument()
+        {
+            var host = new RecordingSessionHost(
+                new RecordingSessionService(),
+                new RecordingRecentProjectService(),
+                new RecordingProjectPackageService())
+            {
+                AllRois = [new CircleRoi()],
+                PixelSize = 0.25,
+                PhysicalUnit = "mm"
+            };
+            ImageViewerSessionControllerDependencies dependencies = CreateDependencies(host);
+
+            ImageViewerPersistenceSnapshot snapshot = dependencies.Persistence.CaptureSnapshot();
+
+            host.PixelSize = 9.0;
+            host.PhysicalUnit = "um";
+
+            Assert.Equal(0.25, snapshot.RoiDocument.PixelSize);
+            Assert.Equal("mm", snapshot.RoiDocument.PhysicalUnit);
+        }
+
         private static ImageViewerSessionControllerDependencies CreateDependencies(RecordingSessionHost host)
         {
             return new ImageViewerSessionControllerDependencies
@@ -495,7 +552,8 @@ namespace ImageViewerControl.Tests
 
             public IReadOnlyList<RoiBase> AllRois { get; set; } = [];
 
-            public double PixelSize { get; set; }
+            // 与真实控件的默认标定一致（像素尺寸必须为有限正值，快照阶段就会校验）。
+            public double PixelSize { get; set; } = 1.0;
 
             public string PhysicalUnit { get; set; } = "px";
 
@@ -603,12 +661,12 @@ namespace ImageViewerControl.Tests
                 0,
                 null);
 
-            public void SaveToFile(string filePath, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry? pluginRegistry = null)
+            public void SaveToFile(string filePath, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry pluginRegistry)
             {
                 throw new NotSupportedException();
             }
 
-            public Task SaveToFileAsync(string filePath, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry? pluginRegistry = null, CancellationToken cancellationToken = default)
+            public Task SaveToFileAsync(string filePath, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry pluginRegistry, CancellationToken cancellationToken = default)
             {
                 if (ThrowOnSave)
                 {
@@ -622,24 +680,24 @@ namespace ImageViewerControl.Tests
                 return Task.CompletedTask;
             }
 
-            public string SerializeSession(string? sessionName, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry? pluginRegistry = null)
+            public string SerializeSession(string? sessionName, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry pluginRegistry)
             {
                 throw new NotSupportedException();
             }
 
-            public ImageViewerSessionData LoadFromFile(string filePath, RoiPluginRegistry? pluginRegistry = null)
+            public ImageViewerSessionData LoadFromFile(string filePath, RoiPluginRegistry pluginRegistry)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<ImageViewerSessionData> LoadFromFileAsync(string filePath, RoiPluginRegistry? pluginRegistry = null, CancellationToken cancellationToken = default)
+            public Task<ImageViewerSessionData> LoadFromFileAsync(string filePath, RoiPluginRegistry pluginRegistry, CancellationToken cancellationToken = default)
             {
                 LastLoadFilePath = filePath;
                 LastLoadPluginRegistry = pluginRegistry;
                 return Task.FromResult(LoadResult);
             }
 
-            public ImageViewerSessionData LoadFromJson(string sessionJson, string? sessionBaseDirectory = null, RoiPluginRegistry? pluginRegistry = null)
+            public ImageViewerSessionData LoadFromJson(string sessionJson, RoiPluginRegistry pluginRegistry, string? sessionBaseDirectory = null)
             {
                 throw new NotSupportedException();
             }
@@ -667,7 +725,7 @@ namespace ImageViewerControl.Tests
                 0,
                 null);
 
-            public Task ExportAsync(string packagePath, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry? pluginRegistry = null, CancellationToken cancellationToken = default)
+            public Task ExportAsync(string packagePath, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry pluginRegistry, CancellationToken cancellationToken = default)
             {
                 LastExportFilePath = packagePath;
                 LastExportPluginRegistry = pluginRegistry;
@@ -676,7 +734,7 @@ namespace ImageViewerControl.Tests
                 return Task.CompletedTask;
             }
 
-            public Task<ImageViewerSessionData> LoadAsync(string packagePath, RoiPluginRegistry? pluginRegistry = null, CancellationToken cancellationToken = default)
+            public Task<ImageViewerSessionData> LoadAsync(string packagePath, RoiPluginRegistry pluginRegistry, CancellationToken cancellationToken = default)
             {
                 LastLoadFilePath = packagePath;
                 LastLoadPluginRegistry = pluginRegistry;

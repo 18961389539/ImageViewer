@@ -60,7 +60,24 @@ MPR 会复用体数据的灰度缓存，冠状和矢状切片使用同一套强�
 
 ## 7. 宿主程序集成
 
-1. 如果你的 WPF 宿主已经使用依赖注入，优先在应用启动时调用 `AddImageViewerHost()`，让 `ImageViewerHost` 和 `ImageViewer` 由容器创建。
+1. 如果你的 WPF 宿主已经使用依赖注入，在应用启动时调用 `AddImageViewerHost()`，然后在**窗口级作用域**内解析 `ImageViewer`。控件、宿主、runtime 与 render 服务都是 scoped，直接从 `ServiceProvider` 根解析等于把它们拖到进程级生命周期，请开启 `ValidateScopes` 让这类误用立即失败。
 2. 如需替换宿主调度策略，可在注册 `AddImageViewerHost()` 之前覆盖 `IImageViewerRefreshSchedulerFactory`、`IImageViewerLatestTaskSchedulerFactory`、`IImageViewerPeriodicTaskSchedulerFactory`。
 3. 如需接管非关键错误日志，可覆盖 `IImageViewerAnalysisDiagnostics`，把分析异常统一接入现有日志或遥测系统。
 4. 如果宿主需要自定义 ROI 注册表或额外组合逻辑，可通过 `AddImageViewerHost(builder => { ... })` 配置 `ImageViewerHostBuilder`。
+5. 一个窗口要放多个 viewer 时，注入 `IImageViewerFactory` 并在同一个作用域内多次 `CreateViewer()`：多个 viewer 共享同一份 runtime 与 render 服务，最后一个 viewer 释放后作用域结束，容器一次性回收。
+6. 手工构造（不经过容器）时用 `new ImageViewer()` 或 `ImageViewerHost.CreateDefault()`；此时宿主自己拥有 runtime，**最后一个 viewer 释放时自动释放 runtime**，之后再调用该宿主的 `CreateViewer()` 会抛出 `ObjectDisposedException`，需要重新创建一个宿主。
+
+### 生命周期与释放责任
+
+| 生命周期 | 本项目中的类型 | 释放责任 |
+| --- | --- | --- |
+| Singleton | 插件注册表、对话框/文件对话框/视口/会话/最近项目/项目包服务、调度器工厂、遥测与分析诊断、`ImageViewerHostServices` | 容器（进程级） |
+| Scoped | `ImageViewerHost`、`ImageViewerRuntimeServices`、`ImageViewerRenderService`（含 4 个 render 接口别名）、`ImageViewer`、`IImageViewerFactory` | 容器在作用域销毁时释放 |
+| 无 Transient | —— | 控件与 runtime 都是可释放资源，注册成 transient 会让容器长期持有引用 |
+
+所有权规则只有一条：**谁创建 runtime services，谁负责释放**。
+
+- `ImageViewerHost.OwnsRuntimeServices == true`：宿主自己创建了 runtime（`new ImageViewer()` / `ImageViewerHost.CreateDefault()` / `UseRuntimeServices(services, ownsRuntimeServices: true)`），宿主在**最后一个 viewer 归还租约**（`ImageViewer.Dispose()`）时释放 runtime 及其 render 服务的分片缓存；列表为空后再 `CreateViewer()` 会失败。
+- `ImageViewerHost.OwnsRuntimeServices == false`：runtime 由容器或调用方创建，宿主只借用、从不释放，由所有者负责。此时宿主可持续创建新的 viewer。
+- `ImageViewerHost.Dispose()` 在仍有活跃 viewer 时只做标记，等到最后一个 viewer 释放才真正释放 runtime，避免抽走活着的 viewer 正在用的资源。
+- 直接用 `new ImageViewer(dependencies)` 构造不会建立宿主租约：依赖集是你创建的，其中的 runtime services 就由你释放。

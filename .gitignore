@@ -24,3 +24,5 @@ Desktop.ini
 
 # Trae IDE local documents (plan/spec working files)
 .trae/
+# WorkBuddy local workspace (memory/notes) — never publish
+.workbuddy/

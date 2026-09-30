@@ -69,5 +69,7 @@ namespace ImageViewer.Controls
         public void ShowStatusHint(string message, StatusHintKind kind) => _owner.ShowStatusHint(message, kind);
 
         public void ClearUndoHistory() => _owner.ViewerState.UndoRedo.Clear();
+
+        public void AppendUnresolvedRois(IReadOnlyList<RoiPersistenceData> payloads) => _owner.AppendUnresolvedRois(payloads);
     }
 }

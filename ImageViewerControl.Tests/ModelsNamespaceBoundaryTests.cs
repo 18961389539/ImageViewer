@@ -11,9 +11,13 @@ namespace ImageViewerControl.Tests
     /// 模型层边界守卫。
     /// Chinese: 断言 ImageViewer.Models 命名空间下不出现任何 WPF UI 类型（控件、画刷、Dispatcher 等），
     /// 把"模型层不依赖 UI"从口头约定变成可执行的约束。
-    /// English: Architectural guard for the model layer. Asserts that no WPF UI type (control, brush,
-    /// Dispatcher, ...) appears in the ImageViewer.Models namespace, turning "the model layer must not
-    /// depend on UI" into an executable constraint.
+    /// v2026-09-30（RoiBase 一族下沉到 Core）后，Models 命名空间横跨两个程序集：
+    /// ① <c>ImageViewer.Core</c> 持有框架中立的领域基础类型（RoiBase / RoiColor / PointD / MeasurementTolerance…），
+    ///    它连 WPF 程序集都不引用，由 <see cref="CoreAssembly_DoesNotReferenceAnyWpfAssembly"/> 在程序集层面锁死；
+    /// ② 控件程序集持有其余模型类型（ROI 子类、体数据），仍需逐个类型扫描。
+    /// English: Architectural guard for the model layer. Since the ROI base types moved to Core, the namespace spans two
+    /// assemblies: Core hosts the framework-neutral domain types and is forbidden from referencing WPF assemblies at all
+    /// (locked down at assembly level), while the control assembly keeps the remaining model types and is scanned per type.
     /// </summary>
     public class ModelsNamespaceBoundaryTests
     {
@@ -52,10 +56,14 @@ namespace ImageViewerControl.Tests
 
         private const string ModelsNamespace = "ImageViewer.Models";
 
+        private static Type[] ControlModelTypes { get; } = GetModelTypes(typeof(ImageViewer.Controls.ImageViewer).Assembly);
+
+        private static Type[] CoreModelTypes { get; } = GetModelTypes(typeof(RoiBase).Assembly);
+
         [Fact]
         public void ModelsNamespace_DoesNotReferenceWpfUiTypes()
         {
-            Type[] modelTypes = GetModelTypes();
+            Type[] modelTypes = [.. CoreModelTypes, .. ControlModelTypes];
 
             var violations = new List<string>();
 
@@ -75,32 +83,48 @@ namespace ImageViewerControl.Tests
 
         /// <summary>
         /// 守卫自身的自检。
-        /// Chinese: 确认扫描确实覆盖了模型层，且自有几何类型（PointD）确实被引用、WPF 几何类型（Point）确实不再出现——
-        /// 否则守卫可能因为扫描失效而"永远通过"。
-        /// English: Self-check for the guard. Confirms the scan actually covers the model layer and that the
-        /// model-owned geometry type (PointD) is genuinely referenced while the WPF one (Point) is gone, so the
-        /// guard cannot pass vacuously.
+        /// Chinese: 确认扫描确实覆盖了控件侧模型层，自有几何类型（PointD）确实被引用、WPF 几何类型（Point）确实不再出现——
+        /// 否则守卫可能因为扫描失效而"永远通过"；同时确认 RoiBase 一族确实已经下沉到 Core。
+        /// （Core 不引用 WPF 由 ImageViewer.Core.Tests 的 CoreArchitectureBoundaryTests 在程序集层面锁死，这里不重复。）
+        /// English: Self-check for the guard: confirms the scan covers the control-side model layer and that the
+        /// moved domain base types now live in Core instead of the control assembly.
         /// </summary>
         [Fact]
         public void Guard_ActuallyScansModelTypesAndSeesModelOwnedGeometryTypes()
         {
-            Type[] modelTypes = GetModelTypes();
-            HashSet<string> referencedNames = modelTypes
+            HashSet<string> referencedNames = ControlModelTypes
                 .SelectMany(EnumerateReferencedTypes)
                 .Select(type => type.FullName ?? type.Name)
                 .ToHashSet(StringComparer.Ordinal);
 
-            Assert.NotEmpty(modelTypes);
-            Assert.Contains(typeof(RoiBase).FullName, referencedNames.Select(_ => typeof(RoiBase).FullName));
+            Assert.NotEmpty(ControlModelTypes);
             Assert.Contains("ImageViewer.Models.PointD", referencedNames);
             Assert.DoesNotContain("System.Windows.Point", referencedNames);
             Assert.Contains("System.Windows.Media.Imaging.BitmapSource", referencedNames);
             Assert.DoesNotContain("System.Windows.Media.Color", referencedNames);
+
+            // RoiBase 一族已下沉：控件侧不再定义，Core 侧必须定义，且四者同属一个程序集。
+            string[] controlModelTypeNames = ControlModelTypes.Select(type => type.FullName ?? type.Name).ToArray();
+            string[] coreModelTypeNames = CoreModelTypes.Select(type => type.FullName ?? type.Name).ToArray();
+            Assert.DoesNotContain(typeof(RoiBase).FullName, controlModelTypeNames);
+            Assert.Contains(typeof(RoiBase).FullName, coreModelTypeNames);
+            Assert.Contains(typeof(RoiColor).FullName, coreModelTypeNames);
+            Assert.Contains(typeof(RoiColors).FullName, coreModelTypeNames);
+
+            // BaseViewModel 在 ImageViewer.Common 命名空间（不属于 Models），只断言它与 ROI 基础类型同属一个程序集。
+            Assert.Same(typeof(RoiBase).Assembly, typeof(RoiColor).Assembly);
+            Assert.Same(typeof(RoiBase).Assembly, typeof(RoiColors).Assembly);
+            Assert.Same(typeof(RoiBase).Assembly, typeof(ImageViewer.Common.BaseViewModel).Assembly);
+            Assert.Contains(
+                typeof(ImageViewer.Common.BaseViewModel).FullName,
+                typeof(RoiBase).Assembly.GetTypes().Select(type => type.FullName).ToArray());
         }
 
-        private static Type[] GetModelTypes()
+        private static Type[] GetModelTypes(Assembly assembly)
         {
-            return typeof(RoiBase).Assembly
+            ArgumentNullException.ThrowIfNull(assembly);
+
+            return assembly
                 .GetTypes()
                 .Where(type => string.Equals(type.Namespace, ModelsNamespace, StringComparison.Ordinal))
                 .ToArray();

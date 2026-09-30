@@ -1,8 +1,7 @@
 using System.Text.Json.Serialization;
 using ImageViewer.Models;
-using ImageViewer.Services;
 
-namespace ImageViewer.Persistence
+namespace ImageViewer.Core.Persistence
 {
     /// <summary>
     /// Source-generated JSON metadata for framework-neutral session and ROI schema types.

@@ -537,9 +537,13 @@ namespace ImageViewer.Services
                 return false;
             }
 
+            // Store the fitted circle as the ROI geometry. The click seed and wide search radius
+            // are only inputs to detection; they are not the geometry the user edits or exports.
+            candidate.Center = detection.DetectedCenter.ToPointD();
+            candidate.Radius = detection.DetectedRadius;
+
             // Keep the committed ROI compact and editable after the wide search has succeeded.
-            // The broad search is an implementation detail of the click; subsequent refreshes use
-            // a local caliper around the fitted circle instead of drawing a full-image overlay.
+            // Subsequent refreshes use a local caliper around the fitted circle.
             candidate.CaliperSearchRange = Math.Clamp((int)Math.Ceiling(detection.DetectedRadius * 0.15), 8, 64);
             CircularCaliperDetectionResult displayDetection = detection with
             {

@@ -6,6 +6,7 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 using ImageViewer.Models;
 using ImageViewer.Rendering;
+using ImageViewer.Services;
 using ImageViewer.Utils;
 using ImageViewer.ViewModels;
 
@@ -79,6 +80,36 @@ namespace ImageViewer.Controls
             RequestAnalysisRefresh(forceAnalysis, immediate: immediate && forceAnalysis);
         }
 
+        /// <summary>
+        /// 可视区域对应的图像坐标矩形。
+        /// Chinese: 超出可视区域的 ROI 不会出现在屏幕上，渲染它们纯属浪费——但 ROI 的标注/手柄会越出包围盒，
+        /// 所以这里留了 32 个屏幕像素的余量（换算回图像单位）。
+        /// English: The image-space rect covered by the viewport, padded by a screen margin so labels and handles of
+        /// partially visible ROIs are not clipped away.
+        /// </summary>
+        internal Rect GetVisibleImageRect(Size imageSize)
+        {
+            var vm = ViewModel;
+            double scale = vm.Scale;
+            if (!double.IsFinite(scale) || scale <= 0)
+            {
+                return new Rect(0, 0, imageSize.Width, imageSize.Height);
+            }
+
+            const double screenMargin = 32;
+            double margin = screenMargin / Math.Max(scale, 0.1);
+            double left = Math.Max(-margin, -vm.OffsetX / scale - margin);
+            double top = Math.Max(-margin, -vm.OffsetY / scale - margin);
+            double right = Math.Min(imageSize.Width + margin, (ActualWidth - vm.OffsetX) / scale + margin);
+            double bottom = Math.Min(imageSize.Height + margin, (ActualHeight - vm.OffsetY) / scale + margin);
+            if (right <= left || bottom <= top)
+            {
+                return Rect.Empty;
+            }
+
+            return new Rect(left, top, right - left, bottom - top);
+        }
+
         private void RefreshViewportOverlay()
         {
             var vm = ViewModel;
@@ -97,7 +128,28 @@ namespace ImageViewer.Controls
         {
             committedOverlayCanvas.Children.Clear();
             var context = CreateRoiRenderContext(committedOverlayCanvas);
-            RoiRenderer.RenderCommitted(vm.AllRois, context, vm.SelectedRoi);
+
+            // 可视区域裁剪：包围盒已知且完全在可视区域之外的 ROI 跳过；包围盒未知（新类型）一律照常渲染，
+            // 因为 Rect.Empty 在 GetRoiBounds 里表示“类型未知”，把它当成零尺寸会让新 ROI 直接消失。
+            Rect visible = GetVisibleImageRect(ImageViewerImageSourceUtilities.TryGetSourceImageSize(ImageSource, out Size imageSize)
+                ? imageSize
+                : new Size(0, 0));
+
+            foreach (RoiBase roi in vm.AllRois)
+            {
+                if (ReferenceEquals(roi, vm.SelectedRoi))
+                {
+                    continue;
+                }
+
+                Rect bounds = ImageAnalysisService.GetRoiBounds(roi);
+                if (!bounds.IsEmpty && !bounds.IntersectsWith(visible))
+                {
+                    continue;
+                }
+
+                RoiRenderer.Render(roi, context, null, false);
+            }
         }
 
         private void DrawSelectedRoi(ImageViewerViewModel vm)

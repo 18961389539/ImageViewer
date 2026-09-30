@@ -98,7 +98,12 @@ namespace ImageViewer.Services
             return true;
         }
 
-        private static Rect GetRoiBounds(RoiBase roi)
+        /// <summary>
+        /// ROI 的图像坐标包围盒。
+        /// Chinese: 未覆盖的类型返回 <see cref="Rect.Empty"/>——调用方必须把 Empty 当作“未知”，
+        /// 不能当作“零尺寸”（渲染层据此决定是否做可视区域裁剪，未知类型一律照常渲染）。
+        /// </summary>
+        internal static Rect GetRoiBounds(RoiBase roi)
         {
             return roi switch
             {

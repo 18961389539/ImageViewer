@@ -11,14 +11,31 @@ namespace ImageViewerControl.Tests
 {
     public class ImageViewerSessionServiceTests
     {
+        /// <summary>
+        /// 构造快照时在"UI 线程侧"完成 ROI→DTO 转换，与 ImageViewerSessionPersistenceWorkflow.CaptureSnapshot 一致。
+        /// </summary>
         private static ImageViewerPersistenceSnapshot CreateSnapshot(
             string? imagePath,
             IReadOnlyList<RoiBase> rois,
             double pixelSize = 1.0,
             string physicalUnit = "px",
-            CameraCalibration? calibration = null)
+            CameraCalibration? calibration = null,
+            IReadOnlyList<RoiPersistenceData>? unresolvedRois = null,
+            ImageAnalysisQualityProfile? qualityProfile = null)
         {
-            return new ImageViewerPersistenceSnapshot(imagePath, rois, pixelSize, physicalUnit, 1.0, 0, 0, calibration);
+            return new ImageViewerPersistenceSnapshot(
+                imagePath,
+                RoiPersistenceService.CreateDocument(
+                    rois,
+                    pixelSize,
+                    physicalUnit,
+                    RoiPluginRegistry.CreateBuiltIn(),
+                    unresolvedRois,
+                    qualityProfile),
+                1.0,
+                0,
+                0,
+                calibration);
         }
 
         [Fact]
@@ -29,7 +46,7 @@ namespace ImageViewerControl.Tests
             string sessionJson = service.SerializeSession("sample", CreateSnapshot("assets/source.png", [], 1.0, "px"), registry);
             string sessionDirectory = Path.Combine(Path.GetTempPath(), "ImageViewerSessionTests", "project");
 
-            ImageViewerSessionData result = service.LoadFromJson(sessionJson, sessionDirectory, registry);
+            ImageViewerSessionData result = service.LoadFromJson(sessionJson, registry, sessionDirectory);
 
             Assert.Equal(Path.GetFullPath(Path.Combine(sessionDirectory, "assets/source.png")), result.ImagePath);
         }
@@ -40,7 +57,7 @@ namespace ImageViewerControl.Tests
             var service = new ImageViewerSessionService();
 
             Assert.Throws<System.Text.Json.JsonException>(() =>
-                service.LoadFromJson("{ invalid", null, RoiPluginRegistry.CreateBuiltIn()));
+                service.LoadFromJson("{ invalid", RoiPluginRegistry.CreateBuiltIn()));
         }
 
         [Fact]
@@ -49,7 +66,7 @@ namespace ImageViewerControl.Tests
             var service = new ImageViewerSessionService();
             const string sessionJson = "{\"SessionName\":\"sample\",\"RoiDocumentJson\":\"{}\"}";
 
-            ImageViewerSessionData result = service.LoadFromJson(sessionJson, null, RoiPluginRegistry.CreateBuiltIn());
+            ImageViewerSessionData result = service.LoadFromJson(sessionJson, RoiPluginRegistry.CreateBuiltIn());
 
             Assert.Equal(1.0, result.Scale);
             Assert.Equal(1.0, result.PixelSize);
@@ -63,13 +80,13 @@ namespace ImageViewerControl.Tests
             var registry = RoiPluginRegistry.CreateBuiltIn();
             var service = new ImageViewerSessionService();
             var unresolved = new RoiPersistenceData { Type = "future-plugin-roi", Label = "keep-me" };
-            ImageViewerPersistenceSnapshot snapshot = CreateSnapshot(null, [new CircleRoi()]) with
-            {
-                UnresolvedRois = [unresolved]
-            };
+            ImageViewerPersistenceSnapshot snapshot = CreateSnapshot(
+                null,
+                [new CircleRoi()],
+                unresolvedRois: [unresolved]);
 
             string sessionJson = service.SerializeSession("sample", snapshot, registry);
-            ImageViewerSessionData reopened = service.LoadFromJson(sessionJson, null, registry);
+            ImageViewerSessionData reopened = service.LoadFromJson(sessionJson, registry);
 
             Assert.IsType<CircleRoi>(Assert.Single(reopened.Rois));
             RoiPersistenceData kept = Assert.Single(reopened.UnresolvedRois);
@@ -98,7 +115,7 @@ namespace ImageViewerControl.Tests
             };
 
             string sessionJson = service.SerializeSession("sample", CreateSnapshot(null, [], 0.02, "mm", calibration), registry);
-            ImageViewerSessionData result = service.LoadFromJson(sessionJson, null, registry);
+            ImageViewerSessionData result = service.LoadFromJson(sessionJson, registry);
 
             Assert.NotNull(result.Calibration);
             Assert.Equal(0.05, result.Calibration!.K1, 6);
@@ -133,9 +150,9 @@ namespace ImageViewerControl.Tests
                 ReviewResidualRms = 2.5
             };
 
-            ImageViewerPersistenceSnapshot snapshot = CreateSnapshot(null, []) with { QualityProfile = profile };
+            ImageViewerPersistenceSnapshot snapshot = CreateSnapshot(null, [], qualityProfile: profile);
             string sessionJson = service.SerializeSession("quality-project", snapshot, registry);
-            ImageViewerSessionData result = service.LoadFromJson(sessionJson, null, registry);
+            ImageViewerSessionData result = service.LoadFromJson(sessionJson, registry);
 
             Assert.Equal(profile, result.QualityProfile);
             Assert.Contains("\"QualityProfile\"", sessionJson, StringComparison.Ordinal);
@@ -175,7 +192,7 @@ namespace ImageViewerControl.Tests
                     TranslateY = -12
                 },
                 registry);
-            ImageViewerSessionData result = service.LoadFromJson(sessionJson, null, registry);
+            ImageViewerSessionData result = service.LoadFromJson(sessionJson, registry);
 
             Assert.Equal(0.5, result.PixelSize);
             Assert.Equal("mm", result.PhysicalUnit);
@@ -202,8 +219,8 @@ namespace ImageViewerControl.Tests
 
             ImageViewerSessionData result = service.LoadFromJson(
                 File.ReadAllText(fixturePath),
-                sessionBaseDirectory,
-                RoiPluginRegistry.CreateBuiltIn());
+                RoiPluginRegistry.CreateBuiltIn(),
+                sessionBaseDirectory);
 
             Assert.Equal("legacy-session", result.SessionName);
             Assert.Equal(Path.GetFullPath(Path.Combine(sessionBaseDirectory, "assets/source.png")), result.ImagePath);
@@ -227,7 +244,7 @@ namespace ImageViewerControl.Tests
             string sessionJson = $"{{\"Version\":{version},\"SessionName\":\"sample\",\"RoiDocumentJson\":\"{{}}\"}}";
 
             Assert.Throws<NotSupportedException>(() =>
-                service.LoadFromJson(sessionJson, null, RoiPluginRegistry.CreateBuiltIn()));
+                service.LoadFromJson(sessionJson, RoiPluginRegistry.CreateBuiltIn()));
         }
 
         [Theory]
@@ -239,7 +256,7 @@ namespace ImageViewerControl.Tests
             var service = new ImageViewerSessionService();
             string sessionJson = $"{{\"Version\":{version},\"SessionName\":\"sample\",\"RoiDocumentJson\":\"{{}}\"}}";
 
-            ImageViewerSessionData result = service.LoadFromJson(sessionJson, null, RoiPluginRegistry.CreateBuiltIn());
+            ImageViewerSessionData result = service.LoadFromJson(sessionJson, RoiPluginRegistry.CreateBuiltIn());
 
             Assert.Equal("sample", result.SessionName);
         }
@@ -250,7 +267,7 @@ namespace ImageViewerControl.Tests
             var service = new ImageViewerSessionService();
             const string sessionJson = "{\"SessionName\":\"sample\",\"RoiDocumentJson\":\"{}\"}";
 
-            ImageViewerSessionData result = service.LoadFromJson(sessionJson, null, RoiPluginRegistry.CreateBuiltIn());
+            ImageViewerSessionData result = service.LoadFromJson(sessionJson, RoiPluginRegistry.CreateBuiltIn());
 
             Assert.Equal("sample", result.SessionName);
         }
@@ -261,7 +278,7 @@ namespace ImageViewerControl.Tests
             var service = new ImageViewerSessionService();
             const string sessionJson = "{\"SessionName\":\"sample\",\"RoiDocumentJson\":\"{}\"}";
 
-            ImageViewerSessionData result = service.LoadFromJson(sessionJson, null, RoiPluginRegistry.CreateBuiltIn());
+            ImageViewerSessionData result = service.LoadFromJson(sessionJson, RoiPluginRegistry.CreateBuiltIn());
 
             Assert.Null(result.Calibration);
         }

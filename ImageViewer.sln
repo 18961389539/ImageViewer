@@ -13,6 +13,12 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImageViewer.Core", "ImageVi
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImageViewer.Core.Tests", "ImageViewer.Core.Tests\ImageViewer.Core.Tests.csproj", "{EA60D841-5B8E-4B1B-A8E1-6E59BCCA7C3B}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "third_party", "third_party", "{0DC175A4-010F-A5A8-72A9-B7A5E3C716E6}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "JLVision", "JLVision", "{77B44CDB-7B46-5A88-EBFE-4711A9FB48CE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JLVisionLib", "third_party\JLVision\JLVisionLib.csproj", "{E95CA33B-7793-481A-A935-3152922871F6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -83,8 +89,24 @@ Global
 		{EA60D841-5B8E-4B1B-A8E1-6E59BCCA7C3B}.Release|x64.Build.0 = Release|Any CPU
 		{EA60D841-5B8E-4B1B-A8E1-6E59BCCA7C3B}.Release|x86.ActiveCfg = Release|Any CPU
 		{EA60D841-5B8E-4B1B-A8E1-6E59BCCA7C3B}.Release|x86.Build.0 = Release|Any CPU
+		{E95CA33B-7793-481A-A935-3152922871F6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E95CA33B-7793-481A-A935-3152922871F6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E95CA33B-7793-481A-A935-3152922871F6}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E95CA33B-7793-481A-A935-3152922871F6}.Debug|x64.Build.0 = Debug|Any CPU
+		{E95CA33B-7793-481A-A935-3152922871F6}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{E95CA33B-7793-481A-A935-3152922871F6}.Debug|x86.Build.0 = Debug|Any CPU
+		{E95CA33B-7793-481A-A935-3152922871F6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E95CA33B-7793-481A-A935-3152922871F6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E95CA33B-7793-481A-A935-3152922871F6}.Release|x64.ActiveCfg = Release|Any CPU
+		{E95CA33B-7793-481A-A935-3152922871F6}.Release|x64.Build.0 = Release|Any CPU
+		{E95CA33B-7793-481A-A935-3152922871F6}.Release|x86.ActiveCfg = Release|Any CPU
+		{E95CA33B-7793-481A-A935-3152922871F6}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{77B44CDB-7B46-5A88-EBFE-4711A9FB48CE} = {0DC175A4-010F-A5A8-72A9-B7A5E3C716E6}
+		{E95CA33B-7793-481A-A935-3152922871F6} = {77B44CDB-7B46-5A88-EBFE-4711A9FB48CE}
 	EndGlobalSection
 EndGlobal

@@ -28,6 +28,13 @@ namespace ImageViewer.Controls
         bool ShowScaleBar { get; }
         bool ShowSnapGrid { get; }
         double Scale { get; }
+
+        /// <summary>视口平移（屏幕像素）。网格/ROI 的可视区域裁剪需要它换算成图像坐标。</summary>
+        double TranslateX { get; }
+
+        /// <summary>见 <see cref="TranslateX"/>。</summary>
+        double TranslateY { get; }
+
         double GridSpacing { get; }
         ImageSource? ImageSource { get; }
         FrameworkElement ImageContainer { get; }
@@ -206,12 +213,26 @@ namespace ImageViewer.Controls
                 return;
             }
 
+            // 只创建可视区域内的网格线：整幅图可能有上千条线，而视口通常只覆盖一小块。
+            Rect visible = ImageViewerImageSourceUtilities.GetVisibleImageRect(
+                imageSize,
+                _host.ViewerSize,
+                _host.Scale,
+                _host.TranslateX,
+                _host.TranslateY);
+            if (visible.IsEmpty)
+            {
+                return;
+            }
+
             double width = imageSize.Width;
             double height = imageSize.Height;
             double spacing = _host.GridSpacing;
             double thickness = 1 / Math.Max(_host.Scale, _minScale);
 
-            for (double x = 0; x <= width; x += spacing)
+            double firstX = Math.Floor(Math.Max(0, visible.Left) / spacing) * spacing;
+            double lastX = Math.Min(width, visible.Right);
+            for (double x = firstX; x <= lastX; x += spacing)
             {
                 _host.SnapGridCanvas.Children.Add(new Line
                 {
@@ -226,7 +247,9 @@ namespace ImageViewer.Controls
                 });
             }
 
-            for (double y = 0; y <= height; y += spacing)
+            double firstY = Math.Floor(Math.Max(0, visible.Top) / spacing) * spacing;
+            double lastY = Math.Min(height, visible.Bottom);
+            for (double y = firstY; y <= lastY; y += spacing)
             {
                 _host.SnapGridCanvas.Children.Add(new Line
                 {

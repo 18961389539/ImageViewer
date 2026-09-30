@@ -525,6 +525,7 @@
   <data name="StatusSaveSessionSuccess" xml:space="preserve"><value>会话已保存</value></data>
   <data name="StatusLoadSessionSuccess" xml:space="preserve"><value>会话已加载</value></data>
   <data name="StatusProjectUnresolvedRois" xml:space="preserve"><value>工程中有 {0} 个标注因缺少对应插件未能载入（{1}）；原件已原样保留，安装插件后可重新打开。</value></data>
+  <data name="StatusRoisDroppedByPluginChange" xml:space="preserve"><value>插件变更后有 {0} 个标注暂时无法编辑（{1}）；已随会话保存，安装对应插件后可恢复。</value></data>
   <data name="StatusExportPngSuccess" xml:space="preserve"><value>已导出当前视图为 PNG</value></data>
   <data name="StatusExportCsvSuccess" xml:space="preserve"><value>已导出分析结果为 CSV</value></data>
   <data name="StatusExportCsvWithMetadataSuccess" xml:space="preserve"><value>已导出分析结果，并生成可复现元数据</value></data>

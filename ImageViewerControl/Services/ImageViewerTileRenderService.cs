@@ -13,6 +13,8 @@ namespace ImageViewer.Services
 
         public void ClearTileCache() => _tileCache.Clear();
 
+        internal bool IsDisposed => _tileCache.IsDisposed;
+
         public void Dispose() => _tileCache.Dispose();
 
         public ValueTask DisposeAsync() => _tileCache.DisposeAsync();
@@ -20,6 +22,7 @@ namespace ImageViewer.Services
         public ImageViewerRenderFrame BuildFrame(
             BitmapSource source,
             IReadOnlyList<ImagePyramidLevel> levels,
+            PseudoColorPalette palette,
             Size viewport,
             double scale,
             Point translation,
@@ -42,36 +45,40 @@ namespace ImageViewer.Services
 
             if (!useTiledRendering)
             {
-                return new ImageViewerRenderFrame(workingSource, 0, 0, workingSource.PixelWidth, workingSource.PixelHeight, 1.0, false);
+                // 非 tiled 路径复用同一个 tile 缓存：整幅图就是一块"tile"。着色是最贵的一步（整块拷贝 +
+                // 逐像素查表），缓存它才能在重复帧上省下来（之前这里每帧全量重着色 4MP ≈ 15MB BGRA 拷贝，
+                // 且不参与预算）；实例复用也让 WPF 不必每帧重传纹理。
+                Int32Rect fullImageRect = new(0, 0, workingSource.PixelWidth, workingSource.PixelHeight);
+                Func<BitmapSource, BitmapSource>? nonTiledValueFactory = palette == PseudoColorPalette.None
+                    ? null
+                    : tile => ImageViewerDisplaySourceService.ApplyPseudoColor(tile, palette);
+                BitmapSource displaySource = _tileCache.GetOrCreateTileView(workingSource, fullImageRect, palette, fullImageRect, nonTiledValueFactory);
+                return new ImageViewerRenderFrame(displaySource, 0, 0, displaySource.PixelWidth, displaySource.PixelHeight, 1.0, false);
             }
 
             Rect visibleRegion = GetVisibleRegion(workingSource, viewport, scale, translation, prefetchAdjacentTiles);
             if (visibleRegion.IsEmpty)
             {
-                return new ImageViewerRenderFrame(level.Bitmap, 0, 0, workingSource.PixelWidth, workingSource.PixelHeight, level.ScaleFactor, false);
+                BitmapSource displaySource = palette == PseudoColorPalette.None
+                    ? level.Bitmap
+                    : ImageViewerDisplaySourceService.ApplyPseudoColor(level.Bitmap, palette);
+                return new ImageViewerRenderFrame(displaySource, 0, 0, workingSource.PixelWidth, workingSource.PixelHeight, level.ScaleFactor, false);
             }
 
             Int32Rect sourceCrop = ToCropRect(level.Bitmap, visibleRegion, level.ScaleFactor);
-            if (_tileCache.TryGet(level.Bitmap, sourceCrop, out BitmapSource? cachedFrame))
-            {
-                Prefetch(level.Bitmap, sourceCrop, prefetchAdjacentTiles, tilePrefetchRadius);
-                return BuildTiledFrame(cachedFrame!, sourceCrop, level.ScaleFactor);
-            }
 
-            Int32Rect cacheCrop = ImageViewerRenderTileCache.ExpandToTileGrid(sourceCrop, level.Bitmap.PixelWidth, level.Bitmap.PixelHeight);
-            BitmapSource cachedTile = _tileCache.GetOrCreate(level.Bitmap, cacheCrop);
-            Int32Rect cropWithinTile = new(sourceCrop.X - cacheCrop.X, sourceCrop.Y - cacheCrop.Y, sourceCrop.Width, sourceCrop.Height);
-            BitmapSource tiledSource = cropWithinTile.X == 0 && cropWithinTile.Y == 0 && cropWithinTile.Width == cachedTile.PixelWidth && cropWithinTile.Height == cachedTile.PixelHeight
-                ? cachedTile
-                : new CroppedBitmap(cachedTile, cropWithinTile);
+            // 只缓存网格对齐的 tile，且把"着色"这一步放进 tile 的键里：着色是最贵的一步（整块拷贝 + 逐像素查表），
+            // 缓存它才能在静止帧上省下来。可见 crop 不再单独成为缓存条目——它是挂在 tile 上的派生视图，
+            // 这样既保留"重复帧返回同一实例"（WPF 不会每帧重传纹理），也不会产生账外内存。
+            Int32Rect tileRect = ImageViewerRenderTileCache.ExpandToTileGrid(sourceCrop, level.Bitmap.PixelWidth, level.Bitmap.PixelHeight);
+            Func<BitmapSource, BitmapSource>? valueFactory = palette == PseudoColorPalette.None
+                ? null
+                : tile => ImageViewerDisplaySourceService.ApplyPseudoColor(tile, palette);
 
-            if (tiledSource.CanFreeze)
-            {
-                tiledSource.Freeze();
-            }
+            Int32Rect cropWithinTile = new(sourceCrop.X - tileRect.X, sourceCrop.Y - tileRect.Y, sourceCrop.Width, sourceCrop.Height);
+            BitmapSource tiledSource = _tileCache.GetOrCreateTileView(level.Bitmap, tileRect, palette, cropWithinTile, valueFactory);
 
-            _tileCache.Store(level.Bitmap, sourceCrop, tiledSource);
-            Prefetch(level.Bitmap, cacheCrop, prefetchAdjacentTiles, tilePrefetchRadius);
+            Prefetch(level.Bitmap, tileRect, palette, valueFactory, prefetchAdjacentTiles, tilePrefetchRadius);
             return BuildTiledFrame(tiledSource, sourceCrop, level.ScaleFactor);
         }
 
@@ -93,12 +100,22 @@ namespace ImageViewer.Services
                 true);
         }
 
-        private void Prefetch(BitmapSource source, Int32Rect rect, bool enabled, int radius)
+        private void Prefetch(
+            BitmapSource source,
+            Int32Rect rect,
+            PseudoColorPalette palette,
+            Func<BitmapSource, BitmapSource>? valueFactory,
+            bool enabled,
+            int radius)
         {
             int effectiveRadius = enabled ? Math.Max(0, radius) : 0;
             if (effectiveRadius > 0)
             {
-                _tileCache.Prefetch(source, ImageViewerRenderTileCache.BuildPrefetchRects(rect, source.PixelWidth, source.PixelHeight, effectiveRadius));
+                _tileCache.Prefetch(
+                    source,
+                    ImageViewerRenderTileCache.BuildPrefetchRects(rect, source.PixelWidth, source.PixelHeight, effectiveRadius),
+                    palette,
+                    valueFactory);
             }
         }
 

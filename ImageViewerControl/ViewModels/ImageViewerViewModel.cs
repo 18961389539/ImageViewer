@@ -57,7 +57,7 @@ namespace ImageViewer.ViewModels
 
         public UndoRedoManager UndoRedo => _undoRedoManager;
 
-        public ImageViewerViewModel(RoiPluginRegistry? pluginRegistry = null, ISelectedRoiDetectionService? selectedRoiDetectionService = null)
+        public ImageViewerViewModel(RoiPluginRegistry pluginRegistry, ISelectedRoiDetectionService? selectedRoiDetectionService = null)
         {
             _selectedRoiDetectionService = selectedRoiDetectionService ?? ImageViewer.Services.SelectedRoiDetectionService.Default;
             _pluginRegistry = pluginRegistry ?? throw new ArgumentNullException(nameof(pluginRegistry));
@@ -156,6 +156,48 @@ namespace ImageViewer.ViewModels
         }
 
         public ObservableCollection<RoiBase> AllRois => _roiState.AllRois;
+
+        /// <summary>
+        /// 插件注册表变更时的状态迁移。
+        /// Chinese: 一次性完成"丢弃按类型缓存的旧集合 → 迁移新注册表仍认识的 ROI → 处理选中项 → 清空撤销栈"。
+        /// 不能只重建总列表：旧集合会让旧 ROI 被重新枚举回来，而撤销栈里的命令在插件缺失时只会静默失败。
+        /// 返回因新注册表不认识其类型而被移除的 ROI（调用方负责提示/落盘处理）。
+        /// English: Migrates ROI state to a changed plugin registry: drop the cached typed collections, re-add the ROIs
+        /// whose type is still known, resolve selection, and clear the undo stack. Returns the ROIs dropped because the
+        /// new registry no longer knows their type.
+        /// </summary>
+        public IReadOnlyList<RoiBase> ApplyPluginRegistryChange(RoiPluginRegistry pluginRegistry, IReadOnlyList<RoiBase> rois)
+        {
+            ArgumentNullException.ThrowIfNull(pluginRegistry);
+            ArgumentNullException.ThrowIfNull(rois);
+
+            _pluginRegistry = pluginRegistry;
+
+            var migratable = new List<RoiBase>(rois.Count);
+            var dropped = new List<RoiBase>();
+            foreach (RoiBase roi in rois)
+            {
+                (pluginRegistry.FindByRoi(roi) != null ? migratable : dropped).Add(roi);
+            }
+
+            RoiBase? selectedRoi = SelectedRoi;
+            bool selectionSurvives = selectedRoi != null && pluginRegistry.FindByRoi(selectedRoi) != null;
+
+            _roiState.RunBatch(() =>
+            {
+                _roiState.Reset();
+
+                foreach (RoiBase roi in migratable)
+                {
+                    AddRoiToTypedCollection(roi);
+                }
+
+                SelectedRoi = selectionSurvives ? selectedRoi : null;
+            });
+
+            UndoRedo.Clear();
+            return dropped;
+        }
 
         public ObservableCollection<T> GetRoiCollection<T>() where T : RoiBase
         {

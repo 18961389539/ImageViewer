@@ -10,7 +10,7 @@ namespace ImageViewer.Rendering
     {
         private readonly RoiPluginRegistry _pluginRegistry;
 
-        public RoiRenderService(RoiPluginRegistry? pluginRegistry = null)
+        public RoiRenderService(RoiPluginRegistry pluginRegistry)
         {
             _pluginRegistry = pluginRegistry ?? throw new ArgumentNullException(nameof(pluginRegistry));
         }

@@ -426,16 +426,23 @@
 
       <section id="integration">
         <h2>嵌入 WPF 宿主</h2>
-        <p>使用依赖注入的宿主可在应用启动时注册 ImageViewer 服务：</p>
+        <p>使用依赖注入的宿主可在应用启动时注册 ImageViewer 服务；控件、宿主、runtime 与 render 服务都是 scoped（与窗口同寿命），请在窗口级作用域内解析：</p>
         <pre><code>using ImageViewer.Controls;
 using Microsoft.Extensions.DependencyInjection;
 
 var services = new ServiceCollection();
 services.AddImageViewerHost();
 
-using ServiceProvider serviceProvider = services.BuildServiceProvider();
-ImageViewer viewer = serviceProvider.GetRequiredService&lt;ImageViewer&gt;();</code></pre>
+using ServiceProvider serviceProvider = services.BuildServiceProvider(new ServiceProviderOptions
+{
+    ValidateScopes = true
+});
+
+using IServiceScope windowScope = serviceProvider.CreateScope();
+ImageViewer viewer = windowScope.ServiceProvider.GetRequiredService&lt;ImageViewer&gt;();</code></pre>
         <p>宿主可在注册前替换调度器、刷新策略与分析诊断服务；也可使用 <code>AddImageViewerHost(builder =&gt; { ... })</code> 配置 <code>ImageViewerHostBuilder</code>。遥测通过 <code>IImageViewerTelemetry</code> 的 <code>ActivitySource</code> 与 <code>Meter</code> 输出，可接入 OpenTelemetry。</p>
+        <p>生命周期只有三层：<strong>Singleton</strong>（应用级共享服务：插件注册表、对话框/会话/最近项目/项目包服务、调度器工厂、遥测与分析诊断、<code>ImageViewerHostServices</code>）、<strong>Scoped</strong>（<code>ImageViewerHost</code>、<code>ImageViewerRuntimeServices</code>、<code>ImageViewerRenderService</code> 及其 4 个接口别名、<code>ImageViewer</code>、<code>IImageViewerFactory</code>，由容器在作用域销毁时释放）、以及<strong>不再使用 transient</strong> 注册可释放资源。</p>
+        <p>所有权规则只有一条：<strong>谁创建 runtime services，谁负责释放</strong>。<code>ImageViewerHost.OwnsRuntimeServices</code> 为 true 时（手工 <code>new ImageViewer()</code> 或 <code>ImageViewerHost.CreateDefault()</code>），宿主在最后一个 viewer 释放时释放 runtime 及其分片缓存，之后该宿主不可再创建 viewer；为 false 时（容器或调用方提供）宿主只借用、从不释放，可持续创建 viewer。</p>
         <p>更多格式和集成约定请参阅同目录的 <a href="project-file-format.md">项目文件格式说明</a> 与 <a href="import-export-conventions.md">导入导出约定</a>。</p>
       </section>
     </main>
