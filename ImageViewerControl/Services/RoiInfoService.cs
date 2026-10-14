@@ -205,14 +205,26 @@ namespace ImageViewer.Services
                 case ParallelismMeasureRoi parallelism:
                     lines.Add(UiText.FormatInvariant("InfoLineParallelism", parallelism.AngleDifference));
                     lines.Add(UiText.FormatInvariant("InfoLineParallelismDetail", FormatLength(parallelism.AverageDistance * correction, pixelSize, physicalUnit), parallelism.ParallelismError));
+                    lines.Add(UiText.Get("InfoLineAngularUnitNote"));
+                    lines.Add(UiText.Get("InfoLineGeometricToleranceNote"));
                     break;
                 case PerpendicularityMeasureRoi perpendicularity:
                     lines.Add(UiText.FormatInvariant("InfoLinePerpendicularity", perpendicularity.AngleBetweenLines));
                     lines.Add(UiText.FormatInvariant("InfoLinePerpendicularityDetail", perpendicularity.PerpendicularityError));
+                    lines.Add(UiText.Get("InfoLineAngularUnitNote"));
+                    lines.Add(UiText.Get("InfoLineGeometricToleranceNote"));
                     break;
                 case ConcentricityMeasureRoi concentricity:
-                    lines.Add(UiText.FormatInvariant("InfoLineConcentricity", FormatLength(concentricity.CenterDistance * correction, pixelSize, physicalUnit)));
-                    lines.Add(UiText.FormatInvariant("InfoLineConcentricityDetail", FormatLength(concentricity.Radius1 * correction, pixelSize, physicalUnit), FormatLength(concentricity.Radius2 * correction, pixelSize, physicalUnit)));
+                    // 判定用的就是"公差带直径"(= 2 × 中心距)，界面必须显示同一个量，否则用户会拿中心距去比公差。
+                    lines.Add(UiText.FormatInvariant(
+                        "InfoLineConcentricity",
+                        FormatLength(MeasureZones.ConcentricityZoneDiameter(concentricity) * correction, pixelSize, physicalUnit)));
+                    lines.Add(UiText.FormatInvariant(
+                        "InfoLineConcentricityDetail",
+                        FormatLength(concentricity.CenterDistance * correction, pixelSize, physicalUnit),
+                        FormatLength(concentricity.Radius1 * correction, pixelSize, physicalUnit),
+                        FormatLength(concentricity.Radius2 * correction, pixelSize, physicalUnit)));
+                    lines.Add(UiText.Get("InfoLineGeometricToleranceNote"));
                     break;
                 case CenterDistanceMeasureRoi centerDistance:
                     lines.Add(UiText.FormatInvariant("InfoLineCenterDistance", FormatLength(centerDistance.CenterDistance * correction, pixelSize, physicalUnit)));
@@ -396,24 +408,45 @@ namespace ImageViewer.Services
                 lines.Add(UiText.FormatInvariant("InfoLineCalibration", pixelSize, GetDisplayUnit(physicalUnit)));
             }
 
-            if (calibration is { IsEnabled: true })
+            if (calibration is null)
             {
-                if (calibration.HasExtendedDistortionModel || calibration.ReprojectionErrorRms > 0 || calibration.MeasurementUncertaintyPixels > 0)
-                {
-                    lines.Add(UiText.FormatInvariant(
-                        "InfoLineCalibrationDistortionExtended",
-                        calibration.K1,
-                        calibration.K2,
-                        calibration.K3,
-                        calibration.TangentialP1,
-                        calibration.TangentialP2,
-                        calibration.ReprojectionErrorRms,
-                        calibration.MeasurementUncertaintyPixels));
-                }
-                else
-                {
-                    lines.Add(UiText.FormatInvariant("InfoLineCalibrationDistortion", calibration.K1, calibration.K2));
-                }
+                return;
+            }
+
+            // 畸变模型与精度元数据是两条独立证据：只有比例+精度记录（无畸变系数）也必须显示，
+            // 否则用户看不到"这次标定准到什么程度"。
+            if (calibration.HasExtendedDistortionModel)
+            {
+                lines.Add(UiText.FormatInvariant(
+                    "InfoLineCalibrationDistortionExtended",
+                    calibration.K1,
+                    calibration.K2,
+                    calibration.K3,
+                    calibration.TangentialP1,
+                    calibration.TangentialP2,
+                    calibration.ReprojectionErrorRms,
+                    calibration.MeasurementUncertaintyPixels));
+            }
+            else if (calibration.IsEnabled)
+            {
+                lines.Add(UiText.FormatInvariant("InfoLineCalibrationDistortion", calibration.K1, calibration.K2));
+            }
+
+            if (!calibration.HasExtendedDistortionModel && (calibration.ReprojectionErrorRms > 0 || calibration.MeasurementUncertaintyPixels > 0))
+            {
+                lines.Add(UiText.FormatInvariant(
+                    "InfoLineCalibrationAccuracy",
+                    calibration.ReprojectionErrorRms,
+                    calibration.MeasurementUncertaintyPixels));
+            }
+
+            if (!calibration.IsValid)
+            {
+                lines.Add(UiText.Get("InfoLineCalibrationInvalid"));
+            }
+            else if (!string.IsNullOrWhiteSpace(calibration.CalibrationId))
+            {
+                lines.Add(UiText.FormatInvariant("InfoLineCalibrationIdentity", calibration.CalibrationId));
             }
         }
 

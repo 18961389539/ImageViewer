@@ -16,6 +16,10 @@ namespace ImageViewer.Controls
         Task SaveSessionAsync();
         Task LoadSessionAsync();
         Task ExportProjectPackageAsync();
+        Task SaveRecipeAsync();
+        Task LoadRecipeAsync();
+        Task LoadAlignedRecipeAsync();
+        void CaptureRecipeDatumPoint(int index, bool currentImage);
         void ToggleAutoSave();
     }
 
@@ -48,6 +52,12 @@ namespace ImageViewer.Controls
         public Task LoadSessionAsync() => _operations.LoadSessionAsync();
 
         public Task ExportProjectPackageAsync() => _operations.ExportProjectPackageAsync();
+
+        public Task SaveRecipeAsync() => _operations.SaveRecipeAsync();
+
+        public Task LoadRecipeAsync() => _operations.LoadRecipeAsync();
+        public Task LoadAlignedRecipeAsync() => _operations.LoadAlignedRecipeAsync();
+        public void CaptureRecipeDatumPoint(int index, bool currentImage) => _operations.CaptureRecipeDatumPoint(index, currentImage);
 
         public void ToggleAutoSave() => _operations.ToggleAutoSave();
 
@@ -82,6 +92,10 @@ namespace ImageViewer.Controls
         public Task SaveSessionAsync() => _sessionController.SaveSessionAsync();
         public Task LoadSessionAsync() => _sessionController.LoadProjectAsync();
         public Task ExportProjectPackageAsync() => _sessionController.ExportProjectPackageAsync();
+        public Task SaveRecipeAsync() => _sessionController.SaveRecipeAsync();
+        public Task LoadRecipeAsync() => _sessionController.LoadRecipeAsync();
+        public Task LoadAlignedRecipeAsync() => _sessionController.LoadAlignedRecipeAsync();
+        public void CaptureRecipeDatumPoint(int index, bool currentImage) => _sessionController.CaptureRecipeDatumPoint(index, currentImage);
         public void ToggleAutoSave() => _sessionController.ToggleAutoSave();
     }
 }

@@ -74,7 +74,19 @@ Type,Label,Metric1,Metric2,Metric3,Mean,Min,Max,StdDev,PixelCount,DetectionStatu
 - `MeasuredValue`、`NominalValue`、`TolerancePlus`、`ToleranceMinus`：以 `PhysicalUnit` 表示的测量值和判定参数。
 - `PhysicalUnit`：测量单位；未标定时为 `px`。
 
-批量导出会在上述列前增加 `Source,Status,Error`。输入图像缺失、解码失败或分析失败时，仍会为每个输入图像和每个 ROI 输出一行，确保失败项不会从结果集中消失。
+批量导出会在上述列前增加 `Source,Status,Error`，并在末尾增加 `SourceIndex,MeasurementItemKey`。`SourceIndex` 标识本批次中的输入图像轮次；`MeasurementItemKey` 标识本批次的模板项，在不同输入图像中保持一致，不以可能重复或为空的标签作为身份。输入图像缺失、解码失败或分析失败时，仍会为每个输入图像和每个 ROI 输出一行，确保失败项不会从结果集中消失。
+
+### 成套文件与一致性
+
+带导出上下文的单图 CSV 同时交付 `.metadata.json` 和 `.report.md`；批量 CSV 同时交付 `.metadata.json`、`.summary.json` 和 `.repeatability.md`。所有内容先生成并写入临时文件，再替换目标文件。暂存失败、取消或替换失败时会清理临时文件，并尝试恢复此前已存在的完整文件集；回滚失败会明确返回错误并保留可恢复的备份。
+
+这是进程内的回滚保护，多文件替换不具备断电或进程崩溃时的整体原子性。消费者应校验元数据提供的文件哈希及导出批次标识，避免读取混合版本的结果。哈希针对实际落盘的 UTF-8 文件字节，包含 BOM。
+
+### 批次离散度与重复性
+
+重复性研究按测量项身份聚合，每个输入轮次对同一项最多贡献一个有效测量值；失败或未测得的值不补零。参与图像数按输入轮次计数，不按结果行数计数。
+
+调用方通过 `RepeatabilityStudyOptions` 明确提供工件上下文。只有 `SameWorkpiece` 才给出同件重复性及其占用公差的结论；缺省的 `Unspecified` 和 `DifferentWorkpieces` 只描述源间变化，不能据此认定测量系统的重复性。角度项使用度，长度项使用标定单位。批次模板编号只保证本批次内的对应关系，不能用于匹配重新排序后的另一个批次。
 
 批量导出元数据的 `result` 同时记录以下状态统计：
 

@@ -11,5 +11,7 @@ namespace ImageViewer.Services
         BitmapSource? Bitmap,
         double PixelSize,
         string? PhysicalUnit,
-        CameraCalibration? Calibration);
+        CameraCalibration? Calibration,
+        int SourceIndex = -1,
+        string? MeasurementItemKey = null);
 }

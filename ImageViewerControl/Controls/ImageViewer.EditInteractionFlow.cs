@@ -39,10 +39,8 @@ namespace ImageViewer.Controls
             {
                 if (viewModel.UndoRedo.CanUndo)
                 {
-                    viewModel.UndoRedo.Undo();
-                    _host.TryRefreshCaliperDetection(viewModel.SelectedRoi);
-                    _host.DrawRois();
-                    _host.ShowStatusHint(UiText.Get("StatusUndone"), StatusHintKind.Info);
+                    // 走宿主（内部是 RoiEditController），由它负责刷新、状态提示与失败兜底。
+                    _host.Undo();
                 }
 
                 return true;
@@ -52,10 +50,7 @@ namespace ImageViewer.Controls
             {
                 if (viewModel.UndoRedo.CanRedo)
                 {
-                    viewModel.UndoRedo.Redo();
-                    _host.TryRefreshCaliperDetection(viewModel.SelectedRoi);
-                    _host.DrawRois();
-                    _host.ShowStatusHint(UiText.Get("StatusRedone"), StatusHintKind.Info);
+                    _host.Redo();
                 }
 
                 return true;
@@ -107,11 +102,11 @@ namespace ImageViewer.Controls
         public bool TryBeginEdit(Point imagePosition, bool isRightButtonPressed)
         {
             var viewModel = _host.ViewModel;
-            // 右键保留给上下文菜单；唯一的例外是多边形/折线顶点删除。
-            // 这样普通 ROI 的右键不会意外进入拖动编辑状态。
+            // 右键保留给对象上下文菜单。顶点删除由菜单中的显式命令完成，
+            // 不能在打开菜单之前改写几何或历史栈。
             if (isRightButtonPressed)
             {
-                return TryRemovePathPoint(imagePosition, viewModel);
+                return false;
             }
 
             ResizeHandle handle = _host.GetHandleAt(imagePosition);
@@ -179,35 +174,6 @@ namespace ImageViewer.Controls
             _host.CaptureRootMouse();
             _host.DrawRois();
             return true;
-        }
-
-        private bool TryRemovePathPoint(Point imagePosition, ImageViewerViewModel viewModel)
-        {
-            int pointIndex = _host.GetPolygonPointIndexAt(imagePosition);
-            if (pointIndex == -1)
-            {
-                return false;
-            }
-
-            if (viewModel.SelectedRoi is PolygonRoi removablePolygon && removablePolygon.Points.Count > 3)
-            {
-                RoiBase oldState = removablePolygon.Clone();
-                removablePolygon.Points.RemoveAt(pointIndex);
-                viewModel.UndoRedo.Execute(new RoiStateCommand(removablePolygon, oldState, removablePolygon.Clone()));
-                _host.DrawRois();
-                return true;
-            }
-
-            if (viewModel.SelectedRoi is PolylineRoi removablePolyline && removablePolyline.Points.Count > 2)
-            {
-                RoiBase oldState = removablePolyline.Clone();
-                removablePolyline.Points.RemoveAt(pointIndex);
-                viewModel.UndoRedo.Execute(new RoiStateCommand(removablePolyline, oldState, removablePolyline.Clone()));
-                _host.DrawRois();
-                return true;
-            }
-
-            return false;
         }
 
         public bool TryHandleActiveEditMove(Point imagePosition)

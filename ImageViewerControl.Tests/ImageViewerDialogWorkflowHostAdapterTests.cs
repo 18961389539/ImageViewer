@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using ImageViewer.Controls;
 using ImageViewer.Models;
 using ImageViewer.Plugins;
@@ -103,7 +103,8 @@ namespace ImageViewerControl.Tests
                 Calibration = new ImageViewerDialogCalibrationWorkflow
                 {
                     GetPhysicalUnit = () => "px",
-                    ApplyCalibration = (_, _, _, _) => { }
+                    GetCalibration = () => null,
+                    ApplyCalibration = (_, _, _) => { }
                 }
             };
         }
@@ -147,11 +148,15 @@ namespace ImageViewerControl.Tests
 
             public string? ShowSaveProjectPackageDialog() => null;
 
+            public string? ShowSaveRecipeDialog() => null;
+
+            public string? ShowOpenRecipeDialog() => null;
+
             public string? ShowSaveSnapshotDialog() => null;
 
             public string? ShowSaveAnalysisCsvDialog() => null;
 
-            public CalibrationDialogResult? ShowCalibrationDialog(string currentUnit) => null;
+            public CalibrationDialogResult? ShowCalibrationDialog(string currentUnit, CameraCalibration? currentCalibration) => null;
 
             public CaliperMeasureRoi? ShowLineMeasureCaliperSettingsDialog(CaliperMeasureRoi roi, Action<CaliperMeasureRoi>? previewAction = null) => LineMeasureCaliperResult;
 

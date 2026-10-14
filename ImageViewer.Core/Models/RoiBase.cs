@@ -1,6 +1,7 @@
 #pragma warning disable CS1591
 using System;
 using ImageViewer.Common;
+using ImageViewer.Core.Measurements;
 
 namespace ImageViewer.Models
 {
@@ -19,6 +20,24 @@ namespace ImageViewer.Models
         private bool _isVisible = true;
         private bool _isLocked;
         private MeasurementTolerance? _tolerance;
+        private Guid _measurementId = Guid.NewGuid();
+        private AdvancedMeasurementDefinition[] _advancedMeasurements = [];
+
+        /// <summary>Stable identity used to associate advanced measurements with this ROI.</summary>
+        public Guid MeasurementId
+        {
+            get => _measurementId;
+            set => SetProperty(ref _measurementId, value == Guid.Empty ? Guid.NewGuid() : value);
+        }
+
+        /// <summary>Gets or sets the advanced measurements owned by this ROI.</summary>
+        public AdvancedMeasurementDefinition[] AdvancedMeasurements
+        {
+            get => _advancedMeasurements;
+            set => SetProperty(ref _advancedMeasurements, value?.Where(item => item is not null)
+                .Select(item => item with { Sources = item.Sources is null ? [] : [.. item.Sources] })
+                .ToArray() ?? []);
+        }
 
         public string Label
         {
@@ -59,6 +78,14 @@ namespace ImageViewer.Models
             IsLocked = source.IsLocked;
         }
 
+        /// <summary>Copies persistent identity and advanced measurement definitions when creating a clone.</summary>
+        protected void CopyMeasurementIdentityFrom(RoiBase source)
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            MeasurementId = source.MeasurementId;
+            AdvancedMeasurements = source.AdvancedMeasurements;
+        }
+
         protected void ApplyCommonState(RoiBase source)
         {
             ArgumentNullException.ThrowIfNull(source);
@@ -66,6 +93,7 @@ namespace ImageViewer.Models
             Label = source.Label;
             Tolerance = source.Tolerance?.Clone();
             CopyVisualStateFrom(source);
+            AdvancedMeasurements = source.AdvancedMeasurements;
         }
 
         public RoiColor StrokeColor

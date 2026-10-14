@@ -41,6 +41,8 @@ namespace ImageViewer.Controls
             registrations.AddCleanup(CancelPendingInfoPanelUpdate);
             registrations.AddCleanup(_analysisRefreshScheduler.Dispose);
             registrations.AddCleanup(_viewportOverlayRefreshScheduler.Dispose);
+            registrations.AddCleanup(DisposeAdvancedMeasurementDialog);
+            registrations.AddCleanup(DisposeDetectionRecommendations);
             return registrations;
         }
     }

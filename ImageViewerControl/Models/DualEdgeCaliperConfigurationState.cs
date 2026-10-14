@@ -14,7 +14,10 @@ namespace ImageViewer.Models
         double CaliperOutlierThreshold,
         CaliperEdgePolarity CaliperEdgePolarity,
         JLVisionLineFitMode CaliperLineFitMode,
-        int CaliperFitClippingEndPoints)
+        int CaliperFitClippingEndPoints,
+        double MinimumEdgeGap,
+        double NominalEdgeGap,
+        double NominalEdgeGapTolerance)
     {
         public static DualEdgeCaliperConfigurationState Capture(CaliperMeasureRoi roi)
         {
@@ -32,7 +35,10 @@ namespace ImageViewer.Models
                 roi.CaliperOutlierThreshold,
                 roi.CaliperEdgePolarity,
                 roi.CaliperLineFitMode,
-                roi.CaliperFitClippingEndPoints);
+                roi.CaliperFitClippingEndPoints,
+                roi.MinimumEdgeGap,
+                roi.NominalEdgeGap,
+                roi.NominalEdgeGapTolerance);
         }
 
         public void ApplyTo(CaliperMeasureRoi roi)
@@ -51,6 +57,9 @@ namespace ImageViewer.Models
             roi.CaliperEdgePolarity = CaliperEdgePolarity;
             roi.CaliperLineFitMode = CaliperLineFitMode;
             roi.CaliperFitClippingEndPoints = CaliperFitClippingEndPoints;
+            roi.MinimumEdgeGap = MinimumEdgeGap;
+            roi.NominalEdgeGap = NominalEdgeGap;
+            roi.NominalEdgeGapTolerance = NominalEdgeGapTolerance;
         }
     }
 }

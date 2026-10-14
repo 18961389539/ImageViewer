@@ -6,35 +6,44 @@
     xmlns:localization="clr-namespace:ImageViewer.Localization"
     xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
     automation:AutomationProperties.Name="{localization:UiText Volume3DViewerName}">
-    <Grid Background="#0A0F16">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- 默认深色主题。必须放在 UserControl.Resources：放在子级 Grid.Resources 会遮蔽外层，
+                     使 Theme/ThemeDictionary 属性切换到别的字典时不生效。 -->
+                <ResourceDictionary Source="pack://application:,,,/ImageViewerControl;component/Themes/ViewerTheme.Dark.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+    <Grid Background="{DynamicResource ViewerBackdropSolidBrush}">
         <Grid.ContextMenu>
             <ContextMenu x:Name="threeDContextMenu" x:FieldModifier="internal" Opened="OnThreeDContextMenuOpened">
                 <ContextMenu.Resources>
                     <Style TargetType="ContextMenu">
-                        <Setter Property="Background" Value="#18212E" />
-                        <Setter Property="Foreground" Value="#F5F8FC" />
-                        <Setter Property="BorderBrush" Value="#314158" />
+                        <Setter Property="Background" Value="{DynamicResource ViewerMenuPopupBrush}" />
+                        <Setter Property="Foreground" Value="{DynamicResource ViewerTextPrimaryBrush}" />
+                        <Setter Property="BorderBrush" Value="{DynamicResource ViewerMenuBorderBrush}" />
                         <Setter Property="BorderThickness" Value="1" />
                         <Setter Property="Padding" Value="2" />
                         <Setter Property="Template">
                             <Setter.Value>
                                 <ControlTemplate TargetType="ContextMenu">
-                                    <Border Background="#18212E" BorderBrush="#314158" BorderThickness="1" CornerRadius="6" Padding="2" SnapsToDevicePixels="True">
+                                    <Border Background="{DynamicResource ViewerMenuPopupBrush}" BorderBrush="{DynamicResource ViewerMenuBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="2" SnapsToDevicePixels="True">
                                         <DockPanel LastChildFill="True">
                                             <StackPanel DockPanel.Dock="Top">
                                                 <TextBlock Margin="8,6,8,0"
-                                                           Foreground="#AAB5C3"
+                                                           Foreground="{DynamicResource ViewerTextSecondaryBrush}"
                                                            FontSize="11"
                                                            Text="{localization:UiText MenuSearch}" />
                                                 <TextBox x:Name="PART_MenuSearchBox"
                                                          Margin="4"
                                                          Padding="8,5"
                                                          HorizontalAlignment="Stretch"
-                                                         Background="#111824"
-                                                         Foreground="#F5F8FC"
-                                                         BorderBrush="#314158"
-                                                         CaretBrush="#F5F8FC"
-                                                         SelectionBrush="#69AFFF"
+                                                         Background="{DynamicResource ViewerSurfaceAltBrush}"
+                                                         Foreground="{DynamicResource ViewerTextPrimaryBrush}"
+                                                         BorderBrush="{DynamicResource ViewerMenuBorderBrush}"
+                                                         CaretBrush="{DynamicResource ViewerTextPrimaryBrush}"
+                                                         SelectionBrush="{DynamicResource ViewerSelectionBrush}"
                                                          ToolTip="{localization:UiText MenuSearch}"
                                                          automation:AutomationProperties.Name="{localization:UiText MenuSearch}"
                                                          automation:AutomationProperties.HelpText="{localization:UiText MenuSearch}"
@@ -42,13 +51,13 @@
                                                          PreviewKeyDown="OnThreeDMenuSearchPreviewKeyDown" />
                                                 <TextBlock x:Name="PART_MenuSearchMatchCount"
                                                            Margin="12,4,12,2"
-                                                           Foreground="#69AFFF"
+                                                           Foreground="{DynamicResource ViewerAccentBrush}"
                                                            Text="{localization:UiText MenuSearchMatchCount}"
                                                            automation:AutomationProperties.LiveSetting="Polite"
                                                            Visibility="Collapsed" />
                                                 <TextBlock x:Name="PART_MenuSearchNoResults"
                                                            Margin="12,4,12,8"
-                                                           Foreground="#AAB5C3"
+                                                           Foreground="{DynamicResource ViewerTextSecondaryBrush}"
                                                            Text="{localization:UiText MenuSearchNoResults}"
                                                            automation:AutomationProperties.LiveSetting="Polite"
                                                            Visibility="Collapsed" />
@@ -64,7 +73,7 @@
                     <Style TargetType="MenuItem">
                         <Setter Property="HorizontalContentAlignment" Value="Left" />
                         <Setter Property="VerticalContentAlignment" Value="Center" />
-                        <Setter Property="Foreground" Value="#F5F8FC" />
+                        <Setter Property="Foreground" Value="{DynamicResource ViewerTextPrimaryBrush}" />
                         <Setter Property="Padding" Value="10,5" />
                         <Setter Property="Template">
                             <Setter.Value>
@@ -79,17 +88,17 @@
                                                     <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
                                                 <Path Grid.Column="0" x:Name="checkGlyph" Visibility="Collapsed"
-                                                      Data="M 0,4 L 3.5,7.5 L 8,1" Stroke="#69AFFF" StrokeThickness="1.5"
+                                                      Data="M 0,4 L 3.5,7.5 L 8,1" Stroke="{DynamicResource ViewerAccentBrush}" StrokeThickness="1.5"
                                                       Margin="10,0,4,0" VerticalAlignment="Center" Width="8" Height="9" />
                                                 <ContentPresenter Grid.Column="1" ContentSource="Header"
                                                                   Margin="{TemplateBinding Padding}"
                                                                   RecognizesAccessKey="True" VerticalAlignment="Center" />
                                                 <TextBlock Grid.Column="2" x:Name="shortcutText"
                                                            Text="{TemplateBinding InputGestureText}"
-                                                           Foreground="#AAB5C3" Margin="24,0,10,0"
+                                                           Foreground="{DynamicResource ViewerTextSecondaryBrush}" Margin="24,0,10,0"
                                                            VerticalAlignment="Center" FontSize="11" />
                                                 <Path Grid.Column="3" x:Name="submenuArrow" Visibility="Collapsed"
-                                                      Data="M 0,0 L 4,4 L 0,8" Stroke="#AAB5C3" StrokeThickness="1.5"
+                                                      Data="M 0,0 L 4,4 L 0,8" Stroke="{DynamicResource ViewerTextSecondaryBrush}" StrokeThickness="1.5"
                                                       Margin="0,0,10,0" VerticalAlignment="Center" />
                                             </Grid>
                                         </Border>
@@ -97,20 +106,20 @@
                                                IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
                                                Placement="Right" VerticalOffset="-2" HorizontalOffset="-2"
                                                PopupAnimation="Slide" Focusable="False">
-                                            <Border Background="#18212E" BorderBrush="#314158" BorderThickness="1" CornerRadius="4" Padding="2" SnapsToDevicePixels="True">
+                                            <Border Background="{DynamicResource ViewerMenuPopupBrush}" BorderBrush="{DynamicResource ViewerMenuBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="2" SnapsToDevicePixels="True">
                                                 <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle" />
                                             </Border>
                                         </Popup>
                                     </Grid>
                                     <ControlTemplate.Triggers>
                                         <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="menuItemBorder" Property="Background" Value="#243245" />
+                                            <Setter TargetName="menuItemBorder" Property="Background" Value="{DynamicResource ViewerButtonHoverBrush}" />
                                         </Trigger>
                                         <Trigger Property="IsEnabled" Value="False">
                                             <Setter TargetName="menuItemBorder" Property="Background" Value="Transparent" />
-                                            <Setter Property="Foreground" Value="#5A6B7D" />
-                                            <Setter TargetName="shortcutText" Property="Foreground" Value="#536172" />
-                                            <Setter TargetName="submenuArrow" Property="Stroke" Value="#536172" />
+                                            <Setter Property="Foreground" Value="{DynamicResource ViewerTextDisabledBrush}" />
+                                            <Setter TargetName="shortcutText" Property="Foreground" Value="{DynamicResource ViewerTextMutedBrush}" />
+                                            <Setter TargetName="submenuArrow" Property="Stroke" Value="{DynamicResource ViewerTextMutedBrush}" />
                                         </Trigger>
                                         <Trigger Property="IsChecked" Value="True">
                                             <Setter TargetName="checkGlyph" Property="Visibility" Value="Visible" />
@@ -128,17 +137,17 @@
                         <Setter Property="Template">
                             <Setter.Value>
                                 <ControlTemplate TargetType="Separator">
-                                    <Border Height="1" Background="#314158" Margin="8,3" SnapsToDevicePixels="True" />
+                                    <Border Height="1" Background="{DynamicResource ViewerMenuBorderBrush}" Margin="8,3" SnapsToDevicePixels="True" />
                                 </ControlTemplate>
                             </Setter.Value>
                         </Setter>
                     </Style>
                     <Style TargetType="TextBox">
-                        <Setter Property="Background" Value="#111824" />
-                        <Setter Property="Foreground" Value="#F5F8FC" />
-                        <Setter Property="BorderBrush" Value="#314158" />
-                        <Setter Property="CaretBrush" Value="#F5F8FC" />
-                        <Setter Property="SelectionBrush" Value="#69AFFF" />
+                        <Setter Property="Background" Value="{DynamicResource ViewerSurfaceAltBrush}" />
+                        <Setter Property="Foreground" Value="{DynamicResource ViewerTextPrimaryBrush}" />
+                        <Setter Property="BorderBrush" Value="{DynamicResource ViewerMenuBorderBrush}" />
+                        <Setter Property="CaretBrush" Value="{DynamicResource ViewerTextPrimaryBrush}" />
+                        <Setter Property="SelectionBrush" Value="{DynamicResource ViewerSelectionBrush}" />
                     </Style>
                 </ContextMenu.Resources>
                 <MenuItem Header="{localization:UiText Menu3DResetCamera}" ToolTip="{localization:UiText Menu3DResetCameraTooltip}" Click="OnResetCameraClick" />
@@ -166,7 +175,7 @@
         </Grid.ContextMenu>
         <helix:Viewport3DX
             x:Name="viewport"
-            BackgroundColor="#11151C"
+            BackgroundColor="{DynamicResource ViewerViewportBackgroundColor}"
             CameraRotationMode="Trackball"
             ShowCoordinateSystem="True"
             ShowFrameRate="False"
@@ -176,9 +185,9 @@
             VerticalAlignment="Top"
             Margin="12"
             Padding="8,5"
-            Background="#C018212E"
+            Background="{DynamicResource ViewerSurfaceOverlayMenuBrush}"
             CornerRadius="8">
-            <TextBlock x:Name="volumeStatusText" Foreground="#F5F8FC" automation:AutomationProperties.Name="{localization:UiText Volume3DStatusName}" automation:AutomationProperties.LiveSetting="Polite" />
+            <TextBlock x:Name="volumeStatusText" Foreground="{DynamicResource ViewerTextPrimaryBrush}" automation:AutomationProperties.Name="{localization:UiText Volume3DStatusName}" automation:AutomationProperties.LiveSetting="Polite" />
         </Border>
     </Grid>
 </UserControl>

@@ -163,6 +163,9 @@ dotnet test ImageViewer.Core.Tests/ImageViewer.Core.Tests.csproj `
 ## 文档索引
 
 - [使用说明](docs/usage.md)
+- [高级测量](docs/advanced-measurements.md)
+- [右键菜单](docs/context-menu.md)
+- [检测参数推荐](docs/detection-parameter-recommendations.md)
 - [项目文件格式](docs/project-file-format.md)
 - [导入导出约定](docs/import-export-conventions.md)
 - [NuGet 发布](docs/nuget-publishing.md)

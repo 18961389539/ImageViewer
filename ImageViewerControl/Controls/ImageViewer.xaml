@@ -16,185 +16,171 @@
     automation:AutomationProperties.Name="{localization:UiText ViewerAccessibleName}"
     mc:Ignorable="d">
     <UserControl.Resources>
-        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- 默认深色主题。宿主可通过 ViewerTheme 属性或 Application.Resources 覆盖同键资源换肤。 -->
+                <ResourceDictionary Source="pack://application:,,,/ImageViewerControl;component/Themes/ViewerTheme.Dark.xaml" />
+            </ResourceDictionary.MergedDictionaries>
 
-        <LinearGradientBrush x:Key="ViewerBackdropBrush" StartPoint="0,0" EndPoint="0,1">
-            <GradientStop Color="#0E141D" Offset="0" />
-            <GradientStop Color="#0A0F16" Offset="0.55" />
-            <GradientStop Color="#080B11" Offset="1" />
-        </LinearGradientBrush>
+            <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
 
-        <SolidColorBrush x:Key="ViewerSurfaceBrush" Color="#18212E" />
-        <SolidColorBrush x:Key="ViewerSurfaceAltBrush" Color="#111824" />
-        <SolidColorBrush x:Key="ViewerPanelBorderBrush" Color="#314158" />
-        <SolidColorBrush x:Key="ViewerAccentBrush" Color="#69AFFF" />
-        <SolidColorBrush x:Key="ViewerAccentSoftBrush" Color="#2869AFFF" />
-        <SolidColorBrush x:Key="ViewerAccentBorderBrush" Color="#567FD6FF" />
-        <SolidColorBrush x:Key="ViewerTextPrimaryBrush" Color="#F5F8FC" />
-        <SolidColorBrush x:Key="ViewerTextSecondaryBrush" Color="#AAB5C3" />
-        <SolidColorBrush x:Key="ViewerButtonHoverBrush" Color="#243245" />
-        <SolidColorBrush x:Key="ViewerButtonPressedBrush" Color="#2D3D54" />
-        <SolidColorBrush x:Key="ViewerChipBorderBrush" Color="#35506D" />
-        <SolidColorBrush x:Key="ViewerErrorBrush" Color="#FF6B6B" />
-        <SolidColorBrush x:Key="ViewerErrorSoftBrush" Color="#3D1F2A" />
-        <SolidColorBrush x:Key="ViewerErrorBorderBrush" Color="#B94A5A" />
+            <ControlTemplate x:Key="ViewerChromeButtonTemplate" TargetType="{x:Type ButtonBase}">
+                <Border x:Name="Chrome"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="10"
+                        SnapsToDevicePixels="True">
+                    <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                      Margin="{TemplateBinding Padding}"
+                                      RecognizesAccessKey="True" />
+                </Border>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource ViewerButtonHoverBrush}" />
+                    </Trigger>
+                    <Trigger Property="IsPressed" Value="True">
+                        <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource ViewerButtonPressedBrush}" />
+                    </Trigger>
+                    <Trigger Property="IsKeyboardFocused" Value="True">
+                        <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource ViewerAccentBrush}" />
+                    </Trigger>
+                    <Trigger Property="IsEnabled" Value="False">
+                        <Setter Property="Opacity" Value="0.45" />
+                    </Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate>
 
-        <ControlTemplate x:Key="ViewerChromeButtonTemplate" TargetType="{x:Type ButtonBase}">
-            <Border x:Name="Chrome"
-                    Background="{TemplateBinding Background}"
-                    BorderBrush="{TemplateBinding BorderBrush}"
-                    BorderThickness="{TemplateBinding BorderThickness}"
-                    CornerRadius="10"
-                    SnapsToDevicePixels="True">
-                <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                  VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
-                                  Margin="{TemplateBinding Padding}"
-                                  RecognizesAccessKey="True" />
-            </Border>
-            <ControlTemplate.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter TargetName="Chrome" Property="Background" Value="{StaticResource ViewerButtonHoverBrush}" />
-                </Trigger>
-                <Trigger Property="IsPressed" Value="True">
-                    <Setter TargetName="Chrome" Property="Background" Value="{StaticResource ViewerButtonPressedBrush}" />
-                </Trigger>
-                <Trigger Property="IsKeyboardFocused" Value="True">
-                    <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource ViewerAccentBrush}" />
-                </Trigger>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Opacity" Value="0.45" />
-                </Trigger>
-            </ControlTemplate.Triggers>
-        </ControlTemplate>
+            <Style x:Key="ViewerFloatingPanelStyle" TargetType="Border">
+                <Setter Property="Background" Value="{DynamicResource ViewerSurfaceBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource ViewerPanelBorderBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="16" />
+                <Setter Property="Padding" Value="14" />
+                <Setter Property="SnapsToDevicePixels" Value="True" />
+                <Setter Property="Effect">
+                    <Setter.Value>
+                        <effects:DropShadowEffect BlurRadius="24" ShadowDepth="8" Opacity="0.28" Color="{DynamicResource ViewerShadowColor}" />
+                    </Setter.Value>
+                </Setter>
+            </Style>
 
-        <Style x:Key="ViewerFloatingPanelStyle" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource ViewerSurfaceBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource ViewerPanelBorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="16" />
-            <Setter Property="Padding" Value="14" />
-            <Setter Property="SnapsToDevicePixels" Value="True" />
-            <Setter Property="Effect">
-                <Setter.Value>
-                    <effects:DropShadowEffect BlurRadius="24" ShadowDepth="8" Opacity="0.28" Color="#000000" />
-                </Setter.Value>
-            </Setter>
-        </Style>
+            <Style x:Key="ViewerSectionTitleStyle" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource ViewerTextSecondaryBrush}" />
+                <Setter Property="FontSize" Value="11" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Margin" Value="0,0,0,8" />
+                <Setter Property="TextWrapping" Value="NoWrap" />
+            </Style>
 
-        <Style x:Key="ViewerSectionTitleStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource ViewerTextSecondaryBrush}" />
-            <Setter Property="FontSize" Value="11" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Margin" Value="0,0,0,8" />
-            <Setter Property="TextWrapping" Value="NoWrap" />
-        </Style>
+            <Style x:Key="ViewerToolbarButtonStyle" TargetType="Button">
+                <Setter Property="Foreground" Value="{DynamicResource ViewerTextPrimaryBrush}" />
+                <Setter Property="Background" Value="{DynamicResource ViewerSurfaceAltBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource ViewerChipBorderBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Padding" Value="12,7" />
+                <Setter Property="Margin" Value="0,0,8,8" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="HorizontalContentAlignment" Value="Center" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+                <Setter Property="Template" Value="{StaticResource ViewerChromeButtonTemplate}" />
+            </Style>
 
-        <Style x:Key="ViewerToolbarButtonStyle" TargetType="Button">
-            <Setter Property="Foreground" Value="{StaticResource ViewerTextPrimaryBrush}" />
-            <Setter Property="Background" Value="{StaticResource ViewerSurfaceAltBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource ViewerChipBorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Padding" Value="12,7" />
-            <Setter Property="Margin" Value="0,0,8,8" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="HorizontalContentAlignment" Value="Center" />
-            <Setter Property="VerticalContentAlignment" Value="Center" />
-            <Setter Property="Template" Value="{StaticResource ViewerChromeButtonTemplate}" />
-        </Style>
+            <Style x:Key="ViewerToolbarPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource ViewerToolbarButtonStyle}">
+                <Setter Property="Background" Value="{DynamicResource ViewerAccentSoftBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource ViewerAccentBorderBrush}" />
+            </Style>
 
-        <Style x:Key="ViewerToolbarPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource ViewerToolbarButtonStyle}">
-            <Setter Property="Background" Value="{StaticResource ViewerAccentSoftBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource ViewerAccentBorderBrush}" />
-        </Style>
+            <Style x:Key="ViewerErrorPanelStyle" TargetType="Border" BasedOn="{StaticResource ViewerFloatingPanelStyle}">
+                <Setter Property="Background" Value="{DynamicResource ViewerErrorSoftBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource ViewerErrorBorderBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="10" />
+            </Style>
 
-        <Style x:Key="ViewerErrorPanelStyle" TargetType="Border" BasedOn="{StaticResource ViewerFloatingPanelStyle}">
-            <Setter Property="Background" Value="{StaticResource ViewerErrorSoftBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource ViewerErrorBorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="10" />
-        </Style>
+            <Style x:Key="ViewerErrorActionButtonStyle" TargetType="Button" BasedOn="{StaticResource ViewerToolbarButtonStyle}">
+                <Setter Property="Background" Value="{DynamicResource ViewerErrorSoftBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource ViewerErrorBorderBrush}" />
+                <Setter Property="Foreground" Value="{DynamicResource ViewerTextPrimaryBrush}" />
+            </Style>
 
-        <Style x:Key="ViewerErrorActionButtonStyle" TargetType="Button" BasedOn="{StaticResource ViewerToolbarButtonStyle}">
-            <Setter Property="Background" Value="{StaticResource ViewerErrorSoftBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource ViewerErrorBorderBrush}" />
-            <Setter Property="Foreground" Value="{StaticResource ViewerTextPrimaryBrush}" />
-        </Style>
+            <Style x:Key="ViewerErrorDismissButtonStyle" TargetType="Button">
+                <Setter Property="Foreground" Value="{DynamicResource ViewerErrorBrush}" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderBrush" Value="{DynamicResource ViewerErrorBorderBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="Padding" Value="6,0" />
+                <Setter Property="FontWeight" Value="Bold" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Template" Value="{StaticResource ViewerChromeButtonTemplate}" />
+            </Style>
 
-        <Style x:Key="ViewerErrorDismissButtonStyle" TargetType="Button">
-            <Setter Property="Foreground" Value="{StaticResource ViewerErrorBrush}" />
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderBrush" Value="{StaticResource ViewerErrorBorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="6,0" />
-            <Setter Property="FontWeight" Value="Bold" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Template" Value="{StaticResource ViewerChromeButtonTemplate}" />
-        </Style>
+            <Style x:Key="ViewerToolbarToggleButtonStyle" TargetType="ToggleButton">
+                <Setter Property="Foreground" Value="{DynamicResource ViewerTextPrimaryBrush}" />
+                <Setter Property="Background" Value="{DynamicResource ViewerSurfaceAltBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource ViewerChipBorderBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Padding" Value="12,7" />
+                <Setter Property="Margin" Value="0,0,8,8" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="HorizontalContentAlignment" Value="Center" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+                <Setter Property="Template" Value="{StaticResource ViewerChromeButtonTemplate}" />
+                <Style.Triggers>
+                    <Trigger Property="IsChecked" Value="True">
+                        <Setter Property="Background" Value="{DynamicResource ViewerAccentSoftBrush}" />
+                        <Setter Property="BorderBrush" Value="{DynamicResource ViewerAccentBorderBrush}" />
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
 
-        <Style x:Key="ViewerToolbarToggleButtonStyle" TargetType="ToggleButton">
-            <Setter Property="Foreground" Value="{StaticResource ViewerTextPrimaryBrush}" />
-            <Setter Property="Background" Value="{StaticResource ViewerSurfaceAltBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource ViewerChipBorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Padding" Value="12,7" />
-            <Setter Property="Margin" Value="0,0,8,8" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="HorizontalContentAlignment" Value="Center" />
-            <Setter Property="VerticalContentAlignment" Value="Center" />
-            <Setter Property="Template" Value="{StaticResource ViewerChromeButtonTemplate}" />
-            <Style.Triggers>
-                <Trigger Property="IsChecked" Value="True">
-                    <Setter Property="Background" Value="{StaticResource ViewerAccentSoftBrush}" />
-                    <Setter Property="BorderBrush" Value="{StaticResource ViewerAccentBorderBrush}" />
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="ViewerProgressBarStyle" TargetType="ProgressBar">
-            <Setter Property="Foreground" Value="{StaticResource ViewerAccentBrush}" />
-            <Setter Property="Background" Value="#172433" />
-            <Setter Property="BorderBrush" Value="#28405B" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Height" Value="8" />
-            <Setter Property="Margin" Value="0,10,0,0" />
-        </Style>
+            <Style x:Key="ViewerProgressBarStyle" TargetType="ProgressBar">
+                <Setter Property="Foreground" Value="{DynamicResource ViewerAccentBrush}" />
+                <Setter Property="Background" Value="{DynamicResource ViewerProgressTrackBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource ViewerProgressBorderBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="Height" Value="8" />
+                <Setter Property="Margin" Value="0,10,0,0" />
+            </Style>
+        </ResourceDictionary>
     </UserControl.Resources>
-    <Grid x:Name="rootGrid" Background="{StaticResource ViewerBackdropBrush}" ClipToBounds="True" SnapsToDevicePixels="True" AllowDrop="True">
+    <Grid x:Name="rootGrid" Background="{DynamicResource ViewerBackdropBrush}" ClipToBounds="True" SnapsToDevicePixels="True" AllowDrop="True">
         <Grid.ContextMenu>
             <ContextMenu x:Name="mainContextMenu" x:FieldModifier="internal" Opened="OnContextMenuOpened">
                 <ContextMenu.Resources>
                     <Style TargetType="ContextMenu">
-                        <Setter Property="Background" Value="#18212E" />
-                        <Setter Property="Foreground" Value="#F5F8FC" />
-                        <Setter Property="BorderBrush" Value="#314158" />
+                        <Setter Property="Background" Value="{DynamicResource ViewerMenuPopupBrush}" />
+                        <Setter Property="Foreground" Value="{DynamicResource ViewerTextPrimaryBrush}" />
+                        <Setter Property="BorderBrush" Value="{DynamicResource ViewerMenuBorderBrush}" />
                         <Setter Property="BorderThickness" Value="1" />
                         <Setter Property="Padding" Value="2" />
                         <Setter Property="Template">
                             <Setter.Value>
                                 <ControlTemplate TargetType="ContextMenu">
-                                    <Border Background="#18212E" BorderBrush="#314158" BorderThickness="1" CornerRadius="6" Padding="2" SnapsToDevicePixels="True">
+                                    <Border Background="{DynamicResource ViewerMenuPopupBrush}" BorderBrush="{DynamicResource ViewerMenuBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="2" SnapsToDevicePixels="True">
                                         <DockPanel LastChildFill="True">
                                             <!-- 搜索区固定挂在菜单模板顶部，而不是作为一个菜单项：
                                                  作为菜单项时会被自动生成的容器按内容宽度左对齐（HorizontalContentAlignment=Left），
                                                  导致搜索框塌成一个小方块、无法横贯菜单宽度。 -->
                                             <StackPanel DockPanel.Dock="Top">
                                                 <TextBlock Margin="8,6,8,0"
-                                                           Foreground="{StaticResource ViewerTextSecondaryBrush}"
+                                                           Foreground="{DynamicResource ViewerTextSecondaryBrush}"
                                                            FontSize="11"
                                                            Text="{localization:UiText MenuSearch}" />
                                                 <TextBox x:Name="PART_MenuSearchBox"
                                                          Margin="4"
                                                          Padding="8,5"
                                                          HorizontalAlignment="Stretch"
-                                                         Background="#111824"
-                                                         Foreground="#F5F8FC"
-                                                         BorderBrush="#314158"
-                                                         CaretBrush="#F5F8FC"
-                                                         SelectionBrush="#69AFFF"
+                                                         Background="{DynamicResource ViewerSurfaceAltBrush}"
+                                                         Foreground="{DynamicResource ViewerTextPrimaryBrush}"
+                                                         BorderBrush="{DynamicResource ViewerMenuBorderBrush}"
+                                                         CaretBrush="{DynamicResource ViewerTextPrimaryBrush}"
+                                                         SelectionBrush="{DynamicResource ViewerSelectionBrush}"
                                                          ToolTip="{localization:UiText MenuSearch}"
                                                          automation:AutomationProperties.Name="{localization:UiText MenuSearch}"
                                                          automation:AutomationProperties.HelpText="{localization:UiText MenuSearch}"
@@ -202,13 +188,13 @@
                                                          PreviewKeyDown="OnMenuSearchPreviewKeyDown" />
                                                 <TextBlock x:Name="PART_MenuSearchMatchCount"
                                                             Margin="12,4,12,2"
-                                                            Foreground="{StaticResource ViewerAccentBrush}"
+                                                            Foreground="{DynamicResource ViewerAccentBrush}"
                                                             Text="{localization:UiText MenuSearchMatchCount}"
                                                             automation:AutomationProperties.LiveSetting="Polite"
                                                             Visibility="Collapsed" />
                                                 <TextBlock x:Name="PART_MenuSearchNoResults"
                                                             Margin="12,4,12,8"
-                                                            Foreground="{StaticResource ViewerTextSecondaryBrush}"
+                                                            Foreground="{DynamicResource ViewerTextSecondaryBrush}"
                                                             Text="{localization:UiText MenuSearchNoResults}"
                                                             automation:AutomationProperties.LiveSetting="Polite"
                                                             Visibility="Collapsed" />
@@ -224,7 +210,7 @@
                     <Style TargetType="MenuItem">
                         <Setter Property="HorizontalContentAlignment" Value="Left" />
                         <Setter Property="VerticalContentAlignment" Value="Center" />
-                        <Setter Property="Foreground" Value="#F5F8FC" />
+                        <Setter Property="Foreground" Value="{DynamicResource ViewerTextPrimaryBrush}" />
                         <Setter Property="Padding" Value="10,5" />
                         <Setter Property="Template">
                             <Setter.Value>
@@ -239,17 +225,17 @@
                                                     <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
                                                 <Path Grid.Column="0" x:Name="checkGlyph" Visibility="Collapsed"
-                                                      Data="M 0,4 L 3.5,7.5 L 8,1" Stroke="#69AFFF" StrokeThickness="1.5"
+                                                      Data="M 0,4 L 3.5,7.5 L 8,1" Stroke="{DynamicResource ViewerAccentBrush}" StrokeThickness="1.5"
                                                       Margin="10,0,4,0" VerticalAlignment="Center" Width="8" Height="9" />
                                                 <ContentPresenter Grid.Column="1" ContentSource="Header"
                                                                   Margin="{TemplateBinding Padding}"
                                                                   RecognizesAccessKey="True" VerticalAlignment="Center" />
                                                 <TextBlock Grid.Column="2" x:Name="shortcutText"
                                                            Text="{TemplateBinding InputGestureText}"
-                                                           Foreground="#AAB5C3" Margin="24,0,10,0"
+                                                           Foreground="{DynamicResource ViewerTextSecondaryBrush}" Margin="24,0,10,0"
                                                            VerticalAlignment="Center" FontSize="11" />
                                                 <Path Grid.Column="3" x:Name="submenuArrow" Visibility="Collapsed"
-                                                      Data="M 0,0 L 4,4 L 0,8" Stroke="#AAB5C3" StrokeThickness="1.5"
+                                                      Data="M 0,0 L 4,4 L 0,8" Stroke="{DynamicResource ViewerTextSecondaryBrush}" StrokeThickness="1.5"
                                                       Margin="0,0,10,0" VerticalAlignment="Center" />
                                             </Grid>
                                         </Border>
@@ -257,20 +243,20 @@
                                                IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
                                                Placement="Right" VerticalOffset="-2" HorizontalOffset="-2"
                                                PopupAnimation="Slide" Focusable="False">
-                                            <Border Background="#18212E" BorderBrush="#314158" BorderThickness="1" CornerRadius="4" Padding="2" SnapsToDevicePixels="True">
+                                            <Border Background="{DynamicResource ViewerMenuPopupBrush}" BorderBrush="{DynamicResource ViewerMenuBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="2" SnapsToDevicePixels="True">
                                                 <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle" />
                                             </Border>
                                         </Popup>
                                     </Grid>
                                     <ControlTemplate.Triggers>
                                         <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="menuItemBorder" Property="Background" Value="#243245" />
+                                            <Setter TargetName="menuItemBorder" Property="Background" Value="{DynamicResource ViewerButtonHoverBrush}" />
                                         </Trigger>
                                         <Trigger Property="IsEnabled" Value="False">
                                             <Setter TargetName="menuItemBorder" Property="Background" Value="Transparent" />
-                                            <Setter Property="Foreground" Value="#5A6B7D" />
-                                            <Setter TargetName="shortcutText" Property="Foreground" Value="#536172" />
-                                            <Setter TargetName="submenuArrow" Property="Stroke" Value="#536172" />
+                                            <Setter Property="Foreground" Value="{DynamicResource ViewerTextDisabledBrush}" />
+                                            <Setter TargetName="shortcutText" Property="Foreground" Value="{DynamicResource ViewerTextMutedBrush}" />
+                                            <Setter TargetName="submenuArrow" Property="Stroke" Value="{DynamicResource ViewerTextMutedBrush}" />
                                         </Trigger>
                                         <Trigger Property="IsChecked" Value="True">
                                             <Setter TargetName="checkGlyph" Property="Visibility" Value="Visible" />
@@ -288,37 +274,48 @@
                         <Setter Property="Template">
                             <Setter.Value>
                                 <ControlTemplate TargetType="Separator">
-                                    <Border Height="1" Background="#314158" Margin="8,3" SnapsToDevicePixels="True" />
+                                    <Border Height="1" Background="{DynamicResource ViewerMenuBorderBrush}" Margin="8,3" SnapsToDevicePixels="True" />
                                 </ControlTemplate>
                             </Setter.Value>
                         </Setter>
                     </Style>
                     <Style TargetType="TextBox">
-                        <Setter Property="Background" Value="#111824" />
-                        <Setter Property="Foreground" Value="#F5F8FC" />
-                        <Setter Property="BorderBrush" Value="#314158" />
-                        <Setter Property="CaretBrush" Value="#F5F8FC" />
-                        <Setter Property="SelectionBrush" Value="#69AFFF" />
+                        <Setter Property="Background" Value="{DynamicResource ViewerSurfaceAltBrush}" />
+                        <Setter Property="Foreground" Value="{DynamicResource ViewerTextPrimaryBrush}" />
+                        <Setter Property="BorderBrush" Value="{DynamicResource ViewerMenuBorderBrush}" />
+                        <Setter Property="CaretBrush" Value="{DynamicResource ViewerTextPrimaryBrush}" />
+                        <Setter Property="SelectionBrush" Value="{DynamicResource ViewerSelectionBrush}" />
                     </Style>
                 </ContextMenu.Resources>
                 <MenuItem Header="{Binding DataContext.ImageLoadStatusText, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                           IsEnabled="False"
-                          Foreground="{StaticResource ViewerErrorBrush}"
+                          Foreground="{DynamicResource ViewerErrorBrush}"
                           Visibility="{Binding DataContext.ImageLoadHasError, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 <MenuItem Header="{localization:UiText ImageLoadRetry}"
                           Click="OnRetryImageLoadClick"
                           Visibility="{Binding DataContext.CanRetryImageLoad, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 <Separator Visibility="{Binding DataContext.ImageLoadHasError, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                <MenuItem Header="{localization:UiText MenuPrimaryActions}">
-                    <MenuItem x:Name="openImageMenuItem" x:FieldModifier="internal" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.OpenImage}" Header="{localization:UiText MenuOpenImageFile}" InputGestureText="Ctrl+O" />
-                    <MenuItem x:Name="saveSessionMenuItem" x:FieldModifier="internal" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.SaveSession}" Header="{localization:UiText MenuSaveSession}" InputGestureText="Ctrl+S" IsEnabled="{Binding MenuState.File.SaveSessionEnabled}" />
-                    <Separator />
-                    <MenuItem x:Name="undoMenuItem" x:FieldModifier="internal" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.Undo}" Header="{localization:UiText MenuUndo}" InputGestureText="Ctrl+Z" IsEnabled="{Binding MenuState.Context.UndoEnabled}" />
-                    <MenuItem x:Name="redoMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.Redo}" Header="{localization:UiText MenuRedo}" InputGestureText="Ctrl+Y" IsEnabled="{Binding MenuState.Context.RedoEnabled}" />
-                    <Separator />
-                    <MenuItem x:Name="fitToViewMenuItem" x:FieldModifier="internal" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.FitToView}" Header="{localization:UiText MenuFitToView}" InputGestureText="Ctrl+F" IsEnabled="{Binding MenuState.View.FitToViewEnabled}" />
-                    <MenuItem x:Name="actualSizeMenuItem" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ActualSize}" Header="{localization:UiText MenuActualSize}" IsEnabled="{Binding MenuState.View.ActualSizeEnabled}" />
-                    <MenuItem x:Name="resetViewMenuItem" x:FieldModifier="internal" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ResetView}" Header="{localization:UiText MenuResetView}" InputGestureText="Ctrl+0" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
+                <MenuItem x:Name="openImageMenuItem" x:FieldModifier="internal" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.OpenImage}" Header="{localization:UiText MenuOpenImageFile}" InputGestureText="Ctrl+O" />
+                <MenuItem x:Name="saveSessionMenuItem" x:FieldModifier="internal" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.SaveSession}" Header="{localization:UiText MenuSaveSession}" InputGestureText="Ctrl+S" IsEnabled="{Binding MenuState.File.SaveSessionEnabled}" />
+                <Separator />
+                <MenuItem x:Name="undoMenuItem" x:FieldModifier="internal" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.Undo}" Header="{localization:UiText MenuUndo}" InputGestureText="Ctrl+Z" IsEnabled="{Binding MenuState.Context.UndoEnabled}" />
+                <MenuItem x:Name="redoMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.Redo}" Header="{localization:UiText MenuRedo}" InputGestureText="Ctrl+Y" IsEnabled="{Binding MenuState.Context.RedoEnabled}" />
+                <Separator />
+                <MenuItem x:Name="fitToViewMenuItem" x:FieldModifier="internal" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.FitToView}" Header="{localization:UiText MenuFitToView}" InputGestureText="Ctrl+F" IsEnabled="{Binding MenuState.View.FitToViewEnabled}" />
+                <MenuItem x:Name="actualSizeMenuItem" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ActualSize}" Header="{localization:UiText MenuActualSize}" IsEnabled="{Binding MenuState.View.ActualSizeEnabled}" />
+                <MenuItem x:Name="resetViewMenuItem" x:FieldModifier="internal" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ResetView}" Header="{localization:UiText MenuResetView}" InputGestureText="Ctrl+0" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
+                <MenuItem x:Name="editPropertiesMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.EditProperties}" Header="{localization:UiText MenuEditProperties}" IsEnabled="{Binding MenuState.Context.EditPropertiesEnabled}" Visibility="{Binding MenuState.Context.EditPropertiesEnabled, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <MenuItem x:Name="contextRoiShortcutsMenuItem" Header="{localization:UiText MenuSelectedObjectShortcuts}">
+                    <MenuItem x:Name="setLabelMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.SetLabel}" Header="{localization:UiText MenuSetLabel}" IsEnabled="{Binding MenuState.Context.SetLabelEnabled}" Visibility="{Binding MenuState.Context.SetLabelEnabled, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <MenuItem x:Name="setColorMenuItem" Header="{localization:UiText MenuSetColor}" IsEnabled="{Binding MenuState.Context.SetColorEnabled}" Visibility="{Binding MenuState.Context.SetColorEnabled, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <MenuItem Click="OnRoiMenuCommandClick" Header="{localization:UiText MenuColorCyanDefault}" Tag="{x:Static controls:ImageViewerRoiMenuTags.SetColorCyan}" />
+                        <MenuItem Click="OnRoiMenuCommandClick" Header="{localization:UiText MenuColorRed}" Tag="{x:Static controls:ImageViewerRoiMenuTags.SetColorRed}" />
+                        <MenuItem Click="OnRoiMenuCommandClick" Header="{localization:UiText MenuColorGreen}" Tag="{x:Static controls:ImageViewerRoiMenuTags.SetColorGreen}" />
+                        <MenuItem Click="OnRoiMenuCommandClick" Header="{localization:UiText MenuColorYellow}" Tag="{x:Static controls:ImageViewerRoiMenuTags.SetColorYellow}" />
+                        <MenuItem Click="OnRoiMenuCommandClick" Header="{localization:UiText MenuColorMagenta}" Tag="{x:Static controls:ImageViewerRoiMenuTags.SetColorMagenta}" />
+                    </MenuItem>
+                    <MenuItem x:Name="editCaliperSettingsMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.EditCaliperSettings}" Header="{localization:UiText MenuEditCaliperSettings}" IsEnabled="{Binding MenuState.Context.EditCaliperSettingsEnabled}" Visibility="{Binding MenuState.Context.EditCaliperSettingsEnabled, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <MenuItem x:Name="zoomToSelectionMenuItem" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ZoomToSelection}" Header="{localization:UiText MenuZoomToSelectedRoi}" IsEnabled="{Binding MenuState.View.ZoomToSelectionEnabled}" Visibility="{Binding MenuState.View.ZoomToSelectionEnabled, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 </MenuItem>
                 <MenuItem x:Name="drawRoiMenuItem" x:FieldModifier="internal" Header="{localization:UiText MenuDraw}" ToolTip="{localization:UiText MenuDrawTooltip}" IsEnabled="{Binding MenuState.Context.DrawRoiEnabled}" />
                 <MenuItem x:Name="measureMenuItem" Header="{localization:UiText MenuMeasure}">
@@ -328,21 +325,9 @@
                     <MenuItem x:Name="deleteRoiMenuItem" x:FieldModifier="internal" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.DeleteSelected}" Header="{localization:UiText MenuDeleteSelectedRoi}" ToolTip="{localization:UiText RoiDestructiveActionUndoHint}" IsEnabled="{Binding MenuState.Context.DeleteSelectedEnabled}" Visibility="{Binding MenuState.Context.DeleteSelectedEnabled, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     <MenuItem x:Name="clearAllMenuItem" x:FieldModifier="internal" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.ClearAll}" Header="{localization:UiText MenuClearAllRois}" ToolTip="{localization:UiText RoiClearAllUndoHint}" IsEnabled="{Binding MenuState.Context.ClearAllEnabled}" />
                     <Separator />
-                    <MenuItem x:Name="editPropertiesMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.EditProperties}" Header="{localization:UiText MenuEditProperties}" IsEnabled="{Binding MenuState.Context.EditPropertiesEnabled}" Visibility="{Binding MenuState.Context.EditPropertiesEnabled, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                    <MenuItem x:Name="setLabelMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.SetLabel}" Header="{localization:UiText MenuSetLabel}" IsEnabled="{Binding MenuState.Context.SetLabelEnabled}" Visibility="{Binding MenuState.Context.SetLabelEnabled, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                    <MenuItem x:Name="setColorMenuItem" Header="{localization:UiText MenuSetColor}" IsEnabled="{Binding MenuState.Context.SetColorEnabled}" Visibility="{Binding MenuState.Context.SetColorEnabled, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <MenuItem Click="OnRoiMenuCommandClick" Header="{localization:UiText MenuColorCyanDefault}" Tag="{x:Static controls:ImageViewerRoiMenuTags.SetColorCyan}" />
-                        <MenuItem Click="OnRoiMenuCommandClick" Header="{localization:UiText MenuColorRed}" Tag="{x:Static controls:ImageViewerRoiMenuTags.SetColorRed}" />
-                        <MenuItem Click="OnRoiMenuCommandClick" Header="{localization:UiText MenuColorGreen}" Tag="{x:Static controls:ImageViewerRoiMenuTags.SetColorGreen}" />
-                        <MenuItem Click="OnRoiMenuCommandClick" Header="{localization:UiText MenuColorYellow}" Tag="{x:Static controls:ImageViewerRoiMenuTags.SetColorYellow}" />
-                        <MenuItem Click="OnRoiMenuCommandClick" Header="{localization:UiText MenuColorMagenta}" Tag="{x:Static controls:ImageViewerRoiMenuTags.SetColorMagenta}" />
-                    </MenuItem>
-                    <Separator />
                     <MenuItem x:Name="calibratePixelsMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.CalibratePixels}" Header="{localization:UiText MenuCalibratePixels}" IsEnabled="{Binding MenuState.Context.CalibratePixelsEnabled}" Visibility="{Binding MenuState.Context.CalibratePixelsEnabled, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                    <MenuItem x:Name="editCaliperSettingsMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.EditCaliperSettings}" Header="{localization:UiText MenuEditCaliperSettings}" IsEnabled="{Binding MenuState.Context.EditCaliperSettingsEnabled}" Visibility="{Binding MenuState.Context.EditCaliperSettingsEnabled, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     <Separator />
                     <MenuItem x:Name="showRoiListMenuItem" Header="{localization:UiText MenuShowRoiList}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleRoiList}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowRoiListChecked}" />
-                    <MenuItem x:Name="zoomToSelectionMenuItem" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ZoomToSelection}" Header="{localization:UiText MenuZoomToSelectedRoi}" IsEnabled="{Binding MenuState.View.ZoomToSelectionEnabled}" Visibility="{Binding MenuState.View.ZoomToSelectionEnabled, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 </MenuItem>
                 <MenuItem Header="{localization:UiText MenuFileAndProjects}">
                     <MenuItem x:Name="loadSessionMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.LoadSession}" Header="{localization:UiText MenuOpenProjectOrSession}" />
@@ -361,6 +346,18 @@
                     <MenuItem x:Name="saveRoisMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.SaveRois}" Header="{localization:UiText MenuSaveRois}" IsEnabled="{Binding MenuState.File.SaveRoisEnabled}" />
                     <MenuItem x:Name="loadRoisMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.LoadRois}" Header="{localization:UiText MenuLoadRois}" />
                     <Separator />
+                    <MenuItem x:Name="saveRecipeMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.SaveRecipe}" Header="{localization:UiText MenuSaveRecipe}" IsEnabled="{Binding MenuState.File.SaveRoisEnabled}" ToolTip="{localization:UiText TooltipSaveRecipe}" />
+                    <MenuItem x:Name="loadRecipeMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.LoadRecipe}" Header="{localization:UiText MenuLoadRecipe}" ToolTip="{localization:UiText TooltipLoadRecipe}" />
+                    <MenuItem Header="{localization:UiText MenuRecipeReferenceDatums}">
+                        <MenuItem Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.CaptureRecipeReferenceDatum1}" Header="{localization:UiText MenuRecipeReferenceDatum1}" />
+                        <MenuItem Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.CaptureRecipeReferenceDatum2}" Header="{localization:UiText MenuRecipeReferenceDatum2}" />
+                    </MenuItem>
+                    <MenuItem Header="{localization:UiText MenuRecipeCurrentDatums}">
+                        <MenuItem Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.CaptureCurrentAlignmentDatum1}" Header="{localization:UiText MenuRecipeCurrentDatum1}" />
+                        <MenuItem Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.CaptureCurrentAlignmentDatum2}" Header="{localization:UiText MenuRecipeCurrentDatum2}" />
+                    </MenuItem>
+                    <MenuItem Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.LoadAlignedRecipe}" Header="{localization:UiText MenuLoadAlignedRecipe}" ToolTip="{localization:UiText TooltipLoadAlignedRecipe}" />
+                    <Separator />
                     <MenuItem x:Name="exportProjectPackageMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.ExportProjectPackage}" Header="{localization:UiText MenuExportProjectPackage}" IsEnabled="{Binding MenuState.File.ExportProjectPackageEnabled}" />
                     <MenuItem x:Name="autoSaveMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.ToggleAutoSave}" Header="{localization:UiText MenuAutoSave}" IsCheckable="True" IsChecked="{Binding MenuState.File.AutoSaveChecked}" />
                 </MenuItem>
@@ -372,7 +369,19 @@
                     <MenuItem Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.FlipHorizontal}" Header="{localization:UiText MenuFlipHorizontal}" InputGestureText="Ctrl+H" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
                     <MenuItem Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.FlipVertical}" Header="{localization:UiText MenuFlipVertical}" InputGestureText="Ctrl+Shift+H" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
                 </MenuItem>
-                <MenuItem Header="{localization:UiText MenuDisplaySettings}">
+                <MenuItem Header="{localization:UiText MenuImageDisplay}">
+                    <MenuItem x:Name="smartDisplaySuggestionMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ShowSmartDisplaySuggestion}" Header="{localization:UiText MenuSmartDisplaySuggestion}" IsEnabled="{Binding MenuState.Analysis.EnableRefreshAnalysis}" />
+                    <MenuItem Header="{localization:UiText MenuPseudoColorStrategy}">
+                        <MenuItem x:Name="preferShaderPseudoColorMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.TogglePreferShaderPseudoColor}" Header="{localization:UiText MenuPreferShaderPseudoColor}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PreferShaderPseudoColorChecked}" />
+                        <MenuItem x:Name="allowCpuPseudoColorFallbackMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ToggleAllowCpuPseudoColorFallback}" Header="{localization:UiText MenuAllowCpuFallback}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.AllowCpuPseudoColorFallbackChecked}" />
+                    </MenuItem>
+                    <MenuItem x:Name="pseudoColorMenuItem" x:FieldModifier="internal" Header="{localization:UiText MenuPseudoColor}">
+                        <MenuItem Header="{localization:UiText MenuPseudoColorOriginal}" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.SetPseudoColorPaletteNone}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PseudoColorNoneChecked}" />
+                        <MenuItem Header="{localization:UiText MenuPseudoColorHot}" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.SetPseudoColorPaletteHot}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PseudoColorHotChecked}" />
+                        <MenuItem Header="{localization:UiText MenuPseudoColorJet}" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.SetPseudoColorPaletteJet}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PseudoColorJetChecked}" />
+                        <MenuItem Header="{localization:UiText MenuPseudoColorViridis}" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.SetPseudoColorPaletteViridis}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PseudoColorViridisChecked}" />
+                    </MenuItem>
+                    <Separator />
                     <MenuItem x:Name="showToolbarMenuItem" x:FieldModifier="internal" Header="{localization:UiText MenuShowToolbar}" ToolTip="{localization:UiText MenuShowToolbarTooltip}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleToolbar}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowToolbarChecked}" />
                     <MenuItem x:Name="showPixelGridMenuItem" Header="{localization:UiText MenuShowPixelGrid}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.TogglePixelGrid}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowPixelGridChecked}" />
                     <MenuItem x:Name="showSnapGridMenuItem" Header="{localization:UiText MenuShowSnapGrid}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleSnapGrid}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowSnapGridChecked}" />
@@ -387,10 +396,12 @@
                     <MenuItem x:Name="showScaleBarMenuItem" Header="{localization:UiText MenuShowScaleBar}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleScaleBar}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowScaleBarChecked}" />
                 </MenuItem>
                 <MenuItem Header="{localization:UiText MenuAnalysisAndExport}">
+                    <MenuItem x:Name="advancedMeasurementsMenuItem" Click="OnAdvancedMeasurementsClick" Header="{localization:UiText AdvancedMeasurementDialogTitle}" />
                     <MenuItem x:Name="exportSnapshotMenuItem" x:FieldModifier="internal" Click="OnFeatureMenuCommandClick" Tag="{x:Static controls:ImageViewerFeatureMenuTags.ExportSnapshot}" Header="{localization:UiText MenuExportCurrentViewPng}" IsEnabled="{Binding MenuState.Context.ExportSnapshotEnabled}" />
                     <MenuItem x:Name="exportAnalysisCsvMenuItem" Click="OnFeatureMenuCommandClick" Tag="{x:Static controls:ImageViewerFeatureMenuTags.ExportAnalysisCsv}" Header="{localization:UiText MenuExportAnalysisCsv}" IsEnabled="{Binding MenuState.Context.ExportAnalysisCsvEnabled}" />
                     <MenuItem x:Name="exportBatchAnalysisCsvMenuItem" Click="OnFeatureMenuCommandClick" Tag="{x:Static controls:ImageViewerFeatureMenuTags.ExportBatchAnalysisCsv}" Header="{localization:UiText MenuExportBatchAnalysisCsv}" IsEnabled="{Binding MenuState.Context.ExportAnalysisCsvEnabled}" />
                     <MenuItem x:Name="showAnalysisSummaryMenuItem" Click="OnFeatureMenuCommandClick" Tag="{x:Static controls:ImageViewerFeatureMenuTags.ShowAnalysisSummary}" Header="{localization:UiText MenuShowAnalysisSummary}" IsEnabled="{Binding MenuState.Context.ShowAnalysisSummaryEnabled}" />
+                    <MenuItem x:Name="checkCalibrationReadinessMenuItem" Click="OnFeatureMenuCommandClick" Tag="{x:Static controls:ImageViewerFeatureMenuTags.CheckCalibrationReadiness}" Header="{localization:UiText MenuCheckCalibrationReadiness}" ToolTip="{localization:UiText ToolbarCalibrationCheckTooltip}" />
                     <Separator />
                     <MenuItem Header="{localization:UiText MenuAnalysisRun}">
                         <MenuItem x:Name="enableAsyncAnalysisMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ToggleAsyncAnalysis}" Header="{localization:UiText MenuEnableAsyncAnalysis}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.EnableAsyncAnalysisChecked}" />
@@ -399,9 +410,7 @@
                         <MenuItem x:Name="refreshAnalysisMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.RefreshAnalysis}" Header="{localization:UiText MenuRefreshAnalysis}" IsEnabled="{Binding MenuState.Analysis.EnableRefreshAnalysis}" />
                     </MenuItem>
                 </MenuItem>
-                <MenuItem Header="{localization:UiText MenuLargeImageAndPerformance}">
-                    <MenuItem x:Name="smartDisplaySuggestionMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ShowSmartDisplaySuggestion}" Header="{localization:UiText MenuSmartDisplaySuggestion}" IsEnabled="{Binding MenuState.Analysis.EnableRefreshAnalysis}" />
-                    <Separator />
+                <MenuItem Header="{localization:UiText MenuPerformance}">
                     <MenuItem x:Name="enableImagePyramidMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ToggleImagePyramid}" Header="{localization:UiText MenuEnableImagePyramid}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.EnableImagePyramidChecked}" />
                     <MenuItem x:Name="autoSelectPyramidLevelMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ToggleAutoSelectPyramidLevel}" Header="{localization:UiText MenuAutoSelectPyramidLevel}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.AutoSelectPyramidLevelChecked}" IsEnabled="{Binding MenuState.Analysis.AutoSelectPyramidLevelEnabled}" />
                     <MenuItem Header="{localization:UiText MenuAdvancedPerformance}">
@@ -411,17 +420,6 @@
                         <Separator />
                         <MenuItem x:Name="clearPyramidCacheMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ClearPyramidCache}" Header="{localization:UiText MenuClearPyramidCache}" IsEnabled="{Binding MenuState.Analysis.EnableClearPyramidCache}" />
                         <MenuItem x:Name="clearAnalysisCacheMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ClearAnalysisCache}" Header="{localization:UiText MenuClearAnalysisCache}" IsEnabled="{Binding MenuState.Analysis.EnableClearAnalysisCache}" />
-                    </MenuItem>
-                    <Separator />
-                    <MenuItem Header="{localization:UiText MenuPseudoColorStrategy}">
-                        <MenuItem x:Name="preferShaderPseudoColorMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.TogglePreferShaderPseudoColor}" Header="{localization:UiText MenuPreferShaderPseudoColor}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PreferShaderPseudoColorChecked}" />
-                        <MenuItem x:Name="allowCpuPseudoColorFallbackMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ToggleAllowCpuPseudoColorFallback}" Header="{localization:UiText MenuAllowCpuFallback}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.AllowCpuPseudoColorFallbackChecked}" />
-                    </MenuItem>
-                    <MenuItem x:Name="pseudoColorMenuItem" x:FieldModifier="internal" Header="{localization:UiText MenuPseudoColor}">
-                        <MenuItem Header="{localization:UiText MenuPseudoColorOriginal}" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.SetPseudoColorPaletteNone}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PseudoColorNoneChecked}" />
-                        <MenuItem Header="{localization:UiText MenuPseudoColorHot}" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.SetPseudoColorPaletteHot}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PseudoColorHotChecked}" />
-                        <MenuItem Header="{localization:UiText MenuPseudoColorJet}" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.SetPseudoColorPaletteJet}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PseudoColorJetChecked}" />
-                        <MenuItem Header="{localization:UiText MenuPseudoColorViridis}" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.SetPseudoColorPaletteViridis}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PseudoColorViridisChecked}" />
                     </MenuItem>
                     <MenuItem x:Name="showRenderStatusMenuItem" x:FieldModifier="internal" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ShowRenderStatus}" Header="{localization:UiText MenuShowRenderStatus}" IsEnabled="{Binding MenuState.Analysis.EnableShowRenderStatus}" />
                 </MenuItem>
@@ -463,17 +461,17 @@
             <!-- 缩放比例徽标：跟随光标短暂显示，淡入淡出 -->
             <Border x:Name="zoomBadgeBorder" x:FieldModifier="internal"
                     Padding="10,5"
-                    Background="{StaticResource ViewerSurfaceBrush}"
-                    BorderBrush="{StaticResource ViewerAccentBorderBrush}"
+                    Background="{DynamicResource ViewerSurfaceBrush}"
+                    BorderBrush="{DynamicResource ViewerAccentBorderBrush}"
                     BorderThickness="1"
                     CornerRadius="8"
                     Visibility="Collapsed"
                     Opacity="0">
                 <Border.Effect>
-                    <effects:DropShadowEffect BlurRadius="14" ShadowDepth="3" Opacity="0.35" Color="#000000" />
+                    <effects:DropShadowEffect BlurRadius="14" ShadowDepth="3" Opacity="0.35" Color="{DynamicResource ViewerShadowColor}" />
                 </Border.Effect>
                 <TextBlock x:Name="zoomBadgeTextBlock" x:FieldModifier="internal"
-                           Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                           Foreground="{DynamicResource ViewerTextPrimaryBrush}"
                            FontSize="12"
                            FontWeight="SemiBold" />
             </Border>
@@ -502,12 +500,12 @@
                     Text="⚠"
                     Margin="0,0,8,0"
                     VerticalAlignment="Center"
-                    Foreground="{StaticResource ViewerErrorBrush}"
+                    Foreground="{DynamicResource ViewerErrorBrush}"
                     FontSize="15"
                     FontWeight="Bold" />
                  <TextBlock x:Name="diagnosticErrorTextBlock" x:FieldModifier="internal"
                      Text="{Binding DiagnosticErrorText, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                   Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                   Foreground="{DynamicResource ViewerTextPrimaryBrush}"
                    FontWeight="SemiBold"
                    TextWrapping="Wrap"
                    MaxWidth="360"
@@ -517,8 +515,8 @@
 
         <!-- 十字准星（不随图像缩放） -->
         <Canvas IsHitTestVisible="False">
-            <Line x:Name="crosshairH" Stroke="{StaticResource ViewerAccentBrush}" StrokeThickness="1.25" Visibility="Collapsed" />
-            <Line x:Name="crosshairV" Stroke="{StaticResource ViewerAccentBrush}" StrokeThickness="1.25" Visibility="Collapsed" />
+            <Line x:Name="crosshairH" Stroke="{DynamicResource ViewerAccentBrush}" StrokeThickness="1.25" Visibility="Collapsed" />
+            <Line x:Name="crosshairV" Stroke="{DynamicResource ViewerAccentBrush}" StrokeThickness="1.25" Visibility="Collapsed" />
         </Canvas>
 
         <!-- 坐标显示 -->
@@ -526,8 +524,8 @@
                 VerticalAlignment="Bottom"
                 Margin="10"
                 Padding="10,6"
-                Background="#C0141D29"
-                BorderBrush="#334A63"
+                Background="{DynamicResource ViewerSurfaceOverlayBrush}"
+                BorderBrush="{DynamicResource ViewerPopupBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="12"
                 IsHitTestVisible="False">
@@ -542,7 +540,7 @@
                 </Style>
             </Border.Style>
             <TextBlock x:Name="coordTextBlock"
-                       Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                       Foreground="{DynamicResource ViewerTextPrimaryBrush}"
                        FontWeight="SemiBold" />
         </Border>
 
@@ -555,8 +553,8 @@
                 Height="30" 
                 IsHitTestVisible="False" 
                 Visibility="Collapsed">
-            <Polyline x:Name="scaleBarLine" Stroke="{StaticResource ViewerAccentBrush}" StrokeThickness="2" Points="0,0 0,10 100,10 100,0" />
-            <TextBlock x:Name="scaleBarText" Text="{localization:UiText ScaleBarDefault}" Foreground="{StaticResource ViewerTextPrimaryBrush}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" Canvas.Left="30" Canvas.Top="-5"/>
+            <Polyline x:Name="scaleBarLine" Stroke="{DynamicResource ViewerAccentBrush}" StrokeThickness="2" Points="0,0 0,10 100,10 100,0" />
+            <TextBlock x:Name="scaleBarText" Text="{localization:UiText ScaleBarDefault}" Foreground="{DynamicResource ViewerTextPrimaryBrush}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" Canvas.Left="30" Canvas.Top="-5"/>
         </Canvas>
 
         <!-- 常驻状态栏：图像尺寸与文件路径（底部居中常驻显示） -->
@@ -566,8 +564,8 @@
                 Margin="10,0,10,10"
                 MaxWidth="620"
                 Padding="10,6"
-                Background="#C0141D29"
-                BorderBrush="#334A63"
+                Background="{DynamicResource ViewerSurfaceOverlayBrush}"
+                BorderBrush="{DynamicResource ViewerPopupBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="12"
                 IsHitTestVisible="False"
@@ -581,7 +579,7 @@
                 </Grid.ColumnDefinitions>
                 <TextBlock x:Name="statusBarTextBlock" x:FieldModifier="internal"
                            Grid.Column="0"
-                           Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                           Foreground="{DynamicResource ViewerTextPrimaryBrush}"
                            FontWeight="SemiBold"
                            FontSize="12"
                            TextTrimming="CharacterEllipsis"
@@ -589,21 +587,21 @@
                 <Border Grid.Column="1"
                         Margin="8,0,0,0"
                         Padding="7,2"
-                        Background="{StaticResource ViewerAccentSoftBrush}"
-                        BorderBrush="{StaticResource ViewerAccentBorderBrush}"
+                        Background="{DynamicResource ViewerAccentSoftBrush}"
+                        BorderBrush="{DynamicResource ViewerAccentBorderBrush}"
                         BorderThickness="1"
                         CornerRadius="7"
                         ToolTip="{Binding InteractionModeHint, RelativeSource={RelativeSource AncestorType=UserControl}}"
                         automation:AutomationProperties.LiveSetting="Polite">
                     <TextBlock Text="{Binding InteractionModeText, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                               Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                               Foreground="{DynamicResource ViewerTextPrimaryBrush}"
                                FontWeight="Bold"
                                FontSize="11" />
                 </Border>
                 <TextBlock Grid.Column="2"
                            Margin="8,0,0,0"
                            Text="{localization:UiText StatusUnsavedMarker}"
-                           Foreground="{StaticResource ViewerAccentBrush}"
+                           Foreground="{DynamicResource ViewerAccentBrush}"
                            FontWeight="Bold"
                            Visibility="{Binding IsDirty, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}"
                            automation:AutomationProperties.Name="{localization:UiText StatusUnsavedAccessibleName}" />
@@ -612,8 +610,8 @@
                         Grid.Column="3"
                         Margin="10,0,0,0"
                         Padding="8,3"
-                        Background="{StaticResource ViewerAccentSoftBrush}"
-                        BorderBrush="{StaticResource ViewerAccentBorderBrush}"
+                        Background="{DynamicResource ViewerAccentSoftBrush}"
+                        BorderBrush="{DynamicResource ViewerAccentBorderBrush}"
                         BorderThickness="1"
                         CornerRadius="8"
                         Visibility="Collapsed"
@@ -622,7 +620,7 @@
                     <TextBlock x:Name="calibrationBadgeTextBlock"
                                x:FieldModifier="internal"
                                MaxWidth="300"
-                               Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                               Foreground="{DynamicResource ViewerTextPrimaryBrush}"
                                FontWeight="Bold"
                                FontSize="12"
                                TextTrimming="CharacterEllipsis"
@@ -636,8 +634,8 @@
                 VerticalAlignment="Top"
                 Margin="10"
                 Padding="10,7"
-                Background="{StaticResource ViewerSurfaceBrush}"
-                BorderBrush="{StaticResource ViewerAccentBorderBrush}"
+                Background="{DynamicResource ViewerSurfaceBrush}"
+                BorderBrush="{DynamicResource ViewerAccentBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="10"
                 Panel.ZIndex="125"
@@ -645,22 +643,22 @@
             <DockPanel LastChildFill="False">
                 <TextBlock VerticalAlignment="Center"
                            Margin="0,0,10,0"
-                           Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                           Foreground="{DynamicResource ViewerTextPrimaryBrush}"
                            Text="{localization:UiText RecoveryBannerText}"
                            automation:AutomationProperties.LiveSetting="Polite" />
                 <Button Padding="10,4"
                         Content="{localization:UiText RecoveryRestoreButton}"
                         Click="OnRecoverAutoSaveClick"
-                        Background="{StaticResource ViewerAccentSoftBrush}"
-                        BorderBrush="{StaticResource ViewerAccentBorderBrush}"
-                        Foreground="{StaticResource ViewerTextPrimaryBrush}" />
+                        Background="{DynamicResource ViewerAccentSoftBrush}"
+                        BorderBrush="{DynamicResource ViewerAccentBorderBrush}"
+                        Foreground="{DynamicResource ViewerTextPrimaryBrush}" />
                 <Button Margin="6,0,0,0"
                         Padding="8,4"
                         Content="{localization:UiText RecoveryDismissButton}"
                         Click="OnDismissRecoveryClick"
                         Background="Transparent"
-                        BorderBrush="{StaticResource ViewerPanelBorderBrush}"
-                        Foreground="{StaticResource ViewerTextSecondaryBrush}" />
+                        BorderBrush="{DynamicResource ViewerPanelBorderBrush}"
+                        Foreground="{DynamicResource ViewerTextSecondaryBrush}" />
             </DockPanel>
         </Border>
 
@@ -680,7 +678,7 @@
                     Style="{StaticResource ViewerFloatingPanelStyle}"
                     IsHitTestVisible="False"
                     Visibility="Visible">
-                <TextBlock x:Name="infoTextBlock" Foreground="{StaticResource ViewerTextPrimaryBrush}" TextWrapping="Wrap" MaxWidth="320" />
+                <TextBlock x:Name="infoTextBlock" Foreground="{DynamicResource ViewerTextPrimaryBrush}" TextWrapping="Wrap" MaxWidth="320" />
             </Border>
 
             <Border x:Name="roiListPanel"
@@ -702,11 +700,11 @@
                     <DockPanel Grid.Row="0" LastChildFill="True" Margin="0,0,0,6">
                         <TextBlock DockPanel.Dock="Left"
                                    Text="{localization:UiText RoiListTitle}"
-                                   Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                                   Foreground="{DynamicResource ViewerTextPrimaryBrush}"
                                    FontWeight="Bold" />
                         <TextBlock x:Name="roiListCountText"
                                    Margin="8,0,0,0"
-                                   Foreground="{StaticResource ViewerTextSecondaryBrush}"
+                                   Foreground="{DynamicResource ViewerTextSecondaryBrush}"
                                    Text="{Binding ViewerState.AllRois.Count, RelativeSource={RelativeSource AncestorType=UserControl}, StringFormat={}({0})}" />
                     </DockPanel>
                     <TextBox x:Name="roiFilterTextBox"
@@ -720,7 +718,7 @@
                              x:Name="roiListBox" x:FieldModifier="internal"
                              Background="Transparent"
                              BorderThickness="0"
-                             Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                             Foreground="{DynamicResource ViewerTextPrimaryBrush}"
                              automation:AutomationProperties.Name="{localization:UiText RoiListAccessibleName}"
                              ItemsSource="{Binding ViewerState.AllRois, RelativeSource={RelativeSource AncestorType=UserControl}}"
                              SelectedItem="{Binding ViewerState.SelectedRoi, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}">
@@ -733,10 +731,10 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                        <TextBlock Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                                        <TextBlock Foreground="{DynamicResource ViewerTextPrimaryBrush}"
                                                    Text="{Binding DisplayName}"
                                                    TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Foreground="{StaticResource ViewerTextSecondaryBrush}"
+                                        <TextBlock Foreground="{DynamicResource ViewerTextSecondaryBrush}"
                                                    FontSize="10"
                                                    Text="{Binding DisplayTypeName}"
                                                    TextTrimming="CharacterEllipsis" />
@@ -744,14 +742,14 @@
                                     <CheckBox Grid.Column="1"
                                               Margin="8,0,0,0"
                                               VerticalAlignment="Center"
-                                              Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                                              Foreground="{DynamicResource ViewerTextPrimaryBrush}"
                                               IsChecked="{Binding IsVisible, Mode=TwoWay}"
                                               ToolTip="{localization:UiText RoiListToggleVisibleTooltip}"
                                               Content="{localization:UiText RoiListToggleVisible}" />
                                     <CheckBox Grid.Column="2"
                                               Margin="6,0,0,0"
                                               VerticalAlignment="Center"
-                                              Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                                              Foreground="{DynamicResource ViewerTextPrimaryBrush}"
                                               IsChecked="{Binding IsLocked, Mode=TwoWay}"
                                               ToolTip="{localization:UiText RoiListToggleLockedTooltip}"
                                               Content="{localization:UiText RoiListToggleLocked}" />
@@ -795,7 +793,7 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0"
                                    Text="{localization:UiText PropertyPanelTitle}"
-                                   Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                                   Foreground="{DynamicResource ViewerTextPrimaryBrush}"
                                    FontWeight="Bold"
                                    VerticalAlignment="Center" />
                         <Button x:Name="circularCaliperSettingsButton"
@@ -842,7 +840,7 @@
                 Visibility="Collapsed"
                 IsHitTestVisible="False">
             <Grid>
-                <TextBlock Text="{localization:UiText HistogramPanelTitle}" Foreground="{StaticResource ViewerTextSecondaryBrush}" HorizontalAlignment="Left" VerticalAlignment="Top" FontSize="10" FontWeight="SemiBold" Opacity="0.95"/>
+                <TextBlock Text="{localization:UiText HistogramPanelTitle}" Foreground="{DynamicResource ViewerTextSecondaryBrush}" HorizontalAlignment="Left" VerticalAlignment="Top" FontSize="10" FontWeight="SemiBold" Opacity="0.95"/>
                 <Canvas x:Name="histogramCanvas" Margin="0,15,0,0" Width="256" Height="140" ClipToBounds="True"/>
             </Grid>
         </Border>
@@ -859,7 +857,7 @@
                 Visibility="Collapsed"
                 IsHitTestVisible="False">
             <Grid>
-                <TextBlock Text="{localization:UiText ProfilePanelTitle}" Foreground="{StaticResource ViewerTextSecondaryBrush}" HorizontalAlignment="Left" VerticalAlignment="Top" FontSize="10" FontWeight="SemiBold" Opacity="0.95"/>
+                <TextBlock Text="{localization:UiText ProfilePanelTitle}" Foreground="{DynamicResource ViewerTextSecondaryBrush}" HorizontalAlignment="Left" VerticalAlignment="Top" FontSize="10" FontWeight="SemiBold" Opacity="0.95"/>
                 <Canvas x:Name="profileCanvas" Margin="0,15,0,0" Width="256" Height="140" ClipToBounds="True"/>
             </Grid>
         </Border>
@@ -889,41 +887,41 @@
                         Height="72"
                         HorizontalAlignment="Center"
                         Margin="0,0,0,16"
-                        Background="{StaticResource ViewerAccentSoftBrush}"
-                        BorderBrush="{StaticResource ViewerAccentBorderBrush}"
+                        Background="{DynamicResource ViewerAccentSoftBrush}"
+                        BorderBrush="{DynamicResource ViewerAccentBorderBrush}"
                         BorderThickness="1"
                         CornerRadius="20">
                     <Viewbox Margin="16">
                         <Canvas Width="40" Height="40">
-                            <Path Data="M4,8 H36 V32 H4 Z" Stroke="{StaticResource ViewerAccentBrush}" StrokeThickness="2" Fill="Transparent" StrokeLineJoin="Round" />
-                            <Path Data="M8,26 L16,18 L24,26 L29,21 L34,28" Stroke="{StaticResource ViewerAccentBrush}" StrokeThickness="2" Fill="Transparent" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" />
-                            <Ellipse Canvas.Left="28" Canvas.Top="12" Width="4" Height="4" Fill="{StaticResource ViewerAccentBrush}" />
+                            <Path Data="M4,8 H36 V32 H4 Z" Stroke="{DynamicResource ViewerAccentBrush}" StrokeThickness="2" Fill="Transparent" StrokeLineJoin="Round" />
+                            <Path Data="M8,26 L16,18 L24,26 L29,21 L34,28" Stroke="{DynamicResource ViewerAccentBrush}" StrokeThickness="2" Fill="Transparent" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" />
+                            <Ellipse Canvas.Left="28" Canvas.Top="12" Width="4" Height="4" Fill="{DynamicResource ViewerAccentBrush}" />
                         </Canvas>
                     </Viewbox>
                 </Border>
 
                 <TextBlock Text="{localization:UiText EmptyStateTitle}"
-                           Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                           Foreground="{DynamicResource ViewerTextPrimaryBrush}"
                            FontSize="20"
                            FontWeight="SemiBold"
                            TextAlignment="Center" />
 
                 <TextBlock Text="{localization:UiText EmptyStateDescription}"
-                           Foreground="{StaticResource ViewerTextSecondaryBrush}"
+                           Foreground="{DynamicResource ViewerTextSecondaryBrush}"
                            FontSize="13"
                            TextAlignment="Center"
                            TextWrapping="Wrap"
                            Margin="0,8,0,0" />
 
                 <WrapPanel HorizontalAlignment="Center" Margin="0,16,0,0">
-                    <Border Margin="0,0,8,8" Padding="10,4" Background="#1C2736" BorderBrush="#36516E" BorderThickness="1" CornerRadius="999">
-                        <TextBlock Text="{localization:UiText EmptyStateDropLoad}" Foreground="{StaticResource ViewerTextSecondaryBrush}" FontSize="11" FontWeight="SemiBold" />
+                    <Border Margin="0,0,8,8" Padding="10,4" Background="{DynamicResource ViewerSurfaceInsetBrush}" BorderBrush="{DynamicResource ViewerInsetBorderBrush}" BorderThickness="1" CornerRadius="999">
+                        <TextBlock Text="{localization:UiText EmptyStateDropLoad}" Foreground="{DynamicResource ViewerTextSecondaryBrush}" FontSize="11" FontWeight="SemiBold" />
                     </Border>
-                    <Border Margin="0,0,8,8" Padding="10,4" Background="#1C2736" BorderBrush="#36516E" BorderThickness="1" CornerRadius="999">
-                        <TextBlock Text="{localization:UiText EmptyStateBackgroundRetry}" Foreground="{StaticResource ViewerTextSecondaryBrush}" FontSize="11" FontWeight="SemiBold" />
+                    <Border Margin="0,0,8,8" Padding="10,4" Background="{DynamicResource ViewerSurfaceInsetBrush}" BorderBrush="{DynamicResource ViewerInsetBorderBrush}" BorderThickness="1" CornerRadius="999">
+                        <TextBlock Text="{localization:UiText EmptyStateBackgroundRetry}" Foreground="{DynamicResource ViewerTextSecondaryBrush}" FontSize="11" FontWeight="SemiBold" />
                     </Border>
-                    <Border Margin="0,0,8,8" Padding="10,4" Background="#1C2736" BorderBrush="#36516E" BorderThickness="1" CornerRadius="999">
-                        <TextBlock Text="{localization:UiText EmptyStateTiledRendering}" Foreground="{StaticResource ViewerTextSecondaryBrush}" FontSize="11" FontWeight="SemiBold" />
+                    <Border Margin="0,0,8,8" Padding="10,4" Background="{DynamicResource ViewerSurfaceInsetBrush}" BorderBrush="{DynamicResource ViewerInsetBorderBrush}" BorderThickness="1" CornerRadius="999">
+                        <TextBlock Text="{localization:UiText EmptyStateTiledRendering}" Foreground="{DynamicResource ViewerTextSecondaryBrush}" FontSize="11" FontWeight="SemiBold" />
                     </Border>
                 </WrapPanel>
 
@@ -935,7 +933,7 @@
                         Style="{StaticResource ViewerToolbarPrimaryButtonStyle}" />
 
                 <TextBlock Text="{localization:UiText EmptyStateHint}"
-                           Foreground="{StaticResource ViewerTextSecondaryBrush}"
+                           Foreground="{DynamicResource ViewerTextSecondaryBrush}"
                            FontSize="11"
                            TextAlignment="Center"
                            TextWrapping="Wrap"
@@ -1026,6 +1024,10 @@
 
                 <TextBlock Text="{localization:UiText MenuAnalysisAndExport}" Style="{StaticResource ViewerSectionTitleStyle}" Margin="0,4,0,8" />
                 <WrapPanel MaxWidth="420">
+                    <Button Content="{localization:UiText AdvancedMeasurementDialogTitle}" Click="OnAdvancedMeasurementsClick"
+                            automation:AutomationProperties.Name="{localization:UiText AdvancedMeasurementDialogTitle}"
+                            ToolTip="{localization:UiText AdvancedMeasurementDialogDescription}"
+                            Style="{StaticResource ViewerToolbarButtonStyle}" />
                     <Button Content="{localization:UiText MenuCalibratePixels}"
                             Click="OnRoiMenuCommandClick"
                             Tag="{x:Static controls:ImageViewerRoiMenuTags.CalibratePixels}"
@@ -1033,6 +1035,13 @@
                             automation:AutomationProperties.Name="{localization:UiText MenuCalibratePixels}"
                             automation:AutomationProperties.HelpText="{localization:UiText ToolbarCalibratePixelsTooltip}"
                             IsEnabled="{Binding MenuState.Context.CalibratePixelsEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            Style="{StaticResource ViewerToolbarButtonStyle}" />
+                    <Button Content="{localization:UiText MenuCheckCalibrationReadiness}"
+                            Click="OnFeatureMenuCommandClick"
+                            Tag="{x:Static controls:ImageViewerFeatureMenuTags.CheckCalibrationReadiness}"
+                            ToolTip="{localization:UiText ToolbarCalibrationCheckTooltip}"
+                            automation:AutomationProperties.Name="{localization:UiText DialogCalibrationCheckAccessibleName}"
+                            automation:AutomationProperties.HelpText="{localization:UiText ToolbarCalibrationCheckTooltip}"
                             Style="{StaticResource ViewerToolbarButtonStyle}" />
                     <Button Content="{localization:UiText MenuExportAnalysisCsv}"
                             Click="OnFeatureMenuCommandClick"
@@ -1069,9 +1078,9 @@
                         ToolTip="{localization:UiText ToolbarZoomInTooltip}"
                         automation:AutomationProperties.HelpText="{localization:UiText ToolbarZoomInTooltip}"
                         Style="{StaticResource ViewerToolbarButtonStyle}" />
-                    <Border Margin="0,0,8,8" Padding="10,7" Background="{StaticResource ViewerSurfaceAltBrush}" BorderBrush="{StaticResource ViewerChipBorderBrush}" BorderThickness="1" CornerRadius="10">
+                    <Border Margin="0,0,8,8" Padding="10,7" Background="{DynamicResource ViewerSurfaceAltBrush}" BorderBrush="{DynamicResource ViewerChipBorderBrush}" BorderThickness="1" CornerRadius="10">
                     <TextBlock Text="{Binding Scale, RelativeSource={RelativeSource AncestorType=UserControl}, StringFormat={}{0:P0}}"
-                           Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                           Foreground="{DynamicResource ViewerTextPrimaryBrush}"
                            FontWeight="SemiBold"
                            VerticalAlignment="Center"
                            automation:AutomationProperties.Name="{localization:UiText ZoomLevelDisplayAccessibleName}"
@@ -1168,8 +1177,8 @@
                 VerticalAlignment="Bottom"
                 Margin="16,0,16,54"
                 Padding="12,8"
-                Background="{StaticResource ViewerAccentSoftBrush}"
-                BorderBrush="{StaticResource ViewerAccentBorderBrush}"
+                Background="{DynamicResource ViewerAccentSoftBrush}"
+                BorderBrush="{DynamicResource ViewerAccentBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="10"
                 Panel.ZIndex="125"
@@ -1185,19 +1194,19 @@
                         Style="{StaticResource ViewerToolbarButtonStyle}" />
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock Text="{localization:UiText ActiveToolPrefix}"
-                               Foreground="{StaticResource ViewerTextSecondaryBrush}"
+                               Foreground="{DynamicResource ViewerTextSecondaryBrush}"
                                FontSize="12"
                                FontWeight="SemiBold"
                                VerticalAlignment="Center" />
                     <TextBlock x:Name="activeToolNameTextBlock" x:FieldModifier="internal"
-                               Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                               Foreground="{DynamicResource ViewerTextPrimaryBrush}"
                                FontSize="13"
                                FontWeight="Bold"
                                Margin="4,0,10,0"
                                VerticalAlignment="Center"
                                automation:AutomationProperties.LiveSetting="Polite" />
                     <TextBlock Text="{localization:UiText ActiveToolHint}"
-                               Foreground="{StaticResource ViewerTextSecondaryBrush}"
+                               Foreground="{DynamicResource ViewerTextSecondaryBrush}"
                                FontSize="11"
                                VerticalAlignment="Center" />
                 </StackPanel>
@@ -1211,15 +1220,15 @@
                 VerticalAlignment="Top"
                 Margin="16,14"
                 Padding="16,10"
-                Background="{StaticResource ViewerSurfaceBrush}"
-                BorderBrush="{StaticResource ViewerPanelBorderBrush}"
+                Background="{DynamicResource ViewerSurfaceBrush}"
+                BorderBrush="{DynamicResource ViewerPanelBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="10"
                 Panel.ZIndex="130"
                 IsHitTestVisible="False"
                 Visibility="Collapsed">
             <Border.Effect>
-                <effects:DropShadowEffect BlurRadius="16" ShadowDepth="4" Opacity="0.35" Color="#000000" />
+                <effects:DropShadowEffect BlurRadius="16" ShadowDepth="4" Opacity="0.35" Color="{DynamicResource ViewerShadowColor}" />
             </Border.Effect>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                 <TextBlock x:Name="statusHintIconTextBlock" x:FieldModifier="internal"
@@ -1229,7 +1238,7 @@
                            FontWeight="Bold"
                            Visibility="Collapsed" />
                 <TextBlock x:Name="statusHintTextBlock" x:FieldModifier="internal"
-                           Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                           Foreground="{DynamicResource ViewerTextPrimaryBrush}"
                            FontSize="12.5"
                            FontWeight="SemiBold"
                            TextAlignment="Center"
@@ -1251,8 +1260,8 @@
                 <Style TargetType="Border" BasedOn="{StaticResource ViewerFloatingPanelStyle}">
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding ImageLoadHasError, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
-                            <Setter Property="Background" Value="{StaticResource ViewerErrorSoftBrush}" />
-                            <Setter Property="BorderBrush" Value="{StaticResource ViewerErrorBorderBrush}" />
+                            <Setter Property="Background" Value="{DynamicResource ViewerErrorSoftBrush}" />
+                            <Setter Property="BorderBrush" Value="{DynamicResource ViewerErrorBorderBrush}" />
                             <Setter Property="BorderThickness" Value="1" />
                             <Setter Property="CornerRadius" Value="10" />
                         </DataTrigger>
@@ -1266,9 +1275,9 @@
                 </Grid.ColumnDefinitions>
 
                 <Grid Width="48" Height="48" HorizontalAlignment="Center" VerticalAlignment="Top">
-                    <Ellipse Stroke="#294055" StrokeThickness="4" />
+                    <Ellipse Stroke="{DynamicResource ViewerChipHoverBrush}" StrokeThickness="4" />
                     <Ellipse x:Name="loadingSpinner"
-                             Stroke="{StaticResource ViewerAccentBrush}"
+                             Stroke="{DynamicResource ViewerAccentBrush}"
                              StrokeDashArray="1.2 2.5"
                              StrokeDashCap="Round"
                              StrokeThickness="4">
@@ -1286,7 +1295,7 @@
                         </Ellipse.RenderTransform>
                     </Ellipse>
                     <TextBlock Text="⚠"
-                               Foreground="{StaticResource ViewerErrorBrush}"
+                               Foreground="{DynamicResource ViewerErrorBrush}"
                                FontSize="24"
                                FontWeight="Bold"
                                HorizontalAlignment="Center"
@@ -1310,13 +1319,13 @@
                 <StackPanel Grid.Column="1" Margin="14,0,0,0">
                     <TextBlock x:Name="imageLoadStatusTextBlock" x:FieldModifier="internal"
                                Text="{Binding ImageLoadStatusText, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                               Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                               Foreground="{DynamicResource ViewerTextPrimaryBrush}"
                                FontWeight="SemiBold"
                                FontSize="14"
                                TextWrapping="Wrap"
                                automation:AutomationProperties.LiveSetting="Polite" />
                     <TextBlock Text="⚠"
-                               Foreground="{StaticResource ViewerErrorBrush}"
+                               Foreground="{DynamicResource ViewerErrorBrush}"
                                FontSize="16"
                                FontWeight="Bold"
                                Margin="0,6,0,0"
@@ -1355,8 +1364,8 @@
         <!-- 拖放视觉反馈：拖入可打开文件时显示，提示松开即可打开 -->
         <Border x:Name="dropHintOverlay" x:FieldModifier="internal"
                 Margin="24"
-                Background="#66102133"
-                BorderBrush="{StaticResource ViewerAccentBorderBrush}"
+                Background="{DynamicResource ViewerSurfaceOverlayAltBrush}"
+                BorderBrush="{DynamicResource ViewerAccentBorderBrush}"
                 BorderThickness="2"
                 CornerRadius="16"
                 IsHitTestVisible="False"
@@ -1364,7 +1373,7 @@
                 Visibility="Collapsed">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                 <TextBlock Text="{localization:UiText DropOverlayHint}"
-                           Foreground="{StaticResource ViewerTextPrimaryBrush}"
+                           Foreground="{DynamicResource ViewerTextPrimaryBrush}"
                            FontSize="18"
                            FontWeight="SemiBold" />
             </StackPanel>

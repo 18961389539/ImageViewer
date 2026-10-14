@@ -64,6 +64,9 @@ namespace ImageViewer.Controls
 
         void ShowAnalysisSummary();
 
+        /// <summary>“标定检查”步骤：在测量/出报告前确认数值是否可信。</summary>
+        void CheckCalibrationReadiness();
+
         void UpdateContextMenuState();
     }
 
@@ -92,6 +95,9 @@ namespace ImageViewer.Controls
                     break;
                 case ImageViewerFeatureMenuCommand.ShowAnalysisSummary:
                     Host.ShowAnalysisSummary();
+                    break;
+                case ImageViewerFeatureMenuCommand.CheckCalibrationReadiness:
+                    Host.CheckCalibrationReadiness();
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(command), command, null);

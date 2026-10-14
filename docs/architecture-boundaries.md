@@ -66,6 +66,56 @@ Rules that keep the chain closed:
 - `ImageViewerRuntimeServices` releases only the render service it created (`ownsRenderService`); a container-provided render service stays container-owned.
 - DI lifetimes mirror those roles: application-lifetime singletons for stateless shared services, scoped for host/runtime/render/viewer inside a window scope, and no transient registrations for disposable resources. Within one scope every render-service interface resolves to the same instance, so a scope owns exactly one tile cache.
 
+## Control Theme Ownership
+
+The control's colors live in `Themes/ViewerTheme.{Dark,Light,HighContrast}.xaml` — never inline in a control's XAML. Every color reference inside the controls is a `DynamicResource` on a `Viewer*Brush` key, so replacing the dictionary re-skins a live control without reloading it.
+
+The precedence trap this design works around: `FrameworkElement.Resources` is searched **before** `Application.Resources`, so a theme dictionary merged into a control's own `Resources.MergedDictionaries` **shadows** any same-key resource the host defines at application or window scope. Consequences:
+
+- Each control (`.xaml`) merges `ViewerTheme.Dark.xaml` into its **`UserControl.Resources`** so it renders standalone — the unit-test harness has no `Application`, and a missing dictionary would resolve brushes to `null`. The dictionary must **not** go on a child element's `Resources` (e.g. the root `Grid`): a child's resources are searched first, so the control-level swap would be shadowed and the theme would appear not to change.
+- Hosts override through the control, not around it: `ImageViewer`/`AdaptiveImageViewer`/`Volume3DViewer` expose `Theme` (a `ViewerThemes.Theme`) and `ThemeDictionary`. Setting either swaps the control-local dictionary in place via `ViewerThemeSwitcher.Apply`.
+- `ViewerThemeSwitcher` tracks the dictionary it last installed per element (weak table). `Source` alone cannot identify a host dictionary, so **every** replacement goes through the tracked slot: the previous custom dictionary is removed before the new one is inserted. Without that, a second `ThemeDictionary` assignment would be inserted at index 0 while the first custom dictionary — still at a lower index — kept shadowing it, and `ThemeDictionary = null` would not restore the built-in look.
+- `ViewerThemes.Apply(Application.Current.Resources, …)` mounts a dictionary at application scope for consumers that resolve brushes themselves; it does not reach into a control's own resources.
+- `AdaptiveImageViewer` also propagates its theme to the nested `ImageViewer`/`Volume3DViewer` instances it creates, so one property switch re-skins the whole stack.
+- `ViewerThemeKeys` exposes `ComponentResourceKey`s for hosts that prefer per-key override over a whole dictionary.
+
+`ViewerThemeTests` guards the resolution of every theme brush without an `Application`, that switching a built-in theme changes resolved brush colors, that repeated switches replace (never accumulate) the dictionary, that a host-supplied dictionary takes over completely, that a **second** host dictionary still wins, that clearing it restores the built-in default, and that `AdaptiveImageViewer`/`Volume3DViewer` actually re-resolve their own brushes on a theme switch.
+
+## Auto-Save Recovery Across Restarts
+
+An unsaved document is written to `autosave-<DocumentId>.ivsession`. `DocumentId` is generated per process, so a restart cannot find the previous run's file by name alone — `recovery-index.json` (see `ImageViewerRecoveryIndex`) records every auto-save file that has been written on this machine, and recovery accepts an on-disk candidate only when the index vouches for it **and** the snapshot is not owned by a live session:
+
+| Candidate source | Accepted? | Why |
+| --- | --- | --- |
+| This window's own file name (`autosave-<myDocumentId>`) | yes | Live document in the current process. |
+| Indexed path that still exists on disk **and** whose owner's heartbeat is stale (or absent) | yes | The previous run's unsaved document — this is what makes recovery survive a crash. |
+| Indexed path still held by a live session (`LastHeartbeatUtc` fresh and `OwnerInstanceId` ≠ mine) | no | Another window has that document open right now; offering it would restore a document that is not orphaned. |
+| `autosave.ivsession` (legacy shared name) | only if neither of the above matched | Upgrade fallback for builds that wrote every unsaved document to one shared file. |
+| Un-indexed, non-legacy `*.ivsession` | no | Belongs to another window/process; adopting it would restore the wrong document. |
+
+**Ownership / heartbeat.** Every entry carries `OwnerInstanceId` (a per-window identity, distinct from `DocumentId` which changes meaning once a project path exists) and `LastHeartbeatUtc`, refreshed on every successful auto-save. A snapshot is recoverable when it is not owned by this instance *and* its last heartbeat is older than `3 × AutoSaveInterval` (floor 30 s). A window that exits **cleanly** calls `ReleaseRecoveryOwnership()` (from `OnUnloaded` and from the lifetime disposal path), so a document the user deliberately closed is not offered at the next start; a window that **crashes** never reaches that call and its stale heartbeat makes the snapshot recoverable again.
+
+**Index concurrency.** The index is one file shared by every window/process on the machine, so all of `Register`/`Unregister`/`Prune`/`Write` run their whole read-modify-write inside a machine-wide named `Mutex` (`Global\ImageViewerRecoveryIndex-<sha256(directory)[..16]>`), and every write is atomic (temp file + `File.Move(overwrite: true)`). Without the lock, 16 concurrent registrations collapse to a single surviving entry; without the atomic replace, a concurrent reader can observe a half-written JSON and degrade the whole index to empty.
+
+**Cleanup scope.** `GetRecoveryCleanupPaths` cleans only the files this document produced: the current auto-save name, the name recorded in `ImageViewerAutoSaveController.LastWrittenAutoSavePath` (the pre-save name, which changes from `autosave-<DocumentId>` to `autosave-<name>-<hash>` once a project path exists), the legacy name, the shared `autosave.ivsession`, and the adopted `_recoveryFilePath`. It must **not** enumerate `autosave-*.ivsession` — that directory is shared with other windows, so a sweep makes saving one document delete another's recovery file.
+
+
+## Undo/Redo Failure Semantics
+
+`UndoRedoManager` records a command **only after it succeeds**. The stacks therefore always describe edits that actually happened:
+
+| Operation | Success | Command throws |
+| --- | --- | --- |
+| `Execute` | command pushed to undo stack, redo stack cleared | nothing recorded — undo stack unchanged, redo stack **not** cleared, exception propagates |
+| `Undo` | command moved undo → redo | command stays on the **undo** stack (`CanUndo` remains true, `CanRedo` stays false) |
+| `Redo` | command moved redo → undo | command stays on the **redo** stack (`CanRedo` remains true, `CanUndo` stays false) |
+
+The earlier design moved the command across stacks *before* invoking it; a throwing `Undo` then left the command sitting on the redo stack, so `CanRedo` claimed an edit that was never reverted. The rule now is: **a failed operation leaves its stack entry where it was, so the failing action stays retryable and no false "already done" state is exposed.**
+
+Because the stacks stay consistent, the callers do not need to repair state — they only need to not crash. Both entry points (`RoiEditController.Undo/Redo`, which the Ctrl+Z/Ctrl+Y handler in `EditInteractionFlow` delegates to through `IImageViewerEditInteractionHost`) wrap the call in `TryRunHistoryOperation`: on failure they log via `LogNonCriticalError`, show `StatusUndoRedoFailed` with `StatusHintKind.Error`, and skip the refresh plus the "已撤销/已重做" hint. The keyboard path no longer calls the manager directly, so a throwing command cannot escape into the key handler.
+
+Guards: `UndoRedoManagerTests` (14 direct tests, including all three throwing paths, the retry path, depth eviction and change notification), `RoiEditControllerTests` (failure logs and does not claim success; success still refreshes and hints), and the two `UndoRedoManager_When…Throws_…` tests in `ImageViewerMemoryLeakTests`. Reverting to the old "move-then-invoke" ordering makes three of them fail.
+
 ## Migration Order
 
 1. Define a framework-neutral contract for each new capability.

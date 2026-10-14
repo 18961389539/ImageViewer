@@ -1,4 +1,5 @@
 using System;
+using ImageViewer.Models;
 
 namespace ImageViewer.Controls
 {
@@ -28,6 +29,8 @@ namespace ImageViewer.Controls
                             ShowSaveSessionDialog = dialogWorkflowService.ShowSaveSessionDialog,
                             ShowOpenSessionDialog = dialogWorkflowService.ShowOpenSessionDialog,
                             ShowSaveProjectPackageDialog = dialogWorkflowService.ShowSaveProjectPackageDialog,
+                            ShowSaveRecipeDialog = dialogWorkflowService.ShowSaveRecipeDialog,
+                            ShowOpenRecipeDialog = dialogWorkflowService.ShowOpenRecipeDialog,
                             SessionService = _owner.RuntimeServices.SessionService,
                             RecentProjectService = _owner.RuntimeServices.RecentProjectService,
                             ProjectPackageService = _owner.RuntimeServices.ProjectPackageService,
@@ -39,6 +42,17 @@ namespace ImageViewer.Controls
                             SetPhysicalUnit = value => _owner.PhysicalUnit = value,
                             GetCalibration = () => _owner.Calibration,
                             SetCalibration = value => _owner.Calibration = value,
+                            GetWorkpieceCoordinateSystem = () => _owner.WorkpieceCoordinateSystem,
+                            SetWorkpieceCoordinateSystem = value => _owner.WorkpieceCoordinateSystem = value,
+                            GetRecipeDatumPoints = _owner.GetRecipeReferenceDatums,
+                            GetCurrentRecipeDatumPoints = _owner.GetRecipeCurrentDatums,
+                            GetCurrentImageIdentity = () => _owner.ImageSource,
+                            GetSelectedRecipeDatumPosition = () => _owner.ViewerState.SelectedRoi is PointCoordinateMeasureRoi point
+                                ? point.Position
+                                : null,
+                            SetRecipeDatumPoint = _owner.SetRecipeReferenceDatum,
+                            SetRecipeDatumPoints = _owner.SetRecipeReferenceDatums,
+                            SetCurrentRecipeDatumPoint = _owner.SetRecipeCurrentDatum,
                             GetQualityProfile = () => _owner.QualityProfile,
                             SetQualityProfile = value => _owner.QualityProfile = value,
                             GetCurrentViewportState = () => viewportController.CurrentState,

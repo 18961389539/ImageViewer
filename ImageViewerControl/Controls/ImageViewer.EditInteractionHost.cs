@@ -68,6 +68,12 @@ namespace ImageViewer.Controls
             }
 
             public void ShowStatusHint(string message, StatusHintKind kind) => _owner.ShowStatusHint(message, kind);
+
+            // 撤销/重做统一走 RoiEditController：它在命令抛异常时记录日志并给出状态提示，
+            // 避免键盘路径直接把异常抛出事件处理器。
+            public void Undo() => _roiEditController.Undo();
+
+            public void Redo() => _roiEditController.Redo();
         }
     }
 }

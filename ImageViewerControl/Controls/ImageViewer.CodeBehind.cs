@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using System.ComponentModel;
 using System.Windows;
@@ -118,6 +120,8 @@ namespace ImageViewer.Controls
             await RunShutdownOperationAsync(
                 "Drain autosave during unload",
                 () => _controlComposition.SessionController.DrainAutoSaveAsync());
+            // 关闭是"正常结束"：本实例留下的快照不该在下次启动时被当成待恢复文档。
+            _controlComposition.SessionController.ReleaseRecoveryOwnership();
         }
 
         private static IEnumerable<MenuItem> EnumerateMenuItems(ItemsControl itemsControl)
@@ -141,7 +145,6 @@ namespace ImageViewer.Controls
         private void RefreshRoiDrawingMenuItems()
         {
             drawRoiMenuItem.Items.Clear();
-            measureMenuItem.Items.Clear();
             roiOperationsMenuItem.Items.Remove(gradientDetectMenuItem);
 
             foreach (var tool in AvailableDrawingTools)
@@ -150,17 +153,13 @@ namespace ImageViewer.Controls
                 MenuItem menuItem = CreateDynamicMenuItem(menuDescriptor);
 
                 menuItem.Click += OnRoiDrawingToolClick;
-                if (menuDescriptor.Group == ImageViewerDynamicMenuGroup.Measurement)
-                {
-                    measureMenuItem.Items.Add(menuItem);
-                }
-                else
+                if (menuDescriptor.Group != ImageViewerDynamicMenuGroup.Measurement)
                 {
                     drawRoiMenuItem.Items.Add(menuItem);
                 }
             }
 
-            measureMenuItem.Items.Add(gradientDetectMenuItem);
+            PopulateMeasurementMenu(AvailableDrawingTools);
 
             drawRoiMenuItem.Visibility = drawRoiMenuItem.Items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
             measureMenuItem.Visibility = measureMenuItem.Items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -349,6 +348,8 @@ namespace ImageViewer.Controls
         private TextBox? _menuSearchBox;
         private TextBlock? _menuSearchMatchCountText;
         private TextBlock? _menuSearchNoResultsText;
+        private MenuItem? _menuSearchResultsHost;
+        private readonly List<MenuItem> _menuSearchResultItems = new();
         private readonly Dictionary<UIElement, MenuSearchVisibilitySnapshot> _menuSearchVisibilitySnapshots = new();
 
         private sealed record MenuSearchVisibilitySnapshot(BindingBase? Binding, Visibility Value);
@@ -368,6 +369,24 @@ namespace ImageViewer.Controls
                 ?? throw new InvalidOperationException("菜单搜索区模板部件 'PART_MenuSearchMatchCount' 缺失。");
             _menuSearchNoResultsText = mainContextMenu.Template?.FindName("PART_MenuSearchNoResults", mainContextMenu) as TextBlock
                 ?? throw new InvalidOperationException("菜单搜索区模板部件 'PART_MenuSearchNoResults' 缺失。");
+            EnsureMenuSearchResultsHost();
+        }
+
+        private void EnsureMenuSearchResultsHost()
+        {
+            if (_menuSearchResultsHost is not null)
+            {
+                return;
+            }
+
+            _menuSearchResultsHost = new MenuItem
+            {
+                Header = UiText.Get("MenuSearchResults"),
+                Tag = new MenuSearchHostTag(),
+                IsEnabled = false,
+                Visibility = Visibility.Collapsed,
+            };
+            mainContextMenu.Items.Insert(0, _menuSearchResultsHost);
         }
 
         internal TextBox menuSearchBox
@@ -397,11 +416,22 @@ namespace ImageViewer.Controls
             }
         }
 
+        internal MenuItem menuSearchResultsHost
+        {
+            get
+            {
+                EnsureMenuSearchTemplateParts();
+                return _menuSearchResultsHost!;
+            }
+        }
+
         private void OnContextMenuOpened(object sender, RoutedEventArgs e)
         {
             RestoreMenuSearchVisibility();
             menuSearchBox.Text = string.Empty;
             _contextMenuController.HandleOpened();
+            PrepareContextualRoiMenu();
+            ApplyMenuAvailabilityHints();
             menuSearchBox.Dispatcher.BeginInvoke(
                 () => menuSearchBox.Focus(),
                 DispatcherPriority.Input);
@@ -415,25 +445,22 @@ namespace ImageViewer.Controls
             if (words.Length == 0)
             {
                 RestoreMenuSearchVisibility();
+                ClearMenuSearchResults();
                 menuSearchMatchCountText.Visibility = Visibility.Collapsed;
                 menuSearchNoResultsText.Visibility = Visibility.Collapsed;
                 return;
             }
 
             CaptureMenuSearchVisibility(mainContextMenu);
-            bool hasMatch = false;
-            int matchCount = 0;
+            List<MenuSearchCommand> results = MenuSearchCommands.Find(
+                mainContextMenu.Items.Cast<object>(),
+                words,
+                menuItem => GetMenuSearchBaseVisibility(menuItem) != Visibility.Collapsed).ToList();
             foreach (object item in mainContextMenu.Items)
             {
-                if (item is MenuItem menuItem)
+                if (item is MenuItem menuItem && menuItem.Tag is not (MenuSearchHostTag or MenuSearchResultTag))
                 {
-                    bool itemMatch = UpdateMenuSearchVisibility(menuItem, words);
-                    hasMatch |= itemMatch;
-                    if (itemMatch)
-                    {
-                        // 统计命中的叶子命令数，而非顶级分组数，使"找到 N 个匹配命令"贴合用户感知
-                        matchCount += CountMatchingLeafMenuItems(menuItem, words);
-                    }
+                    menuItem.Visibility = Visibility.Collapsed;
                 }
                 else if (item is Separator separator)
                 {
@@ -441,10 +468,10 @@ namespace ImageViewer.Controls
                 }
             }
 
-            menuSearchMatchCountText.Text = UiText.Format("MenuSearchMatchCount", matchCount);
-            menuSearchMatchCountText.Visibility = hasMatch ? Visibility.Visible : Visibility.Collapsed;
-            menuSearchNoResultsText.Visibility = hasMatch ? Visibility.Collapsed : Visibility.Visible;
-            UpdateMenuSeparatorVisibility(mainContextMenu);
+            UpdateMenuSearchResults(results);
+            menuSearchMatchCountText.Text = UiText.Format("MenuSearchMatchCount", results.Count);
+            menuSearchMatchCountText.Visibility = results.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            menuSearchNoResultsText.Visibility = results.Count > 0 ? Visibility.Collapsed : Visibility.Visible;
         }
 
         private void OnMenuSearchPreviewKeyDown(object sender, KeyEventArgs e)
@@ -481,9 +508,19 @@ namespace ImageViewer.Controls
 
         private bool TryFocusFirstVisibleMenuItem()
         {
+            if (_menuSearchResultsHost?.Visibility == Visibility.Visible)
+            {
+                MenuItem? result = _menuSearchResultItems.FirstOrDefault(item => item.IsEnabled);
+                if (result is not null)
+                {
+                    result.Focus();
+                    return true;
+                }
+            }
+
             foreach (MenuItem menuItem in EnumerateMenuItems(mainContextMenu))
             {
-                if (menuItem.Items.Count == 0 && menuItem.Visibility == Visibility.Visible && menuItem.IsEnabled)
+                if (menuItem.Items.Count == 0 && menuItem.Visibility == Visibility.Visible && menuItem.IsEnabled && menuItem.Tag is not MenuSearchResultTag)
                 {
                     menuItem.Focus();
                     return true;
@@ -501,7 +538,7 @@ namespace ImageViewer.Controls
             }
 
             List<MenuItem> matches = EnumerateMenuItems(mainContextMenu)
-                .Where(item => item.Items.Count == 0 && item.Visibility == Visibility.Visible && item.IsEnabled)
+                .Where(item => item.Items.Count == 0 && item.Visibility == Visibility.Visible && item.IsEnabled && item.Tag is MenuSearchResultTag)
                 .Take(2)
                 .ToList();
             if (matches.Count != 1)
@@ -509,47 +546,71 @@ namespace ImageViewer.Controls
                 return false;
             }
 
-            matches[0].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            InvokeMenuSearchResult(matches[0]);
             return true;
         }
 
-        private bool UpdateMenuSearchVisibility(MenuItem menuItem, string[] words)
+        private void UpdateMenuSearchResults(IReadOnlyList<MenuSearchCommand> results)
         {
-            bool childMatch = false;
-            foreach (object child in menuItem.Items)
+            MenuItem host = _menuSearchResultsHost!;
+            ClearMenuSearchResultItems();
+            host.Header = UiText.Get("MenuSearchResults");
+            int insertionIndex = mainContextMenu.Items.IndexOf(host) + 1;
+            foreach (MenuSearchCommand result in results)
             {
-                if (child is MenuItem childMenuItem)
+                MenuItem copy = new()
                 {
-                    childMatch |= UpdateMenuSearchVisibility(childMenuItem, words);
-                }
+                    Header = result.Path,
+                    Tag = new MenuSearchResultTag(result.Original),
+                    IsEnabled = result.IsEnabled,
+                    ToolTip = result.IsEnabled ? result.Original.ToolTip : result.DisabledReason ?? UiText.Get("MenuUnavailable"),
+                    InputGestureText = result.Original.InputGestureText,
+                };
+                copy.Click += OnMenuSearchResultClick;
+                ToolTipService.SetShowOnDisabled(copy, true);
+                _menuSearchResultItems.Add(copy);
+                mainContextMenu.Items.Insert(insertionIndex++, copy);
             }
 
-            // 搜索父级分类名称时不显示空的子菜单；只有叶子命令参与命中。
-            bool ownMatch = menuItem.Items.Count == 0 && MatchesOwnSearchTerms(menuItem, words);
-            bool visible = GetMenuSearchBaseVisibility(menuItem) != Visibility.Collapsed
-                && (ownMatch || childMatch);
-            menuItem.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-            return visible;
+            host.Visibility = results.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        /// <summary>递归统计命中的叶子命令数（无子菜单的可执行项），用于搜索结果计数。</summary>
-        private static int CountMatchingLeafMenuItems(MenuItem menuItem, string[] words)
+        private void ClearMenuSearchResults()
         {
-            int count = 0;
-            foreach (object child in menuItem.Items)
+            if (_menuSearchResultsHost is null)
             {
-                if (child is MenuItem childMenuItem)
-                {
-                    count += CountMatchingLeafMenuItems(childMenuItem, words);
-                }
+                return;
             }
 
-            if (menuItem.Items.Count == 0 && MatchesOwnSearchTerms(menuItem, words))
+            ClearMenuSearchResultItems();
+            _menuSearchResultsHost.Visibility = Visibility.Collapsed;
+        }
+
+        private void ClearMenuSearchResultItems()
+        {
+            foreach (MenuItem item in _menuSearchResultItems)
             {
-                count += menuItem.Visibility == Visibility.Visible ? 1 : 0;
+                mainContextMenu.Items.Remove(item);
             }
 
-            return count;
+            _menuSearchResultItems.Clear();
+        }
+
+        private void OnMenuSearchResultClick(object sender, RoutedEventArgs e)
+        {
+            if (sender is MenuItem { Tag: MenuSearchResultTag tag, IsEnabled: true })
+            {
+                InvokeMenuSearchResult((MenuItem)sender);
+            }
+        }
+
+        private void InvokeMenuSearchResult(MenuItem result)
+        {
+            if (result.Tag is MenuSearchResultTag { Original.IsEnabled: true } tag)
+            {
+                mainContextMenu.IsOpen = false;
+                tag.Original.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            }
         }
 
         private void CaptureMenuSearchVisibility(ItemsControl itemsControl)
@@ -558,6 +619,10 @@ namespace ImageViewer.Controls
             {
                 if (item is MenuItem menuItem)
                 {
+                    if (menuItem.Tag is MenuSearchHostTag or MenuSearchResultTag)
+                    {
+                        continue;
+                    }
                     CaptureMenuSearchVisibility(menuItem);
                 }
                 else if (item is Separator separator)
@@ -574,6 +639,22 @@ namespace ImageViewer.Controls
                 _menuSearchVisibilitySnapshots[(UIElement)element] = new(
                     BindingOperations.GetBindingBase(element, UIElement.VisibilityProperty),
                     ((UIElement)element).Visibility);
+            }
+        }
+
+        private void CaptureMenuSearchVisibility(MenuItem menuItem)
+        {
+            CaptureMenuSearchVisibility((DependencyObject)menuItem);
+            foreach (object child in menuItem.Items)
+            {
+                if (child is MenuItem nested)
+                {
+                    CaptureMenuSearchVisibility(nested);
+                }
+                else if (child is Separator separator)
+                {
+                    CaptureMenuSearchVisibility(separator);
+                }
             }
         }
 
@@ -594,97 +675,11 @@ namespace ImageViewer.Controls
                 }
                 else
                 {
-                    element.SetCurrentValue(UIElement.VisibilityProperty, snapshot.Value);
+                    ((UIElement)element).Visibility = snapshot.Value;
                 }
             }
 
             _menuSearchVisibilitySnapshots.Clear();
-        }
-
-        private void UpdateMenuSeparatorVisibility(ItemsControl itemsControl)
-        {
-            for (int index = 0; index < itemsControl.Items.Count; index++)
-            {
-                if (itemsControl.Items[index] is not Separator separator)
-                {
-                    continue;
-                }
-
-                bool hasVisibleBefore = FindVisibleMenuItem(itemsControl, index, -1);
-                bool hasVisibleAfter = FindVisibleMenuItem(itemsControl, index, 1);
-                separator.Visibility = GetMenuSearchBaseVisibility(separator) != Visibility.Collapsed
-                    && hasVisibleBefore
-                    && hasVisibleAfter
-                    ? Visibility.Visible
-                    : Visibility.Collapsed;
-            }
-
-            foreach (object item in itemsControl.Items)
-            {
-                if (item is MenuItem menuItem)
-                {
-                    UpdateMenuSeparatorVisibility(menuItem);
-                }
-            }
-        }
-
-        private static bool FindVisibleMenuItem(ItemsControl itemsControl, int separatorIndex, int direction)
-        {
-            for (int index = separatorIndex + direction; index >= 0 && index < itemsControl.Items.Count; index += direction)
-            {
-                if (itemsControl.Items[index] is MenuItem menuItem)
-                {
-                    return menuItem.Visibility == Visibility.Visible;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool MatchesOwnSearchTerms(MenuItem menuItem, string[] words)
-        {
-            return words.Length == 0
-                || MatchesAllWords(menuItem.Header?.ToString(), words)
-                || MatchesAllWords(menuItem.InputGestureText, words)
-                || MatchesAllWords(menuItem.ToolTip?.ToString(), words);
-        }
-
-        /// <summary>多个空格分隔的关键词都必须命中（AND 语义）。</summary>
-        private static bool MatchesAllWords(string? text, string[] words)
-        {
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                return false;
-            }
-
-            string normalized = NormalizeSearchText(text);
-            foreach (string word in words)
-            {
-                if (!normalized.Contains(NormalizeSearchText(word), StringComparison.Ordinal))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        /// <summary>归一化：转小写并移除常见分隔符（空格、加减号、括号、斜杠、点等），方便按快捷键或关键词连写搜索。</summary>
-        private static string NormalizeSearchText(string text)
-        {
-            Span<char> buffer = text.Length <= 256 ? stackalloc char[text.Length] : new char[text.Length];
-            int count = 0;
-            foreach (char c in text)
-            {
-                if (char.IsWhiteSpace(c) || c is '+' or '-' or '.' or '/' or '\\' or '(' or ')' or '（' or '）')
-                {
-                    continue;
-                }
-
-                buffer[count++] = char.ToLowerInvariant(c);
-            }
-
-            return count == text.Length ? text.ToLowerInvariant() : new string(buffer[..count]);
         }
 
         private void OnZoomInClick(object sender, RoutedEventArgs e) => ZoomAtViewportCenter(1.25);
@@ -706,7 +701,11 @@ namespace ImageViewer.Controls
             _controlComposition.ViewportController.ZoomAt(imagePoint, factor);
         }
 
-        internal void UpdateContextMenuState() => _contextMenuController.UpdateState();
+        internal void UpdateContextMenuState()
+        {
+            _contextMenuController.UpdateState();
+            ApplyMenuAvailabilityHints();
+        }
 
         /// <summary>
         /// 更新常驻状态栏：显示当前图像像素尺寸与文件路径；无图像时显示"未加载数据"。
@@ -784,14 +783,122 @@ namespace ImageViewer.Controls
                 text += " " + UiText.Get("CalibrationBadgeDistortionSuffix");
             }
 
+            // 标定精度元数据（重投影 RMS / 不确定度）之前没有任何出口，用户无法判断标定是否够用。
+            // 把它挂在同一个徽标上：徽标文本给概览，ToolTip 给可直接核对的完整精度档案。
+            string? accuracySuffix = null;
+            if (isCalibrated && Calibration is { } calibration)
+            {
+                if (calibration.MeasurementUncertaintyPixels > 0)
+                {
+                    accuracySuffix = UiText.FormatInvariant(
+                        "CalibrationBadgeUncertaintySuffix",
+                        FormatPixelSizeLength(calibration.MeasurementUncertaintyPixels, PixelSize, unit),
+                        unit);
+                }
+                else if (calibration.ReprojectionErrorRms > 0)
+                {
+                    accuracySuffix = UiText.FormatInvariant(
+                        "CalibrationBadgeReprojectionSuffix",
+                        FormatPixelSizeLength(calibration.ReprojectionErrorRms, PixelSize, unit),
+                        unit);
+                }
+            }
+
+            if (!string.IsNullOrEmpty(accuracySuffix))
+            {
+                text += " " + accuracySuffix;
+            }
+
             bool textChanged = !string.Equals(calibrationBadgeTextBlock.Text, text, StringComparison.Ordinal);
             calibrationBadgeTextBlock.Text = text;
-            calibrationBadgeTextBlock.ToolTip = text;
+            calibrationBadgeTextBlock.ToolTip = BuildCalibrationTooltip(isCalibrated, unit);
             calibrationBadge.Visibility = Visibility.Visible;
             if (textChanged)
             {
                 RaiseLiveRegionChanged(calibrationBadgeTextBlock);
             }
+        }
+
+        /// <summary>
+        /// 把像素量换算成物理量用于精度描述。
+        /// Chinese: PixelSize 未标定（1.0/无效）时退回像素单位，避免出现"1 px = 1 mm"的暗示。
+        /// </summary>
+        private static string FormatPixelSizeLength(double pixels, double pixelSize, string unit)
+        {
+            bool isPhysical = double.IsFinite(pixelSize) && pixelSize > 0
+                && !string.Equals(unit, UiText.Get("InfoUnitPixels"), StringComparison.OrdinalIgnoreCase);
+            return isPhysical
+                ? (pixels * pixelSize).ToString("G4", CultureInfo.CurrentCulture)
+                : pixels.ToString("G4", CultureInfo.CurrentCulture);
+        }
+
+        /// <summary>
+        /// 构造标定详情 ToolTip：畸变模型 + 精度元数据 + 标定标识/时间。
+        /// Chinese: 这些字段此前完全没有 UI 出口，是"支持亚像素不等于测准"的关键证据链。
+        /// </summary>
+        private string BuildCalibrationTooltip(bool isCalibrated, string unit)
+        {
+            if (!isCalibrated)
+            {
+                return UiText.Get("CalibrationBadgeUncalibratedText");
+            }
+
+            var builder = new StringBuilder();
+            builder.Append(UiText.FormatInvariant("CalibrationBadgeTooltipScale", PixelSize, unit));
+            if (Calibration is not { } calibration)
+            {
+                return builder.ToString();
+            }
+
+            builder.Append(Environment.NewLine);
+            if (calibration.HasExtendedDistortionModel)
+            {
+                builder.Append(UiText.FormatInvariant(
+                    "CalibrationBadgeTooltipDistortionExtended",
+                    calibration.K1,
+                    calibration.K2,
+                    calibration.K3,
+                    calibration.TangentialP1,
+                    calibration.TangentialP2));
+            }
+            else if (calibration.IsEnabled)
+            {
+                builder.Append(UiText.FormatInvariant("CalibrationBadgeTooltipDistortion", calibration.K1, calibration.K2));
+            }
+            else
+            {
+                builder.Append(UiText.Get("CalibrationBadgeTooltipNoDistortion"));
+            }
+
+            if (calibration.ReprojectionErrorRms > 0 || calibration.MeasurementUncertaintyPixels > 0)
+            {
+                builder.Append(Environment.NewLine);
+                builder.Append(UiText.FormatInvariant(
+                    "CalibrationBadgeTooltipAccuracy",
+                    calibration.ReprojectionErrorRms,
+                    calibration.MeasurementUncertaintyPixels,
+                    FormatPixelSizeLength(calibration.MeasurementUncertaintyPixels, PixelSize, unit),
+                    unit));
+            }
+
+            if (!string.IsNullOrWhiteSpace(calibration.CalibrationId) || calibration.CalibratedAtUtc.HasValue)
+            {
+                builder.Append(Environment.NewLine);
+                builder.Append(UiText.FormatInvariant(
+                    "CalibrationBadgeTooltipIdentity",
+                    string.IsNullOrWhiteSpace(calibration.CalibrationId) ? UiText.Get("CalibrationBadgeNoId") : calibration.CalibrationId,
+                    calibration.CalibratedAtUtc.HasValue
+                        ? calibration.CalibratedAtUtc.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.CurrentCulture)
+                        : UiText.Get("CalibrationBadgeNoTimestamp")));
+            }
+
+            if (!calibration.IsValid)
+            {
+                builder.Append(Environment.NewLine);
+                builder.Append(UiText.Get("CalibrationBadgeInvalidWarning"));
+            }
+
+            return builder.ToString();
         }
 
         private async void OnViewCommandMenuClick(object sender, RoutedEventArgs e)

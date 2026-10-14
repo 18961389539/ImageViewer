@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Windows;
 using ImageViewer.Abstractions;
@@ -268,11 +268,15 @@ namespace ImageViewerControl.Tests
 
             public string? ShowSaveProjectPackageDialog() => throw new NotSupportedException();
 
+            public string? ShowSaveRecipeDialog() => throw new NotSupportedException();
+
+            public string? ShowOpenRecipeDialog() => throw new NotSupportedException();
+
             public string? ShowSaveSnapshotDialog() => throw new NotSupportedException();
 
             public string? ShowSaveAnalysisCsvDialog() => throw new NotSupportedException();
 
-            public CalibrationDialogResult? ShowCalibrationDialog(string currentUnit) => throw new NotSupportedException();
+            public CalibrationDialogResult? ShowCalibrationDialog(string currentUnit, CameraCalibration? currentCalibration) => throw new NotSupportedException();
 
             public CaliperMeasureRoi? ShowLineMeasureCaliperSettingsDialog(CaliperMeasureRoi roi, Action<CaliperMeasureRoi>? previewAction = null) => throw new NotSupportedException();
 

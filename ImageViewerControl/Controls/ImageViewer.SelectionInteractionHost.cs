@@ -24,6 +24,10 @@ namespace ImageViewer.Controls
 
             public RoiBase? HitTest(System.Windows.Point point) => _owner.HitTest(point);
 
+            public int GetPathVertexIndexAt(System.Windows.Point point) => _owner.GetPolygonPointIndexAt(point);
+
+            public void CaptureContextualPathVertex(RoiBase? roi, int? pointIndex) => _owner.CaptureContextualPathVertex(roi, pointIndex);
+
             public void ExitCurrentMode() => _owner.ExitCurrentMode();
 
             public void DrawRois() => _owner.DrawRois();

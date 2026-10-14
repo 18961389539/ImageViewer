@@ -112,5 +112,29 @@ namespace ImageViewer.Dialogs
 
             return dialog.ShowDialog(owner) == true ? dialog.FileName : null;
         }
+
+        public string? ShowSaveRecipeDialog(Window? owner)
+        {
+            var dialog = new SaveFileDialog
+            {
+                Title = UiText.Get("FileDialogSaveRecipeTitle"),
+                Filter = UiText.Get("FileDialogRecipeFilter"),
+                DefaultExt = ".ivrecipe"
+            };
+
+            return dialog.ShowDialog(owner) == true ? dialog.FileName : null;
+        }
+
+        public string? ShowOpenRecipeDialog(Window? owner)
+        {
+            var dialog = new OpenFileDialog
+            {
+                Title = UiText.Get("FileDialogOpenRecipeTitle"),
+                Filter = UiText.Get("FileDialogRecipeFilter"),
+                DefaultExt = ".ivrecipe"
+            };
+
+            return dialog.ShowDialog(owner) == true ? dialog.FileName : null;
+        }
     }
 }

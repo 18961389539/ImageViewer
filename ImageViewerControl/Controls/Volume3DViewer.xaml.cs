@@ -53,6 +53,59 @@ namespace ImageViewer.Controls
             viewport.EffectsManager = new DefaultEffectsManager();
             viewport.Items.Add(new DirectionalLight3D { Direction = new Vector3D(-1, -1, -1) });
             volumeStatusText.Text = UiText.Get("StatusNoVolume");
+            ApplyTheme();
+        }
+
+        /// <summary>
+        /// 控件主题（默认深色）。
+        /// Chinese: 内部配色通过 DynamicResource 引用主题键，切换即时生效；含 Helix 视口背景色。
+        /// English: Theme of this control, including the Helix viewport background color.
+        /// </summary>
+        public static readonly DependencyProperty ThemeProperty =
+            DependencyProperty.Register(
+                nameof(Theme),
+                typeof(ViewerThemes.Theme),
+                typeof(Volume3DViewer),
+                new PropertyMetadata(ViewerThemes.Theme.Dark, OnThemeChanged));
+
+        /// <summary>自定义主题字典；非 null 时优先于 <see cref="Theme"/>。</summary>
+        public static readonly DependencyProperty ThemeDictionaryProperty =
+            DependencyProperty.Register(
+                nameof(ThemeDictionary),
+                typeof(ResourceDictionary),
+                typeof(Volume3DViewer),
+                new PropertyMetadata(null, OnThemeChanged));
+
+        /// <summary>控件主题（默认深色）。</summary>
+        public ViewerThemes.Theme Theme
+        {
+            get => (ViewerThemes.Theme)GetValue(ThemeProperty);
+            set => SetValue(ThemeProperty, value);
+        }
+
+        /// <summary>自定义主题字典；非 null 时优先于 <see cref="Theme"/>。</summary>
+        public ResourceDictionary? ThemeDictionary
+        {
+            get => (ResourceDictionary?)GetValue(ThemeDictionaryProperty);
+            set => SetValue(ThemeDictionaryProperty, value);
+        }
+
+        private static void OnThemeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is Volume3DViewer viewer)
+            {
+                viewer.ApplyTheme();
+            }
+        }
+
+        private void ApplyTheme()
+        {
+            if (!IsInitialized)
+            {
+                return;
+            }
+
+            ViewerThemeSwitcher.Apply(this, ThemeDictionary ?? ViewerThemes.CreateDictionary(Theme));
         }
 
         public VolumeData? Volume

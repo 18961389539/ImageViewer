@@ -2,6 +2,7 @@
 
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using ImageViewer.Core.Measurements;
 using ImageViewer.Models;
 
 namespace ImageViewer.Core.Persistence
@@ -9,6 +10,10 @@ namespace ImageViewer.Core.Persistence
     public sealed class RoiPersistenceData
     {
         public string Type { get; set; } = string.Empty;
+
+        public Guid MeasurementId { get; set; }
+
+        public AdvancedMeasurementDefinition[] AdvancedMeasurements { get; set; } = [];
 
         [JsonIgnore]
         public RoiPersistenceCommonData Common { get; } = new();

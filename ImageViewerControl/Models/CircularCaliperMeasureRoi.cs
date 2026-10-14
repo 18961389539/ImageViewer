@@ -304,6 +304,7 @@ namespace ImageViewer.Models
         {
             var clone = new CircularCaliperMeasureRoi();
             clone.ApplyFrom(this);
+            clone.CopyMeasurementIdentityFrom(this);
             return clone;
         }
 

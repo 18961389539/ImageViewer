@@ -9,6 +9,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Media.Imaging;
+using ImageViewer.Core.Analysis;
 using ImageViewer.Models;
 using ImageViewer.Utils;
 
@@ -60,7 +61,209 @@ namespace ImageViewer.Services
                 lines.Add($"ROIs With Statistics: {statisticsCount}");
             }
 
+            lines.AddRange(BuildPrecisionLines(roiList, pixelSize, unit, calibration));
+
             return string.Join(Environment.NewLine, lines);
+        }
+
+        /// <summary>
+        /// 生成结构化测量报告（Markdown）。
+        /// Chinese: 与 CSV 同目录、同基名（`*.report.md`），凑成"数据 + 可读报告"一套交付物。
+        /// 报告头部包含标定身份与前置检查结论，因为这说明"这些数字凭什么可信"。
+        /// English: Produces the human-readable half of the deliverable. The header carries calibration
+        /// identity and readiness verdict so the numbers can be justified, not just quoted.
+        /// </summary>
+        public static string BuildReport(
+            IEnumerable<RoiBase> rois,
+            BitmapSource? bitmap,
+            double pixelSize,
+            string? physicalUnit,
+            CameraCalibration? calibration,
+            string? sourceName = null,
+            string? sourceSha256 = null,
+            bool hasKnownReference = false)
+        {
+            ArgumentNullException.ThrowIfNull(rois);
+
+            var roiList = rois.ToList();
+            var items = roiList.Select(roi =>
+            {
+                RoiInspectionResult inspection = RoiInspectionEvaluator.Evaluate(roi, pixelSize, calibration);
+                string unit = IsAngularQuantity(roi) ? "°" : string.IsNullOrWhiteSpace(physicalUnit) ? "px" : physicalUnit!;
+                return new MeasurementReportItem(
+                    DescribeRoi(roi),
+                    DescribeQuantity(roi),
+                    unit,
+                    inspection.MeasuredValue,
+                    inspection.NominalValue,
+                    inspection.TolerancePlus,
+                    inspection.ToleranceMinus,
+                    inspection.DetectionStatus.ToString(),
+                    inspection.SpecificationStatus.ToString());
+            }).ToList();
+
+            MeasurementReport report = MeasurementReportBuilder.Build(
+                items,
+                pixelSize,
+                physicalUnit,
+                calibration,
+                sourceName: sourceName,
+                sourceSha256: sourceSha256,
+                hasKnownReference: hasKnownReference);
+
+            return MeasurementReportRenderer.RenderMarkdown(report);
+        }
+
+        /// <summary>报告落到 CSV 同目录、同基名的 <c>.report.md</c>。</summary>
+        internal static string GetReportPath(string csvFilePath) =>
+            Path.ChangeExtension(csvFilePath, ".report.md");
+
+        /// <summary>重复性研究落到 CSV 同目录、同基名的 <c>.repeatability.md</c>。</summary>
+        internal static string GetRepeatabilityPath(string csvFilePath) =>
+            Path.ChangeExtension(csvFilePath, ".repeatability.md");
+
+        /// <summary>
+        /// 由批次结果构建重复性研究。
+        /// Chinese: 单张图每个 ROI 只有一个值，离散度无从谈起；只有把同一 ROI 在多张图上的结果
+        /// 聚起来（分组键 = 标签，回退到类型名），重复性才成立。检测失败/未测到的项**不参与**分组，
+        /// 否则"漏测"会被当成 0 拉低离散度、把不可靠的测量方案粉饰成稳定。
+        /// English: Aggregates batch rows into a repeatability study. Rows without a measured value are
+        /// excluded rather than coerced to 0 — a missing detection is not a measurement of zero.
+        /// </summary>
+        internal static RepeatabilityStudy BuildRepeatabilityStudy(
+            IEnumerable<RoiAnalysisBatchCsvRow> rows,
+            string? physicalUnit,
+            RepeatabilityStudyOptions? options = null,
+            IEnumerable<int>? sourceIndices = null)
+        {
+            ArgumentNullException.ThrowIfNull(rows);
+
+            var rowList = rows.ToList();
+            var samples = new List<RepeatabilityStudyBuilder.RoundSample>(rowList.Count);
+            var toleranceByKey = new Dictionary<string, (double? Nominal, double? Plus, double? Minus)?>(StringComparer.Ordinal);
+            var quantityByKey = new Dictionary<string, string>(StringComparer.Ordinal);
+            var unitByKey = new Dictionary<string, string>(StringComparer.Ordinal);
+
+            for (int index = 0; index < rowList.Count; index++)
+            {
+                RoiAnalysisBatchCsvRow row = rowList[index];
+                // Batch identity follows the template slot across input images. Labels describe
+                // the item to a person, but may be duplicated or blank and are not grouping keys.
+                string key = row.MeasurementItemKey ?? $"unidentified-row:{index}";
+                string label = DescribeRoi(row.Roi);
+
+                toleranceByKey.TryAdd(key, ToToleranceInput(row.Roi.Tolerance));
+                quantityByKey.TryAdd(key, DescribeQuantity(row.Roi));
+                unitByKey.TryAdd(key, DescribeUnit(row.Roi, row.PhysicalUnit ?? physicalUnit));
+
+                RoiInspectionResult inspection = row.Bitmap == null
+                    ? RoiInspectionEvaluator.EvaluateInputFailure(row.Roi)
+                    : RoiInspectionEvaluator.Evaluate(row.Roi, row.PixelSize, row.Calibration);
+                if (inspection.MeasuredValue is not { } measured || !double.IsFinite(measured))
+                {
+                    // 未测得值不计入样本：留空是"不知道"，不是"等于 0"。
+                    continue;
+                }
+
+                samples.Add(new RepeatabilityStudyBuilder.RoundSample(key, measured, row.SourceIndex, label));
+            }
+
+            return RepeatabilityStudyBuilder.Build(
+                samples,
+                key => toleranceByKey.TryGetValue(key, out var tolerance) ? tolerance : null,
+                key => quantityByKey.TryGetValue(key, out string? quantity) ? quantity : null,
+                physicalUnit,
+                options: options,
+                sourceIndices: rowList.Select(row => row.SourceIndex).Concat(sourceIndices ?? []),
+                unitLookup: key => unitByKey.TryGetValue(key, out string? itemUnit) ? itemUnit : null);
+        }
+
+        private static string DescribeUnit(RoiBase roi, string? physicalUnit) => roi switch
+        {
+            ParallelismMeasureRoi or PerpendicularityMeasureRoi or AngleMeasureRoi => "°",
+            _ => string.IsNullOrWhiteSpace(physicalUnit) ? "px" : physicalUnit
+        };
+
+        private static (double? Nominal, double? Plus, double? Minus)? ToToleranceInput(MeasurementTolerance? tolerance) =>
+            tolerance is { IsEnabled: true }
+                ? (tolerance.Nominal, tolerance.TolerancePlus, tolerance.ToleranceMinus)
+                : null;
+
+        /// <summary>
+        /// 角度类 ROI 的主测量量的单位文案。
+        /// Chinese: 方向公差（平行度/垂直度）与同心度在 2D 图上比较的是角度/直径差，与长度量不同，
+        /// 报告必须写清楚量名与单位，否则"0.05"到底是毫米还是度无法判断。
+        /// </summary>
+        private static string DescribeQuantity(RoiBase roi) => roi switch
+        {
+            ParallelismMeasureRoi => "平行度角度偏差",
+            PerpendicularityMeasureRoi => "垂直度角度偏差",
+            ConcentricityMeasureRoi => "同心度公差带直径 (2e)",
+            AngleMeasureRoi => "夹角",
+            CaliperMeasureRoi => "宽度(边缘中心距)",
+            LineCaliperMeasureRoi => "长度",
+            ArcCaliperMeasureRoi => "弧长",
+            CircularCaliperMeasureRoi => "半径",
+            CircleRoi => "半径",
+            ArcMeasureRoi => "半径",
+            ThreePointCircleMeasureRoi => "半径",
+            LineMeasureRoi => "长度",
+            CenterDistanceMeasureRoi => "中心距",
+            PointToLineDistanceRoi => "点到线距离",
+            PointToCircleDistanceRoi => "点到圆距离",
+            PolygonRoi polygon when polygon.IsClosed && polygon.Points.Count >= 3 => "面积",
+            _ => "测量值"
+        };
+
+        private static bool IsAngularQuantity(RoiBase roi) =>
+            roi is ParallelismMeasureRoi or PerpendicularityMeasureRoi or ConcentricityMeasureRoi or AngleMeasureRoi;
+
+        /// <summary>
+        /// 追加精度摘要。
+        /// Chinese: 单次测量的结果必须带上"这次测量能信到什么程度"；有公差配置的 ROI 会给出
+        /// 标定不确定度与综合不确定度，把"支持亚像素"与"测得准"分开说清楚。
+        /// English: Appends the precision summary so single-shot results carry their uncertainty.
+        /// </summary>
+        private static IEnumerable<string> BuildPrecisionLines(IReadOnlyList<RoiBase> rois, double pixelSize, string unit, CameraCalibration? calibration)
+        {
+            var toleranceRois = rois.Where(roi => roi.Tolerance is { IsEnabled: true }).ToList();
+            if (toleranceRois.Count == 0)
+            {
+                yield break;
+            }
+
+            double? calibrationUncertaintyPixels = calibration is { IsValid: true } && calibration.MeasurementUncertaintyPixels > 0
+                ? calibration.MeasurementUncertaintyPixels
+                : null;
+            double? reprojectionErrorRms = calibration is { } c && c.ReprojectionErrorRms > 0 ? c.ReprojectionErrorRms : null;
+
+            yield return string.Empty;
+            yield return $"[Precision] calibrated={calibration is { IsValid: true }} " +
+                $"calibrationUncertainty={(calibrationUncertaintyPixels.HasValue ? $"{calibrationUncertaintyPixels.Value * pixelSize:F4} {unit}" : "n/a")} " +
+                $"reprojectionRms={(reprojectionErrorRms.HasValue ? $"{reprojectionErrorRms.Value:F4} px" : "n/a")}";
+
+            foreach (var roi in toleranceRois)
+            {
+                RoiInspectionResult inspection = RoiInspectionEvaluator.Evaluate(roi, pixelSize, calibration);
+                if (inspection.MeasuredValue is not { } measured)
+                {
+                    yield return $"[Precision] {DescribeRoi(roi)}: measured=n/a (single sample, no repeatability)";
+                    continue;
+                }
+
+                // 单次测量无重复性可言，因此只报告标定侧不确定度，并明确说明重复性样本数为 1。
+                double? combined = calibrationUncertaintyPixels.HasValue
+                    ? calibrationUncertaintyPixels.Value * pixelSize
+                    : null;
+                yield return $"[Precision] {DescribeRoi(roi)}: measured={measured:F4} {unit} " +
+                    $"combinedUncertainty(k=2)={(combined.HasValue ? $"{combined.Value:F4} {unit}" : "n/a")} " +
+                    $"repeatability=1 sample";
+            }
+        }
+
+        private static string DescribeRoi(RoiBase roi)
+        {
+            return string.IsNullOrWhiteSpace(roi.Label) ? roi.RoiTypeName : roi.Label;
         }
 
         public static void SaveCsv(string filePath, IEnumerable<RoiBase> rois, BitmapSource? bitmap, double pixelSize, string? physicalUnit, CameraCalibration? calibration = null)
@@ -92,21 +295,60 @@ namespace ImageViewer.Services
             RoiAnalysisExportContext? exportContext,
             CancellationToken cancellationToken)
         {
-            await ImageViewerAtomicFile.WriteAllTextAsync(filePath, BuildCsv(rois, bitmap, pixelSize, physicalUnit, calibration), Encoding.UTF8, cancellationToken).ConfigureAwait(false);
+            string csv = BuildCsv(rois, bitmap, pixelSize, physicalUnit, calibration);
             if (exportContext == null)
             {
+                await ImageViewerExportArtifactSet.WriteAllTextAsync(
+                    new Dictionary<string, string> { [filePath] = csv }, cancellationToken).ConfigureAwait(false);
                 return;
             }
 
             string metadataPath = Path.ChangeExtension(filePath, ".metadata.json");
-            string csvHash = await ComputeSha256Async(filePath, cancellationToken).ConfigureAwait(false);
-            string metadata = await BuildMetadataJsonAsync(rois, bitmap, pixelSize, physicalUnit, calibration, exportContext, csvHash, cancellationToken).ConfigureAwait(false);
-            await ImageViewerAtomicFile.WriteAllTextAsync(metadataPath, metadata, Encoding.UTF8, cancellationToken).ConfigureAwait(false);
+            string reportPath = GetReportPath(filePath);
+            string exportBatchId = Guid.NewGuid().ToString("N");
+            string csvHash = ImageViewerExportArtifactSet.ComputeSha256Utf8Text(csv);
+
+            // 报告与人读的摘要一起产出：CSV 给机器，Markdown 给人，metadata 给复现。
+            string report = BuildReport(
+                rois,
+                bitmap,
+                pixelSize,
+                physicalUnit,
+                calibration,
+                sourceName: string.IsNullOrWhiteSpace(exportContext.SourcePath) ? null : Path.GetFileName(exportContext.SourcePath),
+                sourceSha256: await TryComputeSourceHashAsync(exportContext.SourcePath, cancellationToken).ConfigureAwait(false));
+            report += $"\n\n<!-- exportBatchId: {exportBatchId} -->\n";
+            string reportHash = ImageViewerExportArtifactSet.ComputeSha256Utf8Text(report);
+            string metadata = await BuildMetadataJsonAsync(
+                rois,
+                bitmap,
+                pixelSize,
+                physicalUnit,
+                calibration,
+                exportContext,
+                csvHash,
+                exportBatchId,
+                reportHash,
+                cancellationToken).ConfigureAwait(false);
+
+            await ImageViewerExportArtifactSet.WriteAllTextAsync(
+                new Dictionary<string, string>
+                {
+                    [filePath] = csv,
+                    [metadataPath] = metadata,
+                    [reportPath] = report
+                },
+                cancellationToken).ConfigureAwait(false);
         }
 
-        private static async Task<string> ComputeSha256Async(string filePath, CancellationToken cancellationToken)
+        private static async Task<string?> TryComputeSourceHashAsync(string? sourcePath, CancellationToken cancellationToken)
         {
-            await using FileStream stream = File.OpenRead(filePath);
+            if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
+            {
+                return null;
+            }
+
+            await using FileStream stream = File.OpenRead(sourcePath);
             byte[] hash = await SHA256.HashDataAsync(stream, cancellationToken).ConfigureAwait(false);
             return Convert.ToHexString(hash).ToLowerInvariant();
         }
@@ -119,6 +361,8 @@ namespace ImageViewer.Services
             CameraCalibration? calibration,
             RoiAnalysisExportContext exportContext,
             string csvHash,
+            string exportBatchId,
+            string reportHash,
             CancellationToken cancellationToken)
         {
             string? sourceHash = null;
@@ -145,6 +389,13 @@ namespace ImageViewer.Services
             var metadata = new Dictionary<string, object?>
             {
                 ["exportFormatVersion"] = 2,
+                ["exportBatchId"] = exportBatchId,
+                ["artifactSet"] = new Dictionary<string, object?>
+                {
+                    ["batchId"] = exportBatchId,
+                    ["csvSha256"] = csvHash,
+                    ["reportSha256"] = reportHash
+                },
                 ["exportedAtUtc"] = DateTimeOffset.UtcNow,
                 ["applicationVersion"] = typeof(RoiAnalysisExportService).Assembly.GetName().Version?.ToString() ?? "unknown",
                 ["analysisAlgorithm"] = FittingAlgorithmMetadata.Version,
@@ -328,7 +579,7 @@ namespace ImageViewer.Services
             ArgumentNullException.ThrowIfNull(rows);
 
             var builder = new StringBuilder();
-            builder.AppendLine("Source,Status,Error,Type,Label,Metric1,Metric2,Metric3,Mean,Min,Max,StdDev,PixelCount,DetectionStatus,SpecificationStatus,MeasuredValue,NominalValue,TolerancePlus,ToleranceMinus,PhysicalUnit");
+            builder.AppendLine("Source,Status,Error,Type,Label,Metric1,Metric2,Metric3,Mean,Min,Max,StdDev,PixelCount,DetectionStatus,SpecificationStatus,MeasuredValue,NominalValue,TolerancePlus,ToleranceMinus,PhysicalUnit,SourceIndex,MeasurementItemKey");
             foreach (RoiAnalysisBatchCsvRow row in rows)
             {
                 var metrics = GetMetrics(row.Roi, row.PixelSize, string.IsNullOrWhiteSpace(row.PhysicalUnit) ? "px" : row.PhysicalUnit, row.Calibration);
@@ -371,7 +622,9 @@ namespace ImageViewer.Services
                     FormatNullable(inspection.NominalValue),
                     FormatNullable(inspection.TolerancePlus),
                     FormatNullable(inspection.ToleranceMinus),
-                    Escape(unit)));
+                    Escape(unit),
+                    row.SourceIndex.ToString(CultureInfo.InvariantCulture),
+                    Escape(row.MeasurementItemKey)));
             }
 
             return builder.ToString();

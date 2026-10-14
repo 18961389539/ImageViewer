@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Media.Imaging;
+using ImageViewer.Core.Analysis;
 using ImageViewer.Models;
 using ImageViewer.Plugins;
 
@@ -59,6 +60,42 @@ namespace ImageViewer.Services
                 cancellationToken: cancellationToken);
         }
 
+        public static Task<BatchRoiAnalysisExportSummary> ExportAsync(
+            string outputPath,
+            IEnumerable<string> imagePaths,
+            IEnumerable<RoiBase> roiTemplates,
+            double pixelSize,
+            string? physicalUnit,
+            RepeatabilityStudyOptions repeatabilityOptions,
+            CameraCalibration? calibration = null,
+            RoiPluginRegistry? pluginRegistry = null,
+            IReadOnlyDictionary<string, string>? renderSettings = null,
+            IProgress<BatchRoiAnalysisExportProgress>? progress = null,
+            CancellationToken cancellationToken = default)
+        {
+            return ExportAsync(outputPath, imagePaths, roiTemplates, pixelSize, physicalUnit, calibration,
+                pluginRegistry, renderSettings, qualityProfile: null, repeatabilityOptions: repeatabilityOptions,
+                progress: progress, cancellationToken: cancellationToken);
+        }
+
+        public static Task<BatchRoiAnalysisExportSummary> ExportAsync(
+            string outputPath,
+            IEnumerable<string> imagePaths,
+            IEnumerable<RoiBase> roiTemplates,
+            double pixelSize,
+            string? physicalUnit,
+            CameraCalibration? calibration,
+            RoiPluginRegistry? pluginRegistry,
+            IReadOnlyDictionary<string, string>? renderSettings,
+            ImageAnalysisQualityProfile? qualityProfile,
+            IProgress<BatchRoiAnalysisExportProgress>? progress = null,
+            CancellationToken cancellationToken = default)
+        {
+            return ExportAsync(outputPath, imagePaths, roiTemplates, pixelSize, physicalUnit, calibration,
+                pluginRegistry, renderSettings, qualityProfile, repeatabilityOptions: new RepeatabilityStudyOptions(),
+                progress: progress, cancellationToken: cancellationToken);
+        }
+
         public static async Task<BatchRoiAnalysisExportSummary> ExportAsync(
             string outputPath,
             IEnumerable<string> imagePaths,
@@ -69,6 +106,7 @@ namespace ImageViewer.Services
             RoiPluginRegistry? pluginRegistry,
             IReadOnlyDictionary<string, string>? renderSettings,
             ImageAnalysisQualityProfile? qualityProfile,
+            RepeatabilityStudyOptions repeatabilityOptions,
             IProgress<BatchRoiAnalysisExportProgress>? progress = null,
             CancellationToken cancellationToken = default)
         {
@@ -121,7 +159,7 @@ namespace ImageViewer.Services
                     inputTrace.PixelWidth = bitmap.PixelWidth;
                     inputTrace.PixelHeight = bitmap.PixelHeight;
                     RoiAnalysisBatchCsvRow[] sourceRows = await Task.Run(
-                        () => AnalyzeSource(sourcePath, bitmap, templates, pixelSize, physicalUnit, calibration, quality, cancellationToken),
+                        () => AnalyzeSource(sourceIndex, sourcePath, bitmap, templates, pixelSize, physicalUnit, calibration, quality, cancellationToken),
                         cancellationToken).ConfigureAwait(false);
                     rows.AddRange(sourceRows);
                     inputTrace.RowCount = sourceRows.Length;
@@ -168,7 +206,7 @@ namespace ImageViewer.Services
                     inputTrace.Status = status;
                     inputTrace.Error = error;
                     inputTrace.RowCount = templates.Length;
-                    rows.AddRange(CreateFailureRows(sourcePath, status, error, templates, pixelSize, physicalUnit, calibration));
+                    rows.AddRange(CreateFailureRows(sourceIndex, sourcePath, status, error, templates, pixelSize, physicalUnit, calibration));
                     errors.Add($"{Path.GetFileName(sourcePath)}: {error}");
                     if (bitmapLoaded)
                     {
@@ -186,14 +224,21 @@ namespace ImageViewer.Services
             // Persist completed work even when the user cancels. The summary is useful
             // for resuming or auditing a long batch and must not be blocked by the
             // canceled token that triggered the partial export.
-            await ImageViewerAtomicFile.WriteAllTextAsync(outputPath, csv, Encoding.UTF8, CancellationToken.None).ConfigureAwait(false);
             string metadataPath = Path.ChangeExtension(outputPath, ".metadata.json");
             string summaryPath = Path.ChangeExtension(outputPath, ".summary.json");
-            string csvHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(csv))).ToLowerInvariant();
+            // 重复性研究随批次一并产出：多图批次正是重复性的唯一真实来源（单图只有 1 个样本）。
+            string repeatabilityPath = RoiAnalysisExportService.GetRepeatabilityPath(outputPath);
+            string batchId = Guid.NewGuid().ToString("N");
+            RepeatabilityStudy repeatabilityStudy = RoiAnalysisExportService.BuildRepeatabilityStudy(
+                rows, physicalUnit, repeatabilityOptions, inputTraces.Select(trace => trace.InputIndex));
+            string repeatabilityMarkdown = RepeatabilityStudyRenderer.RenderMarkdown(repeatabilityStudy);
+            string csvHash = ImageViewerExportArtifactSet.ComputeSha256Utf8Text(csv);
+            string repeatabilityHash = ImageViewerExportArtifactSet.ComputeSha256Utf8Text(repeatabilityMarkdown);
             var metadata = new Dictionary<string, object?>
             {
                 ["exportFormatVersion"] = 2,
                 ["batch"] = true,
+                ["batchId"] = batchId,
                 ["status"] = canceled ? "Canceled" : "Completed",
                 ["canceled"] = canceled,
                 ["exportedAtUtc"] = DateTimeOffset.UtcNow,
@@ -224,6 +269,37 @@ namespace ImageViewer.Services
                 },
                 ["qualityThresholds"] = quality,
                 ["roiCount"] = templates.Length,
+                ["repeatability"] = new Dictionary<string, object?>
+                {
+                    ["path"] = repeatabilityPath,
+                    ["workpieceContext"] = repeatabilityStudy.Context.Context.ToString(),
+                    ["workpieceId"] = repeatabilityStudy.Context.WorkpieceId,
+                    ["sourceCount"] = repeatabilityStudy.SourceCount,
+                    ["conclusiveItemCount"] = repeatabilityStudy.ConclusiveItemCount,
+                    ["inconclusiveItemCount"] = repeatabilityStudy.InconclusiveItemCount,
+                    ["toleranceConsumedItemCount"] = repeatabilityStudy.ToleranceConsumedCount,
+                    ["hasConclusiveResult"] = repeatabilityStudy.HasConclusiveResult,
+                    ["items"] = repeatabilityStudy.Items.Select(item => new Dictionary<string, object?>
+                    {
+                        ["label"] = item.Label,
+                        ["measurementItemKey"] = item.MeasurementItemKey,
+                        ["unit"] = item.Unit,
+                        ["quantity"] = item.Quantity,
+                        ["sampleCount"] = item.Statistics.SampleCount,
+                        ["mean"] = item.Statistics.Mean,
+                        ["standardDeviation"] = item.Statistics.StandardDeviation,
+                        ["expandedUncertainty"] = item.Statistics.ExpandedUncertainty,
+                        ["range"] = item.Statistics.Range,
+                        ["toleranceBand"] = item.ToleranceBand,
+                        ["shareOfTolerancePercent"] = item.RepeatabilityShareOfTolerancePercent
+                    }).ToList()
+                },
+                ["artifacts"] = new Dictionary<string, object?>
+                {
+                    ["csvSha256"] = csvHash,
+                    ["repeatabilitySha256"] = repeatabilityHash,
+                    ["summarySha256"] = null
+                },
                 ["roiTypes"] = templates
                     .GroupBy(roi => roi.RoiTypeName)
                     .OrderBy(group => group.Key, StringComparer.Ordinal)
@@ -231,7 +307,7 @@ namespace ImageViewer.Services
                 ["renderSettings"] = renderSettings,
                 ["hasRoiPersistenceRegistry"] = pluginRegistry != null
             };
-            await ImageViewerAtomicFile.WriteAllTextAsync(metadataPath, JsonSerializer.Serialize(metadata, MetadataJsonOptions), Encoding.UTF8, CancellationToken.None).ConfigureAwait(false);
+            string metadataJson = JsonSerializer.Serialize(metadata, MetadataJsonOptions);
             BatchRoiAnalysisExportSummary summary = new(
                 sources.Length,
                 processedFileCount,
@@ -246,12 +322,31 @@ namespace ImageViewer.Services
                 InputFailedFileCount = inputFailedFileCount,
                 IsCanceled = canceled,
                 MetadataPath = metadataPath,
-                SummaryPath = summaryPath
+                SummaryPath = summaryPath,
+                RepeatabilityPath = repeatabilityPath,
+                RepeatabilitySourceCount = repeatabilityStudy.SourceCount,
+                RepeatabilityConclusiveItemCount = repeatabilityStudy.ConclusiveItemCount,
+                RepeatabilityToleranceConsumedItemCount = repeatabilityStudy.ToleranceConsumedCount,
+                BatchId = batchId,
+                CsvSha256 = csvHash,
+                RepeatabilitySha256 = repeatabilityHash
             };
-            await ImageViewerAtomicFile.WriteAllTextAsync(
-                summaryPath,
-                JsonSerializer.Serialize(summary, MetadataJsonOptions),
-                Encoding.UTF8,
+            string summaryJson = JsonSerializer.Serialize(summary, MetadataJsonOptions);
+            metadata["artifacts"] = new Dictionary<string, object?>
+            {
+                ["csvSha256"] = csvHash,
+                ["repeatabilitySha256"] = repeatabilityHash,
+                ["summarySha256"] = ImageViewerExportArtifactSet.ComputeSha256Utf8Text(summaryJson)
+            };
+            metadataJson = JsonSerializer.Serialize(metadata, MetadataJsonOptions);
+            await ImageViewerExportArtifactSet.WriteAllTextAsync(
+                new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    [outputPath] = csv,
+                    [repeatabilityPath] = repeatabilityMarkdown,
+                    [metadataPath] = metadataJson,
+                    [summaryPath] = summaryJson
+                },
                 CancellationToken.None).ConfigureAwait(false);
             progress?.Report(new BatchRoiAnalysisExportProgress(sources.Length, inputTraces.Count, string.Empty, canceled ? "Canceled" : "Exported", rows.Count));
             if (canceled)
@@ -281,6 +376,7 @@ namespace ImageViewer.Services
         }
 
         private static RoiAnalysisBatchCsvRow[] AnalyzeSource(
+            int sourceIndex,
             string sourcePath,
             BitmapSource bitmap,
             IReadOnlyList<RoiBase> templates,
@@ -314,7 +410,7 @@ namespace ImageViewer.Services
                     error = ex.Message;
                 }
 
-                rows[i] = new RoiAnalysisBatchCsvRow(sourcePath, status, error, roi, bitmap, pixelSize, physicalUnit, calibration);
+                rows[i] = new RoiAnalysisBatchCsvRow(sourcePath, status, error, roi, bitmap, pixelSize, physicalUnit, calibration, sourceIndex, $"roi:{i}");
             }
 
             return rows;
@@ -337,6 +433,7 @@ namespace ImageViewer.Services
         }
 
         private static RoiAnalysisBatchCsvRow[] CreateFailureRows(
+            int sourceIndex,
             string sourcePath,
             string status,
             string error,
@@ -346,7 +443,7 @@ namespace ImageViewer.Services
             CameraCalibration? calibration)
         {
             return templates
-                .Select(template => new RoiAnalysisBatchCsvRow(
+                .Select((template, index) => new RoiAnalysisBatchCsvRow(
                     sourcePath,
                     status,
                     error,
@@ -354,7 +451,9 @@ namespace ImageViewer.Services
                     Bitmap: null,
                     pixelSize,
                     physicalUnit,
-                    calibration))
+                    calibration,
+                    sourceIndex,
+                    $"roi:{index}"))
                 .ToArray();
         }
 
@@ -529,5 +628,26 @@ namespace ImageViewer.Services
         public string? MetadataPath { get; init; }
 
         public string? SummaryPath { get; init; }
+
+        /// <summary>重复性研究报告路径（<c>*.repeatability.md</c>）。</summary>
+        public string? RepeatabilityPath { get; init; }
+
+        /// <summary>参与重复性研究的图像数。</summary>
+        public int RepeatabilitySourceCount { get; init; }
+
+        /// <summary>样本数足够（≥2）因而能给出重复性结论的项数。</summary>
+        public int RepeatabilityConclusiveItemCount { get; init; }
+
+        /// <summary>重复性已占满公差带（≥100%）的项数；&gt;0 表示该测量方案的可判定性存在问题。</summary>
+        public int RepeatabilityToleranceConsumedItemCount { get; init; }
+
+        /// <summary>Links the CSV, repeatability report, summary, and metadata from one export.</summary>
+        public string? BatchId { get; init; }
+
+        /// <summary>SHA-256 of the exact UTF-8-with-BOM CSV bytes.</summary>
+        public string? CsvSha256 { get; init; }
+
+        /// <summary>SHA-256 of the exact UTF-8-with-BOM repeatability report bytes.</summary>
+        public string? RepeatabilitySha256 { get; init; }
     }
 }

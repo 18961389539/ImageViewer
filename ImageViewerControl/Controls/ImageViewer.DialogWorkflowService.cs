@@ -66,7 +66,14 @@ namespace ImageViewer.Controls
     {
         public required Func<string> GetPhysicalUnit { get; init; }
 
-        public required Action<double, string, double, double> ApplyCalibration { get; init; }
+        /// <summary>当前已生效的畸变标定，用于预填对话框。</summary>
+        public required Func<CameraCalibration?> GetCalibration { get; init; }
+
+        /// <summary>
+        /// 应用标定。第 4 个参数是对话框采集到的完整畸变模型（可能为 null 表示不校正）。
+        /// Chinese: 主点/归一化半径若对话框未提供（&lt;= 0），由实现方按图像尺寸补齐。
+        /// </summary>
+        public required Action<double, string, CameraCalibration?> ApplyCalibration { get; init; }
     }
 
     internal sealed class ImageViewerDialogWorkflowService
@@ -287,6 +294,16 @@ namespace ImageViewer.Controls
             return _adapter.ShowSaveProjectPackageDialog();
         }
 
+        public string? ShowSaveRecipeDialog()
+        {
+            return _adapter.ShowSaveRecipeDialog();
+        }
+
+        public string? ShowOpenRecipeDialog()
+        {
+            return _adapter.ShowOpenRecipeDialog();
+        }
+
         public string? ShowSaveSnapshotDialog()
         {
             return _adapter.ShowSaveSnapshotDialog();
@@ -375,14 +392,15 @@ namespace ImageViewer.Controls
                 return;
             }
 
-            var calibration = _adapter.ShowCalibrationDialog(_dependencies.Calibration.GetPhysicalUnit());
+            var calibration = _adapter.ShowCalibrationDialog(
+                _dependencies.Calibration.GetPhysicalUnit(),
+                _dependencies.Calibration.GetCalibration());
             if (calibration != null)
             {
                 _dependencies.Calibration.ApplyCalibration(
                     calibration.Value.Length / pixelDistance,
                     calibration.Value.Unit,
-                    calibration.Value.K1,
-                    calibration.Value.K2);
+                    calibration.Value.Distortion);
             }
         }
 

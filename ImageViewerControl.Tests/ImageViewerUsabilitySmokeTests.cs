@@ -102,11 +102,11 @@ namespace ImageViewerControl.Tests
 
                 searchBox.Text = "导出 PNG";
                 WpfTestRunner.DrainDispatcher();
-                Assert.Equal(Visibility.Visible, exportSnapshot.Visibility);
+                Assert.Contains(viewer.mainContextMenu.Items.OfType<MenuItem>(), item => item.Tag is MenuSearchResultTag tag && ReferenceEquals(tag.Original, exportSnapshot));
 
                 searchBox.Text = "导出 缩放";
                 WpfTestRunner.DrainDispatcher();
-                Assert.Equal(Visibility.Collapsed, exportSnapshot.Visibility);
+                Assert.DoesNotContain(viewer.mainContextMenu.Items.OfType<MenuItem>(), item => item.Tag is MenuSearchResultTag tag && ReferenceEquals(tag.Original, exportSnapshot));
             });
         }
 
@@ -482,13 +482,82 @@ namespace ImageViewerControl.Tests
 
                 Assert.Equal(Visibility.Visible, viewer.calibrationBadge.Visibility);
                 Assert.Equal(UiText.FormatInvariant("CalibrationBadgeText", 0.5, "mm"), viewer.calibrationBadgeTextBlock.Text);
-                Assert.Equal(viewer.calibrationBadgeTextBlock.Text, viewer.calibrationBadgeTextBlock.ToolTip);
+                // 无畸变模型时 ToolTip 只包含标定比例（精度档案从 ①-1 起才出现在 ToolTip 里）。
+                Assert.Equal(UiText.FormatInvariant("CalibrationBadgeTooltipScale", 0.5, "mm"), viewer.calibrationBadgeTextBlock.ToolTip);
 
                 viewer.PixelSize = 1.0;
                 viewer.PhysicalUnit = "px";
                 WpfTestRunner.DrainDispatcher();
 
                 Assert.Equal(Visibility.Collapsed, viewer.calibrationBadge.Visibility);
+            });
+        }
+
+        /// <summary>
+        /// ①-1 守卫：标定精度元数据（重投影 RMS / 不确定度 / 标定标识）必须在状态栏徽标上可见。
+        /// Chinese: 此前这些字段没有任何 UI 出口，用户无法判断标定是否满足当前测量要求。
+        /// </summary>
+        [Fact]
+        public void CalibrationIndicator_SurfacesAccuracyMetadataFromCalibration()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                using var viewer = new ImageViewer.Controls.ImageViewer();
+                WpfTestRunner.DrainDispatcher();
+
+                viewer.PixelSize = 0.5;
+                viewer.PhysicalUnit = "mm";
+                viewer.Calibration = new CameraCalibration
+                {
+                    K1 = 0.01,
+                    K2 = -0.002,
+                    K3 = 0.0003,
+                    TangentialP1 = 0.00004,
+                    ReprojectionErrorRms = 0.08,
+                    MeasurementUncertaintyPixels = 0.2,
+                    CalibrationId = "CERT-X",
+                    CalibratedAtUtc = new DateTimeOffset(2026, 3, 1, 8, 30, 0, TimeSpan.Zero)
+                };
+                WpfTestRunner.DrainDispatcher();
+
+                Assert.Equal(Visibility.Visible, viewer.calibrationBadge.Visibility);
+
+                // 徽标文本：不确定度优先（它直接对应"测出来能准到多少"），按 PixelSize 换算为物理单位
+                Assert.Contains(UiText.FormatInvariant("CalibrationBadgeText", 0.5, "mm"), viewer.calibrationBadgeTextBlock.Text);
+                Assert.Contains(UiText.FormatInvariant("CalibrationBadgeUncertaintySuffix", 0.1, "mm"), viewer.calibrationBadgeTextBlock.Text);
+
+                // ToolTip：完整精度档案
+                string tooltip = (string)viewer.calibrationBadgeTextBlock.ToolTip;
+                Assert.Contains("CERT-X", tooltip);
+                Assert.Contains("0.08", tooltip);
+                Assert.Contains("0.2", tooltip);
+                Assert.Contains(UiText.FormatInvariant("CalibrationBadgeTooltipDistortionExtended", 0.01, -0.002, 0.0003, 0.00004, 0.0), tooltip);
+            });
+        }
+
+        /// <summary>
+        /// 只有重投影 RMS、没有不确定度时，徽标也必须给出可读精度而非静默丢弃。
+        /// </summary>
+        [Fact]
+        public void CalibrationIndicator_FallsBackToReprojectionErrorWhenUncertaintyMissing()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                using var viewer = new ImageViewer.Controls.ImageViewer();
+                WpfTestRunner.DrainDispatcher();
+
+                viewer.PixelSize = 0.5;
+                viewer.PhysicalUnit = "mm";
+                viewer.Calibration = new CameraCalibration
+                {
+                    K1 = 0.01,
+                    ReprojectionErrorRms = 0.08
+                };
+                WpfTestRunner.DrainDispatcher();
+
+                Assert.Contains(
+                    UiText.FormatInvariant("CalibrationBadgeReprojectionSuffix", 0.04, "mm"),
+                    viewer.calibrationBadgeTextBlock.Text);
             });
         }
 
@@ -601,10 +670,15 @@ namespace ImageViewerControl.Tests
             WpfTestRunner.Run(() =>
             {
                 using var viewer = new ImageViewer.Controls.ImageViewer();
+                var circle = new CircleRoi { Center = new PointD(1, 1), Radius = 1 };
+                Assert.True(viewer.AddRoi(circle));
+                viewer.ViewerState.SelectedRoi = circle;
+                viewer.UpdateContextMenuState();
+                WpfTestRunner.DrainDispatcher();
                 viewer.menuSearchBox.Text = "Ctrl+Z";
                 WpfTestRunner.DrainDispatcher();
 
-                Assert.Equal(Visibility.Visible, viewer.undoMenuItem.Visibility);
+                Assert.Contains(viewer.mainContextMenu.Items.OfType<MenuItem>(), item => item.Tag is MenuSearchResultTag tag && ReferenceEquals(tag.Original, viewer.undoMenuItem));
                 // 撤销、删除、清空三项的 ToolTip/InputGestureText 均提及 Ctrl+Z，应按叶子命令计数为 3
                 Assert.StartsWith("找到 3", viewer.menuSearchMatchCountText.Text);
             });

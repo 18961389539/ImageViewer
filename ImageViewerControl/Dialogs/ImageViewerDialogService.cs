@@ -18,15 +18,15 @@ namespace ImageViewer.Dialogs
             return dialog.ShowDialog() == true ? dialog.Input : null;
         }
 
-        public CalibrationDialogResult? ShowCalibrationDialog(Window? owner, string currentUnit)
+        public CalibrationDialogResult? ShowCalibrationDialog(Window? owner, string currentUnit, CameraCalibration? currentCalibration)
         {
-            var dialog = new CalibrationDialog(currentUnit)
+            var dialog = new CalibrationDialog(currentUnit, currentCalibration)
             {
                 Owner = owner
             };
 
             return dialog.ShowDialog() == true
-                ? new CalibrationDialogResult(dialog.Length, dialog.Unit, dialog.K1, dialog.K2)
+                ? new CalibrationDialogResult(dialog.Length, dialog.Unit, dialog.Distortion)
                 : null;
         }
 

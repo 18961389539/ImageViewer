@@ -49,7 +49,13 @@ namespace ImageViewer.Controls
                 return;
             }
 
-            _viewModel.UndoRedo.Undo();
+            // 撤销失败时管理器不改动栈（命令仍在撤销栈，可重试），但异常不能让键盘/菜单路径崩溃：
+            // 这里记录并给出状态提示，界面保持与历史一致。
+            if (!TryRunHistoryOperation(() => _viewModel.UndoRedo.Undo(), "Undo"))
+            {
+                return;
+            }
+
             _tryRefreshCaliperDetection(_viewModel.SelectedRoi);
             _drawRois();
             _showStatusHint(UiText.Get("StatusUndone"), StatusHintKind.Info);
@@ -62,10 +68,34 @@ namespace ImageViewer.Controls
                 return;
             }
 
-            _viewModel.UndoRedo.Redo();
+            if (!TryRunHistoryOperation(() => _viewModel.UndoRedo.Redo(), "Redo"))
+            {
+                return;
+            }
+
             _tryRefreshCaliperDetection(_viewModel.SelectedRoi);
             _drawRois();
             _showStatusHint(UiText.Get("StatusRedone"), StatusHintKind.Info);
+        }
+
+        /// <summary>
+        /// 执行一次撤销/重做，捕获异常并转为日志 + 状态提示。
+        /// Chinese: 返回 false 表示操作失败；调用方应跳过后续的界面刷新与"已完成"提示。
+        /// English: Runs a history operation, converting any failure into a log entry plus a status hint.
+        /// </summary>
+        private bool TryRunHistoryOperation(Action operation, string operationName)
+        {
+            try
+            {
+                operation();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logNonCriticalError($"历史操作失败：{operationName}", ex);
+                _showStatusHint(UiText.Get("StatusUndoRedoFailed"), StatusHintKind.Error);
+                return false;
+            }
         }
 
         public void DeleteSelected()

@@ -59,6 +59,7 @@ namespace ImageViewerControl.Tests
             public int ExportAnalysisCsvCount { get; private set; }
             public int ExportBatchAnalysisCsvCount { get; private set; }
             public int ShowAnalysisSummaryCount { get; private set; }
+            public int CheckCalibrationReadinessCount { get; private set; }
             public int UpdateContextMenuStateCount { get; private set; }
 
             public void RunGradientDetection() => RunGradientDetectionCount++;
@@ -82,6 +83,8 @@ namespace ImageViewerControl.Tests
             }
 
             public void ShowAnalysisSummary() => ShowAnalysisSummaryCount++;
+
+            public void CheckCalibrationReadiness() => CheckCalibrationReadinessCount++;
 
             public void UpdateContextMenuState() => UpdateContextMenuStateCount++;
         }

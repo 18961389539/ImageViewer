@@ -922,6 +922,8 @@ namespace ImageViewer.Plugins
 
         public static void ApplyCommonState(this RoiBase roi, RoiPersistenceData data)
         {
+            roi.MeasurementId = data.MeasurementId;
+            roi.AdvancedMeasurements = data.AdvancedMeasurements;
             roi.Label = data.Common.Label ?? string.Empty;
             roi.StrokeThickness = data.Common.StrokeThickness;
             roi.IsVisible = data.Common.IsVisible;
@@ -947,6 +949,8 @@ namespace ImageViewer.Plugins
         public static void PopulateCommonState(this RoiPersistenceData data, RoiBase roi, string typeKey)
         {
             data.Type = typeKey;
+            data.MeasurementId = roi.MeasurementId;
+            data.AdvancedMeasurements = roi.AdvancedMeasurements.Select(item => item.DeepClone()).ToArray();
             data.Common.Label = roi.Label;
             data.Common.StrokeColor = roi.StrokeColor.ToString();
             data.Common.StrokeThickness = roi.StrokeThickness;

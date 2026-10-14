@@ -1,7 +1,11 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using ImageViewer.Abstractions;
+using ImageViewer.Core.Analysis;
+using ImageViewer.Core.Geometry;
+using ImageViewer.Core.Persistence;
 using ImageViewer.Localization;
 using ImageViewer.Models;
 using ImageViewer.Plugins;
@@ -24,6 +28,10 @@ namespace ImageViewer.Controls
         public required Func<string?> ShowOpenSessionDialog { get; init; }
 
         public required Func<string?> ShowSaveProjectPackageDialog { get; init; }
+
+        public required Func<string?> ShowSaveRecipeDialog { get; init; }
+
+        public required Func<string?> ShowOpenRecipeDialog { get; init; }
 
         public required IImageViewerSessionService SessionService { get; init; }
 
@@ -50,6 +58,31 @@ namespace ImageViewer.Controls
         public Action<ImageAnalysisQualityProfile> SetQualityProfile { get; init; } = static _ => { };
 
         public required Action<CameraCalibration?> SetCalibration { get; init; }
+
+        /// <summary>
+        /// 当前工件坐标系（可为 null = 未定义，此时所有映射退化为恒等）。
+        /// Chinese: 与 ROI 一样属于"当前测量方案"的一部分，随配方一起存取。
+        /// </summary>
+        public Func<WorkpieceCoordinateSystem?> GetWorkpieceCoordinateSystem { get; init; } = static () => null;
+
+        public Action<WorkpieceCoordinateSystem?> SetWorkpieceCoordinateSystem { get; init; } = static _ => { };
+
+        /// <summary>
+        /// 保存配方时手动捕获的参考图像基准点，最多两个，顺序固定。
+        /// </summary>
+        public Func<IReadOnlyList<RecipeDatumPoint>> GetRecipeDatumPoints { get; init; } = static () => Array.Empty<RecipeDatumPoint>();
+
+        public Func<IReadOnlyList<RecipeDatumPoint>> GetCurrentRecipeDatumPoints { get; init; } = static () => Array.Empty<RecipeDatumPoint>();
+
+        public Func<object?> GetCurrentImageIdentity { get; init; } = static () => null;
+
+        public Func<PointD?> GetSelectedRecipeDatumPosition { get; init; } = static () => null;
+
+        public Action<int, RecipeDatumPoint> SetRecipeDatumPoint { get; init; } = static (_, _) => { };
+
+        public Action<IReadOnlyList<RecipeDatumPoint>> SetRecipeDatumPoints { get; init; } = static _ => { };
+
+        public Action<int, RecipeDatumPoint> SetCurrentRecipeDatumPoint { get; init; } = static (_, _) => { };
 
         public required Func<ImageViewerViewportState> GetCurrentViewportState { get; init; }
 
@@ -171,11 +204,21 @@ namespace ImageViewer.Controls
         private readonly ImageViewerAutoSaveWorkflow _autoSave;
         private readonly ImageViewerRecentProjectCatalog _recentProjectCatalog;
         private readonly ImageViewerAutoSaveController _autoSaveController;
+        private readonly ImageViewerRecoveryIndex _recoveryIndex;
         private readonly string _autoSaveDirectory;
+        private readonly string _documentId;
+        private readonly string _sessionInstanceId;
         private string? _currentProjectPath;
         private string? _recoveryFilePath;
         private bool _recoveryPromptDismissed;
         private bool _isDirty;
+
+        /// <summary>
+        /// 判定"某份快照是否仍被活动实例持有"的心跳窗口。
+        /// Chinese: 自动保存每 <c>AutoSaveInterval</c> 刷新一次心跳，因此心跳只要在若干个间隔内就算"还活着"。
+        /// 取 3 倍间隔、下限 30 秒，避免间隔极短（测试里 5s）时把仍在运行的窗口误判成已退出。
+        /// </summary>
+        private readonly TimeSpan _liveHeartbeatWindow;
 
         public event EventHandler? StateChanged;
 
@@ -183,16 +226,30 @@ namespace ImageViewer.Controls
             ImageViewerSessionControllerDependencies dependencies,
             IImageViewerPeriodicTaskSchedulerFactory periodicTaskSchedulerFactory,
             IImageViewerSessionStoragePolicy sessionStoragePolicy)
+            : this(dependencies, periodicTaskSchedulerFactory, sessionStoragePolicy, Guid.NewGuid().ToString("N"))
+        {
+        }
+
+        public ImageViewerSessionController(
+            ImageViewerSessionControllerDependencies dependencies,
+            IImageViewerPeriodicTaskSchedulerFactory periodicTaskSchedulerFactory,
+            IImageViewerSessionStoragePolicy sessionStoragePolicy,
+            string documentId)
         {
             ArgumentNullException.ThrowIfNull(dependencies);
             ArgumentNullException.ThrowIfNull(periodicTaskSchedulerFactory);
             ArgumentNullException.ThrowIfNull(sessionStoragePolicy);
+            ArgumentException.ThrowIfNullOrWhiteSpace(documentId);
 
             _persistence = dependencies.Persistence ?? throw new ArgumentNullException(nameof(dependencies));
             _autoSave = dependencies.AutoSave;
             _autoSaveDirectory = sessionStoragePolicy.AutoSaveDirectory;
+            _documentId = documentId;
+            _recoveryIndex = new ImageViewerRecoveryIndex(_autoSaveDirectory);
             _recentProjectCatalog = new ImageViewerRecentProjectCatalog(_persistence.RecentProjectService, sessionStoragePolicy.RecentProjectsFilePath);
-            _autoSaveController = new ImageViewerAutoSaveController(dependencies.AutoSave, periodicTaskSchedulerFactory, sessionStoragePolicy);
+            _autoSaveController = new ImageViewerAutoSaveController(dependencies.AutoSave, periodicTaskSchedulerFactory, sessionStoragePolicy, documentId, _recoveryIndex);
+            _sessionInstanceId = _autoSaveController.SessionInstanceId;
+            _liveHeartbeatWindow = ComputeLiveHeartbeatWindow(sessionStoragePolicy.AutoSaveInterval);
             RefreshRecoverySnapshot();
         }
 
@@ -304,6 +361,220 @@ namespace ImageViewer.Controls
             return OpenProjectAsync(filePath);
         }
 
+        /// <summary>
+        /// 把当前测量方案保存为配方（工件坐标系 + 基准点 + 标定 + 测量项）。
+        /// Chinese: 配方与"会话/项目包"的区别是**可交付、可复现**——它刻意不带图像路径与视口状态，
+        /// 以便同一个测量方案用在任意一张新图上。也因此保存后不改"当前项目"，避免把配方误当成会话。
+        /// English: A recipe is a deliverable plan, not a session: it carries no image path or viewport,
+        /// so it can be reused on any new image.
+        /// </summary>
+        public async Task SaveRecipeAsync()
+        {
+            string? filePath = _persistence.ShowSaveRecipeDialog();
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                return;
+            }
+
+            try
+            {
+                IReadOnlyList<RoiBase> rois = _persistence.GetAllRois();
+                if (rois.Count == 0)
+                {
+                    // 没有测量项的配方没有复现价值；提示而不是写出一个空文件让人以为成功了。
+                    _persistence.ShowStatusHint(UiText.Get("StatusRecipeNoRois"), StatusHintKind.Info);
+                    return;
+                }
+
+                MeasurementRecipeDocument recipe = MeasurementRecipeService.Create(
+                    name: Path.GetFileNameWithoutExtension(filePath),
+                    description: null,
+                    rois: rois,
+                    pixelSize: _persistence.GetPixelSize(),
+                    physicalUnit: _persistence.GetPhysicalUnit(),
+                    pluginRegistry: _persistence.GetPluginRegistry(),
+                    coordinateSystem: _persistence.GetWorkpieceCoordinateSystem(),
+                    datumPoints: _persistence.GetRecipeDatumPoints(),
+                    calibration: _persistence.GetCalibration(),
+                    qualityProfile: _persistence.GetQualityProfile());
+
+                await MeasurementRecipeService.SaveToFileAsync(filePath, recipe).ConfigureAwait(true);
+                _persistence.ShowStatusHint(
+                    UiText.Format("StatusRecipeSaveSuccess", recipe.EnabledItemCount, Path.GetFileName(filePath)),
+                    StatusHintKind.Success);
+            }
+            catch (Exception ex)
+            {
+                _persistence.ShowNonCriticalError(
+                    UiText.Get("ErrorSaveRecipeTitle"),
+                    UiText.Get("ErrorSaveRecipeMessage"),
+                    ex);
+            }
+        }
+
+        public void CaptureRecipeDatumPoint(int index, bool currentImage)
+        {
+            if (index is < 0 or > 1)
+            {
+                throw new ArgumentOutOfRangeException(nameof(index));
+            }
+
+            if (_persistence.GetSelectedRecipeDatumPosition() is not PointD position)
+            {
+                _persistence.ShowStatusHint(UiText.Get("StatusRecipeDatumSelectPoint"), StatusHintKind.Error);
+                return;
+            }
+
+            var point = new RecipeDatumPoint
+            {
+                Name = index == 0 ? "Datum 1" : "Datum 2",
+                X = position.X,
+                Y = position.Y
+            };
+            if (currentImage)
+            {
+                _persistence.SetCurrentRecipeDatumPoint(index, point);
+                _persistence.ShowStatusHint(
+                    UiText.Format("StatusRecipeCurrentDatumCaptured", index + 1, position.X, position.Y),
+                    StatusHintKind.Success);
+            }
+            else
+            {
+                _persistence.SetRecipeDatumPoint(index, point);
+                _persistence.ShowStatusHint(
+                    UiText.Format("StatusRecipeReferenceDatumCaptured", index + 1, position.X, position.Y),
+                    StatusHintKind.Success);
+            }
+        }
+
+        /// <summary>
+        /// 载入配方并应用其测量项、标定与坐标系。
+        /// Chinese: 载入后立刻报一次可判定性——"载入配方 ≠ 可以出判定"，缺标定/缺公差必须当场说清楚，
+        /// 否则操作员会以为配方一切就绪、直接开始出报告。
+        /// </summary>
+        public async Task LoadRecipeAsync()
+        {
+            await LoadRecipeAsync(applyAlignment: false).ConfigureAwait(true);
+        }
+
+        public async Task LoadAlignedRecipeAsync()
+        {
+            await LoadRecipeAsync(applyAlignment: true).ConfigureAwait(true);
+        }
+
+        private async Task LoadRecipeAsync(bool applyAlignment)
+        {
+            string? filePath = _persistence.ShowOpenRecipeDialog();
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                return;
+            }
+
+            try
+            {
+                object? sourceIdentity = _persistence.GetCurrentImageIdentity();
+                IReadOnlyList<RecipeDatumPoint> currentDatumPoints = applyAlignment
+                    ? _persistence.GetCurrentRecipeDatumPoints()
+                        .Select(point => new RecipeDatumPoint { Name = point.Name, X = point.X, Y = point.Y })
+                        .ToArray()
+                    : Array.Empty<RecipeDatumPoint>();
+
+                MeasurementRecipeDocument recipe = await Task.Run(
+                    () => MeasurementRecipeService.LoadFromFile(filePath)).ConfigureAwait(true);
+
+                if (applyAlignment)
+                {
+                    if (!ReferenceEquals(sourceIdentity, _persistence.GetCurrentImageIdentity()))
+                    {
+                        _persistence.ShowStatusHint(UiText.Get("StatusRecipeImageChangedDuringAlignment"), StatusHintKind.Error);
+                        return;
+                    }
+
+                    if (!recipe.CanLocalize || !HasDistinctPair(recipe.DatumPoints)
+                        || currentDatumPoints.Count < 2 || !HasDistinctPair(currentDatumPoints))
+                    {
+                        _persistence.ShowStatusHint(UiText.Get("StatusRecipeAlignmentDatumsRequired"), StatusHintKind.Error);
+                        return;
+                    }
+                }
+
+                RoiDocument roiDocument = applyAlignment
+                    ? MeasurementRecipeService.BuildAlignedRoiDocument(
+                        recipe,
+                        new PointD(currentDatumPoints[0].X, currentDatumPoints[0].Y),
+                        new PointD(currentDatumPoints[1].X, currentDatumPoints[1].Y))
+                    : MeasurementRecipeService.BuildRoiDocument(recipe);
+
+                RoiDocumentLoadResult restored = RoiPersistenceService.CreateRois(
+                    roiDocument,
+                    _persistence.GetPluginRegistry());
+
+                if (applyAlignment && restored.UnresolvedItems.Count > 0)
+                {
+                    throw new InvalidOperationException(
+                        UiText.Format("StatusRecipeUnsupportedRoiCount", restored.UnresolvedItems.Count));
+                }
+
+                WorkpieceCoordinateSystem? coordinateSystem = recipe.CoordinateSystem;
+                if (applyAlignment)
+                {
+                    coordinateSystem = WorkpieceCoordinateSystem.Localize(
+                        new PointD(currentDatumPoints[0].X, currentDatumPoints[0].Y),
+                        new PointD(currentDatumPoints[1].X, currentDatumPoints[1].Y),
+                        new PointD(recipe.DatumPoints[0].X, recipe.DatumPoints[0].Y),
+                        new PointD(recipe.DatumPoints[1].X, recipe.DatumPoints[1].Y),
+                        recipe.CoordinateSystem?.Name);
+                }
+
+                _persistence.ReplaceAllRois(restored.Rois);
+                _persistence.SetPixelSize(recipe.PixelSize);
+                if (!string.IsNullOrWhiteSpace(recipe.PhysicalUnit))
+                {
+                    _persistence.SetPhysicalUnit(recipe.PhysicalUnit);
+                }
+
+                _persistence.SetCalibration(recipe.Calibration);
+                _persistence.SetWorkpieceCoordinateSystem(coordinateSystem);
+                _persistence.SetRecipeDatumPoints(applyAlignment ? currentDatumPoints : recipe.DatumPoints);
+                _persistence.DrawRois();
+                _persistence.UpdateContextMenuState();
+
+                MeasurementWorkflowReadiness readiness = MeasurementRecipeService.EvaluateReadiness(recipe);
+                StatusHintKind kind = readiness.IsBlocked
+                    ? StatusHintKind.Error
+                    : readiness.HasWarnings ? StatusHintKind.Info : StatusHintKind.Success;
+                _persistence.ShowStatusHint(
+                    UiText.Format(
+                        "StatusRecipeLoadSuccess",
+                        restored.Rois.Count,
+                        MeasurementWorkflowReadinessFormatter.FormatSingleLine(readiness))
+                        + (applyAlignment ? " " + UiText.Get("StatusRecipeManualAlignmentApplied") : string.Empty),
+                    kind);
+            }
+            catch (Exception ex)
+            {
+                if (applyAlignment && ex is InvalidOperationException or NotSupportedException or ArgumentOutOfRangeException)
+                {
+                    _persistence.ShowStatusHint(UiText.Format("StatusRecipeAlignmentFailed", ex.Message), StatusHintKind.Error);
+                    return;
+                }
+
+                _persistence.ShowNonCriticalError(
+                    UiText.Get("ErrorLoadRecipeTitle"),
+                    UiText.Get("ErrorLoadRecipeMessage"),
+                    ex);
+            }
+        }
+
+        private static bool HasDistinctPair(IReadOnlyList<RecipeDatumPoint> points)
+        {
+            return points.Count == 2
+                && double.IsFinite(points[0].X) && double.IsFinite(points[0].Y)
+                && double.IsFinite(points[1].X) && double.IsFinite(points[1].Y)
+                && (Math.Abs(points[1].X - points[0].X) > 1e-12
+                    || Math.Abs(points[1].Y - points[0].Y) > 1e-12);
+        }
+
         public async Task RecoverLatestAutoSaveAsync()
         {
             RefreshRecoverySnapshot();
@@ -394,8 +665,19 @@ namespace ImageViewer.Controls
             return _autoSaveController.DrainAsync(cancellationToken);
         }
 
+        /// <summary>
+        /// 正常关闭时释放本实例在恢复索引里的所有权。
+        /// Chinese: 用户主动关掉的窗口不该在下次启动时弹出"恢复未保存文档"——那份快照只是它退出前的
+        /// 最后状态。异常退出（崩溃/强杀）不会走到这里，条目保留并在心跳过期后可恢复。
+        /// </summary>
+        public void ReleaseRecoveryOwnership()
+        {
+            _autoSaveController.ReleaseRecoveryOwnership();
+        }
+
         public void Dispose()
         {
+            _autoSaveController.ReleaseRecoveryOwnership();
             _autoSaveController.Dispose();
         }
 
@@ -463,20 +745,47 @@ namespace ImageViewer.Controls
             _persistence.UpdateContextMenuState();
         }
 
-        private void CompleteSuccessfulSave()
+        /// <summary>
+        /// 成功保存/导出后需要清理与摘除索引的候选路径。
+        /// Chinese: 保存会改变自动保存的文件名（未保存 → autosave-{id}，保存后 → autosave-{名}-{哈希}），
+        /// 所以只按"当前"文件名找会漏掉保存前那份。这里用 <see cref="ImageViewerAutoSaveController.LastWrittenAutoSavePath"/>
+        /// 记住的"本文档真正写过的路径"来补齐——**绝不枚举整个目录**：同目录下还躺着其它窗口/文档的
+        /// 自动保存，按 <c>autosave-*.ivsession</c> 通配清理会把别人的恢复文件一并删掉（保存一个文档
+        /// 却毁掉另一个文档的恢复数据）。
+        /// English: Cleanup covers only files this document produced. Earlier versions swept every
+        /// <c>autosave-*.ivsession</c> in the directory, so saving one document deleted another window's recovery file.
+        /// </summary>
+        private string[] GetRecoveryCleanupPaths()
         {
-            MarkClean();
-            string[] recoveryPaths = new[]
-                {
-                    _recoveryFilePath,
-                    _autoSaveController.GetAutoSaveFilePath(),
-                    _autoSaveController.GetLegacyAutoSaveFilePath(),
-                    Path.Combine(_autoSaveDirectory, "autosave.ivsession")
-                }
+            var paths = new List<string>
+            {
+                _autoSaveController.GetAutoSaveFilePath(),
+                _autoSaveController.GetLegacyAutoSaveFilePath(),
+                Path.Combine(_autoSaveDirectory, "autosave.ivsession")
+            };
+
+            // 保存改名前的实际写盘路径（本文档自己的文件，与通配枚举无关）。
+            if (!string.IsNullOrWhiteSpace(_autoSaveController.LastWrittenAutoSavePath))
+            {
+                paths.Add(_autoSaveController.LastWrittenAutoSavePath!);
+            }
+
+            if (!string.IsNullOrWhiteSpace(_recoveryFilePath))
+            {
+                paths.Add(_recoveryFilePath);
+            }
+
+            return paths
                 .Where(path => !string.IsNullOrWhiteSpace(path))
                 .Select(path => path!)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
+        }
+
+        private void CompleteSuccessfulSave()
+        {
+            MarkClean();
+            string[] recoveryPaths = GetRecoveryCleanupPaths();
             if (recoveryPaths.Length == 0)
             {
                 return;
@@ -499,9 +808,25 @@ namespace ImageViewer.Controls
                 return;
             }
 
+            // 文件已删 + 已经从"未保存"变成"已保存"：索引里的登记要一并摘掉，
+            // 否则下次启动索引会指向不存在的路径，或把已保存的文档又列成待恢复文档。
+            ForgetRecoveryIndexEntries(recoveryPaths);
             _recoveryFilePath = null;
             _recoveryPromptDismissed = false;
             StateChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>
+        /// 从恢复索引里摘除已不再需要恢复的自动保存文件。
+        /// Chinese: 成功保存/导出后，这份文档已经落到了用户指定的路径，重启时不该再提示"恢复未保存文档"。
+        /// English: Drops auto-save files from the recovery index once the document has been saved for real.
+        /// </summary>
+        private void ForgetRecoveryIndexEntries(IEnumerable<string> recoveryPaths)
+        {
+            foreach (string recoveryPath in recoveryPaths)
+            {
+                _recoveryIndex.Unregister(recoveryPath);
+            }
         }
 
         private void RefreshRecoverySnapshot()
@@ -519,7 +844,14 @@ namespace ImageViewer.Controls
 
             try
             {
-                return Directory
+                // 只认"本文档"的自动保存文件：未保存项目时是 autosave-<DocumentId>.ivsession，
+                // 已保存项目时是 autosave-<名>-<路径哈希>.ivsession。此前扫描目录下全部
+                // *.ivsession，多个窗口会互相把对方的自动保存当成自己的恢复候选（先到先得），
+                // 结果既可能恢复成别人的文档，也会把对方的候选从列表里顶掉。
+                // 旧版遗留的无身份文件（autosave.ivsession / 旧命名）仅在"尚未有任何本文档
+                // 候选"时作为兜底接受，保证升级用户的存量恢复记录不丢。
+                string ownFileName = Path.GetFileName(_autoSaveController.GetAutoSaveFilePath());
+                string[] candidates = Directory
                     .EnumerateFiles(_autoSaveDirectory, "*.ivsession", SearchOption.TopDirectoryOnly)
                     .Where(path =>
                     {
@@ -530,11 +862,103 @@ namespace ImageViewer.Controls
                     })
                     .OrderByDescending(GetLastWriteTimeUtc)
                     .ToArray();
+
+                string[] ownCandidates = candidates
+                    .Where(path => string.Equals(Path.GetFileName(path), ownFileName, StringComparison.OrdinalIgnoreCase))
+                    .ToArray();
+                if (ownCandidates.Length > 0)
+                {
+                    return ownCandidates;
+                }
+
+                // 重启后 DocumentId 是新的，自己的文件名根本不存在；靠持久化索引认出"上一次运行遗留的
+                // 待恢复文档"。只接受索引里明确登记过、且当前磁盘上确实存在的文件——不退回"扫目录全收"，
+                // 否则同目录下别的窗口的自动保存又会被误当成自己的候选。
+                string[] indexedCandidates = GetIndexedRecoveryCandidates(candidates);
+                if (indexedCandidates.Length > 0)
+                {
+                    return indexedCandidates;
+                }
+
+                return candidates
+                    .Where(path => IsLegacyUnidentifiedAutoSave(Path.GetFileName(path)))
+                    .ToArray();
             }
             catch
             {
                 return [];
             }
+        }
+
+        /// <summary>
+        /// 从磁盘上的候选里挑出被恢复索引登记过、且**不再被活动实例持有**的那些（保持原有 mtime 倒序）。
+        /// Chinese: 索引是"本机遗留的未保存文档"的清单。两类条目不该出现在候选里：
+        /// ① 已正常保存过的文档（成功保存时已从索引摘除）；
+        /// ② 仍被某个活着的窗口持有的文档——它只是"另一个窗口正开着"，不是"待恢复的遗留文档"。
+        /// 后者靠 <see cref="ImageViewerRecoveryIndexEntry.OwnerInstanceId"/> + 新鲜心跳识别，
+        /// 因此崩溃/强杀的实例（心跳过期）仍然可恢复。
+        /// </summary>
+        private string[] GetIndexedRecoveryCandidates(string[] onDiskCandidates)
+        {
+            IReadOnlyList<ImageViewerRecoveryIndexEntry> indexedEntries = _recoveryIndex.Prune();
+            if (indexedEntries.Count == 0)
+            {
+                return [];
+            }
+
+            DateTimeOffset heartbeatThreshold = DateTimeOffset.UtcNow - _liveHeartbeatWindow;
+            var recoverablePaths = new HashSet<string>(
+                indexedEntries
+                    .Where(entry => IsRecoverable(entry, heartbeatThreshold))
+                    .Select(entry => entry.Path),
+                StringComparer.OrdinalIgnoreCase);
+
+            return onDiskCandidates
+                .Where(path => recoverablePaths.Contains(Path.GetFullPath(path)))
+                .ToArray();
+        }
+
+        /// <summary>
+        /// 这份快照是否可被本窗口恢复。
+        /// Chinese: 同一实例（自己的）不是"要恢复的遗留文档"；其它实例只要心跳还新鲜就视为"仍在使用"。
+        /// 没有所有者信息的历史条目（升级前写的）没有心跳可比，按"可恢复"处理以保住存量数据。
+        /// English: A snapshot is recoverable when it is not owned by this instance and its owner's heartbeat
+        /// is stale. Legacy entries without ownership info are treated as recoverable.
+        /// </summary>
+        private bool IsRecoverable(ImageViewerRecoveryIndexEntry entry, DateTimeOffset heartbeatThreshold)
+        {
+            if (string.Equals(entry.OwnerInstanceId, _sessionInstanceId, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (entry.LastHeartbeatUtc is not DateTimeOffset heartbeat)
+            {
+                return true;
+            }
+
+            // 心跳落在阈值之内 = 写它的窗口还活着（或刚刚才写），不该提示恢复。
+            return heartbeat < heartbeatThreshold;
+        }
+
+        private static TimeSpan ComputeLiveHeartbeatWindow(TimeSpan autoSaveInterval)
+        {
+            TimeSpan window = autoSaveInterval <= TimeSpan.Zero
+                ? TimeSpan.FromSeconds(30)
+                : autoSaveInterval * 3;
+            return window < TimeSpan.FromSeconds(30) ? TimeSpan.FromSeconds(30) : window;
+        }
+
+        /// <summary>
+        /// 旧版遗留的、不带文档身份信息的自动保存文件名。
+        /// Chinese: 仅用于升级兜底——过去所有未保存项目都写同一个 "autosave.ivsession"。
+        /// 一旦本窗口产生了自己的候选，就不再回退到这些共享文件，避免多窗口互相抢占。
+        /// English: Legacy shared names kept only as an upgrade fallback (older builds wrote every unsaved
+        /// document to "autosave.ivsession"). Once this window has its own candidate we stop falling back.
+        /// </summary>
+        private static bool IsLegacyUnidentifiedAutoSave(string fileName)
+        {
+            return string.Equals(fileName, "autosave.ivsession", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool HasContent(string filePath)

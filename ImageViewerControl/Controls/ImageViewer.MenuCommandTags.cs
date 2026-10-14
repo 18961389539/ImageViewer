@@ -147,6 +147,13 @@ namespace ImageViewer.Controls
         public static ImageViewerFileMenuCommandTag SaveSession { get; } = new(ImageViewerFileMenuCommand.SaveSession);
         public static ImageViewerFileMenuCommandTag LoadSession { get; } = new(ImageViewerFileMenuCommand.LoadSession);
         public static ImageViewerFileMenuCommandTag ExportProjectPackage { get; } = new(ImageViewerFileMenuCommand.ExportProjectPackage);
+        public static ImageViewerFileMenuCommandTag SaveRecipe { get; } = new(ImageViewerFileMenuCommand.SaveRecipe);
+        public static ImageViewerFileMenuCommandTag LoadRecipe { get; } = new(ImageViewerFileMenuCommand.LoadRecipe);
+        public static ImageViewerFileMenuCommandTag CaptureRecipeReferenceDatum1 { get; } = new(ImageViewerFileMenuCommand.CaptureRecipeReferenceDatum1);
+        public static ImageViewerFileMenuCommandTag CaptureRecipeReferenceDatum2 { get; } = new(ImageViewerFileMenuCommand.CaptureRecipeReferenceDatum2);
+        public static ImageViewerFileMenuCommandTag CaptureCurrentAlignmentDatum1 { get; } = new(ImageViewerFileMenuCommand.CaptureCurrentAlignmentDatum1);
+        public static ImageViewerFileMenuCommandTag CaptureCurrentAlignmentDatum2 { get; } = new(ImageViewerFileMenuCommand.CaptureCurrentAlignmentDatum2);
+        public static ImageViewerFileMenuCommandTag LoadAlignedRecipe { get; } = new(ImageViewerFileMenuCommand.LoadAlignedRecipe);
         public static ImageViewerFileMenuCommandTag ToggleAutoSave { get; } = new(ImageViewerFileMenuCommand.ToggleAutoSave);
     }
 
@@ -157,5 +164,6 @@ namespace ImageViewer.Controls
         public static ImageViewerFeatureMenuCommandTag ExportAnalysisCsv { get; } = new(ImageViewerFeatureMenuCommand.ExportAnalysisCsv);
         public static ImageViewerFeatureMenuCommandTag ExportBatchAnalysisCsv { get; } = new(ImageViewerFeatureMenuCommand.ExportBatchAnalysisCsv);
         public static ImageViewerFeatureMenuCommandTag ShowAnalysisSummary { get; } = new(ImageViewerFeatureMenuCommand.ShowAnalysisSummary);
+        public static ImageViewerFeatureMenuCommandTag CheckCalibrationReadiness { get; } = new(ImageViewerFeatureMenuCommand.CheckCalibrationReadiness);
     }
 }

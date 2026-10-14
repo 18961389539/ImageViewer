@@ -19,6 +19,14 @@ namespace ImageViewer.Controls
 
         Task ExportProjectPackageAsync();
 
+        Task SaveRecipeAsync();
+
+        Task LoadRecipeAsync();
+
+        Task LoadAlignedRecipeAsync();
+
+        void CaptureRecipeDatumPoint(int index, bool currentImage);
+
         void ToggleAutoSave();
 
         void UpdateContextMenuState();
@@ -52,6 +60,27 @@ namespace ImageViewer.Controls
                     break;
                 case ImageViewerFileMenuCommand.ExportProjectPackage:
                     await Host.ExportProjectPackageAsync();
+                    break;
+                case ImageViewerFileMenuCommand.SaveRecipe:
+                    await Host.SaveRecipeAsync();
+                    break;
+                case ImageViewerFileMenuCommand.LoadRecipe:
+                    await Host.LoadRecipeAsync();
+                    break;
+                case ImageViewerFileMenuCommand.CaptureRecipeReferenceDatum1:
+                    Host.CaptureRecipeDatumPoint(0, currentImage: false);
+                    break;
+                case ImageViewerFileMenuCommand.CaptureRecipeReferenceDatum2:
+                    Host.CaptureRecipeDatumPoint(1, currentImage: false);
+                    break;
+                case ImageViewerFileMenuCommand.CaptureCurrentAlignmentDatum1:
+                    Host.CaptureRecipeDatumPoint(0, currentImage: true);
+                    break;
+                case ImageViewerFileMenuCommand.CaptureCurrentAlignmentDatum2:
+                    Host.CaptureRecipeDatumPoint(1, currentImage: true);
+                    break;
+                case ImageViewerFileMenuCommand.LoadAlignedRecipe:
+                    await Host.LoadAlignedRecipeAsync();
                     break;
                 case ImageViewerFileMenuCommand.ToggleAutoSave:
                     Host.ToggleAutoSave();

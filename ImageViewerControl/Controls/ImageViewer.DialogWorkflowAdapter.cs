@@ -21,11 +21,15 @@ namespace ImageViewer.Controls
 
         string? ShowSaveProjectPackageDialog();
 
+        string? ShowSaveRecipeDialog();
+
+        string? ShowOpenRecipeDialog();
+
         string? ShowSaveSnapshotDialog();
 
         string? ShowSaveAnalysisCsvDialog();
 
-        CalibrationDialogResult? ShowCalibrationDialog(string currentUnit);
+        CalibrationDialogResult? ShowCalibrationDialog(string currentUnit, CameraCalibration? currentCalibration);
 
         CaliperMeasureRoi? ShowLineMeasureCaliperSettingsDialog(CaliperMeasureRoi roi, Action<CaliperMeasureRoi>? previewAction = null);
 
@@ -70,11 +74,15 @@ namespace ImageViewer.Controls
 
         public string? ShowSaveProjectPackageDialog() => _fileDialogService.ShowSaveProjectPackageDialog(_ownerWindowProvider());
 
+        public string? ShowSaveRecipeDialog() => _fileDialogService.ShowSaveRecipeDialog(_ownerWindowProvider());
+
+        public string? ShowOpenRecipeDialog() => _fileDialogService.ShowOpenRecipeDialog(_ownerWindowProvider());
+
         public string? ShowSaveSnapshotDialog() => _fileDialogService.ShowSaveSnapshotDialog(_ownerWindowProvider());
 
         public string? ShowSaveAnalysisCsvDialog() => _fileDialogService.ShowSaveAnalysisCsvDialog(_ownerWindowProvider());
 
-        public CalibrationDialogResult? ShowCalibrationDialog(string currentUnit) => _dialogService.ShowCalibrationDialog(_ownerWindowProvider(), currentUnit);
+        public CalibrationDialogResult? ShowCalibrationDialog(string currentUnit, CameraCalibration? currentCalibration) => _dialogService.ShowCalibrationDialog(_ownerWindowProvider(), currentUnit, currentCalibration);
 
         public CaliperMeasureRoi? ShowLineMeasureCaliperSettingsDialog(CaliperMeasureRoi roi, Action<CaliperMeasureRoi>? previewAction = null)
             => _dialogService.ShowLineMeasureCaliperSettingsDialog(_ownerWindowProvider(), roi, previewAction);

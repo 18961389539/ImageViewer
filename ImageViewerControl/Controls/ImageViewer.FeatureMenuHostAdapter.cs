@@ -2,12 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media.Imaging;
 using CoreCircularDetectionResult = ImageViewer.Core.Analysis.CircularCaliperDetectionResult;
 using CoreLineMeasureDetectionResult = ImageViewer.Core.Analysis.LineMeasureGradientDetectionResult;
+using ImageViewer.Core.Analysis;
 using ImageViewer.Localization;
 using ImageViewer.Models;
 using ImageViewer.Plugins;
@@ -212,6 +214,24 @@ namespace ImageViewer.Controls
                     summary.FullySuccessfulFileCount == summary.RequestedFileCount
                         ? StatusHintKind.Success
                         : StatusHintKind.Info);
+
+                // 重复性结论单独播报：它是"这批数据能不能支撑判定"的核心结论，
+                // 埋在文件里等于没告诉操作员。吃穿公差时必须用错误级提示。
+                if (summary.RepeatabilityToleranceConsumedItemCount > 0)
+                {
+                    _feedback.ShowStatusHint(
+                        UiText.Format(
+                            "StatusBatchRepeatabilityToleranceConsumed",
+                            summary.RepeatabilityToleranceConsumedItemCount,
+                            summary.RepeatabilityConclusiveItemCount),
+                        StatusHintKind.Error);
+                }
+                else if (summary.RepeatabilityConclusiveItemCount > 0)
+                {
+                    _feedback.ShowStatusHint(
+                        UiText.Format("StatusBatchRepeatabilityOk", summary.RepeatabilityConclusiveItemCount),
+                        StatusHintKind.Success);
+                }
             }
             catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
             {
@@ -248,6 +268,46 @@ namespace ImageViewer.Controls
         {
             string summary = RoiAnalysisExportService.BuildSummary(_data.AllRois, _analysis.AnalysisBitmapSource, _data.PixelSize, _data.PhysicalUnit, _data.Calibration);
             _dialogs.ShowReadOnlyText(UiText.Get("DialogAnalysisSummaryTitle"), summary);
+        }
+
+        /// <summary>
+        /// “标定检查”步骤。
+        /// Chinese: 这是离线工作流里"测量"与"出报告"之间的关口。它不做测量，只回答一个问题：
+        /// 按当前标定/公差配置，接下来的数值能不能用来判定？因此它用与报告完全相同的前置检查
+        /// （<see cref="MeasurementWorkflowReadinessEvaluator"/>），避免两处判定漂移。
+        /// English: The calibration-check gate. Uses the exact same precondition evaluator as the report so
+        /// the gate and the report can never disagree.
+        /// </summary>
+        public void CheckCalibrationReadiness()
+        {
+            IReadOnlyList<RoiBase> rois = _data.AllRois;
+            var toleranced = rois.Where(roi => roi.Tolerance is { IsEnabled: true }).ToList();
+            int unmeasured = toleranced.Count(roi =>
+                !RoiInspectionEvaluator.Evaluate(roi, _data.PixelSize, _data.Calibration).MeasuredValue.HasValue);
+
+            MeasurementWorkflowReadiness readiness = MeasurementWorkflowReadinessEvaluator.Evaluate(
+                _data.PixelSize,
+                _data.PhysicalUnit,
+                _data.Calibration,
+                rois.Count,
+                toleranced.Count,
+                unmeasured);
+
+            _dialogs.ShowReadOnlyText(
+                UiText.Get("DialogCalibrationCheckTitle"),
+                MeasurementWorkflowReadinessFormatter.Format(readiness, _data.PixelSize, _data.PhysicalUnit));
+
+            _feedback.ShowStatusHint(
+                readiness.IsBlocked
+                    ? UiText.Get("StatusCalibrationCheckBlocked")
+                    : readiness.HasWarnings
+                        ? UiText.Get("StatusCalibrationCheckWarning")
+                        : UiText.Get("StatusCalibrationCheckPassed"),
+                readiness.IsBlocked
+                    ? StatusHintKind.Error
+                    : readiness.HasWarnings
+                        ? StatusHintKind.Info
+                        : StatusHintKind.Success);
         }
 
         public void UpdateContextMenuState() => _feedback.UpdateContextMenuState();

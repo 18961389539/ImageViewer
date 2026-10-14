@@ -60,6 +60,8 @@ namespace ImageViewer.Controls
         RoiBase? SelectedRoi { get; set; }
 
         RoiBase? HitTest(Point point);
+        int GetPathVertexIndexAt(Point point) => -1;
+        void CaptureContextualPathVertex(RoiBase? roi, int? pointIndex) { }
         void ExitCurrentMode();
         void DrawRois();
         void ShowRoiProperties(RoiBase roi);
@@ -75,6 +77,8 @@ namespace ImageViewer.Controls
         void CaptureRootMouse();
         void ReleaseRootMouse();
         bool RemoveSelectedRoi();
+        void Undo();
+        void Redo();
         ResizeHandle GetHandleAt(Point point);
         int GetPolygonPointIndexAt(Point point);
         int GetPolygonSegmentAt(Point point);
@@ -182,7 +186,9 @@ namespace ImageViewer.Controls
 
         public void HandleMouseRightButtonDown(MouseButtonEventArgs e)
         {
-            Point imagePosition = _pointerInteractionFlow.SnapPoint(e.GetPosition(_host.ImageElement));
+            // Context selection and vertex hit testing must use the actual pointer location;
+            // grid snapping is an editing aid and can otherwise redirect a right-click.
+            Point imagePosition = e.GetPosition(_host.ImageElement);
             if (_editInteractionFlow.TryBeginEdit(imagePosition, isRightButtonPressed: true))
             {
                 e.Handled = true;

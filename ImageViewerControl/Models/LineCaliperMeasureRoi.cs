@@ -227,6 +227,7 @@ namespace ImageViewer.Models
         {
             var clone = new LineCaliperMeasureRoi();
             clone.ApplyFrom(this);
+            clone.CopyMeasurementIdentityFrom(this);
             return clone;
         }
 

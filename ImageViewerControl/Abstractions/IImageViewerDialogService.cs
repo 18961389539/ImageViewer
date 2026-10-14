@@ -7,7 +7,7 @@ namespace ImageViewer.Abstractions
     {
         string? ShowLabelDialog(Window? owner, string message, string defaultValue);
 
-        CalibrationDialogResult? ShowCalibrationDialog(Window? owner, string currentUnit);
+        CalibrationDialogResult? ShowCalibrationDialog(Window? owner, string currentUnit, CameraCalibration? currentCalibration);
 
         CaliperMeasureRoi? ShowLineMeasureCaliperSettingsDialog(Window? owner, CaliperMeasureRoi roi, Action<CaliperMeasureRoi>? previewAction = null);
 

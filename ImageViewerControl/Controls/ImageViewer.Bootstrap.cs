@@ -39,6 +39,7 @@ namespace ImageViewer.Controls
             IImageViewerLatestTaskScheduler infoPanelStatisticsScheduler = hostState.HostServices.LatestTaskSchedulerFactory.Create();
 
             InitializeComponent();
+            ApplyTheme();
             mainContextMenu.DataContext = this;
 
             return new ImageViewerBootstrapState(

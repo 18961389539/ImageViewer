@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Media;
+using ImageViewer.Core.Geometry;
 using ImageViewer.Models;
 using ImageViewer.Services;
 
@@ -134,6 +135,13 @@ namespace ImageViewer.Controls
         public static readonly DependencyProperty CalibrationProperty =
             DependencyProperty.Register(nameof(Calibration), typeof(CameraCalibration), typeof(ImageViewer),
                 new PropertyMetadata(null, OnCalibrationChanged));
+
+        /// <summary>
+        /// 工件坐标系。
+        /// Chinese: 刻意不做成依赖属性——它不是给 XAML 绑定的视觉状态，而是"当前测量方案"的一部分，
+        /// 只由配方加载/自动定位设置。放在普通属性上可以避免触发无谓的布局与重绘。
+        /// </summary>
+        public WorkpieceCoordinateSystem? WorkpieceCoordinateSystem { get; set; }
 
         public static readonly DependencyProperty MenuStateProperty =
             DependencyProperty.Register(nameof(MenuState), typeof(object), typeof(ImageViewer),
@@ -381,6 +389,7 @@ namespace ImageViewer.Controls
         {
             WithViewer(d, viewer =>
             {
+                viewer.ClearAllRecipeDatums();
                 viewer._imageSourceController.HandleImageSourceChanged(e.NewValue as ImageSource);
                 viewer.UpdateStatusBar();
                 // Keep the visible toolbar and context menu in sync as soon as a new image is assigned.

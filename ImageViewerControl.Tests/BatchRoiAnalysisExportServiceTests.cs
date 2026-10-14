@@ -1,10 +1,12 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using ImageViewer.Core.Analysis;
 using ImageViewer.Models;
 using ImageViewer.Services;
 using Xunit;
@@ -201,6 +203,171 @@ namespace ImageViewerControl.Tests
                 Assert.Equal(2, summary.ExportedRowCount);
                 using JsonDocument metadata = JsonDocument.Parse(File.ReadAllText(Path.ChangeExtension(csvPath, ".metadata.json")));
                 Assert.Equal(2, metadata.RootElement.GetProperty("inputRecords").GetArrayLength());
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
+        public async Task ExportAsync_WritesSameWorkpieceRepeatabilityWhenContextIsSpecified()
+        {
+            string root = Path.Combine(Path.GetTempPath(), $"image-viewer-batch-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(root);
+            try
+            {
+                // 三个"轮次"就是三张图；几何 ROI 不依赖检测，因此在灰度图上也能逐图产出测量值。
+                string[] imagePaths = new string[3];
+                for (int i = 0; i < imagePaths.Length; i++)
+                {
+                    imagePaths[i] = Path.Combine(root, $"round-{i}.png");
+                    SaveBitmap(imagePaths[i], CreateBitmap(20, 16, 90));
+                }
+
+                string csvPath = Path.Combine(root, "batch.csv");
+                // 半径 3 px，pixelSize=1（=3 个单位）。图上无边缘可检测，但几何 ROI 直接出值，
+                // 三张图完全一致 ⇒ σ = 0 ⇒ 重复性结论成立且不占公差。
+                var roi = new CircleRoi
+                {
+                    Center = new PointD(8, 7),
+                    Radius = 3,
+                    Label = "内径",
+                    Tolerance = new MeasurementTolerance { Nominal = 3, TolerancePlus = 0.5, ToleranceMinus = 0.5 }
+                };
+
+                BatchRoiAnalysisExportSummary summary = await BatchRoiAnalysisExportService.ExportAsync(
+                    csvPath,
+                    imagePaths,
+                    [roi],
+                    pixelSize: 1,
+                    physicalUnit: "mm",
+                    repeatabilityOptions: new RepeatabilityStudyOptions(RepeatabilityStudyContext.SameWorkpiece, "part-001"));
+
+                string repeatabilityPath = Path.ChangeExtension(csvPath, ".repeatability.md");
+                Assert.True(File.Exists(repeatabilityPath), "多图批次必须产出重复性报告，否则 GroupRepeatability 永远没有调用方。");
+                Assert.Equal(repeatabilityPath, summary.RepeatabilityPath);
+                Assert.Equal(3, summary.RepeatabilitySourceCount);
+                Assert.Equal(1, summary.RepeatabilityConclusiveItemCount);
+                Assert.Equal(0, summary.RepeatabilityToleranceConsumedItemCount);
+
+                string report = File.ReadAllText(repeatabilityPath);
+                Assert.Contains("# 重复性研究报告", report);
+                Assert.Contains("参与图像数: 3", report);
+                Assert.Contains("内径", report);
+                // 完全一致的三轮 ⇒ 不该出现"警告：…占满公差带"的告警行。
+                Assert.DoesNotContain("**警告", report);
+                Assert.Contains("未发现重复性占满公差带的项目", report);
+
+                // 结论也必须进 metadata，供自动化消费（否则只有人读得到）。
+                using JsonDocument metadata = JsonDocument.Parse(File.ReadAllText(Path.ChangeExtension(csvPath, ".metadata.json")));
+                JsonElement repeatability = metadata.RootElement.GetProperty("repeatability");
+                Assert.Equal(3, repeatability.GetProperty("sourceCount").GetInt32());
+                Assert.Equal(1, repeatability.GetProperty("conclusiveItemCount").GetInt32());
+                Assert.True(repeatability.GetProperty("hasConclusiveResult").GetBoolean());
+                JsonElement item = Assert.Single(repeatability.GetProperty("items").EnumerateArray());
+                Assert.Equal("内径", item.GetProperty("label").GetString());
+                Assert.Equal(3, item.GetProperty("sampleCount").GetInt32());
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
+        public async Task ExportAsync_RepeatabilityIgnoresUndetectedRois()
+        {
+            string root = Path.Combine(Path.GetTempPath(), $"image-viewer-batch-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(root);
+            try
+            {
+                string[] imagePaths = new string[2];
+                for (int i = 0; i < imagePaths.Length; i++)
+                {
+                    imagePaths[i] = Path.Combine(root, $"round-{i}.png");
+                    SaveBitmap(imagePaths[i], CreateBitmap(20, 16, 90));
+                }
+
+                string csvPath = Path.Combine(root, "batch.csv");
+                // 卡尺 ROI 在纯色图上必然检测失败 ⇒ 没有测得值 ⇒ 绝不能当成"0"进入重复性样本，
+                // 否则会把"完全测不到"粉饰成"重复性极好"。
+                var caliper = new CaliperMeasureRoi
+                {
+                    P1 = new PointD(4, 8),
+                    P2 = new PointD(12, 8),
+                    Label = "边缘",
+                    Tolerance = new MeasurementTolerance { Nominal = 8, TolerancePlus = 0.1, ToleranceMinus = 0.1 }
+                };
+
+                BatchRoiAnalysisExportSummary summary = await BatchRoiAnalysisExportService.ExportAsync(
+                    csvPath,
+                    imagePaths,
+                    [caliper],
+                    pixelSize: 1,
+                    physicalUnit: "mm");
+
+                Assert.Equal(0, summary.RepeatabilityConclusiveItemCount);
+                Assert.Equal(2, summary.RepeatabilitySourceCount);
+                Assert.Equal(0, summary.RepeatabilityToleranceConsumedItemCount);
+
+                string report = File.ReadAllText(Path.ChangeExtension(csvPath, ".repeatability.md"));
+                Assert.Contains("无法给出同一工件重复性结论", report);
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
+        public async Task ExportAsync_DefaultContextReportsSourceVariationAndKeepsTemplateItemsSeparate()
+        {
+            string root = Path.Combine(Path.GetTempPath(), $"image-viewer-batch-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(root);
+            try
+            {
+                string[] imagePaths = new string[2];
+                for (int i = 0; i < imagePaths.Length; i++)
+                {
+                    imagePaths[i] = Path.Combine(root, $"round-{i}.png");
+                    SaveBitmap(imagePaths[i], CreateBitmap(20, 16, 90));
+                }
+
+                string csvPath = Path.Combine(root, "batch.csv");
+                CircleRoi[] rois =
+                [
+                    new() { Center = new PointD(5, 5), Radius = 2, Label = "duplicate" },
+                    new() { Center = new PointD(8, 5), Radius = 3, Label = "duplicate" },
+                    new() { Center = new PointD(11, 5), Radius = 4 },
+                    new() { Center = new PointD(14, 5), Radius = 5 }
+                ];
+
+                BatchRoiAnalysisExportSummary summary = await BatchRoiAnalysisExportService.ExportAsync(
+                    csvPath, imagePaths, rois, pixelSize: 1, physicalUnit: "mm");
+
+                Assert.Equal(2, summary.RepeatabilitySourceCount);
+                Assert.Equal(0, summary.RepeatabilityConclusiveItemCount);
+                string report = File.ReadAllText(Path.ChangeExtension(csvPath, ".repeatability.md"));
+                Assert.Contains("未指定，反映源间变化", report);
+                Assert.Contains("无法给出同一工件重复性结论", report);
+
+                using JsonDocument metadata = JsonDocument.Parse(File.ReadAllText(Path.ChangeExtension(csvPath, ".metadata.json")));
+                JsonElement repeatability = metadata.RootElement.GetProperty("repeatability");
+                Assert.Equal("Unspecified", repeatability.GetProperty("workpieceContext").GetString());
+                JsonElement[] items = repeatability.GetProperty("items").EnumerateArray().ToArray();
+                Assert.Equal(4, items.Length);
+                Assert.All(items, item => Assert.Equal(2, item.GetProperty("sampleCount").GetInt32()));
+                Assert.Equal(2, items.Count(item => item.GetProperty("label").GetString() == "duplicate"));
+                Assert.Equal("roi:0", items[0].GetProperty("measurementItemKey").GetString());
+                Assert.Equal("mm", items[0].GetProperty("unit").GetString());
+
+                string csv = File.ReadAllText(csvPath);
+                Assert.Contains(",SourceIndex,MeasurementItemKey", csv);
+                Assert.Contains(",0,\"roi:0\"", csv);
+                Assert.Equal(
+                    Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(csvPath))).ToLowerInvariant(),
+                    metadata.RootElement.GetProperty("artifacts").GetProperty("csvSha256").GetString());
             }
             finally
             {

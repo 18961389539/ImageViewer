@@ -703,7 +703,23 @@ namespace ImageViewer.Services
                         caliper.CaliperMinimumGradient,
                         caliper.CaliperEdgePolarity,
                         caliper.EdgeSelection,
-                        out JLVisionEdgeSample nativeSample))
+                        out JLVisionEdgeSample nativeSample)
+                    // Some native runtimes cannot produce a circular measure for a narrow
+                    // angular strip. Use the same radial rectangular caliper as the full-circle
+                    // detector while retaining the arc angles and all detection/fit thresholds.
+                    && !JLVisionAlgorithmEntryPoint.TryMeasureSingle(
+                        image.Image,
+                        image.Width,
+                        image.Height,
+                        sampleCenter,
+                        radialDirection,
+                        caliper.CaliperSearchRange,
+                        caliper.CaliperSamplingHalfWidth,
+                        caliper.CaliperEdgeSigma,
+                        caliper.CaliperMinimumGradient,
+                        caliper.CaliperEdgePolarity,
+                        caliper.EdgeSelection,
+                        out nativeSample))
                 {
                     invalidSamplePoints.Add(sampleCenter);
                     continue;

@@ -57,6 +57,8 @@ namespace ImageViewer.Models
                 IsVisible = IsVisible,
                 IsLocked = IsLocked,
                 Tolerance = Tolerance?.Clone(),
+                MeasurementId = MeasurementId,
+                AdvancedMeasurements = AdvancedMeasurements,
                 UseOtsu = UseOtsu,
                 ManualThreshold = ManualThreshold,
                 DetectDark = DetectDark,

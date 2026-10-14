@@ -182,12 +182,28 @@
   <data name="CalibrationDialogWarningTitle" xml:space="preserve"><value>校准</value></data>
   <data name="CalibrationDialogInvalidLengthMessage" xml:space="preserve"><value>请输入有效的实际长度。</value></data>
   <data name="CalibrationDefaultUnit" xml:space="preserve"><value>mm</value></data>
-  <data name="CalibrationDialogDistortionHeader" xml:space="preserve"><value>镜头径向畸变（可选）</value></data>
-  <data name="CalibrationDialogDistortionHint" xml:space="preserve"><value>K1/K2 为归一化径向畸变系数（填 0 表示不校正）。主点按图像中心、归一化半径按图像短边一半自动计算。</value></data>
+  <data name="CalibrationDialogDistortionHeader" xml:space="preserve"><value>镜头畸变（可选）</value></data>
+  <data name="CalibrationDialogDistortionHint" xml:space="preserve"><value>K1/K2/K3 为归一化径向畸变系数，P1/P2 为切向畸变系数（填 0 表示不校正）。</value></data>
   <data name="CalibrationDialogK1Label" xml:space="preserve"><value>一阶畸变系数 K1</value></data>
   <data name="CalibrationDialogK2Label" xml:space="preserve"><value>二阶畸变系数 K2</value></data>
+  <data name="CalibrationDialogK3Label" xml:space="preserve"><value>三阶畸变系数 K3</value></data>
+  <data name="CalibrationDialogP1Label" xml:space="preserve"><value>切向畸变系数 P1</value></data>
+  <data name="CalibrationDialogP2Label" xml:space="preserve"><value>切向畸变系数 P2</value></data>
+  <data name="CalibrationDialogAccuracyHeader" xml:space="preserve"><value>标定精度（可选）</value></data>
+  <data name="CalibrationDialogAccuracyHint" xml:space="preserve"><value>重投影 RMS 与不确定度来自标定过程本身；填写后会显示在状态栏标定徽标上，便于判断标定是否满足当前测量要求。</value></data>
+  <data name="CalibrationDialogReprojectionErrorLabel" xml:space="preserve"><value>重投影 RMS (px)</value></data>
+  <data name="CalibrationDialogUncertaintyLabel" xml:space="preserve"><value>测量不确定度 (px, 1σ)</value></data>
+  <data name="CalibrationDialogIdLabel" xml:space="preserve"><value>标定标识 / 证书号</value></data>
+  <data name="CalibrationDialogGeometryHeader" xml:space="preserve"><value>标定几何基准（可选）</value></data>
+  <data name="CalibrationDialogGeometryHint" xml:space="preserve"><value>主点与归一化半径留空（0）时按图像中心与短边一半自动推算。</value></data>
+  <data name="CalibrationDialogPrincipalXLabel" xml:space="preserve"><value>主点 X (px)</value></data>
+  <data name="CalibrationDialogPrincipalYLabel" xml:space="preserve"><value>主点 Y (px)</value></data>
+  <data name="CalibrationDialogNormalizationRadiusLabel" xml:space="preserve"><value>归一化半径 (px)</value></data>
   <data name="InfoLineCalibrationDistortion" xml:space="preserve"><value>畸变校正: K1={0:F3}, K2={1:F3}</value></data>
   <data name="InfoLineCalibrationDistortionExtended" xml:space="preserve"><value>畸变校正: K1={0:F3}, K2={1:F3}, K3={2:F3}, P1={3:F5}, P2={4:F5}; 标定RMS={5:F4}px, 不确定度={6:F4}px</value></data>
+  <data name="InfoLineCalibrationAccuracy" xml:space="preserve"><value>标定精度: 重投影 RMS={0:F4}px, 测量不确定度={1:F4}px (1σ)</value></data>
+  <data name="InfoLineCalibrationIdentity" xml:space="preserve"><value>标定标识: {0}</value></data>
+  <data name="InfoLineCalibrationInvalid" xml:space="preserve"><value>⚠ 标定参数不完整或非法，畸变校正按恒等处理</value></data>
   <data name="CaliperFieldCount" xml:space="preserve"><value>卡尺数量</value></data>
   <data name="CaliperFieldSearchRange" xml:space="preserve"><value>搜索范围 (px)</value></data>
   <data name="CaliperFieldSamplingHalfWidth" xml:space="preserve"><value>半宽采样 (px)</value></data>
@@ -231,6 +247,36 @@
   <data name="FileDialogCsvFilter" xml:space="preserve"><value>CSV 文件|*.csv|所有文件|*.*</value></data>
   <data name="FileDialogSaveProjectPackageTitle" xml:space="preserve"><value>导出项目包</value></data>
   <data name="FileDialogProjectPackageFilter" xml:space="preserve"><value>ImageViewer 项目包|*.ivpkg|所有文件|*.*</value></data>
+  <data name="FileDialogSaveRecipeTitle" xml:space="preserve"><value>保存测量配方</value></data>
+  <data name="FileDialogOpenRecipeTitle" xml:space="preserve"><value>载入测量配方</value></data>
+  <data name="FileDialogRecipeFilter" xml:space="preserve"><value>ImageViewer 测量配方|*.ivrecipe|所有文件|*.*</value></data>
+  <data name="MenuSaveRecipe" xml:space="preserve"><value>保存测量配方…</value></data>
+  <data name="MenuLoadRecipe" xml:space="preserve"><value>载入测量配方…</value></data>
+  <data name="TooltipSaveRecipe" xml:space="preserve"><value>把当前测量项、公差、标定与参考图基准点保存为配方；基准点需先用两个点坐标测量 ROI 手动记录</value></data>
+  <data name="TooltipLoadRecipe" xml:space="preserve"><value>载入配方并应用其测量项、公差、标定与工件坐标系；只能出像素值的配方会被当场拦下</value></data>
+  <data name="MenuRecipeReferenceDatums" xml:space="preserve"><value>记录配方参考图基准点（选中点坐标测量 ROI 后操作）</value></data>
+  <data name="MenuRecipeReferenceDatum1" xml:space="preserve"><value>记录参考基准点 1</value></data>
+  <data name="MenuRecipeReferenceDatum2" xml:space="preserve"><value>记录参考基准点 2</value></data>
+  <data name="MenuRecipeCurrentDatums" xml:space="preserve"><value>记录当前图像基准点（手动对齐）</value></data>
+  <data name="MenuRecipeCurrentDatum1" xml:space="preserve"><value>记录当前基准点 1</value></data>
+  <data name="MenuRecipeCurrentDatum2" xml:space="preserve"><value>记录当前基准点 2</value></data>
+  <data name="MenuLoadAlignedRecipe" xml:space="preserve"><value>按基准对齐并载入配方…</value></data>
+  <data name="TooltipLoadAlignedRecipe" xml:space="preserve"><value>按配方参考图与当前图像上手动选取的两个基准点执行刚体对齐；不会自动检测特征</value></data>
+  <data name="StatusRecipeDatumSelectPoint" xml:space="preserve"><value>请先选中一个点坐标测量 ROI，再记录基准点。</value></data>
+  <data name="StatusRecipeReferenceDatumCaptured" xml:space="preserve"><value>已记录配方参考基准点 {0}：({1:F1}, {2:F1})</value></data>
+  <data name="StatusRecipeCurrentDatumCaptured" xml:space="preserve"><value>已记录当前图像基准点 {0}：({1:F1}, {2:F1})</value></data>
+  <data name="StatusRecipeAlignmentDatumsRequired" xml:space="preserve"><value>对齐未执行：配方和当前图像都需要两个不同的基准点。请先记录当前基准点 1、2；现有测量项保持不变。</value></data>
+  <data name="StatusRecipeManualAlignmentApplied" xml:space="preserve"><value>已按手动选取的两个基准点完成刚体对齐。</value></data>
+  <data name="StatusRecipeAlignmentFailed" xml:space="preserve"><value>配方对齐未完成：{0}。现有测量项保持不变。</value></data>
+  <data name="StatusRecipeImageChangedDuringAlignment" xml:space="preserve"><value>对齐未执行：载入过程中图像已切换，请在当前图像重新记录基准点。</value></data>
+  <data name="StatusRecipeUnsupportedRoiCount" xml:space="preserve"><value>有 {0} 个配方项无法还原；对齐载入已取消。</value></data>
+  <data name="StatusRecipeSaveSuccess" xml:space="preserve"><value>配方已保存：{0} 个测量项 → {1}</value></data>
+  <data name="StatusRecipeLoadSuccess" xml:space="preserve"><value>配方已载入：{0} 个测量项；{1}</value></data>
+  <data name="StatusRecipeNoRois" xml:space="preserve"><value>当前没有测量项，未写出配方。</value></data>
+  <data name="ErrorSaveRecipeTitle" xml:space="preserve"><value>保存配方失败</value></data>
+  <data name="ErrorSaveRecipeMessage" xml:space="preserve"><value>无法保存测量配方，请检查目标路径是否可写，或查看日志了解详情。</value></data>
+  <data name="ErrorLoadRecipeTitle" xml:space="preserve"><value>载入配方失败</value></data>
+  <data name="ErrorLoadRecipeMessage" xml:space="preserve"><value>无法载入测量配方，文件可能已损坏或版本不受支持。载入未完成，现有测量结果可能仍为载入前的状态。</value></data>
   <data name="ToolRotatedRect" xml:space="preserve"><value>矩形 ROI</value></data>
   <data name="ToolBlobAnalysis" xml:space="preserve"><value>斑点分析</value></data>
   <data name="ToolEllipse" xml:space="preserve"><value>椭圆 ROI</value></data>
@@ -322,8 +368,10 @@
   <data name="InfoLineParallelismDetail" xml:space="preserve"><value>平均距离:{0} 误差:{1:F2}°</value></data>
   <data name="InfoLinePerpendicularity" xml:space="preserve"><value>垂直度测量  角度:{0:F1}°</value></data>
   <data name="InfoLinePerpendicularityDetail" xml:space="preserve"><value>误差:{0:F2}°</value></data>
-  <data name="InfoLineConcentricity" xml:space="preserve"><value>同心度测量  中心距:{0}</value></data>
-  <data name="InfoLineConcentricityDetail" xml:space="preserve"><value>半径1:{0} 半径2:{1}</value></data>
+  <data name="InfoLineConcentricity" xml:space="preserve"><value>同心度测量  公差带直径:{0}</value></data>
+  <data name="InfoLineConcentricityDetail" xml:space="preserve"><value>中心距:{0} 半径1:{1} 半径2:{2}</value></data>
+  <data name="InfoLineGeometricToleranceNote" xml:space="preserve"><value>注: 该值为二维近似指标，非 ISO 1101 完整形位公差（无基准要素/第三维）</value></data>
+  <data name="InfoLineAngularUnitNote" xml:space="preserve"><value>注: 主测量值为角度偏差（度），判定时比较该角度值</value></data>
   <data name="InfoLineCenterDistance" xml:space="preserve"><value>圆心距  {0}</value></data>
   <data name="InfoLineCenterDistanceDetail" xml:space="preserve"><value>圆心1:({0:F1}, {1:F1}) 圆心2:({2:F1}, {3:F1})</value></data>
   <data name="InfoLineThreePointCircle" xml:space="preserve"><value>三点圆  半径:{0}</value></data>
@@ -403,6 +451,10 @@
   <data name="PixelInfoGray" xml:space="preserve"><value> Gray:{0}</value></data>
   <data name="PixelInfoValues" xml:space="preserve"><value> V:{0},{1},{2}</value></data>
   <data name="EditorDetailsLabel" xml:space="preserve"><value>详情</value></data>
+  <data name="EditorMeasuredQuantityAngle" xml:space="preserve"><value>主测量值: 三点夹角（度）— 公差判定比较该角度</value></data>
+  <data name="EditorMeasuredQuantityParallelism" xml:space="preserve"><value>主测量值: 两线角度差（度）— 公差判定比较该角度</value></data>
+  <data name="EditorMeasuredQuantityPerpendicularity" xml:space="preserve"><value>主测量值: 与 90° 的偏差（度）— 公差判定比较该角度</value></data>
+  <data name="EditorMeasuredQuantityConcentricity" xml:space="preserve"><value>主测量值: 公差带直径 = 2 × 中心距 — 公差判定比较该直径</value></data>
   <data name="EditorToleranceGroup" xml:space="preserve"><value>公差判定</value></data>
   <data name="EditorToleranceNominal" xml:space="preserve"><value>标称值</value></data>
   <data name="EditorTolerancePlus" xml:space="preserve"><value>上公差</value></data>
@@ -535,6 +587,7 @@
   <data name="StatusZoomLevel" xml:space="preserve"><value>缩放：{0:P0}</value></data>
   <data name="StatusUndone" xml:space="preserve"><value>已撤销</value></data>
   <data name="StatusRedone" xml:space="preserve"><value>已重做</value></data>
+  <data name="StatusUndoRedoFailed" xml:space="preserve"><value>撤销/重做失败，操作已回退</value></data>
   <data name="StatusRoiDeleted" xml:space="preserve"><value>已删除所选 ROI，可按 Ctrl+Z 撤销</value></data>
   <data name="StatusRoisCleared" xml:space="preserve"><value>已清空所有 ROI，可按 Ctrl+Z 撤销</value></data>
   <data name="StatusDrawCancelled" xml:space="preserve"><value>已取消绘制</value></data>
@@ -759,6 +812,17 @@
   <data name="CalibrationBadgeText" xml:space="preserve"><value>✓ 已标定 · 1 px = {0:F4} {1}</value></data>
   <data name="CalibrationBadgeUncalibratedText" xml:space="preserve"><value>未标定 · 选中线段后点击“像素/物理尺寸校准”</value></data>
   <data name="CalibrationBadgeDistortionSuffix" xml:space="preserve"><value>· 畸变已校正</value></data>
+  <data name="CalibrationBadgeUncertaintySuffix" xml:space="preserve"><value>· ±{0} {1} (1σ)</value></data>
+  <data name="CalibrationBadgeReprojectionSuffix" xml:space="preserve"><value>· RMS {0} {1}</value></data>
+  <data name="CalibrationBadgeTooltipScale" xml:space="preserve"><value>标定比例: 1 px = {0:F6} {1}</value></data>
+  <data name="CalibrationBadgeTooltipDistortion" xml:space="preserve"><value>径向畸变: K1={0:G6}, K2={1:G6}</value></data>
+  <data name="CalibrationBadgeTooltipDistortionExtended" xml:space="preserve"><value>畸变模型: K1={0:G6}, K2={1:G6}, K3={2:G6}, P1={3:G6}, P2={4:G6}</value></data>
+  <data name="CalibrationBadgeTooltipNoDistortion" xml:space="preserve"><value>未配置畸变模型（仅比例标定）</value></data>
+  <data name="CalibrationBadgeTooltipAccuracy" xml:space="preserve"><value>标定精度: 重投影 RMS={0:G4} px, 不确定度={1:G4} px (≈ {2} {3}, 1σ)</value></data>
+  <data name="CalibrationBadgeTooltipIdentity" xml:space="preserve"><value>标定标识: {0} · 标定时间: {1}</value></data>
+  <data name="CalibrationBadgeNoId" xml:space="preserve"><value>(未填)</value></data>
+  <data name="CalibrationBadgeNoTimestamp" xml:space="preserve"><value>(未记录)</value></data>
+  <data name="CalibrationBadgeInvalidWarning" xml:space="preserve"><value>⚠ 标定参数不完整或非法，畸变校正已按恒等处理</value></data>
   <data name="RecoveryBannerText" xml:space="preserve"><value>发现上次未完成的自动保存内容</value></data>
   <data name="RecoveryRestoreButton" xml:space="preserve"><value>恢复</value></data>
   <data name="RecoveryDismissButton" xml:space="preserve"><value>稍后处理</value></data>
@@ -780,4 +844,292 @@
   <data name="AdaptiveViewerStatusName" xml:space="preserve"><value>自适应查看器状态</value></data>
   <data name="VolumeSliceStatusName" xml:space="preserve"><value>切片状态</value></data>
   <data name="Volume3DStatusName" xml:space="preserve"><value>三维空间参考状态</value></data>
+
+  <!-- 离线工作流：标定检查（选择配方 → 标定检查 → 测量 → 复核 → 出报告） -->
+  <data name="DialogCalibrationCheckTitle" xml:space="preserve"><value>标定检查</value></data>
+  <data name="CalibrationCheckCapabilityHeader" xml:space="preserve"><value>能否继续</value></data>
+  <data name="CalibrationCheckCapabilityBlocked" xml:space="preserve"><value>已阻断：存在必须先解决的问题，当前数值不可用于任何尺寸判定。</value></data>
+  <data name="CalibrationCheckCapabilityVerdict" xml:space="preserve"><value>可以继续：能给出物理单位的测量结果，并可给出合格/不合格判定。</value></data>
+  <data name="CalibrationCheckCapabilityValuesOnly" xml:space="preserve"><value>部分可用：能给出物理单位的测量值，但无法给出合格/不合格判定。</value></data>
+  <data name="CalibrationCheckScaleHeader" xml:space="preserve"><value>比例标定</value></data>
+  <data name="CalibrationCheckScaleMissing" xml:space="preserve"><value>未设置（当前只有像素单位）</value></data>
+  <data name="CalibrationCheckChecksHeader" xml:space="preserve"><value>检查项</value></data>
+  <data name="CalibrationCheckNoIssues" xml:space="preserve"><value>全部通过，未发现标定或配置缺口。</value></data>
+  <data name="CalibrationCheckLevelPassed" xml:space="preserve"><value>通过</value></data>
+  <data name="CalibrationCheckLevelWarning" xml:space="preserve"><value>警告</value></data>
+  <data name="CalibrationCheckLevelBlocked" xml:space="preserve"><value>阻断</value></data>
+  <data name="CalibrationCheckFooter" xml:space="preserve"><value>说明：检测质量与尺寸判定是两件独立的事；"亚像素"只代表算法分辨率高，不代表物理尺寸准确。</value></data>
+  <data name="StatusCalibrationCheckPassed" xml:space="preserve"><value>标定检查通过，可以出报告。</value></data>
+  <data name="StatusCalibrationCheckWarning" xml:space="preserve"><value>标定检查通过但有提醒，详见检查结果。</value></data>
+  <data name="StatusCalibrationCheckBlocked" xml:space="preserve"><value>标定检查未通过，请先解决阻断项。</value></data>
+  <data name="MenuCheckCalibrationReadiness" xml:space="preserve"><value>标定检查</value></data>
+  <data name="ToolbarCalibrationCheckTooltip" xml:space="preserve"><value>在测量与出报告前确认标定、比例与公差配置是否足以支撑尺寸判定</value></data>
+  <data name="DialogCalibrationCheckAccessibleName" xml:space="preserve"><value>标定检查</value></data>
+
+  <!-- 批量导出：多轮重复性结论 -->
+  <data name="StatusBatchRepeatabilityOk" xml:space="preserve"><value>已生成重复性报告：{0} 个项目具备可结论的重复性（样本数 ≥ 2）。</value></data>
+  <data name="StatusBatchRepeatabilityToleranceConsumed" xml:space="preserve"><value>⚠ 重复性报告：{0} 个项目的重复性已占满公差带，同一工件反复测量可能得出相反判定（可结论项 {1} 个）。</value></data>
+  <data name="AdvancedMeasurementDialogTitle" xml:space="preserve"><value>高级测量</value></data>
+  <data name="AdvancedMeasurementDialogHeading" xml:space="preserve"><value>关联测量与轮廓分析</value></data>
+  <data name="AdvancedMeasurementDialogDescription" xml:space="preserve"><value>选择已有 ROI 或构造结果，建立会随源对象更新的测量项；保存会话或配方时一并保存。</value></data>
+  <data name="AdvancedMeasurementOperationLabel" xml:space="preserve"><value>测量工具</value></data>
+  <data name="AdvancedMeasurementNameLabel" xml:space="preserve"><value>测量名称</value></data>
+  <data name="AdvancedMeasurementParameterLabel" xml:space="preserve"><value>参数</value></data>
+  <data name="AdvancedMeasurementNominalXLabel" xml:space="preserve"><value>理论 X</value></data>
+  <data name="AdvancedMeasurementNominalYLabel" xml:space="preserve"><value>理论 Y</value></data>
+  <data name="AdvancedMeasurementLowerLimitLabel" xml:space="preserve"><value>首项指标下限（指标单位，可留空）</value></data>
+  <data name="AdvancedMeasurementUpperLimitLabel" xml:space="preserve"><value>首项指标上限（指标单位，可留空）</value></data>
+  <data name="AdvancedMeasurementSourcesLabel" xml:space="preserve"><value>已选来源（按操作顺序）</value></data>
+  <data name="AdvancedMeasurementAvailableSourcesLabel" xml:space="preserve"><value>可用 ROI / 构造结果</value></data>
+  <data name="AdvancedMeasurementSourceAdd" xml:space="preserve"><value>添加来源</value></data>
+  <data name="AdvancedMeasurementSourceRemove" xml:space="preserve"><value>移除来源</value></data>
+  <data name="AdvancedMeasurementSourceUp" xml:space="preserve"><value>上移</value></data>
+  <data name="AdvancedMeasurementSourceDown" xml:space="preserve"><value>下移</value></data>
+  <data name="AdvancedMeasurementRefreshSources" xml:space="preserve"><value>刷新来源</value></data>
+  <data name="AdvancedMeasurementAdd" xml:space="preserve"><value>保存测量项</value></data>
+  <data name="AdvancedMeasurementDelete" xml:space="preserve"><value>删除测量项</value></data>
+  <data name="AdvancedMeasurementRefresh" xml:space="preserve"><value>重新计算</value></data>
+  <data name="AdvancedMeasurementExport" xml:space="preserve"><value>导出结果与元数据</value></data>
+  <data name="AdvancedMeasurementClose" xml:space="preserve"><value>关闭</value></data>
+  <data name="AdvancedMeasurementResultsLabel" xml:space="preserve"><value>已保存的测量项与结果</value></data>
+  <data name="AdvancedMeasurementPreviewLabel" xml:space="preserve"><value>测量几何预览（当前单位）</value></data>
+  <data name="AdvancedMeasurementSamplesLabel" xml:space="preserve"><value>采样曲线与明细</value></data>
+  <data name="AdvancedMeasurementStatusSuccess" xml:space="preserve"><value>计算完成</value></data>
+  <data name="AdvancedMeasurementStatusFailure" xml:space="preserve"><value>无法测量</value></data>
+  <data name="AdvancedMeasurementStatusWithinLimits" xml:space="preserve"><value>范围内</value></data>
+  <data name="AdvancedMeasurementStatusOutOfLimits" xml:space="preserve"><value>超出范围</value></data>
+  <data name="AdvancedMeasurementStatusNoLimits" xml:space="preserve"><value>未设置限值</value></data>
+  <data name="AdvancedMeasurementNoSources" xml:space="preserve"><value>请先添加测量来源。</value></data>
+  <data name="AdvancedMeasurementNoDefinitions" xml:space="preserve"><value>尚未保存测量项。</value></data>
+  <data name="AdvancedMeasurementNoSamples" xml:space="preserve"><value>此测量项没有采样序列。</value></data>
+  <data name="AdvancedMeasurementNoPreview" xml:space="preserve"><value>没有可预览的有效几何。</value></data>
+  <data name="AdvancedMeasurementInvalidInput" xml:space="preserve"><value>输入无效，请检查参数、来源和限值。</value></data>
+  <data name="AdvancedMeasurementSaveFailed" xml:space="preserve"><value>结果导出失败</value></data>
+  <data name="AdvancedMeasurementSourceHint" xml:space="preserve"><value>交点/中心线需要两条线；垂足按点、线选择；节距/分布圆按顺序选点或圆。形状分析可选闭合多边形，或用矩形/Blob ROI 在图像中自动提取轮廓。Blob 属性控制阈值与亮暗极性。</value></data>
+  <data name="AdvancedMeasurementOperationMidpoint" xml:space="preserve"><value>中点</value></data>
+  <data name="AdvancedMeasurementOperationIntersection" xml:space="preserve"><value>直线交点</value></data>
+  <data name="AdvancedMeasurementOperationProjection" xml:space="preserve"><value>垂足与点线距离</value></data>
+  <data name="AdvancedMeasurementOperationCenterline" xml:space="preserve"><value>平行线中心线</value></data>
+  <data name="AdvancedMeasurementOperationAngleBisector" xml:space="preserve"><value>角平分线</value></data>
+  <data name="AdvancedMeasurementOperationShortestDistance" xml:space="preserve"><value>对象最短边界距离</value></data>
+  <data name="AdvancedMeasurementOperationProjectedDistance" xml:space="preserve"><value>指定方向的中心投影距离</value></data>
+  <data name="AdvancedMeasurementOperationStraightness" xml:space="preserve"><value>直线形状偏差（最小二乘）</value></data>
+  <data name="AdvancedMeasurementOperationCircularity" xml:space="preserve"><value>圆形径向偏差（最小二乘）</value></data>
+  <data name="AdvancedMeasurementOperationRectangle" xml:space="preserve"><value>自动矩形外接尺寸</value></data>
+  <data name="AdvancedMeasurementOperationSlot" xml:space="preserve"><value>槽孔 / 胶囊轮廓拟合</value></data>
+  <data name="AdvancedMeasurementOperationGapProfile" xml:space="preserve"><value>连续间隙 / 厚度</value></data>
+  <data name="AdvancedMeasurementOperationPosition" xml:space="preserve"><value>二维位置偏差</value></data>
+  <data name="AdvancedMeasurementOperationPitch" xml:space="preserve"><value>孔阵列 / 周期节距</value></data>
+  <data name="AdvancedMeasurementOperationDistributionCircle" xml:space="preserve"><value>孔阵列分布圆</value></data>
+  <data name="AdvancedMeasurementOperationContourDeviation" xml:space="preserve"><value>轮廓偏差比较</value></data>
+  <data name="AdvancedMeasurementOperationShapeMetrics" xml:space="preserve"><value>轮廓 / Blob 形状指标</value></data>
+  <data name="AdvancedMeasurementUnitPixels" xml:space="preserve"><value>px</value></data>
+  <data name="AdvancedMeasurementResultRow" xml:space="preserve"><value>{0} · {1} · {2}</value></data>
+  <data name="AdvancedMeasurementMetricRow" xml:space="preserve"><value>{0}: {1:G8} {2}</value></data>
+  <data name="AdvancedMeasurementMethodRow" xml:space="preserve"><value>方法: {0}</value></data>
+  <data name="AdvancedMeasurementErrorRow" xml:space="preserve"><value>原因: {0}</value></data>
+  <data name="AdvancedMeasurementWitnessRow" xml:space="preserve"><value>几何点 {0}: ({1:G8}, {2:G8})</value></data>
+  <data name="AdvancedMeasurementSourceLine" xml:space="preserve"><value>{0} · {1}</value></data>
+  <data name="AdvancedMeasurementParameterHint" xml:space="preserve"><value>间隙：采样间距（当前单位）；投影：方向角（度）；周期节距：负数为暗条纹，否则为亮条纹；轮廓比较：负数为绝对偏差，否则为有符号偏差。</value></data>
+  <data name="AdvancedMeasurementStatusLabel" xml:space="preserve"><value>状态</value></data>
+  <data name="AdvancedMeasurementQualityLabel" xml:space="preserve"><value>检测与拟合信息</value></data>
+  <data name="AdvancedMeasurement.Metric.Distance" xml:space="preserve"><value>距离</value></data>
+  <data name="AdvancedMeasurement.Metric.Length" xml:space="preserve"><value>长度</value></data>
+  <data name="AdvancedMeasurement.Metric.AngleDegrees" xml:space="preserve"><value>夹角</value></data>
+  <data name="AdvancedMeasurement.Metric.PeakToValley" xml:space="preserve"><value>直线残差峰谷差</value></data>
+  <data name="AdvancedMeasurement.Metric.PeakToValleyRadialDeviation" xml:space="preserve"><value>径向残差峰谷差</value></data>
+  <data name="AdvancedMeasurement.Metric.LongSide" xml:space="preserve"><value>长边</value></data>
+  <data name="AdvancedMeasurement.Metric.ShortSide" xml:space="preserve"><value>短边</value></data>
+  <data name="AdvancedMeasurement.Metric.Area" xml:space="preserve"><value>面积</value></data>
+  <data name="AdvancedMeasurement.Metric.MaximumResidual" xml:space="preserve"><value>最大残差</value></data>
+  <data name="AdvancedMeasurement.Metric.Minimum" xml:space="preserve"><value>最小值</value></data>
+  <data name="AdvancedMeasurement.Metric.Maximum" xml:space="preserve"><value>最大值</value></data>
+  <data name="AdvancedMeasurement.Metric.Mean" xml:space="preserve"><value>平均值</value></data>
+  <data name="AdvancedMeasurement.Metric.StandardDeviation" xml:space="preserve"><value>标准差</value></data>
+  <data name="AdvancedMeasurement.Metric.Deviation" xml:space="preserve"><value>偏移量</value></data>
+  <data name="AdvancedMeasurement.Metric.Radius" xml:space="preserve"><value>半径</value></data>
+  <data name="AdvancedMeasurement.Metric.Diameter" xml:space="preserve"><value>直径</value></data>
+  <data name="AdvancedMeasurement.Metric.RootMeanSquareResidual" xml:space="preserve"><value>均方根残差</value></data>
+  <data name="AdvancedMeasurement.Metric.MaximumAbsoluteDeviation" xml:space="preserve"><value>最大绝对偏差</value></data>
+  <data name="AdvancedMeasurement.Metric.Perimeter" xml:space="preserve"><value>周长</value></data>
+  <data name="AdvancedMeasurement.Metric.MinimumFeret" xml:space="preserve"><value>最小 Feret 径</value></data>
+  <data name="AdvancedMeasurement.Metric.MaximumFeret" xml:space="preserve"><value>最大 Feret 径</value></data>
+  <data name="AdvancedMeasurement.Metric.AspectRatio" xml:space="preserve"><value>长宽比</value></data>
+  <data name="AdvancedMeasurement.Metric.Circularity" xml:space="preserve"><value>圆形度（面积周长比）</value></data>
+  <data name="AdvancedMeasurement.Metric.HoleAreaFraction" xml:space="preserve"><value>孔洞面积比例</value></data>
+  <data name="AdvancedMeasurement.Method.Midpoint" xml:space="preserve"><value>两点或线段中点</value></data>
+  <data name="AdvancedMeasurement.Method.Intersection" xml:space="preserve"><value>无限直线交点</value></data>
+  <data name="AdvancedMeasurement.Method.Projection" xml:space="preserve"><value>点到无限直线的垂足</value></data>
+  <data name="AdvancedMeasurement.Method.Centerline" xml:space="preserve"><value>两条平行线段的中心线</value></data>
+  <data name="AdvancedMeasurement.Method.AngleBisector" xml:space="preserve"><value>两条射线的内角平分线</value></data>
+  <data name="AdvancedMeasurement.Method.ShortestDistance" xml:space="preserve"><value>有限边界之间的最短距离</value></data>
+  <data name="AdvancedMeasurement.Method.ProjectedDistance" xml:space="preserve"><value>中心沿指定方向的投影距离</value></data>
+  <data name="AdvancedMeasurement.Method.OrthogonalLeastSquares" xml:space="preserve"><value>正交最小二乘直线拟合，报告垂直残差峰谷差</value></data>
+  <data name="AdvancedMeasurement.Method.AlgebraicLeastSquaresCircle" xml:space="preserve"><value>代数最小二乘圆拟合，报告径向残差峰谷差</value></data>
+  <data name="AdvancedMeasurement.Method.RasterContourMinimumAreaRectangle" xml:space="preserve"><value>阈值像素边界的最小面积外接矩形</value></data>
+  <data name="AdvancedMeasurement.Method.PolygonMinimumAreaRectangle" xml:space="preserve"><value>闭合多边形的最小面积外接矩形</value></data>
+  <data name="AdvancedMeasurement.Method.RasterContourCapsuleFit" xml:space="preserve"><value>阈值像素边界的 PCA 胶囊拟合，含残差门控</value></data>
+  <data name="AdvancedMeasurement.Method.PolygonCapsuleFit" xml:space="preserve"><value>闭合轮廓的 PCA 胶囊拟合，含残差门控</value></data>
+  <data name="AdvancedMeasurement.Method.UniformNormalIntersections" xml:space="preserve"><value>沿源折线均匀采样，寻找法线上的最近对边交点</value></data>
+  <data name="AdvancedMeasurement.Method.PositionDeviation" xml:space="preserve"><value>实际位置与理论图像坐标的二维偏移及两倍偏移</value></data>
+  <data name="AdvancedMeasurement.Method.ConsecutivePointSpacing" xml:space="preserve"><value>按来源顺序计算相邻中心的欧氏距离</value></data>
+  <data name="AdvancedMeasurement.Method.NearestReferenceSegment" xml:space="preserve"><value>被测顶点到参考有限线段的最近距离</value></data>
+  <data name="AdvancedMeasurement.Method.RasterContourShapeMetrics" xml:space="preserve"><value>阈值像素边界的形状指标，含孔洞轮廓</value></data>
+  <data name="AdvancedMeasurement.Method.PolygonShapeMetrics" xml:space="preserve"><value>闭合轮廓的形状指标</value></data>
+  <data name="AdvancedMeasurementWorkpieceNominal" xml:space="preserve"><value>理论位置使用工件坐标/物理单位（未选：图像 px）</value></data>
+  <data name="AdvancedMeasurement.Metric.DiametricalDeviation" xml:space="preserve"><value>两倍位置偏移（直径评价量）</value></data>
+  <data name="AdvancedMeasurement.Method.WorkpiecePositionDeviation" xml:space="preserve"><value>标定后相对于工件基准坐标的二维位置偏移</value></data>
+  <data name="AdvancedMeasurementNew" xml:space="preserve"><value>新建测量项</value></data>
+  <data name="AdvancedMeasurementEvaluateFailed" xml:space="preserve"><value>计算失败：{0}</value></data>
+  <data name="AdvancedMeasurementOperationPeriodicPitch" xml:space="preserve"><value>图像周期条纹 / 引脚节距</value></data>
+  <data name="AdvancedMeasurement.Method.ThresholdRunCenterSpacing" xml:space="preserve"><value>沿图像线段自动阈值分割，取完整亮/暗条纹中心并计算节距</value></data>
+  <data name="AdvancedMeasurement.Method.NearestReferenceSegmentSigned" xml:space="preserve"><value>被测顶点到参考有限线段的有符号最近距离</value></data>
+  <data name="AdvancedMeasurement.Method.NearestReferenceSegmentAbsolute" xml:space="preserve"><value>被测顶点到参考有限线段的绝对最近距离</value></data>
+  <data name="AdvancedMeasurement.Method.ImagePositionDeviation" xml:space="preserve"><value>校正实际与理论图像位置后计算二维偏移</value></data>
+  <data name="AdvancedMeasurementSampleIndex" xml:space="preserve"><value>采样 {0}</value></data>
+  <data name="AdvancedMeasurementSampleTooltip" xml:space="preserve"><value>采样 {0} · 位置 {1} · 数值 {2} {3}</value></data>
+  <data name="AdvancedMeasurementSampleStationAxis" xml:space="preserve"><value>位置 {0}–{1}（{2}）</value></data>
+  <data name="AdvancedMeasurementSampleValueAxis" xml:space="preserve"><value>数值 {0}–{1}（{2}）</value></data>
+  <data name="AdvancedMeasurementSampleIndexAxis" xml:space="preserve"><value>采样序号 {0}–{1}</value></data>
+  <data name="MenuSelectedObjectShortcuts" xml:space="preserve"><value>当前对象</value></data>
+  <data name="MenuImageDisplay" xml:space="preserve"><value>图像显示</value></data>
+  <data name="MenuPerformance" xml:space="preserve"><value>性能设置</value></data>
+  <data name="MenuMeasurementBasic" xml:space="preserve"><value>基础尺寸</value></data>
+  <data name="MenuMeasurementEdge" xml:space="preserve"><value>边缘检测</value></data>
+  <data name="MenuMeasurementGeometry" xml:space="preserve"><value>几何关系与构造</value></data>
+  <data name="MenuMeasurementShape" xml:space="preserve"><value>形状与轮廓</value></data>
+  <data name="MenuMeasurementArray" xml:space="preserve"><value>位置、阵列与节距</value></data>
+  <data name="MenuSearchResults" xml:space="preserve"><value>搜索结果</value></data>
+  <data name="MenuSearchUnavailable" xml:space="preserve"><value>当前不可用，请检查图像、所选对象与测量来源。</value></data>
+  <data name="MenuNeedTwoPoints" xml:space="preserve"><value>需要至少两个点或有效圆心。</value></data>
+  <data name="MenuNeedTwoLines" xml:space="preserve"><value>需要至少两条有效线段。</value></data>
+  <data name="MenuNeedPointAndLine" xml:space="preserve"><value>需要一个点和一条有效线段。</value></data>
+  <data name="MenuNeedThreePoints" xml:space="preserve"><value>需要至少三个点或有效圆心。</value></data>
+  <data name="MenuNeedTwoBoundaries" xml:space="preserve"><value>需要至少两个有效边界对象（线、圆或折线）。</value></data>
+  <data name="MenuNeedLineProfile" xml:space="preserve"><value>需要至少三个实际边缘样本；可先检测直线卡尺或绘制折线。</value></data>
+  <data name="MenuNeedCircleProfile" xml:space="preserve"><value>需要实际圆边缘样本；请先完成圆卡尺检测或建立轮廓。</value></data>
+  <data name="MenuNeedClosedContour" xml:space="preserve"><value>需要闭合多边形，或加载图像后建立矩形/Blob 搜索 ROI。</value></data>
+  <data name="MenuNeedTwoPaths" xml:space="preserve"><value>需要两条有效折线或线段作为测量来源。</value></data>
+  <data name="MenuNeedPoint" xml:space="preserve"><value>需要一个点或有效圆心。</value></data>
+  <data name="MenuNeedScanLine" xml:space="preserve"><value>需要一条横穿重复结构的距离测量线。</value></data>
+  <data name="MenuNeedImage" xml:space="preserve"><value>请先打开图像。</value></data>
+  <data name="MenuUnavailable" xml:space="preserve"><value>当前对象或数据不支持此操作。</value></data>
+  <data name="MenuAliasesMidpoint" xml:space="preserve"><value>中点 midpoint 两点中心</value></data>
+  <data name="MenuAliasesIntersection" xml:space="preserve"><value>交点 intersection 两线相交</value></data>
+  <data name="MenuAliasesProjection" xml:space="preserve"><value>垂足 点线距离 投影 projection</value></data>
+  <data name="MenuAliasesCenterline" xml:space="preserve"><value>中心线 中轴线 centerline</value></data>
+  <data name="MenuAliasesAngleBisector" xml:space="preserve"><value>角平分线 bisector</value></data>
+  <data name="MenuAliasesShortestDistance" xml:space="preserve"><value>最短距离 间隙 边界距离 gap distance</value></data>
+  <data name="MenuAliasesProjectedDistance" xml:space="preserve"><value>投影距离 水平距离 垂直距离 dx dy</value></data>
+  <data name="MenuAliasesStraightness" xml:space="preserve"><value>直线度 直线形状偏差 straightness 弯曲</value></data>
+  <data name="MenuAliasesCircularity" xml:space="preserve"><value>圆度 径向偏差 roundness circularity</value></data>
+  <data name="MenuAliasesRectangle" xml:space="preserve"><value>矩形 长宽 外接尺寸 rectangle</value></data>
+  <data name="MenuAliasesSlot" xml:space="preserve"><value>槽孔 长圆孔 胶囊 capsule slot</value></data>
+  <data name="MenuAliasesGapProfile" xml:space="preserve"><value>缝宽 胶宽 壁厚 连续间隙 厚度 thickness gap</value></data>
+  <data name="MenuAliasesPosition" xml:space="preserve"><value>位置度 孔位 偏移 position</value></data>
+  <data name="MenuAliasesPitch" xml:space="preserve"><value>孔距 节距 阵列 pitch</value></data>
+  <data name="MenuAliasesDistributionCircle" xml:space="preserve"><value>分布圆 孔阵列 节圆 pcd</value></data>
+  <data name="MenuAliasesContourDeviation" xml:space="preserve"><value>轮廓偏差 轮廓度 对比 deviation contour</value></data>
+  <data name="MenuAliasesShapeMetrics" xml:space="preserve"><value>斑点 blob 面积 周长 Feret 圆形度 孔洞率</value></data>
+  <data name="MenuAliasesPeriodicPitch" xml:space="preserve"><value>引脚间距 条纹 螺距 齿距 周期 pitch</value></data>
+  <data name="MenuBasicCircleAliases" xml:space="preserve"><value>圆 孔径 直径 diameter circle</value></data>
+  <data name="MenuBasicCaliperAliases" xml:space="preserve"><value>卡尺 宽度 缝宽 caliper width</value></data>
+  <data name="MenuBasicFitAliases" xml:space="preserve"><value>适应窗口 适配窗口 fit</value></data>
+  <data name="MenuBasicUndoAliases" xml:space="preserve"><value>撤销 undo</value></data>
+  <data name="MenuBasicRedoAliases" xml:space="preserve"><value>重做 redo</value></data>
+  <data name="ContextRoiShortcutsFor" xml:space="preserve"><value>当前对象：{0}（{1}）</value></data>
+  <data name="ContextRoiMeasurements" xml:space="preserve"><value>相关测量</value></data>
+  <data name="ContextRoiCircularDeviation" xml:space="preserve"><value>圆形径向偏差</value></data>
+  <data name="ContextRoiCenterDistance" xml:space="preserve"><value>圆心距 / 孔距</value></data>
+  <data name="ContextRoiBoundaryDistance" xml:space="preserve"><value>最短边界距离</value></data>
+  <data name="ContextRoiCalibratePixels" xml:space="preserve"><value>像素 / 物理尺寸标定</value></data>
+  <data name="ContextRoiDeleteVertex" xml:space="preserve"><value>删除此节点</value></data>
+  <data name="ContextRoiVertexStale" xml:space="preserve"><value>对象或节点已发生变化，请重新右键选择目标。</value></data>
+  <data name="ContextRoiVertexLocked" xml:space="preserve"><value>对象已锁定，请先解锁再编辑节点。</value></data>
+  <data name="ContextRoiVertexMinimum" xml:space="preserve"><value>已达到最少节点数：折线 2 个，多边形 3 个。</value></data>
+  <data name="ContextRoiUnnamed" xml:space="preserve"><value>未命名</value></data>
+  <data name="ContextRoiCenterDistanceHint" xml:space="preserve"><value>按顺序选择两个圆或点，输出中心距；选择多个对象时输出相邻节距。</value></data>
+  <data name="MenuMeasurementLaunchHint" xml:space="preserve"><value>打开“{0}”，检查或选择测量来源。</value></data>
+  <data name="MenuNothingToUndo" xml:space="preserve"><value>没有可撤销的操作。</value></data>
+  <data name="MenuNothingToRedo" xml:space="preserve"><value>没有可重做的操作。</value></data>
+  <data name="MenuNoRois" xml:space="preserve"><value>当前没有 ROI。</value></data>
+  <data name="MenuNeedCalibrationLine" xml:space="preserve"><value>请先选择可用于标定的线段。</value></data>
+  <data name="MenuNeedCaliperSelection" xml:space="preserve"><value>请先选择卡尺测量对象。</value></data>
+  <data name="MenuNeedDetectableCaliper" xml:space="preserve"><value>请先加载图像并选择支持检测的卡尺对象。</value></data>
+  <data name="MenuNeedCompatibleSource" xml:space="preserve"><value>当前对象不能作为此工具的来源。形状偏差需要实际检测边缘或轮廓样本。</value></data>
+  <data name="DetectionRecommendationTitle" xml:space="preserve"><value>推荐检测参数</value></data>
+  <data name="DetectionRecommendationMenu" xml:space="preserve"><value>推荐检测参数…</value></data>
+  <data name="DetectionRecommendationHint" xml:space="preserve"><value>根据当前 ROI 的灰度与噪声生成建议，比较试检测结果后选择应用。</value></data>
+  <data name="DetectionRecommendationAliases" xml:space="preserve"><value>推荐参数 自动调参 检测参数推荐 阈值 极性 sigma recommend parameters tuning</value></data>
+  <data name="DetectionRecommendationComputing" xml:space="preserve"><value>正在分析图像并比较当前与建议参数…</value></data>
+  <data name="DetectionRecommendationBusy" xml:space="preserve"><value>正在生成检测参数建议，请等待本次分析完成。</value></data>
+  <data name="DetectionRecommendationNeedRoi" xml:space="preserve"><value>请先选择直线、双边、圆形、圆弧卡尺或 Blob 分析对象。</value></data>
+  <data name="DetectionRecommendationLocked" xml:space="preserve"><value>对象已锁定，请先解锁再推荐和应用参数。</value></data>
+  <data name="DetectionRecommendationStale" xml:space="preserve"><value>图像、对象或项目设置已变化，请重新生成参数建议。</value></data>
+  <data name="DetectionRecommendationApplied" xml:space="preserve"><value>已应用建议参数及试检测结果，可撤销。</value></data>
+  <data name="DetectionRecommendationFailed" xml:space="preserve"><value>参数建议生成失败，请检查图像与 ROI。</value></data>
+  <data name="DetectionRecommendationParameters" xml:space="preserve"><value>参数比较</value></data>
+  <data name="DetectionRecommendationParameter" xml:space="preserve"><value>参数</value></data>
+  <data name="DetectionRecommendationBefore" xml:space="preserve"><value>当前值</value></data>
+  <data name="DetectionRecommendationAfter" xml:space="preserve"><value>建议值</value></data>
+  <data name="DetectionRecommendationReason" xml:space="preserve"><value>依据</value></data>
+  <data name="DetectionRecommendationEvidence" xml:space="preserve"><value>图像证据</value></data>
+  <data name="DetectionRecommendationContrast" xml:space="preserve"><value>灰度对比度</value></data>
+  <data name="DetectionRecommendationNoise" xml:space="preserve"><value>噪声估计</value></data>
+  <data name="DetectionRecommendationPolarity" xml:space="preserve"><value>主导极性比例</value></data>
+  <data name="DetectionRecommendationSampleBudget" xml:space="preserve"><value>分析采样数</value></data>
+  <data name="DetectionRecommendationMethod" xml:space="preserve"><value>参数来自当前 ROI 的局部采样，应用前请核对试检测结果。</value></data>
+  <data name="DetectionRecommendationHeuristicDisclaimer" xml:space="preserve"><value>建议基于当前图像的局部灰度与噪声，仅供试检测比较。不会调整公差或项目质量门限；单张图像通过不代表测量精度已验证。</value></data>
+  <data name="DetectionRecommendationBeforeTrial" xml:space="preserve"><value>当前参数试检测</value></data>
+  <data name="DetectionRecommendationAfterTrial" xml:space="preserve"><value>建议参数试检测</value></data>
+  <data name="DetectionRecommendationApply" xml:space="preserve"><value>应用建议</value></data>
+  <data name="DetectionRecommendationCancel" xml:space="preserve"><value>取消</value></data>
+  <data name="DetectionRecommendationSuccessfulBaseline" xml:space="preserve"><value>检测成功</value></data>
+  <data name="DetectionRecommendationTrialUnavailable" xml:space="preserve"><value>无法应用：试检测不可用或质量不足。</value></data>
+  <data name="DetectionRecommendationTrialMetrics" xml:space="preserve"><value>评分：{0}    残差 RMS：{1} px    有效采样：{2}/{3}    边缘点：{4}</value></data>
+  <data name="DetectionRecommendationPointTooltip" xml:space="preserve"><value>边缘点 ({0}, {1})</value></data>
+  <data name="RecommendationUnsupportedRoi" xml:space="preserve"><value>当前对象暂不支持检测参数推荐。</value></data>
+  <data name="RecommendationInvalidGeometry" xml:space="preserve"><value>ROI 几何无效，请检查尺寸与位置。</value></data>
+  <data name="RecommendationClippedRoi" xml:space="preserve"><value>ROI 采样区域超出图像，请移到图像内后重试。</value></data>
+  <data name="RecommendationCropTooLarge" xml:space="preserve"><value>分析区域过大，请缩小 ROI 后重试。</value></data>
+  <data name="RecommendationInsufficientSupport" xml:space="preserve"><value>有效采样不足，无法生成可靠建议。</value></data>
+  <data name="RecommendationLowContrast" xml:space="preserve"><value>局部对比度不足，无法生成可靠建议。</value></data>
+  <data name="RecommendationAmbiguousPolarity" xml:space="preserve"><value>边缘极性不明确，保留当前设置。</value></data>
+  <data name="RecommendationReasonSampleCount" xml:space="preserve"><value>按 ROI 长度和有效采样密度调整，保持最低有效比例。</value></data>
+  <data name="RecommendationReasonSearchRange" xml:space="preserve"><value>根据现有搜索区域与局部信号分布调整。</value></data>
+  <data name="RecommendationReasonAveraging" xml:space="preserve"><value>根据局部噪声调整横向平均宽度。</value></data>
+  <data name="RecommendationReasonSigma" xml:space="preserve"><value>根据噪声与边缘对比度调整平滑强度。</value></data>
+  <data name="RecommendationReasonMinimumGradient" xml:space="preserve"><value>根据原始灰度对比度和噪声估计设置梯度阈值。</value></data>
+  <data name="RecommendationReasonPolarity" xml:space="preserve"><value>单边采样呈现一致的灰度变化方向。</value></data>
+  <data name="RecommendationReasonOtsu" xml:space="preserve"><value>使用局部灰度直方图自动估计分割阈值，保留明暗目标设置。</value></data>
+  <data name="EditorEdgeSigma" xml:space="preserve"><value>边缘平滑 Sigma</value></data>
+  <data name="RecommendationTrialUnsupported" xml:space="preserve"><value>当前对象不支持试检测。</value></data>
+  <data name="RecommendationTrialFailed" xml:space="preserve"><value>检测失败或未通过现有质量检查。</value></data>
+  <data name="RecommendationNoParameterChange" xml:space="preserve"><value>当前参数已符合本次建议，无需修改。</value></data>
+  <data name="RecommendationEvidenceInsufficient" xml:space="preserve"><value>图像证据不足，暂不允许应用建议。</value></data>
+  <data name="RecommendationCandidateWorsened" xml:space="preserve"><value>建议试检测相较当前结果出现明显退化，暂不允许应用。</value></data>
+  <data name="RecommendationTrialSucceeded" xml:space="preserve"><value>检测成功</value></data>
+  <data name="RecommendationQualityGateFailed" xml:space="preserve"><value>圆形检测未通过现有质量门限。</value></data>
+  <data name="RecommendationNoteStableEdge" xml:space="preserve"><value>局部灰度轮廓缺少高于噪声的稳定边缘。</value></data>
+  <data name="RecommendationNoteStrongEdgeCoverage" xml:space="preserve"><value>强边缘覆盖的采样位置不足。</value></data>
+  <data name="RecommendationNoteSearchBoundary" xml:space="preserve"><value>强边缘接近搜索边界，现有范围不足以确认其位置。</value></data>
+  <data name="RecommendationNoteGray16Native" xml:space="preserve"><value>保留 Gray16 原始 0–65535 灰度范围。</value></data>
+  <data name="RecommendationNoteByteIntensity" xml:space="preserve"><value>采用 0–255 灰度范围。</value></data>
+  <data name="RecommendationNoteDualAnyPolarity" xml:space="preserve"><value>保留双边卡尺的原有极性设置。</value></data>
+  <data name="RecommendationNoteConsistentPolarity" xml:space="preserve"><value>单边灰度变化方向一致。</value></data>
+  <data name="RecommendationNoteMixedPolarity" xml:space="preserve"><value>极性证据混合，保留原有设置。</value></data>
+  <data name="RecommendationNoteBlobSeparationInsufficient" xml:space="preserve"><value>旋转 ROI 的灰度分离不足。</value></data>
+  <data name="RecommendationNoteOtsuNotStrong" xml:space="preserve"><value>灰度分类证据不足，无法推荐自动阈值。</value></data>
+  <data name="RecommendationNoteOtsuStrong" xml:space="preserve"><value>局部直方图具备清晰的灰度分类。</value></data>
+  <data name="RecommendationNoteDetectDarkRetained" xml:space="preserve"><value>保留原有明暗目标选择。</value></data>
+  <data name="RecommendationValueDarkToLight" xml:space="preserve"><value>暗 → 亮</value></data>
+  <data name="RecommendationValueLightToDark" xml:space="preserve"><value>亮 → 暗</value></data>
+  <data name="RecommendationValueAny" xml:space="preserve"><value>任意</value></data>
+  <data name="RecommendationValueTrue" xml:space="preserve"><value>启用</value></data>
+  <data name="RecommendationValueFalse" xml:space="preserve"><value>关闭</value></data>
+  <data name="RecommendationValueFirst" xml:space="preserve"><value>首个</value></data>
+  <data name="RecommendationValueLast" xml:space="preserve"><value>末个</value></data>
+  <data name="RecommendationValueStrongest" xml:space="preserve"><value>最强</value></data>
+  <data name="RecommendationValueWeakest" xml:space="preserve"><value>最弱</value></data>
+  <data name="DetectionRecommendationBlobTrialMetrics" xml:space="preserve"><value>区域数量：{0}    最大面积：{1} px²    轮廓点：{2}</value></data>
 </root>

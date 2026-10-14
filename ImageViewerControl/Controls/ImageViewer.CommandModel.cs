@@ -89,6 +89,13 @@ namespace ImageViewer.Controls
         SaveSession,
         LoadSession,
         ExportProjectPackage,
+        SaveRecipe,
+        LoadRecipe,
+        CaptureRecipeReferenceDatum1,
+        CaptureRecipeReferenceDatum2,
+        CaptureCurrentAlignmentDatum1,
+        CaptureCurrentAlignmentDatum2,
+        LoadAlignedRecipe,
         ToggleAutoSave
     }
 
@@ -98,6 +105,7 @@ namespace ImageViewer.Controls
         ExportSnapshot,
         ExportAnalysisCsv,
         ExportBatchAnalysisCsv,
-        ShowAnalysisSummary
+        ShowAnalysisSummary,
+        CheckCalibrationReadiness
     }
 }

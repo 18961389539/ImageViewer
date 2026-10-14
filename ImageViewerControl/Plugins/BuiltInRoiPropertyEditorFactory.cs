@@ -146,7 +146,14 @@ namespace ImageViewer.Plugins
             return panel;
         }
 
-        public static FrameworkElement CreateEditor(AngleMeasureRoi roi) => CreatePanel(roi, readOnlyText: UiText.FormatInvariant("EditorAngleDetails", roi.P1.X, roi.P1.Y, roi.Vertex.X, roi.Vertex.Y, roi.P2.X, roi.P2.Y));
+        public static FrameworkElement CreateEditor(AngleMeasureRoi roi)
+        {
+            StackPanel panel = CreatePanel(roi, readOnlyText: UiText.FormatInvariant("EditorAngleDetails", roi.P1.X, roi.P1.Y, roi.Vertex.X, roi.Vertex.Y, roi.P2.X, roi.P2.Y));
+            // 主测量值 = 三点夹角（度），判定即比较该角度值。
+            AppendMeasuredQuantityNote(panel, UiText.Get("EditorMeasuredQuantityAngle"));
+            AppendToleranceEditor(panel, roi);
+            return panel;
+        }
 
         public static FrameworkElement CreateEditor(ArcMeasureRoi roi)
         {
@@ -175,22 +182,33 @@ namespace ImageViewer.Plugins
 
         public static FrameworkElement CreateEditor(ParallelismMeasureRoi roi)
         {
-            return CreatePanel(roi, readOnlyText: UiText.FormatInvariant("EditorParallelismDetails", roi.Line1P1.X, roi.Line1P1.Y, roi.Line1P2.X, roi.Line1P2.Y, roi.Line2P1.X, roi.Line2P1.Y, roi.Line2P2.X, roi.Line2P2.Y, roi.AngleDifference, roi.AverageDistance));
+            StackPanel panel = CreatePanel(roi, readOnlyText: UiText.FormatInvariant("EditorParallelismDetails", roi.Line1P1.X, roi.Line1P1.Y, roi.Line1P2.X, roi.Line1P2.Y, roi.Line2P1.X, roi.Line2P1.Y, roi.Line2P2.X, roi.Line2P2.Y, roi.AngleDifference, roi.AverageDistance));
+            AppendMeasuredQuantityNote(panel, UiText.Get("EditorMeasuredQuantityParallelism"));
+            AppendToleranceEditor(panel, roi);
+            return panel;
         }
 
         public static FrameworkElement CreateEditor(PerpendicularityMeasureRoi roi)
         {
-            return CreatePanel(roi, readOnlyText: UiText.FormatInvariant("EditorPerpendicularityDetails", roi.Line1P1.X, roi.Line1P1.Y, roi.Line1P2.X, roi.Line1P2.Y, roi.Line2P1.X, roi.Line2P1.Y, roi.Line2P2.X, roi.Line2P2.Y, roi.AngleBetweenLines, roi.PerpendicularityError));
+            StackPanel panel = CreatePanel(roi, readOnlyText: UiText.FormatInvariant("EditorPerpendicularityDetails", roi.Line1P1.X, roi.Line1P1.Y, roi.Line1P2.X, roi.Line1P2.Y, roi.Line2P1.X, roi.Line2P1.Y, roi.Line2P2.X, roi.Line2P2.Y, roi.AngleBetweenLines, roi.PerpendicularityError));
+            AppendMeasuredQuantityNote(panel, UiText.Get("EditorMeasuredQuantityPerpendicularity"));
+            AppendToleranceEditor(panel, roi);
+            return panel;
         }
 
         public static FrameworkElement CreateEditor(ConcentricityMeasureRoi roi)
         {
-            return CreatePanel(roi, readOnlyText: UiText.FormatInvariant("EditorConcentricityDetails", roi.Center1.X, roi.Center1.Y, roi.Radius1, roi.Center2.X, roi.Center2.Y, roi.Radius2, roi.CenterDistance));
+            StackPanel panel = CreatePanel(roi, readOnlyText: UiText.FormatInvariant("EditorConcentricityDetails", roi.Center1.X, roi.Center1.Y, roi.Radius1, roi.Center2.X, roi.Center2.Y, roi.Radius2, roi.CenterDistance));
+            AppendMeasuredQuantityNote(panel, UiText.Get("EditorMeasuredQuantityConcentricity"));
+            AppendToleranceEditor(panel, roi);
+            return panel;
         }
 
         public static FrameworkElement CreateEditor(CenterDistanceMeasureRoi roi)
         {
-            return CreatePanel(roi, readOnlyText: UiText.FormatInvariant("EditorCenterDistanceDetails", roi.Center1.X, roi.Center1.Y, roi.Center2.X, roi.Center2.Y, roi.CenterDistance));
+            StackPanel panel = CreatePanel(roi, readOnlyText: UiText.FormatInvariant("EditorCenterDistanceDetails", roi.Center1.X, roi.Center1.Y, roi.Center2.X, roi.Center2.Y, roi.CenterDistance));
+            AppendToleranceEditor(panel, roi);
+            return panel;
         }
 
         public static FrameworkElement CreateEditor(ThreePointCircleMeasureRoi roi)
@@ -350,6 +368,18 @@ namespace ImageViewer.Plugins
             };
             textBlock.SetBinding(TextBlock.TextProperty, new Binding(propertyPath));
             panel.Children.Add(textBlock);
+        }
+
+        /// <summary>
+        /// 追加"主测量值"说明。
+        /// Chinese: 判定比较的是哪一个量，必须与信息面板显示的量一致。平行度/同心度这类名字容易被
+        /// 当成 ISO 1101 形位公差，实际只是二维近似指标，所以在编辑器里也明确写出被比较的量。
+        /// </summary>
+        private static void AppendMeasuredQuantityNote(StackPanel panel, string note)
+        {
+            var label = CreateLabel(note);
+            label.TextWrapping = TextWrapping.Wrap;
+            panel.Children.Add(label);
         }
 
         /// <summary>

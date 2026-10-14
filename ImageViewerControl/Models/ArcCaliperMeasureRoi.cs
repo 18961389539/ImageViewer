@@ -25,6 +25,7 @@ namespace ImageViewer.Models
         {
             var clone = new ArcCaliperMeasureRoi();
             clone.ApplyFrom(this);
+            clone.CopyMeasurementIdentityFrom(this);
             return clone;
         }
 

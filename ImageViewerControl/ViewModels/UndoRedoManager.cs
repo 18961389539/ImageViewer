@@ -44,16 +44,21 @@ namespace ImageViewer.ViewModels
 
         /// <summary>
         /// 执行命令并将其推入撤销栈。
-        /// Chinese: 执行给定的 IUndoRedoCommand，然后将其推入撤销栈，同时清空重做栈；
+        /// Chinese: 执行给定的 IUndoRedoCommand，**成功之后**才将其推入撤销栈并清空重做栈；
         /// 若超出深度上限，淘汰最旧的命令。
-        /// English: Executes the given command, pushes it onto the undo stack and clears the redo stack;
-        /// evicts the oldest command when the depth limit is exceeded.
+        /// 失败语义：命令体抛异常时本管理器不做任何栈变更（命令不入栈、重做栈不清空），异常原样向上抛出。
+        /// 这样"历史记录"始终与实际生效的编辑一致——不会出现"栈里记着已执行、实际没执行"的错位。
+        /// English: Executes the command and only records it after it succeeds; a throwing command leaves the stacks
+        /// untouched and the exception propagates, so bookkeeping never disagrees with the applied edits.
         /// </summary>
         /// <param name="command">要执行的命令 / Command to execute</param>
         public void Execute(IUndoRedoCommand command)
         {
             ArgumentNullException.ThrowIfNull(command);
+
+            // 先执行、后记账：命令失败时撤销/重做栈保持原样。
             command.Execute();
+
             _undoStack.Add(command);
             if (_undoStack.Count > MaxDepth)
             {
@@ -66,42 +71,50 @@ namespace ImageViewer.ViewModels
 
         /// <summary>
         /// 撤销上一个命令（如果存在）。
-        /// Chinese: 从撤销栈弹出并调用 Undo，然后将其放入重做栈。
-        /// English: Undoes the most recently executed command if available.
+        /// Chinese: 调用栈顶命令的 Undo，**成功之后**才把它从撤销栈移到重做栈。
+        /// 失败语义：Undo 抛异常时命令仍留在撤销栈（未移入重做栈），异常向上抛出；
+        /// 因此 `CanUndo` 仍为 true，用户可重试，而不会出现"撤销失败却已被标记为可重做"的状态。
+        /// English: Undoes the most recent command and only moves it to the redo stack on success;
+        /// a throwing Undo leaves the command on the undo stack so the state stays retryable.
         /// </summary>
         public void Undo()
         {
-            if (_undoStack.Count > 0)
+            if (_undoStack.Count == 0)
             {
-                IUndoRedoCommand command = _undoStack[^1];
-                _undoStack.RemoveAt(_undoStack.Count - 1);
-                // 先放入重做栈再执行，避免 Undo 抛异常时命令从两个栈中同时丢失
-                _redoStack.Push(command);
-                command.Undo();
-                RaiseStateChanged();
+                return;
             }
+
+            IUndoRedoCommand command = _undoStack[^1];
+            command.Undo();
+            _undoStack.RemoveAt(_undoStack.Count - 1);
+            _redoStack.Push(command);
+            RaiseStateChanged();
         }
 
         /// <summary>
         /// 重做上一个被撤销的命令（如果存在）。
-        /// Chinese: 从重做栈弹出并重新执行命令，然后将其放回撤销栈。
-        /// English: Redoes the most recently undone command if available.
+        /// Chinese: 重新执行重做栈顶命令，**成功之后**才把它移回撤销栈。
+        /// 失败语义：Execute 抛异常时命令仍留在重做栈（未移回撤销栈），异常向上抛出。
+        /// English: Redoes the most recently undone command and only moves it back on success;
+        /// a throwing Execute leaves it on the redo stack.
         /// </summary>
         public void Redo()
         {
-            if (_redoStack.Count > 0)
+            if (_redoStack.Count == 0)
             {
-                var command = _redoStack.Pop();
-                // 先放回撤销栈再执行，避免 Execute 抛异常时命令从两个栈中同时丢失
-                _undoStack.Add(command);
-                if (_undoStack.Count > MaxDepth)
-                {
-                    _undoStack.RemoveAt(0);
-                }
-
-                command.Execute();
-                RaiseStateChanged();
+                return;
             }
+
+            IUndoRedoCommand command = _redoStack.Peek();
+            command.Execute();
+            _redoStack.Pop();
+            _undoStack.Add(command);
+            if (_undoStack.Count > MaxDepth)
+            {
+                _undoStack.RemoveAt(0);
+            }
+
+            RaiseStateChanged();
         }
 
         /// <summary>

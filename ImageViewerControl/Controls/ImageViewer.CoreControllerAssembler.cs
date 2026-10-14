@@ -129,24 +129,57 @@ namespace ImageViewer.Controls
                         Calibration = new ImageViewerDialogCalibrationWorkflow
                         {
                             GetPhysicalUnit = () => _owner.PhysicalUnit,
-                            ApplyCalibration = (pixelSize, unit, k1, k2) =>
+                            GetCalibration = () => _owner.Calibration,
+                            ApplyCalibration = (pixelSize, unit, distortion) =>
                             {
                                 _owner.PixelSize = pixelSize;
                                 _owner.PhysicalUnit = unit;
-                                _owner.Calibration = Math.Abs(k1) < 1e-9 && Math.Abs(k2) < 1e-9
-                                    ? null
-                                    : CameraCalibration.CreateForImage(k1, k2, _owner.ImageSource?.Width ?? 0, _owner.ImageSource?.Height ?? 0);
+                                _owner.Calibration = NormalizeCalibration(distortion, _owner.ImageSource?.Width ?? 0, _owner.ImageSource?.Height ?? 0);
                             }
                         }
                     },
                     dialogWorkflowAdapter);
             }
 
+            /// <summary>
+            /// 归一化对话框返回的畸变模型：
+            /// Chinese: 主点或归一化半径缺失（&lt;= 0）时按图像中心 / 短边一半补齐，与 CameraCalibration.CreateForImage
+            /// 的推断一致；这样纯"已知长度 → PixelSize"标定也能带上合理的几何基准。
+            /// </summary>
+            private static CameraCalibration? NormalizeCalibration(CameraCalibration? calibration, double imageWidth, double imageHeight)
+            {
+                if (calibration is null)
+                {
+                    return null;
+                }
+
+                bool hasGeometry = calibration.NormalizationRadius > 0 && (calibration.PrincipalX != 0 || calibration.PrincipalY != 0);
+                if (hasGeometry || imageWidth <= 0 || imageHeight <= 0)
+                {
+                    return calibration;
+                }
+
+                return new CameraCalibration
+                {
+                    K1 = calibration.K1,
+                    K2 = calibration.K2,
+                    K3 = calibration.K3,
+                    TangentialP1 = calibration.TangentialP1,
+                    TangentialP2 = calibration.TangentialP2,
+                    PrincipalX = imageWidth / 2.0,
+                    PrincipalY = imageHeight / 2.0,
+                    NormalizationRadius = Math.Min(imageWidth, imageHeight) / 2.0,
+                    ReprojectionErrorRms = calibration.ReprojectionErrorRms,
+                    MeasurementUncertaintyPixels = calibration.MeasurementUncertaintyPixels,
+                    CalibrationId = calibration.CalibrationId,
+                    CalibratedAtUtc = calibration.CalibratedAtUtc
+                };
+            }
+
             public ImageSourceController CreateImageSourceController(
                 ImageViewerDialogWorkflowService dialogWorkflowService,
                 IImageViewStateController imageViewStateController)
-            {
-                ArgumentNullException.ThrowIfNull(dialogWorkflowService);
+            {                ArgumentNullException.ThrowIfNull(dialogWorkflowService);
                 ArgumentNullException.ThrowIfNull(imageViewStateController);
 
                 return new ImageSourceController(

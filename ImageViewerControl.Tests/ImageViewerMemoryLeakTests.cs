@@ -99,10 +99,11 @@ namespace ImageViewerControl.Tests
         }
 
         /// <summary>
-        /// 撤销命令执行抛异常时，命令不应从两个栈中同时丢失；应保留在重做栈以便恢复。
+        /// 撤销命令执行抛异常时，命令必须留在撤销栈（而不是被当作"已撤销"移入重做栈），
+        /// 否则会出现"撤销失败但 CanRedo 为 true"的状态错位；留在撤销栈后用户可重试。
         /// </summary>
         [Fact]
-        public void UndoRedoManager_WhenUndoThrows_CommandRemainsInRedoStack()
+        public void UndoRedoManager_WhenUndoThrows_CommandRemainsInUndoStack()
         {
             WpfTestRunner.Run(() =>
             {
@@ -112,15 +113,17 @@ namespace ImageViewerControl.Tests
 
                 Assert.Throws<InvalidOperationException>(() => manager.Undo());
 
-                Assert.True(manager.CanRedo, "撤销抛异常后命令应仍保留在重做栈。");
+                Assert.True(manager.CanUndo, "撤销抛异常后命令应仍保留在撤销栈以便重试。");
+                Assert.False(manager.CanRedo, "撤销未生效时不应把命令标记为可重做。");
             });
         }
 
         /// <summary>
-        /// 重做命令执行抛异常时，命令不应从两个栈中同时丢失；应保留在撤销栈以便再次尝试。
+        /// 重做命令执行抛异常时，命令必须留在重做栈（而不是被当作"已重做"移回撤销栈），
+        /// 保持 CanRedo 为 true 供用户重试。
         /// </summary>
         [Fact]
-        public void UndoRedoManager_WhenRedoThrows_CommandRemainsInUndoStack()
+        public void UndoRedoManager_WhenRedoThrows_CommandRemainsInRedoStack()
         {
             WpfTestRunner.Run(() =>
             {
@@ -131,7 +134,8 @@ namespace ImageViewerControl.Tests
 
                 Assert.Throws<InvalidOperationException>(() => manager.Redo());
 
-                Assert.True(manager.CanUndo, "重做抛异常后命令应仍保留在撤销栈。");
+                Assert.True(manager.CanRedo, "重做抛异常后命令应仍保留在重做栈以便重试。");
+                Assert.False(manager.CanUndo, "重做未生效时不应把命令标记为可撤销。");
             });
         }
 

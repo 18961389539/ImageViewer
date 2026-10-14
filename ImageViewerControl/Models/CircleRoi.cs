@@ -35,7 +35,9 @@ namespace ImageViewer.Models
                 StrokeThickness = StrokeThickness,
                 IsVisible = IsVisible,
                 IsLocked = IsLocked,
-                Tolerance = Tolerance?.Clone()
+                Tolerance = Tolerance?.Clone(),
+                MeasurementId = MeasurementId,
+                AdvancedMeasurements = AdvancedMeasurements
             };
         }
 

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
@@ -43,14 +43,15 @@ namespace ImageViewerControl.Tests
                 P1 = new PointD(0, 0),
                 P2 = new PointD(10, 0)
             };
-            adapter.CalibrationResult = new CalibrationDialogResult(25d, "mm", 0.01, -0.002);
+            adapter.CalibrationResult = new CalibrationDialogResult(25d, "mm", new CameraCalibration { K1 = 0.01, K2 = -0.002 });
 
             service.CalibrateSelectedRoi(roi);
 
             Assert.Equal(2.5d, state.PixelSize, 5);
             Assert.Equal("mm", state.PhysicalUnit);
-            Assert.Equal(0.01, state.K1, 6);
-            Assert.Equal(-0.002, state.K2, 6);
+            Assert.NotNull(state.Calibration);
+            Assert.Equal(0.01, state.Calibration!.K1, 6);
+            Assert.Equal(-0.002, state.Calibration.K2, 6);
         }
 
         [Fact]
@@ -151,12 +152,12 @@ namespace ImageViewerControl.Tests
                 Calibration = new ImageViewerDialogCalibrationWorkflow
                 {
                     GetPhysicalUnit = () => state.PhysicalUnit,
-                    ApplyCalibration = (pixelSize, unit, k1, k2) =>
+                    GetCalibration = () => state.Calibration,
+                    ApplyCalibration = (pixelSize, unit, distortion) =>
                     {
                         state.PixelSize = pixelSize;
                         state.PhysicalUnit = unit;
-                        state.K1 = k1;
-                        state.K2 = k2;
+                        state.Calibration = distortion;
                     }
                 }
             };
@@ -170,9 +171,7 @@ namespace ImageViewerControl.Tests
 
             public string PhysicalUnit { get; set; } = "px";
 
-            public double K1 { get; set; }
-
-            public double K2 { get; set; }
+            public CameraCalibration? Calibration { get; set; }
 
             public int ImageLoadRetryCount { get; set; } = 2;
 
@@ -235,11 +234,15 @@ namespace ImageViewerControl.Tests
 
             public string? ShowSaveProjectPackageDialog() => null;
 
+            public string? ShowSaveRecipeDialog() => null;
+
+            public string? ShowOpenRecipeDialog() => null;
+
             public string? ShowSaveSnapshotDialog() => null;
 
             public string? ShowSaveAnalysisCsvDialog() => null;
 
-            public CalibrationDialogResult? ShowCalibrationDialog(string currentUnit) => CalibrationResult;
+            public CalibrationDialogResult? ShowCalibrationDialog(string currentUnit, CameraCalibration? currentCalibration) => CalibrationResult;
 
             public CaliperMeasureRoi? ShowLineMeasureCaliperSettingsDialog(CaliperMeasureRoi roi, Action<CaliperMeasureRoi>? previewAction = null) => null;
 

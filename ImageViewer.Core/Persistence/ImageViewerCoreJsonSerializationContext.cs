@@ -9,8 +9,10 @@ namespace ImageViewer.Core.Persistence
     [JsonSourceGenerationOptions(WriteIndented = true, PropertyNameCaseInsensitive = true)]
     [JsonSerializable(typeof(ImageViewerSessionDocument))]
     [JsonSerializable(typeof(RoiDocument))]
+    [JsonSerializable(typeof(MeasurementRecipeDocument))]
     [JsonSerializable(typeof(CameraCalibration))]
     [JsonSerializable(typeof(ImageAnalysisQualityProfile))]
+    [JsonSerializable(typeof(ImageViewer.Core.Measurements.AdvancedMeasurementDefinition[]))]
     public partial class ImageViewerCoreJsonSerializationContext : JsonSerializerContext
     {
     }

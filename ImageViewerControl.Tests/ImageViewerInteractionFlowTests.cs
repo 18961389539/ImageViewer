@@ -28,7 +28,7 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
-        public void SelectionInteractionFlow_HandleRightClick_SelectsHitRoiAndShowsProperties()
+        public void SelectionInteractionFlow_HandleRightClick_SelectsHitRoiAndAllowsContextMenu()
         {
             WpfTestRunner.Run(() =>
             {
@@ -41,10 +41,10 @@ namespace ImageViewerControl.Tests
 
                 bool handled = flow.HandleRightClick(new Point(8, 9));
 
-                Assert.True(handled);
+                Assert.False(handled);
                 Assert.Same(hitRoi, host.SelectedRoi);
                 Assert.Equal(1, host.DrawRoisCallCount);
-                Assert.Same(hitRoi, host.LastPropertiesDialogRoi);
+                Assert.Null(host.LastPropertiesDialogRoi);
             });
         }
 
@@ -251,6 +251,20 @@ namespace ImageViewerControl.Tests
                 return RemoveSelectedRoiResult;
             }
 
+            public int UndoCount { get; private set; }
+
+            public int RedoCount { get; private set; }
+
+            public void Undo()
+            {
+                UndoCount++;
+            }
+
+            public void Redo()
+            {
+                RedoCount++;
+            }
+
             public ResizeHandle GetHandleAt(Point point)
             {
                 return ResizeHandle.None;
@@ -331,7 +345,7 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
-        public void EditInteractionFlow_Undo_ShowsUndoneHint()
+        public void EditInteractionFlow_Undo_DelegatesToHost()
         {
             WpfTestRunner.Run(() =>
             {
@@ -342,7 +356,42 @@ namespace ImageViewerControl.Tests
                 bool handled = flow.HandleKeyInput(Key.Z, isCtrlPressed: true, isShiftPressed: false);
 
                 Assert.True(handled);
-                Assert.Contains("已撤销", host.StatusHints);
+                // 撤销统一走宿主（真实宿主是 RoiEditController，负责刷新、提示与失败兜底）。
+                Assert.Equal(1, host.UndoCount);
+                Assert.Equal(0, host.RedoCount);
+            });
+        }
+
+        [Fact]
+        public void EditInteractionFlow_Redo_DelegatesToHost()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                var host = new FakeEditInteractionHost();
+                host.ViewModel.UndoRedo.Execute(new AddRoiCommand(new LineMeasureRoi(), host.ViewModel));
+                host.ViewModel.UndoRedo.Undo();
+                var flow = new EditInteractionFlow(host);
+
+                bool handled = flow.HandleKeyInput(Key.Y, isCtrlPressed: true, isShiftPressed: false);
+
+                Assert.True(handled);
+                Assert.Equal(0, host.UndoCount);
+                Assert.Equal(1, host.RedoCount);
+            });
+        }
+
+        [Fact]
+        public void EditInteractionFlow_Undo_WhenCannotUndo_DoesNotDelegate()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                var host = new FakeEditInteractionHost();
+                var flow = new EditInteractionFlow(host);
+
+                bool handled = flow.HandleKeyInput(Key.Z, isCtrlPressed: true, isShiftPressed: false);
+
+                Assert.True(handled);
+                Assert.Equal(0, host.UndoCount);
             });
         }
 
