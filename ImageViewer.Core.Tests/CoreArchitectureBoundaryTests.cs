@@ -21,8 +21,7 @@ public class CoreArchitectureBoundaryTests
             "PresentationCore",
             "PresentationFramework",
             "WindowsBase",
-            "HelixToolkit",
-            "JLVision"
+            "HelixToolkit"
         ];
 
         string[] references = typeof(MeasurementStatistics).Assembly
@@ -46,7 +45,6 @@ public class CoreArchitectureBoundaryTests
         Assert.DoesNotContain("PresentationCore", projectFile, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("PresentationFramework", projectFile, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("HelixToolkit", projectFile, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("JLVision", projectFile, StringComparison.OrdinalIgnoreCase);
 
         string[] sourceFiles = Directory.EnumerateFiles(projectDirectory, "*.cs", SearchOption.AllDirectories)
             .Where(path => !path.Contains("\\bin\\", StringComparison.OrdinalIgnoreCase) && !path.Contains("\\obj\\", StringComparison.OrdinalIgnoreCase))
@@ -104,6 +102,18 @@ public class CoreArchitectureBoundaryTests
         Assert.Equal(typeof(MeasurementStatistics).Assembly, typeof(ImageViewer.Core.Analysis.LineMeasureGradientDetectionResult).Assembly);
         Assert.Equal(typeof(MeasurementStatistics).Assembly, typeof(DetectedLineSegment).Assembly);
         Assert.Equal(typeof(MeasurementStatistics).Assembly, typeof(LineFitGeometry).Assembly);
+
+        // 2026-11-10 下沉：托管分析算法属于框架中立的 Core 层，控件只保留 WPF 适配门面。
+        // Chinese: 卡尺/拟合/Blob 与强度平面必须由 Core 拥有，避免算法再次被 WPF 类型绑死。
+        // English: The managed algorithms and the intensity plane are Core-owned; the control keeps only adapters.
+        Assert.Equal(typeof(MeasurementStatistics).Assembly, typeof(ImageViewer.Core.Analysis.CaliperAlgorithm).Assembly);
+        Assert.Equal(typeof(MeasurementStatistics).Assembly, typeof(ImageViewer.Core.Analysis.RobustFitAlgorithm).Assembly);
+        Assert.Equal(typeof(MeasurementStatistics).Assembly, typeof(ImageViewer.Core.Analysis.BlobAlgorithm).Assembly);
+        Assert.Equal(typeof(MeasurementStatistics).Assembly, typeof(ImageViewer.Core.Analysis.IntensityImage).Assembly);
+        Assert.Equal(typeof(MeasurementStatistics).Assembly, typeof(CaliperEdge).Assembly);
+        Assert.Equal(typeof(MeasurementStatistics).Assembly, typeof(CaliperEdgePair).Assembly);
+        Assert.Equal(typeof(MeasurementStatistics).Assembly, typeof(LineFitMode).Assembly);
+        Assert.Equal(typeof(MeasurementStatistics).Assembly, typeof(CaliperEdgePolarity).Assembly);
 
         // 2026-09-30 下沉：ROI 领域基础类型不再属于控件程序集，插件契约才可能脱离 WPF。
         Assert.Equal(typeof(MeasurementStatistics).Assembly, typeof(RoiBase).Assembly);

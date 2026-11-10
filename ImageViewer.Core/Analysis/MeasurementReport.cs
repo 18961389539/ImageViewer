@@ -96,8 +96,12 @@ namespace ImageViewer.Core.Analysis
     /// </summary>
     public static class MeasurementReportRenderer
     {
-        /// <summary>渲染为 Markdown。</summary>
-        public static string RenderMarkdown(MeasurementReport report)
+        /// <summary>
+        /// 渲染为 Markdown。
+        /// <paramref name="appendix"/> 允许调用方在结论页脚之前追加自有章节（如过程能力、控制图摘要），
+        /// 避免在报告末尾另起一段而破坏页脚的收尾语义。
+        /// </summary>
+        public static string RenderMarkdown(MeasurementReport report, string? appendix = null)
         {
             ArgumentNullException.ThrowIfNull(report);
 
@@ -111,7 +115,7 @@ namespace ImageViewer.Core.Analysis
                 builder.Append("图像来源: ").Append(report.SourceName);
                 if (!string.IsNullOrWhiteSpace(report.SourceSha256))
                 {
-                    builder.Append("（SHA256 ").Append(Shorten(report.SourceSha256)).Append('）');
+                    builder.Append("（SHA256 ").Append(MeasurementReportText.ShortenHash(report.SourceSha256)).Append('）');
                 }
 
                 builder.AppendLine();
@@ -120,16 +124,11 @@ namespace ImageViewer.Core.Analysis
             builder.AppendLine();
             builder.AppendLine("## 结论");
             builder.AppendLine();
-            builder.AppendLine(CultureInfo.InvariantCulture, $"- 整体判定: **{DescribeVerdict(report.OverallVerdict)}**");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"- 整体判定: **{MeasurementReportText.DescribeVerdict(report.OverallVerdict)}**");
             builder.AppendLine(CultureInfo.InvariantCulture, $"- 测量项: {report.ItemCount}（通过 {report.PassedCount} / 不合格 {report.FailedCount} / 不可评估 {report.NotEvaluableCount}）");
             builder.Append("- 标定比例: ").AppendLine(report.Scale.Describe());
-            builder.Append("- 标定身份: ").AppendLine(DescribeCalibrationIdentity(report.Calibration));
-            builder.Append("- 测量能力: ")
-                .AppendLine(report.Readiness.CanProduceSpecificationVerdict
-                    ? "可给出尺寸判定"
-                    : report.Readiness.CanProducePhysicalResults
-                        ? "只能给出物理测量值，无法给出尺寸判定"
-                        : "无法给出物理单位的测量结果");
+            builder.Append("- 标定身份: ").AppendLine(MeasurementReportText.DescribeCalibrationIdentity(report.Calibration));
+            builder.Append("- 测量能力: ").AppendLine(MeasurementReportText.DescribeMeasurementCapability(report.Readiness));
 
             AppendPrecisionSection(builder, report);
 
@@ -144,7 +143,7 @@ namespace ImageViewer.Core.Analysis
             {
                 foreach (MeasurementReadinessCheck check in report.Readiness.Checks)
                 {
-                    builder.Append("- [").Append(DescribeLevel(check.Level)).Append("] ").AppendLine(check.Message);
+                    builder.Append("- [").Append(MeasurementReportText.DescribeLevel(check.Level)).Append("] ").AppendLine(check.Message);
                 }
             }
 
@@ -157,15 +156,20 @@ namespace ImageViewer.Core.Analysis
             {
                 builder.Append("| ").Append(Escape(item.Label))
                     .Append(" | ").Append(Escape(item.Quantity))
-                    .Append(" | ").Append(FormatValue(item.MeasuredValue, item.Unit, "G6"))
-                    .Append(" | ").Append(FormatValue(item.NominalValue, item.Unit, "G6"))
-                    .Append(" | ").Append(FormatTolerance(item))
-                    .Append(" | ").Append(Escape(item.DetectionStatus))
-                    .Append(" | ").Append(DescribeVerdict(item.SpecificationStatus))
+                    .Append(" | ").Append(MeasurementReportText.FormatValue(item.MeasuredValue, item.Unit, "G6"))
+                    .Append(" | ").Append(MeasurementReportText.FormatValue(item.NominalValue, item.Unit, "G6"))
+                    .Append(" | ").Append(MeasurementReportText.FormatTolerance(item))
+                    .Append(" | ").Append(MeasurementReportText.DescribeDetectionStatus(item.DetectionStatus))
+                    .Append(" | ").Append(MeasurementReportText.DescribeVerdict(item.SpecificationStatus))
                     .AppendLine(" |");
             }
 
-            builder.AppendLine();
+            if (!string.IsNullOrWhiteSpace(appendix))
+            {
+                builder.AppendLine(appendix.TrimEnd());
+                builder.AppendLine();
+            }
+
             builder.AppendLine("---");
             builder.AppendLine("本报告由 ImageViewer 自动生成；判定基于 2D 图像量测，不等同于三坐标测量机的基准公差结论。");
             return builder.ToString();
@@ -205,78 +209,8 @@ namespace ImageViewer.Core.Analysis
             builder.AppendLine("- 单次测量的综合不确定度 = 重复性(未评估) ⊕ 标定不确定度；未做重复测量时以上述标定不确定度为准。");
         }
 
-        private static string DescribeCalibrationIdentity(CameraCalibration? calibration)
-        {
-            if (calibration is not { IsEnabled: true })
-            {
-                return "无（仅比例标定或未标定）";
-            }
-
-            if (!calibration.IsValid)
-            {
-                return "非法（已按恒等处理，尺寸结果不可信）";
-            }
-
-            string id = string.IsNullOrWhiteSpace(calibration.CalibrationId) ? "（无标识）" : calibration.CalibrationId!;
-            string when = calibration.CalibratedAtUtc is { } timestamp
-                ? timestamp.ToUniversalTime().ToString("yyyy-MM-dd HH:mm 'UTC'", CultureInfo.InvariantCulture)
-                : "（无时间戳）";
-            string model = calibration.HasExtendedDistortionModel ? "扩展畸变模型" : "径向畸变 (K1/K2)";
-            return $"{id} · {when} · {model}";
-        }
-
-        private static string DescribeVerdict(string verdict) => verdict switch
-        {
-            "Passed" => "通过",
-            "Failed" => "不合格",
-            "Blocked" => "已阻断",
-            "NoVerdict" => "无可判定项",
-            "NotEvaluable" => "不可评估",
-            "NotConfigured" => "未配置公差",
-            "NotApplicable" => "不适用",
-            "Review" => "需复核",
-            _ => verdict
-        };
-
-        private static string DescribeLevel(MeasurementReadinessLevel level) => level switch
-        {
-            MeasurementReadinessLevel.Passed => "通过",
-            MeasurementReadinessLevel.Warning => "警告",
-            _ => "阻断"
-        };
-
-        private static string FormatValue(double? value, string? unit, string format)
-        {
-            if (value is not { } number || !double.IsFinite(number))
-            {
-                return "—";
-            }
-
-            string text = number.ToString(format, CultureInfo.InvariantCulture);
-            return string.IsNullOrWhiteSpace(unit) || unit == "px" ? text : text + " " + unit;
-        }
-
-        private static string FormatTolerance(MeasurementReportItem item)
-        {
-            if (item.NominalValue is not { } nominal || !double.IsFinite(nominal))
-            {
-                return "—";
-            }
-
-            double plus = item.TolerancePlus is { } p && double.IsFinite(p) ? p : 0;
-            double minus = item.ToleranceMinus is { } m && double.IsFinite(m) ? m : 0;
-            if (plus == 0 && minus == 0)
-            {
-                return "—";
-            }
-
-            return string.Create(CultureInfo.InvariantCulture, $"+{plus:G6} / -{minus:G6}");
-        }
-
         private static string Escape(string? value) =>
             (value ?? string.Empty).Replace("|", "\\|", StringComparison.Ordinal);
-
-        private static string Shorten(string hash) => hash.Length <= 12 ? hash : hash[..12];
     }
 
     /// <summary>

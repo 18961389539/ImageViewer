@@ -119,6 +119,8 @@ namespace ImageViewer.Controls
         public static ImageViewerAnalysisMenuCommandTag SetPseudoColorPaletteJet { get; } = new(ImageViewerAnalysisCommand.SetPseudoColorPaletteJet);
         public static ImageViewerAnalysisMenuCommandTag SetPseudoColorPaletteViridis { get; } = new(ImageViewerAnalysisCommand.SetPseudoColorPaletteViridis);
         public static ImageViewerAnalysisMenuCommandTag ShowSmartDisplaySuggestion { get; } = new(ImageViewerAnalysisCommand.ShowSmartDisplaySuggestion);
+        public static ImageViewerAnalysisMenuCommandTag ShowDisplayAdjustment { get; } = new(ImageViewerAnalysisCommand.ShowDisplayAdjustment);
+        public static ImageViewerAnalysisMenuCommandTag ResetDisplayAdjustment { get; } = new(ImageViewerAnalysisCommand.ResetDisplayAdjustment);
         public static ImageViewerAnalysisMenuCommandTag ShowRenderStatus { get; } = new(ImageViewerAnalysisCommand.ShowRenderStatus);
     }
 
@@ -164,6 +166,8 @@ namespace ImageViewer.Controls
         public static ImageViewerFeatureMenuCommandTag ExportAnalysisCsv { get; } = new(ImageViewerFeatureMenuCommand.ExportAnalysisCsv);
         public static ImageViewerFeatureMenuCommandTag ExportBatchAnalysisCsv { get; } = new(ImageViewerFeatureMenuCommand.ExportBatchAnalysisCsv);
         public static ImageViewerFeatureMenuCommandTag ShowAnalysisSummary { get; } = new(ImageViewerFeatureMenuCommand.ShowAnalysisSummary);
+        public static ImageViewerFeatureMenuCommandTag ShowProcessCapability { get; } = new(ImageViewerFeatureMenuCommand.ShowProcessCapability);
+        public static ImageViewerFeatureMenuCommandTag PrintReport { get; } = new(ImageViewerFeatureMenuCommand.PrintReport);
         public static ImageViewerFeatureMenuCommandTag CheckCalibrationReadiness { get; } = new(ImageViewerFeatureMenuCommand.CheckCalibrationReadiness);
     }
 }

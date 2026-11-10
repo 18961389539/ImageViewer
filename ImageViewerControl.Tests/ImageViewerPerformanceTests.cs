@@ -52,7 +52,7 @@ namespace ImageViewerControl.Tests
                         new Size(512, 512),
                         1.0,
                         new Point(0, 0),
-                        PseudoColorPalette.None,
+                        ImageViewerDisplaySettings.PassThrough,
                         enableTiledRendering: true,
                         autoSelectPyramidLevel: true,
                         prefetchAdjacentTiles: false,

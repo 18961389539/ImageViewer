@@ -26,6 +26,8 @@ using ImageViewer.Plugins;
 [assembly: TypeForwardedTo(typeof(CameraCalibration))]
 [assembly: TypeForwardedTo(typeof(VolumeSliceProvenance))]
 [assembly: TypeForwardedTo(typeof(VolumeSliceOrderMetadata))]
+[assembly: TypeForwardedTo(typeof(LineFitMode))]
+[assembly: TypeForwardedTo(typeof(CaliperEdgePolarity))]
 
 // 2026-09-30 下沉到 ImageViewer.Core 的 ROI 领域基础类型。
 // Chinese: 外部插件程序集是按程序集限定名引用这些类型的，改程序集后必须保留转发，

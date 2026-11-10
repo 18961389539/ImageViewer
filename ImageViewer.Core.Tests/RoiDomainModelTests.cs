@@ -6,11 +6,11 @@ namespace ImageViewer.Core.Tests;
 
 /// <summary>
 /// ROI 领域模型的"脱离 WPF"证明。
-/// Chinese: 本测试项目只引用 ImageViewer.Core（net10.0，无 WPF）。因此这些用例能跑通本身就证明
+/// Chinese: 本测试项目只引用 ImageViewer.Core（net8.0/net10.0，无 WPF）。因此这些用例能跑通本身就证明
 /// RoiBase / RoiColor 一族已经可以在无 UI 环境下被继承、实例化、克隆与断言——这是插件契约后续
 /// 下沉 Core 的前置条件。
 /// English: Proof that the ROI domain model no longer needs WPF. This test project references Core only
-/// (net10.0, no WPF), so these cases passing means RoiBase/RoiColor can be subclassed, instantiated and
+/// (net8.0/net10.0, no WPF), so these cases passing means RoiBase/RoiColor can be subclassed, instantiated and
 /// asserted headlessly — the prerequisite for moving the plugin contract to Core later.
 /// </summary>
 public class RoiDomainModelTests

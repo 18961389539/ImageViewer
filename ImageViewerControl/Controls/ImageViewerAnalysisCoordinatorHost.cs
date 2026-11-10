@@ -30,7 +30,7 @@ namespace ImageViewer.Controls
         public bool EnableGpuRendering => _owner.EnableGpuRendering;
         public bool PreferShaderPseudoColor => _owner.RuntimeOptions.PreferShaderPseudoColor;
         public bool AllowCpuPseudoColorFallback => _owner.RuntimeOptions.AllowCpuPseudoColorFallback;
-        public PseudoColorPalette PseudoColorPalette => _owner.PseudoColorPalette;
+        public ImageViewerDisplaySettings DisplaySettings => new(_owner.PseudoColorPalette, _owner.DisplayAdjustment);
         public bool EnableImagePyramid => _owner.RuntimeOptions.EnableImagePyramid;
         public bool AutoSelectPyramidLevel => _owner.RuntimeOptions.AutoSelectPyramidLevel;
         public bool EnableTiledRendering => _owner.RuntimeOptions.EnableTiledRendering;

@@ -17,7 +17,7 @@ namespace ImageViewer.Models
         private int _minimumValidCalipers = 4;
         private double _caliperOutlierThreshold = 2.5;
         private CaliperEdgePolarity _caliperEdgePolarity = CaliperEdgePolarity.Any;
-        private JLVisionLineFitMode _caliperLineFitMode = JLVisionLineFitMode.Tukey;
+        private LineFitMode _caliperLineFitMode = LineFitMode.Tukey;
         private int _caliperFitClippingEndPoints;
         private CaliperWidthMeasurementResult _widthMeasurement = CaliperWidthMeasurementResult.Empty;
 
@@ -237,8 +237,8 @@ namespace ImageViewer.Models
             set => SetProperty(ref _caliperEdgePolarity, value);
         }
 
-        /// <summary>JLVision 边缘点直线拟合模式。</summary>
-        public JLVisionLineFitMode CaliperLineFitMode
+        /// <summary>边缘点直线拟合模式。</summary>
+        public LineFitMode CaliperLineFitMode
         {
             get => _caliperLineFitMode;
             set => SetProperty(ref _caliperLineFitMode, value);

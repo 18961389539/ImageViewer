@@ -44,6 +44,30 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
+        public async Task ExecuteAsync_ShowProcessCapability_DelegatesAndRefreshesMenuState()
+        {
+            var host = new FakeFeatureMenuCommandHost();
+            var controller = new ImageViewerFeatureMenuCommandController(host);
+
+            await controller.ExecuteAsync(ImageViewerFeatureMenuCommand.ShowProcessCapability);
+
+            Assert.Equal(1, host.ShowProcessCapabilityCount);
+            Assert.Equal(1, host.UpdateContextMenuStateCount);
+        }
+
+        [Fact]
+        public async Task ExecuteAsync_PrintReport_DelegatesAndRefreshesMenuState()
+        {
+            var host = new FakeFeatureMenuCommandHost();
+            var controller = new ImageViewerFeatureMenuCommandController(host);
+
+            await controller.ExecuteAsync(ImageViewerFeatureMenuCommand.PrintReport);
+
+            Assert.Equal(1, host.ShowPrintableReportCount);
+            Assert.Equal(1, host.UpdateContextMenuStateCount);
+        }
+
+        [Fact]
         public async Task ExecuteAsync_UnknownCommand_ThrowsArgumentOutOfRangeException()
         {
             var controller = new ImageViewerFeatureMenuCommandController(new FakeFeatureMenuCommandHost());
@@ -59,6 +83,8 @@ namespace ImageViewerControl.Tests
             public int ExportAnalysisCsvCount { get; private set; }
             public int ExportBatchAnalysisCsvCount { get; private set; }
             public int ShowAnalysisSummaryCount { get; private set; }
+            public int ShowProcessCapabilityCount { get; private set; }
+            public int ShowPrintableReportCount { get; private set; }
             public int CheckCalibrationReadinessCount { get; private set; }
             public int UpdateContextMenuStateCount { get; private set; }
 
@@ -83,6 +109,10 @@ namespace ImageViewerControl.Tests
             }
 
             public void ShowAnalysisSummary() => ShowAnalysisSummaryCount++;
+
+            public void ShowProcessCapability() => ShowProcessCapabilityCount++;
+
+            public void ShowPrintableReport() => ShowPrintableReportCount++;
 
             public void CheckCalibrationReadiness() => CheckCalibrationReadinessCount++;
 

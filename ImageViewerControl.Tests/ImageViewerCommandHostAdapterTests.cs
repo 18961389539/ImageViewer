@@ -159,6 +159,8 @@ namespace ImageViewerControl.Tests
             public void RebuildPyramidIfNeeded() { }
             public void SetPseudoColorPalette(PseudoColorPalette palette) => _viewer.PseudoColorPalette = palette;
             public void ShowSmartDisplaySuggestion() => _onShowSuggestion();
+            public void ShowDisplayAdjustment() { }
+            public void ResetDisplayAdjustment() { }
             public void ShowRenderStatus() { }
         }
 

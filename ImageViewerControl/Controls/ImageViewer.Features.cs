@@ -5,6 +5,7 @@ using System.Windows.Media.Imaging;
 using CoreCircularDetectionResult = ImageViewer.Core.Analysis.CircularCaliperDetectionResult;
 using CoreLineCaliperDetectionResult = ImageViewer.Core.Analysis.LineCaliperDetectionResult;
 using CoreLineMeasureDetectionResult = ImageViewer.Core.Analysis.LineMeasureGradientDetectionResult;
+using ImageViewer.Core.Analysis;
 using ImageViewer.Localization;
 using ImageViewer.Models;
 using ImageViewer.Services;
@@ -24,33 +25,33 @@ namespace ImageViewer.Controls
         [Obsolete("Use ShowRoiProperties(RoiBase) instead.", false)]
         public void ShowRoiPropertiesDialog(RoiBase roi) => ShowRoiProperties(roi);
 
-        private bool TryApplyCaliperDetection(CaliperMeasureRoi line)
+        private bool TryApplyCaliperDetection(CaliperMeasureRoi line, IntensityImage? intensity = null)
         {
             return TryApplyBitmapAnalysisCore<CaliperMeasureRoi, CoreLineMeasureDetectionResult>(
                 line,
                 static roi => roi.EnsureCaliperRegion(),
                 static roi => roi.ClearDetectedEdges(),
-                (BitmapSource bitmap, CaliperMeasureRoi roi, out CoreLineMeasureDetectionResult result) => ImageAnalysisService.TryDetectLineMeasureEdgesCore(bitmap, roi, out result, QualityProfile),
+                (BitmapSource bitmap, CaliperMeasureRoi roi, out CoreLineMeasureDetectionResult result) => ImageAnalysisService.TryDetectLineMeasureEdgesCore(bitmap, roi, out result, QualityProfile, intensity),
                 RoiDetectionResultMapper.Apply);
         }
 
-        private bool TryApplyLineCaliperDetection(LineCaliperMeasureRoi line)
+        private bool TryApplyLineCaliperDetection(LineCaliperMeasureRoi line, IntensityImage? intensity = null)
         {
             return TryApplyBitmapAnalysisCore<LineCaliperMeasureRoi, CoreLineCaliperDetectionResult>(
                 line,
                 prepare: null,
                 static roi => roi.ClearDetectedLine(),
-                (BitmapSource bitmap, LineCaliperMeasureRoi roi, out CoreLineCaliperDetectionResult result) => ImageAnalysisService.TryDetectLineCaliperEdgesCore(bitmap, roi, out result, QualityProfile),
+                (BitmapSource bitmap, LineCaliperMeasureRoi roi, out CoreLineCaliperDetectionResult result) => ImageAnalysisService.TryDetectLineCaliperEdgesCore(bitmap, roi, out result, QualityProfile, intensity),
                 RoiDetectionResultMapper.Apply);
         }
 
-        private bool TryApplyCircularCaliperDetection(CircularCaliperMeasureRoi caliper)
+        private bool TryApplyCircularCaliperDetection(CircularCaliperMeasureRoi caliper, IntensityImage? intensity = null)
         {
             bool success = TryApplyBitmapAnalysisCore<CircularCaliperMeasureRoi, CoreCircularDetectionResult>(
                 caliper,
                 prepare: null,
                 static roi => roi.ClearDetectedEdges(),
-                (BitmapSource bitmap, CircularCaliperMeasureRoi roi, out CoreCircularDetectionResult result) => ImageAnalysisService.TryDetectCircularCaliperEdgesCore(bitmap, roi, out result, QualityProfile),
+                (BitmapSource bitmap, CircularCaliperMeasureRoi roi, out CoreCircularDetectionResult result) => ImageAnalysisService.TryDetectCircularCaliperEdgesCore(bitmap, roi, out result, QualityProfile, intensity),
                 (roi, result) => RoiDetectionResultMapper.Apply(roi, result, QualityProfile));
             if (!success && caliper is not ArcCaliperMeasureRoi)
             {
@@ -88,18 +89,18 @@ namespace ImageViewer.Controls
             return false;
         }
 
-        private bool TryApplyArcCaliperDetection(ArcCaliperMeasureRoi caliper)
+        private bool TryApplyArcCaliperDetection(ArcCaliperMeasureRoi caliper, IntensityImage? intensity = null)
         {
-            return TryApplyCircularCaliperDetection(caliper);
+            return TryApplyCircularCaliperDetection(caliper, intensity);
         }
 
-        private bool TryRefreshCaliperDetection(RoiBase? roi)
+        private bool TryRefreshCaliperDetection(RoiBase? roi, IntensityImage? intensity = null)
         {
             return roi switch
             {
-                CaliperMeasureRoi line => TryApplyCaliperDetection(line),
-                LineCaliperMeasureRoi lineCaliper => TryApplyLineCaliperDetection(lineCaliper),
-                CircularCaliperMeasureRoi circular => TryApplyCircularCaliperDetection(circular),
+                CaliperMeasureRoi line => TryApplyCaliperDetection(line, intensity),
+                LineCaliperMeasureRoi lineCaliper => TryApplyLineCaliperDetection(lineCaliper, intensity),
+                CircularCaliperMeasureRoi circular => TryApplyCircularCaliperDetection(circular, intensity),
                 BlobAnalysisRoi blob => TryApplyBlobAnalysis(blob),
                 _ => false
             };
@@ -174,9 +175,19 @@ namespace ImageViewer.Controls
 
         private void RefreshAllCaliperDetections()
         {
+            // One conversion serves every caliper ROI in this pass; per-ROI conversion of a
+            // large image otherwise dominates refresh time as the ROI count grows.
+            IntensityImage? intensity = null;
             foreach (RoiBase roi in ViewModel.AllRois)
             {
-                TryRefreshCaliperDetection(roi);
+                if (intensity is null &&
+                    roi is CaliperMeasureRoi or LineCaliperMeasureRoi or CircularCaliperMeasureRoi &&
+                    GetAnalysisBitmapSource() is BitmapSource bitmap)
+                {
+                    intensity = VisionAlgorithmEntryPoint.CreateIntensity(bitmap);
+                }
+
+                TryRefreshCaliperDetection(roi, intensity);
             }
         }
 

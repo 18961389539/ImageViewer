@@ -10,15 +10,16 @@ namespace ImageViewer.Services
     internal static partial class ImageAnalysisService
     {
         /// <summary>
-        /// Runs the WPF/JLVision detector and exposes its result as a framework-neutral Core contract.
+        /// Runs the WPF detector and exposes its result as a framework-neutral Core contract.
         /// </summary>
         internal static bool TryDetectLineMeasureEdgesCore(
             BitmapSource bitmap,
             CaliperMeasureRoi line,
             out CoreDualLineResult result,
-            ImageAnalysisQualityProfile? profile = null)
+            ImageAnalysisQualityProfile? profile = null,
+            IntensityImage? intensity = null)
         {
-            bool success = TryDetectLineMeasureEdges(bitmap, line, out LineMeasureGradientDetectionResult legacy, profile);
+            bool success = TryDetectLineMeasureEdges(bitmap, line, out LineMeasureGradientDetectionResult legacy, profile, intensity);
             result = success ? legacy.ToCore() : default;
             return success;
         }
@@ -27,9 +28,10 @@ namespace ImageViewer.Services
             BitmapSource bitmap,
             LineCaliperMeasureRoi line,
             out CoreLineResult result,
-            ImageAnalysisQualityProfile? profile = null)
+            ImageAnalysisQualityProfile? profile = null,
+            IntensityImage? intensity = null)
         {
-            bool success = TryDetectLineCaliperEdges(bitmap, line, out LineCaliperDetectionResult legacy, profile);
+            bool success = TryDetectLineCaliperEdges(bitmap, line, out LineCaliperDetectionResult legacy, profile, intensity);
             result = success ? legacy.ToCore() : default;
             return success;
         }
@@ -38,9 +40,10 @@ namespace ImageViewer.Services
             BitmapSource bitmap,
             CircularCaliperMeasureRoi caliper,
             out CoreCircularResult result,
-            ImageAnalysisQualityProfile? profile = null)
+            ImageAnalysisQualityProfile? profile = null,
+            IntensityImage? intensity = null)
         {
-            bool success = TryDetectCircularCaliperEdges(bitmap, caliper, out CircularCaliperDetectionResult legacy, profile);
+            bool success = TryDetectCircularCaliperEdges(bitmap, caliper, out CircularCaliperDetectionResult legacy, profile, intensity);
             result = success ? legacy.ToCore() : default;
             return success;
         }

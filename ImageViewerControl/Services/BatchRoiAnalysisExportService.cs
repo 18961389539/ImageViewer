@@ -232,6 +232,13 @@ namespace ImageViewer.Services
             RepeatabilityStudy repeatabilityStudy = RoiAnalysisExportService.BuildRepeatabilityStudy(
                 rows, physicalUnit, repeatabilityOptions, inputTraces.Select(trace => trace.InputIndex));
             string repeatabilityMarkdown = RepeatabilityStudyRenderer.RenderMarkdown(repeatabilityStudy);
+            // 跨图同名项才是真正的过程随时间样本；能力指数附在重复性报告尾部，避免再产出一个只多几行的文件。
+            IReadOnlyList<SpcMeasurementSeries> spcSeries = SpcMeasurementSeriesBuilder.BuildFromBatchRows(rows, physicalUnit);
+            string processCapabilityMarkdown = SpcReportFormatter.BuildMarkdown(spcSeries);
+            if (processCapabilityMarkdown.Length > 0)
+            {
+                repeatabilityMarkdown = repeatabilityMarkdown.TrimEnd() + Environment.NewLine + Environment.NewLine + processCapabilityMarkdown;
+            }
             string csvHash = ImageViewerExportArtifactSet.ComputeSha256Utf8Text(csv);
             string repeatabilityHash = ImageViewerExportArtifactSet.ComputeSha256Utf8Text(repeatabilityMarkdown);
             var metadata = new Dictionary<string, object?>
@@ -269,6 +276,7 @@ namespace ImageViewer.Services
                 },
                 ["qualityThresholds"] = quality,
                 ["roiCount"] = templates.Length,
+                ["processCapability"] = SpcReportFormatter.BuildMetadata(spcSeries),
                 ["repeatability"] = new Dictionary<string, object?>
                 {
                     ["path"] = repeatabilityPath,
@@ -387,6 +395,9 @@ namespace ImageViewer.Services
             CancellationToken cancellationToken)
         {
             var rows = new RoiAnalysisBatchCsvRow[templates.Count];
+            // Caliper detections on the same source share one intensity conversion: decoding
+            // and converting the full image per template would dominate large batches.
+            IntensityImage? intensity = null;
             for (int i = 0; i < templates.Count; i++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -397,7 +408,12 @@ namespace ImageViewer.Services
                 try
                 {
                     ClearPreviousDetectionState(roi);
-                    bool measured = TryDetectRoi(bitmap, roi, quality);
+                    if (roi is CaliperMeasureRoi or LineCaliperMeasureRoi or CircularCaliperMeasureRoi)
+                    {
+                        intensity ??= VisionAlgorithmEntryPoint.CreateIntensity(bitmap);
+                    }
+
+                    bool measured = TryDetectRoi(bitmap, roi, intensity, quality);
                     if (roi is CaliperMeasureRoi or LineCaliperMeasureRoi or CircularCaliperMeasureRoi)
                     {
                         status = measured ? "Measured" : "DetectionFailed";
@@ -457,17 +473,17 @@ namespace ImageViewer.Services
                 .ToArray();
         }
 
-        private static bool TryDetectRoi(BitmapSource bitmap, RoiBase roi, ImageAnalysisQualityProfile quality)
+        private static bool TryDetectRoi(BitmapSource bitmap, RoiBase roi, IntensityImage? intensity, ImageAnalysisQualityProfile quality)
         {
             switch (roi)
             {
-                case CaliperMeasureRoi dualEdge when ImageAnalysisService.TryDetectLineMeasureEdgesCore(bitmap, dualEdge, out ImageViewer.Core.Analysis.LineMeasureGradientDetectionResult dualResult, quality):
+                case CaliperMeasureRoi dualEdge when ImageAnalysisService.TryDetectLineMeasureEdgesCore(bitmap, dualEdge, out ImageViewer.Core.Analysis.LineMeasureGradientDetectionResult dualResult, quality, intensity):
                     RoiDetectionResultMapper.Apply(dualEdge, dualResult);
                     return true;
-                case LineCaliperMeasureRoi line when ImageAnalysisService.TryDetectLineCaliperEdgesCore(bitmap, line, out ImageViewer.Core.Analysis.LineCaliperDetectionResult lineResult, quality):
+                case LineCaliperMeasureRoi line when ImageAnalysisService.TryDetectLineCaliperEdgesCore(bitmap, line, out ImageViewer.Core.Analysis.LineCaliperDetectionResult lineResult, quality, intensity):
                     RoiDetectionResultMapper.Apply(line, lineResult);
                     return true;
-                case CircularCaliperMeasureRoi circular when ImageAnalysisService.TryDetectCircularCaliperEdgesCore(bitmap, circular, out ImageViewer.Core.Analysis.CircularCaliperDetectionResult circularResult, quality):
+                case CircularCaliperMeasureRoi circular when ImageAnalysisService.TryDetectCircularCaliperEdgesCore(bitmap, circular, out ImageViewer.Core.Analysis.CircularCaliperDetectionResult circularResult, quality, intensity):
                     RoiDetectionResultMapper.Apply(circular, circularResult, quality);
                     return true;
                 case CaliperMeasureRoi:

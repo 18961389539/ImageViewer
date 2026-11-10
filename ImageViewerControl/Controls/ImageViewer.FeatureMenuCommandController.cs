@@ -41,6 +41,8 @@ namespace ImageViewer.Controls
         string? ShowSaveAnalysisCsvDialog();
         string[] ShowOpenBatchImageFilesDialog();
         void ShowReadOnlyText(string title, string text);
+        void ShowProcessCapability();
+        void ShowPrintableReport();
     }
 
     internal interface IImageViewerFeatureFeedbackCapability
@@ -63,6 +65,12 @@ namespace ImageViewer.Controls
         bool CancelBatchAnalysisExport() => false;
 
         void ShowAnalysisSummary();
+
+        /// <summary>过程能力与 Xbar-R 控制图窗口。</summary>
+        void ShowProcessCapability();
+
+        /// <summary>可打印测量报告（打印 / 导出 XPS）。</summary>
+        void ShowPrintableReport();
 
         /// <summary>“标定检查”步骤：在测量/出报告前确认数值是否可信。</summary>
         void CheckCalibrationReadiness();
@@ -95,6 +103,12 @@ namespace ImageViewer.Controls
                     break;
                 case ImageViewerFeatureMenuCommand.ShowAnalysisSummary:
                     Host.ShowAnalysisSummary();
+                    break;
+                case ImageViewerFeatureMenuCommand.ShowProcessCapability:
+                    Host.ShowProcessCapability();
+                    break;
+                case ImageViewerFeatureMenuCommand.PrintReport:
+                    Host.ShowPrintableReport();
                     break;
                 case ImageViewerFeatureMenuCommand.CheckCalibrationReadiness:
                     Host.CheckCalibrationReadiness();

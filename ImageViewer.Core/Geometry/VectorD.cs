@@ -22,6 +22,18 @@ namespace ImageViewer.Models
             return length <= 1e-12 ? this : new VectorD(X / length, Y / length);
         }
 
+        /// <summary>返回向量按标量缩放后的结果。</summary>
+        public static VectorD operator *(VectorD vector, double scale)
+        {
+            return new VectorD(vector.X * scale, vector.Y * scale);
+        }
+
+        /// <summary>返回向量按标量缩放后的结果。</summary>
+        public static VectorD operator *(double scale, VectorD vector)
+        {
+            return new VectorD(vector.X * scale, vector.Y * scale);
+        }
+
         /// <inheritdoc />
         public override string ToString() => $"({X}, {Y})";
     }

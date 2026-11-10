@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Media;
+using ImageViewer.Core.Display;
 using ImageViewer.Core.Geometry;
 using ImageViewer.Models;
 using ImageViewer.Services;
@@ -119,6 +120,15 @@ namespace ImageViewer.Controls
         public static readonly DependencyProperty PseudoColorPaletteProperty =
             DependencyProperty.Register(nameof(PseudoColorPalette), typeof(PseudoColorPalette), typeof(ImageViewer),
                 new PropertyMetadata(PseudoColorPalette.None, OnPseudoColorPaletteChanged));
+
+        /// <summary>
+        /// 显示调节（窗宽窗位/亮度/对比度/伽马/反色）。
+        /// Chinese: 只影响显示，不改像素数据——测量、直方图、导出仍读原始位图。
+        /// null 按默认参数（透传）处理，绑定暂时为 null 时不会炸；越界值直接拒绝，免得两条渲染路径各自裁剪出不同结果。
+        /// </summary>
+        public static readonly DependencyProperty DisplayAdjustmentProperty =
+            DependencyProperty.Register(nameof(DisplayAdjustment), typeof(DisplayAdjustment), typeof(ImageViewer),
+                new PropertyMetadata(DisplayAdjustment.Identity, OnDisplayAdjustmentChanged), IsValidDisplayAdjustment);
 
         public static readonly DependencyProperty ScaleProperty =
             DependencyProperty.Register(nameof(Scale), typeof(double), typeof(ImageViewer),
@@ -318,6 +328,12 @@ namespace ImageViewer.Controls
             set => SetValue(PseudoColorPaletteProperty, value);
         }
 
+        public DisplayAdjustment DisplayAdjustment
+        {
+            get => (DisplayAdjustment?)GetValue(DisplayAdjustmentProperty) ?? DisplayAdjustment.Identity;
+            set => SetValue(DisplayAdjustmentProperty, value);
+        }
+
         public double Scale
         {
             get => (double)GetValue(ScaleProperty);
@@ -383,6 +399,12 @@ namespace ImageViewer.Controls
             return value is double pixelSize
                 && double.IsFinite(pixelSize)
                 && pixelSize > 0;
+        }
+
+        private static bool IsValidDisplayAdjustment(object value)
+        {
+            // null 允许：显示设置构造时按默认参数（透传）处理，绑定暂时取到 null 不应该让 SetValue 抛异常。
+            return value is not DisplayAdjustment adjustment || adjustment.TryValidate(out _);
         }
 
         private static void OnImageSourceChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)

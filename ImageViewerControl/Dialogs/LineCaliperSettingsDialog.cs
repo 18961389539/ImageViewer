@@ -62,7 +62,7 @@ namespace ImageViewer.Dialogs
             AdvancedPanel.Children.Add(new TextBlock { Text = UiText.Get("CaliperFieldLineFitMode"), Margin = new Thickness(0, 8, 0, 2) });
             _lineFitModeComboBox = new ComboBox
             {
-                ItemsSource = Enum.GetValues<JLVisionLineFitMode>(),
+                ItemsSource = Enum.GetValues<LineFitMode>(),
                 SelectedItem = _model.CaliperLineFitMode,
                 Margin = new Thickness(0, 0, 0, 4)
             };
@@ -98,7 +98,7 @@ namespace ImageViewer.Dialogs
                 !TryParsePositiveInt(_edgeSelectionTextBox.Text, out int edgeSelection, minValue: 1) ||
                 !TryParseNonNegativeInt(_fitClippingEndPointsTextBox.Text, out int fitClippingEndPoints) ||
                 _polarityComboBox.SelectedItem is not CaliperEdgePolarity polarity ||
-                _lineFitModeComboBox.SelectedItem is not JLVisionLineFitMode lineFitMode)
+                _lineFitModeComboBox.SelectedItem is not LineFitMode lineFitMode)
             {
                 return false;
             }

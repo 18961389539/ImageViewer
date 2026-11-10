@@ -90,6 +90,8 @@ namespace ImageViewer.Controls
         void RebuildPyramidIfNeeded();
         void SetPseudoColorPalette(PseudoColorPalette palette);
         void ShowSmartDisplaySuggestion();
+        void ShowDisplayAdjustment();
+        void ResetDisplayAdjustment();
         void ShowRenderStatus();
     }
 

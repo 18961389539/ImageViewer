@@ -198,6 +198,31 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
+        public void ReportAppendsProcessCapabilityBeforeTheFooterForRepeatedQuantities()
+        {
+            var tolerance = new MeasurementTolerance { Nominal = 10, TolerancePlus = 0.5, ToleranceMinus = 0.5 };
+            var rois = new RoiBase[]
+            {
+                CreateMeasuredRoi("孔1", pixelLength: 9, pixelSize: 1, tolerance),
+                CreateMeasuredRoi("孔2", pixelLength: 10, pixelSize: 1, tolerance),
+                CreateMeasuredRoi("孔3", pixelLength: 11, pixelSize: 1, tolerance)
+            };
+
+            string report = RoiAnalysisExportService.BuildReport(
+                rois,
+                bitmap: null,
+                pixelSize: 1,
+                physicalUnit: "mm",
+                calibration: null);
+
+            Assert.Contains("## 过程能力 (SPC)", report);
+            Assert.Contains("| 长度 | mm | 3 |", report);
+            int spcIndex = report.IndexOf("## 过程能力 (SPC)", StringComparison.Ordinal);
+            int footerIndex = report.IndexOf("本报告由 ImageViewer 自动生成", StringComparison.Ordinal);
+            Assert.True(spcIndex >= 0 && spcIndex < footerIndex, "SPC 章节必须位于报告页脚之前。");
+        }
+
+        [Fact]
         public async Task ExportWritesReportAlongsideCsvAndMetadata()
         {
             string root = Path.Combine(Path.GetTempPath(), $"image-viewer-report-{Guid.NewGuid():N}");
@@ -243,7 +268,9 @@ namespace ImageViewerControl.Tests
                 Assert.Contains("part-777.png（SHA256 ", report);
                 // 其余两份交付物仍在原位，说明报告是"追加"而不是"替换"。
                 Assert.True(File.Exists(csvPath));
-                Assert.True(File.Exists(Path.ChangeExtension(csvPath, ".metadata.json")));
+                string metadataPath = Path.ChangeExtension(csvPath, ".metadata.json");
+                Assert.True(File.Exists(metadataPath));
+                Assert.Contains("\"processCapability\"", File.ReadAllText(metadataPath), StringComparison.Ordinal);
             }
             finally
             {

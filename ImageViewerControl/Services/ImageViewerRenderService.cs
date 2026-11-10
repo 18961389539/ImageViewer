@@ -15,9 +15,9 @@ namespace ImageViewer.Services
     {
         private readonly ImageViewerTileRenderService _tileRenderService = new();
 
-        public ImageSource? BuildDisplaySource(ImageSource? source, PseudoColorPalette palette)
+        public ImageSource? BuildDisplaySource(ImageSource? source, ImageViewerDisplaySettings settings)
         {
-            return ImageViewerDisplaySourceService.BuildDisplaySource(source, palette);
+            return ImageViewerDisplaySourceService.BuildDisplaySource(source, settings);
         }
 
         public void ApplyGpuCaching(Canvas imageContainer, bool enableGpuRendering)
@@ -45,9 +45,9 @@ namespace ImageViewer.Services
             return ImageViewerDisplaySourceService.GetAnalysisBitmap(source);
         }
 
-        public Effect? CreatePseudoColorEffect(PseudoColorPalette palette)
+        public Effect? CreateDisplayEffect(ImageViewerDisplaySettings settings)
         {
-            return ImageViewerDisplaySourceService.CreatePseudoColorEffect(palette);
+            return ImageViewerDisplaySourceService.CreateDisplayEffect(settings);
         }
 
         public Task<IReadOnlyList<ImagePyramidLevel>> BuildPyramidAsync(BitmapSource? source, CancellationToken cancellationToken)
@@ -61,7 +61,7 @@ namespace ImageViewer.Services
             Size viewport,
             double scale,
             Point translation,
-            PseudoColorPalette palette,
+            ImageViewerDisplaySettings settings,
             bool enableTiledRendering,
             bool autoSelectPyramidLevel,
             bool prefetchAdjacentTiles,
@@ -73,11 +73,13 @@ namespace ImageViewer.Services
                 return new ImageViewerRenderFrame(null, 0, 0, 0, 0, 1.0, false);
             }
 
+            ArgumentNullException.ThrowIfNull(settings);
+
             BitmapSource workingSource = source.IsFrozen ? source : Freeze(source);
             return _tileRenderService.BuildFrame(
                 workingSource,
                 pyramid ?? [],
-                palette,
+                settings,
                 viewport,
                 scale,
                 translation,

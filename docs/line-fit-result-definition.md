@@ -8,7 +8,7 @@
 - 单边缘的 `DetectedP1/DetectedP2`：将原始 ROI 两个端点正交投影到拟合无限直线后的结果段。
 - 双边缘的 `DetectedP1/DetectedP2`：测量中心线分别与两条拟合无限直线的交点，结果段长度就是中心线方向的测量宽度。
 
-拟合时按 JLVision `fit_line_contour_xld` 的规则从轮廓首尾各裁剪指定数量的点。裁剪点只影响拟合，不影响输出端点；输出端点始终是原始轮廓首点和末点投影到拟合无限直线后的结果。裁剪数量为 0 时使用全部点。
+拟合时从轮廓首尾各裁剪指定数量的点。裁剪点只影响拟合，不影响输出端点；输出端点始终是原始轮廓首点和末点投影到拟合无限直线后的结果。裁剪数量为 0 时使用全部点。
 
 ## 无限拟合直线
 
@@ -29,16 +29,16 @@ Normal.X * X + Normal.Y * Y = Offset
 - `LineMeasureGradientDetectionResult.FittedEdge1Geometry` / `FittedEdge2Geometry`：双边缘两条拟合直线。
 - `FittingAlgorithmMetadata.LineGeometry`：导出元数据中的结果定义版本。
 
-直线拟合使用 `JLVisionLineFitMode` 配置，支持 regression、huber、tukey、drop 和 gauss；边缘采样统一由 JLVision 卡尺算子完成。
+直线拟合使用 `LineFitMode` 配置，支持 regression、huber、tukey、drop 和 gauss；边缘采样统一由托管卡尺算法（`CaliperAlgorithm`）完成。
 
 ## 参数说明
 
-| 参数 | 作用 | JLVision 传值 |
+| 参数 | 作用 | 托管算法传值 |
 | --- | --- | --- |
-| `CaliperLineFitMode` | 选择拟合权重模型。`Regression` 使用全部点的普通回归，其余模式启用稳健迭代。 | `regression`、`huber`、`tukey`、`drop`、`gauss` |
-| `CaliperFitClippingEndPoints` | 从有序边缘轮廓首尾各去掉的点数，只影响拟合输入，不改变输出端点投影范围。 | `clipping_end_points` |
+| `CaliperLineFitMode` | 选择拟合权重模型。`Regression` 使用全部点的普通回归，其余模式启用稳健迭代。 | `LineFitMode` 枚举 |
+| `CaliperFitClippingEndPoints` | 从有序边缘轮廓首尾各去掉的点数，只影响拟合输入，不改变输出端点投影范围。 | `clippingEndPoints` |
 | `CaliperOutlierThreshold` | 卡尺采样点进入拟合前的残差筛选阈值；设为 `0` 时使用自适应 MAD 阈值。 | ImageViewer 采样层筛选 |
-| `CaliperEdgeSigma` | JLVision 卡尺的一维平滑 sigma，单位为像素。 | `sigma` |
-| `CaliperMinimumGradient` | 接受边缘的最小梯度幅值。 | `threshold` |
+| `CaliperEdgeSigma` | 卡尺剖面的一维高斯平滑 sigma，单位为像素。 | `sigma` |
+| `CaliperMinimumGradient` | 接受边缘的最小梯度幅值。 | `minimumGradient` |
 
-`iterations` 和 `clipping_factor` 由拟合模式统一映射：`Regression` 使用 `iterations=0`；稳健模式使用 3 次迭代，Huber 的截断因子为 1.0，其余模式为 2.0。调用方不再维护第二套拟合参数或私有拟合实现。
+迭代次数与截断因子由拟合模式统一映射：`Regression` 对全部点做普通最小二乘回归；稳健模式使用 3 次迭代，Huber 的截断因子为 1.0，其余模式为 2.0。调用方不再维护第二套拟合参数或私有拟合实现。

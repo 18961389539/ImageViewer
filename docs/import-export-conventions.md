@@ -99,6 +99,27 @@ Type,Label,Metric1,Metric2,Metric3,Mean,Min,Max,StdDev,PixelCount,DetectionStatu
 
 界面摘要使用这些分类，因此“读取成功”不会再被显示成“分析成功”。`inputRecords[*].status` 对应 `Processed`、`PartiallyProcessed`、`AnalysisFailed`、`InputMissing` 或 `DecodeFailed`。
 
+### 过程能力与 SPC
+
+过程能力按“同一量名 + 同一单位”聚合：
+
+- 单图报告聚合当前图像上的重复特征；批次报告按 `MeasurementItemKey` 跨输入图像聚合，顺序即输入轮次顺序。
+- 未测得或非有限值不参与统计，也不补零。
+- 组内 σ 由个体值移动极差均值除以 `d2 = 1.128` 估算；整体 σ 为样本标准差（`n - 1`）。`Cp/Pp` 需要双侧公差，`Cpk/Ppk` 在单侧公差时也可计算，并取较近的一侧。σ 为零时指数无定义，输出 `null` 而不是无穷大。
+- 同一序列内公差互相矛盾时，规范限按“未配置”处理，避免用一套自相矛盾的判据算出看似精确的指数。
+
+单图 `.report.md` 的 SPC 章节位于结论页脚之前；批次 SPC 章节附在 `.repeatability.md` 尾部。两份 `.metadata.json` 均包含 `processCapability` 数组，字段为 `key`、`label`、`unit`、`sampleCount`、`mean`、`sigmaWithin`、`sigmaOverall`、`lowerSpecificationLimit`、`upperSpecificationLimit`、`cp`、`cpk`、`pp`、`ppk`。界面中的控制图使用 Western Electric 判异规则子集，仅用于人工复核，不写入导出文件。
+
+### 可打印报告与 XPS
+
+界面中的“打印报告”与 `BuildReportModel` 共用同一份结构化报告（结论、标定身份、前置检查、测量明细、标定能力、SPC），因此打印稿与 `.report.md` 的数字和判定一致。
+
+- 预览固定为 A4（793.92 × 1122.52 DIP，48 DIP 页边距）。
+- 实际打印时按 `PrintDialog.PrintableAreaWidth/Height` 重建文档，页边距降为 36 DIP，避免打印机驱动边距造成二次裁切。
+- XPS 导出使用 A4 版式，写入固定版式分页文档；不引入 PDF 依赖。
+- 交互式打印窗口只带图像文件名，不带源图 SHA-256；需要完整来源哈希与机器可读字段时，以 CSV 导出的 `.metadata.json` 为准。
+- 打印/导出只消费模型，不重新评估 ROI；窗口打开后继续编辑 ROI 不会改变已生成的报告内容。
+
 分析元数据中的 `qualityThresholds` 保存本次运行实际使用的检测门限。项目应通过查看器实例的 `QualityProfile` 配置设备级门限，避免把默认值误认为现场验收标准。
 
 不同 ROI 的典型指标示例：

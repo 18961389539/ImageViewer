@@ -49,5 +49,6 @@ namespace ImageViewer.Controls
         bool PauseRealtimeHistogram,
         TimeSpan LastHistogramDuration,
         bool PauseRealtimeProfile,
-        TimeSpan LastProfileDuration);
+        TimeSpan LastProfileDuration,
+        ImageViewerDisplaySettings DisplaySettings);
 }

@@ -22,7 +22,7 @@ namespace ImageViewer.Services
         public ImageViewerRenderFrame BuildFrame(
             BitmapSource source,
             IReadOnlyList<ImagePyramidLevel> levels,
-            PseudoColorPalette palette,
+            ImageViewerDisplaySettings settings,
             Size viewport,
             double scale,
             Point translation,
@@ -34,6 +34,7 @@ namespace ImageViewer.Services
         {
             ArgumentNullException.ThrowIfNull(source);
             ArgumentNullException.ThrowIfNull(levels);
+            ArgumentNullException.ThrowIfNull(settings);
             _tileCache.SetMaximumBytes(Math.Max(1, tileCacheMaximumMegabytes) * 1024L * 1024L);
 
             IReadOnlyList<ImagePyramidLevel> effectiveLevels = levels.Count > 0
@@ -49,19 +50,19 @@ namespace ImageViewer.Services
                 // 逐像素查表），缓存它才能在重复帧上省下来（之前这里每帧全量重着色 4MP ≈ 15MB BGRA 拷贝，
                 // 且不参与预算）；实例复用也让 WPF 不必每帧重传纹理。
                 Int32Rect fullImageRect = new(0, 0, workingSource.PixelWidth, workingSource.PixelHeight);
-                Func<BitmapSource, BitmapSource>? nonTiledValueFactory = palette == PseudoColorPalette.None
+                Func<BitmapSource, BitmapSource>? nonTiledValueFactory = settings.IsPassThrough
                     ? null
-                    : tile => ImageViewerDisplaySourceService.ApplyPseudoColor(tile, palette);
-                BitmapSource displaySource = _tileCache.GetOrCreateTileView(workingSource, fullImageRect, palette, fullImageRect, nonTiledValueFactory);
+                    : tile => ImageViewerDisplaySourceService.ApplyDisplayLut(tile, settings);
+                BitmapSource displaySource = _tileCache.GetOrCreateTileView(workingSource, fullImageRect, settings, fullImageRect, nonTiledValueFactory);
                 return new ImageViewerRenderFrame(displaySource, 0, 0, displaySource.PixelWidth, displaySource.PixelHeight, 1.0, false);
             }
 
             Rect visibleRegion = GetVisibleRegion(workingSource, viewport, scale, translation, prefetchAdjacentTiles);
             if (visibleRegion.IsEmpty)
             {
-                BitmapSource displaySource = palette == PseudoColorPalette.None
+                BitmapSource displaySource = settings.IsPassThrough
                     ? level.Bitmap
-                    : ImageViewerDisplaySourceService.ApplyPseudoColor(level.Bitmap, palette);
+                    : ImageViewerDisplaySourceService.ApplyDisplayLut(level.Bitmap, settings);
                 return new ImageViewerRenderFrame(displaySource, 0, 0, workingSource.PixelWidth, workingSource.PixelHeight, level.ScaleFactor, false);
             }
 
@@ -71,14 +72,14 @@ namespace ImageViewer.Services
             // 缓存它才能在静止帧上省下来。可见 crop 不再单独成为缓存条目——它是挂在 tile 上的派生视图，
             // 这样既保留"重复帧返回同一实例"（WPF 不会每帧重传纹理），也不会产生账外内存。
             Int32Rect tileRect = ImageViewerRenderTileCache.ExpandToTileGrid(sourceCrop, level.Bitmap.PixelWidth, level.Bitmap.PixelHeight);
-            Func<BitmapSource, BitmapSource>? valueFactory = palette == PseudoColorPalette.None
+            Func<BitmapSource, BitmapSource>? valueFactory = settings.IsPassThrough
                 ? null
-                : tile => ImageViewerDisplaySourceService.ApplyPseudoColor(tile, palette);
+                : tile => ImageViewerDisplaySourceService.ApplyDisplayLut(tile, settings);
 
             Int32Rect cropWithinTile = new(sourceCrop.X - tileRect.X, sourceCrop.Y - tileRect.Y, sourceCrop.Width, sourceCrop.Height);
-            BitmapSource tiledSource = _tileCache.GetOrCreateTileView(level.Bitmap, tileRect, palette, cropWithinTile, valueFactory);
+            BitmapSource tiledSource = _tileCache.GetOrCreateTileView(level.Bitmap, tileRect, settings, cropWithinTile, valueFactory);
 
-            Prefetch(level.Bitmap, tileRect, palette, valueFactory, prefetchAdjacentTiles, tilePrefetchRadius);
+            Prefetch(level.Bitmap, tileRect, settings, valueFactory, prefetchAdjacentTiles, tilePrefetchRadius);
             return BuildTiledFrame(tiledSource, sourceCrop, level.ScaleFactor);
         }
 
@@ -103,7 +104,7 @@ namespace ImageViewer.Services
         private void Prefetch(
             BitmapSource source,
             Int32Rect rect,
-            PseudoColorPalette palette,
+            ImageViewerDisplaySettings settings,
             Func<BitmapSource, BitmapSource>? valueFactory,
             bool enabled,
             int radius)
@@ -114,7 +115,7 @@ namespace ImageViewer.Services
                 _tileCache.Prefetch(
                     source,
                     ImageViewerRenderTileCache.BuildPrefetchRects(rect, source.PixelWidth, source.PixelHeight, effectiveRadius),
-                    palette,
+                    settings,
                     valueFactory);
             }
         }

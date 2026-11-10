@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using ImageViewer.Localization;
+using ImageViewer.Services;
 
 namespace ImageViewer.Controls;
 
@@ -51,7 +52,8 @@ public partial class ImageViewer
                             : ReferenceEquals(item.Tag, ImageViewerRoiMenuTags.ClearAll) ? "MenuNoRois"
                             : ReferenceEquals(item.Tag, ImageViewerRoiMenuTags.CalibratePixels) ? "MenuNeedCalibrationLine"
                             : ReferenceEquals(item.Tag, ImageViewerRoiMenuTags.EditCaliperSettings) ? "MenuNeedCaliperSelection"
-                            : ReferenceEquals(item.Tag, ImageViewerFeatureMenuTags.GradientDetect) ? "MenuNeedDetectableCaliper"
+                            : ReferenceEquals(item.Tag, ImageViewerFeatureMenuTags.GradientDetect)
+                                ? "MenuNeedDetectableCaliper"
                             : !hasBitmap ? "MenuNeedImage" : "MenuUnavailable";
                         item.SetCurrentValue(ToolTipProperty, original.Value == null ? UiText.Get(reason)
                             : original.Value + "\n" + UiText.Get(reason));

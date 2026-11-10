@@ -1,3 +1,4 @@
+using ImageViewer.Core.Display;
 using ImageViewer.Models;
 using ImageViewer.Services;
 
@@ -24,5 +25,11 @@ namespace ImageViewer.Abstractions
         double TranslateY,
         CameraCalibration? Calibration)
     {
+        /// <summary>
+        /// 保存时的显示调节。
+        /// Chinese: 用 init 属性而不是构造函数参数：快照的字段契约被多处手工构造（会话、项目包、恢复索引），
+        /// 加位置参数会把每一处都变成编译错误，而这里新增的是一项可选状态。
+        /// </summary>
+        public DisplayAdjustment Display { get; init; } = DisplayAdjustment.Identity;
     }
 }

@@ -61,6 +61,8 @@ namespace ImageViewer.Controls
         SetPseudoColorPaletteJet,
         SetPseudoColorPaletteViridis,
         ShowSmartDisplaySuggestion,
+        ShowDisplayAdjustment,
+        ResetDisplayAdjustment,
         ShowRenderStatus
     }
 
@@ -106,6 +108,8 @@ namespace ImageViewer.Controls
         ExportAnalysisCsv,
         ExportBatchAnalysisCsv,
         ShowAnalysisSummary,
+        ShowProcessCapability,
+        PrintReport,
         CheckCalibrationReadiness
     }
 }

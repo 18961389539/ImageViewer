@@ -10,7 +10,7 @@ namespace ImageViewer.Models
         int MinimumValidCalipers { get; set; }
         double CaliperOutlierThreshold { get; set; }
         CaliperEdgePolarity CaliperEdgePolarity { get; set; }
-        JLVisionLineFitMode CaliperLineFitMode { get; set; }
+        LineFitMode CaliperLineFitMode { get; set; }
         int CaliperFitClippingEndPoints { get; set; }
     }
 }

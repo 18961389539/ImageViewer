@@ -11,11 +11,11 @@ namespace ImageViewer.Abstractions
 {
     public interface IImageViewerDisplayRenderService
     {
-        ImageSource? BuildDisplaySource(ImageSource? source, PseudoColorPalette palette);
+        ImageSource? BuildDisplaySource(ImageSource? source, ImageViewerDisplaySettings settings);
 
         void ApplyGpuCaching(System.Windows.Controls.Canvas imageContainer, bool enableGpuRendering);
 
-        Effect? CreatePseudoColorEffect(PseudoColorPalette palette);
+        Effect? CreateDisplayEffect(ImageViewerDisplaySettings settings);
     }
 
     public interface IImageViewerFrameRenderService
@@ -24,7 +24,7 @@ namespace ImageViewer.Abstractions
 
         Task<IReadOnlyList<ImagePyramidLevel>> BuildPyramidAsync(BitmapSource? source, CancellationToken cancellationToken);
 
-        ImageViewerRenderFrame BuildRenderFrame(BitmapSource? source, IReadOnlyList<ImagePyramidLevel>? pyramid, Size viewport, double scale, Point translation, PseudoColorPalette palette, bool enableTiledRendering, bool autoSelectPyramidLevel, bool prefetchAdjacentTiles, int tileCacheMaximumMegabytes, int tilePrefetchRadius);
+        ImageViewerRenderFrame BuildRenderFrame(BitmapSource? source, IReadOnlyList<ImagePyramidLevel>? pyramid, Size viewport, double scale, Point translation, ImageViewerDisplaySettings settings, bool enableTiledRendering, bool autoSelectPyramidLevel, bool prefetchAdjacentTiles, int tileCacheMaximumMegabytes, int tilePrefetchRadius);
     }
 
     public interface IImageViewerAnalysisRenderService

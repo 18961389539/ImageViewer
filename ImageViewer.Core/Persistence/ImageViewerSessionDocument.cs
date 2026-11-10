@@ -1,6 +1,7 @@
 #pragma warning disable CS1591
 using System;
 using System.Text.Json.Serialization;
+using ImageViewer.Core.Display;
 using ImageViewer.Models;
 
 namespace ImageViewer.Core.Persistence
@@ -42,6 +43,14 @@ namespace ImageViewer.Core.Persistence
         public double TranslateX { get; set; }
         public double TranslateY { get; set; }
         public CameraCalibration? Calibration { get; set; }
+
+        /// <summary>
+        /// 显示调节（窗宽窗位/亮度/对比度/伽马/反色）。
+        /// Chinese: 旧文件没有这一项 → 读出 null → 按默认参数（透传）处理，因此不需要提升会话版本号。
+        /// 伪彩色调色板不在这里：它定义在 WPF 侧，框架中立层拿不到那个枚举。
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public DisplayAdjustment? Display { get; set; }
     }
 }
 #pragma warning restore CS1591

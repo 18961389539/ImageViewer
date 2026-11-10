@@ -28,6 +28,7 @@ namespace ImageViewerControl.Tests
     [Trait("Category", "Wpf")]
     public sealed class ImageViewerPerformanceBaselineTests
     {
+        private static readonly ImageViewerDisplaySettings HotSettings = new(PseudoColorPalette.Hot);
         private readonly ITestOutputHelper _output;
 
         public ImageViewerPerformanceBaselineTests(ITestOutputHelper output)
@@ -83,13 +84,13 @@ namespace ImageViewerControl.Tests
                 BitmapSource ValueFactory(BitmapSource input)
                 {
                     colorizeCount++;
-                    return ImageViewerDisplaySourceService.ApplyPseudoColor(input, PseudoColorPalette.Hot);
+                    return ImageViewerDisplaySourceService.ApplyDisplayLut(input, HotSettings);
                 }
 
                 var stopwatch = Stopwatch.StartNew();
                 for (int index = 0; index < 200; index++)
                 {
-                    cache.GetOrCreateTileView(source, rect, PseudoColorPalette.Hot, rect, ValueFactory);
+                    cache.GetOrCreateTileView(source, rect, HotSettings, rect, ValueFactory);
                 }
 
                 stopwatch.Stop();

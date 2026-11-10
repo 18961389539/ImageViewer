@@ -97,7 +97,8 @@ public partial class ImageViewer
         : string.Empty;
 
     private string? GetDetectionRecommendationUnavailableReason() => _detectionRecommendationCancellation != null
-        ? "DetectionRecommendationBusy" : GetAnalysisBitmapSource() == null ? "MenuNeedImage"
+        ? "DetectionRecommendationBusy"
+        : GetAnalysisBitmapSource() == null ? "MenuNeedImage"
         : ViewerState.SelectedRoi is not { } roi || !DetectionParameterRecommendationService.IsSupported(roi)
             ? "DetectionRecommendationNeedRoi" : roi.IsLocked ? "DetectionRecommendationLocked" : null;
 

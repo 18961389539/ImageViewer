@@ -258,6 +258,8 @@ namespace ImageViewerControl.Tests
                 // 完全一致的三轮 ⇒ 不该出现"警告：…占满公差带"的告警行。
                 Assert.DoesNotContain("**警告", report);
                 Assert.Contains("未发现重复性占满公差带的项目", report);
+                // 跨图同名项同时构成过程能力样本，随重复性报告一并交付。
+                Assert.Contains("## 过程能力 (SPC)", report);
 
                 // 结论也必须进 metadata，供自动化消费（否则只有人读得到）。
                 using JsonDocument metadata = JsonDocument.Parse(File.ReadAllText(Path.ChangeExtension(csvPath, ".metadata.json")));
@@ -268,6 +270,11 @@ namespace ImageViewerControl.Tests
                 JsonElement item = Assert.Single(repeatability.GetProperty("items").EnumerateArray());
                 Assert.Equal("内径", item.GetProperty("label").GetString());
                 Assert.Equal(3, item.GetProperty("sampleCount").GetInt32());
+
+                JsonElement capability = Assert.Single(metadata.RootElement.GetProperty("processCapability").EnumerateArray());
+                Assert.Equal(3, capability.GetProperty("sampleCount").GetInt32());
+                // 三轮完全一致 ⇒ σ = 0 ⇒ 能力指数无定义，必须是 null 而不是无穷大。
+                Assert.Equal(JsonValueKind.Null, capability.GetProperty("cp").ValueKind);
             }
             finally
             {

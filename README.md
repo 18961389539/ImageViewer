@@ -9,6 +9,7 @@ ImageViewer 是一个面向 Windows 桌面应用的 WPF 图像查看、ROI 标�
 ### 图像、ROI 与分析
 
 - 打开 `png`、`jpg`、`jpeg`、`bmp`、`tif`、`tiff` 图像，支持缩放、平移、适配视图和实际尺寸浏览。
+- 按 EXIF Orientation 自动旋正 JPEG/TIFF，避免手机和相机照片横置或倒置；单图解码默认限制 1 亿像素，超限时给出明确提示而不是耗尽宿主内存。
 - 使用矩形、圆、椭圆、多边形、折线等 ROI 进行标注；支持标签、颜色、可见性与锁定状态管理。
 - 提供长度、折线、面积、角度、卡尺、点坐标、自动边缘吸附点、自动圆测量、圆心距、三点圆、拟合椭圆与梯度检测对齐等测量和分析辅助工具。
 - 显示像素信息、统计摘要、剖面图、直方图、比例尺和属性面板。
@@ -54,7 +55,9 @@ dotnet run --project ImageViewerDemo/ImageViewerDemo.csproj
 
 ### NuGet 包
 
-控件库、无 WPF 的 Core 层和原生视觉运行时分别发布为 `ImageViewerControl`、`ImageViewer.Core` 与 `JLVisionLib`。在 `net10.0-windows` WPF 宿主中安装控件包即可，Core 和 JLVisionLib 会作为项目依赖自动安装；`JLVisionCore.dll` 只由 JLVisionLib 在 `runtimes/win-x64/native` 提供：
+控件库与无 WPF 的 Core 层分别发布为 `ImageViewerControl` 与 `ImageViewer.Core`。在 `net8.0-windows` 或 `net10.0-windows` WPF 宿主中安装控件包即可，Core 会作为项目依赖自动安装。卡尺检测、稳健拟合与 Blob 分析全部由托管代码实现，无需任何原生运行时。
+
+> 图像分析（卡尺边缘采样、稳健直线/圆拟合、Blob 分割）完全在托管代码中运行，不依赖原生视觉库，因此不再限制于 Windows x64 进程；凡 WPF 目标框架支持的 Windows 架构均可使用。
 
 ```powershell
 dotnet add package ImageViewerControl --version 0.1.0
@@ -66,7 +69,7 @@ dotnet add package ImageViewerControl --version 0.1.0
 ./build/pack.ps1 -Version 0.1.0-rc.1
 ```
 
-包输出到 `artifacts/packages`，同时生成三个包各自的 `.nupkg` 和 `.snupkg`。`.github/workflows/nuget-publish.yml` 支持两种发布方式：创建 `v0.1.0` 形式的 Git 标签自动打包并发布；手动运行工作流时可先将 `publish` 设为 `false` 只验证包，确认后再用 `publish=true` 推送。推送前需要在 GitHub 的 `nuget` environment 中配置 `NUGET_API_KEY`。
+包输出到 `artifacts/packages`，同时生成两个包各自的 `.nupkg` 和 `.snupkg`。`.github/workflows/nuget-publish.yml` 支持两种发布方式：创建 `v0.1.0` 形式的 Git 标签自动打包并发布；手动运行工作流时可先将 `publish` 设为 `false` 只验证包，确认后再用 `publish=true` 推送。推送前需要在 GitHub 的 `nuget` environment 中配置 `NUGET_API_KEY`。
 
 ## 仓库结构
 
@@ -171,3 +174,7 @@ dotnet test ImageViewer.Core.Tests/ImageViewer.Core.Tests.csproj `
 - [NuGet 发布](docs/nuget-publishing.md)
 - [术语与本地化边界](docs/terminology.md)
 - [架构边界](docs/architecture-boundaries.md)
+
+## 许可证
+
+本项目使用 MIT 许可证，见 [LICENSE](LICENSE)。

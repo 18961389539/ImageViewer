@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using ImageViewer.Abstractions;
 using ImageViewer.Core.Analysis;
+using ImageViewer.Core.Display;
 using ImageViewer.Core.Geometry;
 using ImageViewer.Core.Persistence;
 using ImageViewer.Localization;
@@ -58,6 +59,15 @@ namespace ImageViewer.Controls
         public Action<ImageAnalysisQualityProfile> SetQualityProfile { get; init; } = static _ => { };
 
         public required Action<CameraCalibration?> SetCalibration { get; init; }
+
+        /// <summary>
+        /// 采集当前显示调节（随会话/项目包一起存取）。
+        /// Chinese: 带默认值而不是 required —— 快照构造点分散（会话、项目包、恢复索引、测试替身），
+        /// 未接线时退回"透传"，保存出来的就是一项不改变显示的设置，比编译不过或丢状态都好。
+        /// </summary>
+        public Func<DisplayAdjustment> GetDisplay { get; init; } = static () => DisplayAdjustment.Identity;
+
+        public Action<DisplayAdjustment> SetDisplay { get; init; } = static _ => { };
 
         /// <summary>
         /// 当前工件坐标系（可为 null = 未定义，此时所有映射退化为恒等）。
@@ -135,7 +145,10 @@ namespace ImageViewer.Controls
                 viewportState.Scale,
                 viewportState.TranslateX,
                 viewportState.TranslateY,
-                GetCalibration());
+                GetCalibration())
+            {
+                Display = GetDisplay()
+            };
         }
     }
 
@@ -156,6 +169,8 @@ namespace ImageViewer.Controls
         public required Func<string> GetPhysicalUnit { get; init; }
 
         public required Func<CameraCalibration?> GetCalibration { get; init; }
+
+        public Func<DisplayAdjustment> GetDisplay { get; init; } = static () => DisplayAdjustment.Identity;
 
         public Func<ImageAnalysisQualityProfile> GetQualityProfile { get; init; } = static () => ImageAnalysisQualityProfile.Default;
 
@@ -192,7 +207,10 @@ namespace ImageViewer.Controls
                 viewportState.Scale,
                 viewportState.TranslateX,
                 viewportState.TranslateY,
-                GetCalibration());
+                GetCalibration())
+            {
+                Display = GetDisplay()
+            };
         }
     }
 
@@ -731,6 +749,7 @@ namespace ImageViewer.Controls
             _persistence.SetPhysicalUnit(session.PhysicalUnit);
             _persistence.SetQualityProfile(session.QualityProfile);
             _persistence.SetCalibration(session.Calibration);
+            _persistence.SetDisplay(session.Display);
             _persistence.ApplyViewportState(new ImageViewerViewportState(session.Scale, session.TranslateX, session.TranslateY));
             _persistence.DrawRois();
             _persistence.UpdateContextMenuState();

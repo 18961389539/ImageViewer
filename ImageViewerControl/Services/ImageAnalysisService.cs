@@ -4,6 +4,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using ImageViewer.Core.Analysis;
 using ImageViewer.Models;
 using ImageViewer.Utils;
 
@@ -25,7 +26,7 @@ namespace ImageViewer.Services
             return Math.Clamp(score / quality.MaxCaliperScore * 100.0, 0, 100);
         }
 
-        public static bool TryDetectLineMeasureEdges(BitmapSource bitmap, CaliperMeasureRoi line, out LineMeasureGradientDetectionResult result, ImageAnalysisQualityProfile? profile = null)
+        public static bool TryDetectLineMeasureEdges(BitmapSource bitmap, CaliperMeasureRoi line, out LineMeasureGradientDetectionResult result, ImageAnalysisQualityProfile? profile = null, IntensityImage? intensity = null)
         {
             ArgumentNullException.ThrowIfNull(bitmap);
             ArgumentNullException.ThrowIfNull(line);
@@ -44,7 +45,7 @@ namespace ImageViewer.Services
             quality.Validate();
 
             Vector measurementDirection = line.GetCaliperMeasurementDirection().ToWpfVector();
-            using JLVisionImageHandle image = JLVisionAlgorithmEntryPoint.CreateIntensity(bitmap);
+            IntensityImage image = intensity ?? VisionAlgorithmEntryPoint.CreateIntensity(bitmap);
 
             Vector caliperDirection = new(-measurementDirection.Y, measurementDirection.X);
             Point measurementCenter = line.CaliperCenter.ToWpfPoint();
@@ -62,10 +63,8 @@ namespace ImageViewer.Services
                 double lerp = caliperCount == 1 ? 0.5 : (double)i / (caliperCount - 1);
                 double tangentOffset = -regionHalfLength + regionHalfLength * 2 * lerp;
                 Point caliperCenter = measurementCenter + caliperDirection * tangentOffset;
-                if (!JLVisionAlgorithmEntryPoint.TryMeasurePair(
-                        image.Image,
-                        image.Width,
-                        image.Height,
+                if (!VisionAlgorithmEntryPoint.TryMeasurePair(
+                        image,
                         caliperCenter,
                         measurementDirection,
                         halfSearchRange,
@@ -76,14 +75,14 @@ namespace ImageViewer.Services
                         line.MinimumEdgeGap,
                         line.NominalEdgeGap,
                         line.NominalEdgeGapTolerance,
-                        out JLVisionEdgePair nativePair))
+                        out CaliperEdgePair nativePair))
                 {
                     invalidCaliperCenters.Add(caliperCenter);
                     continue;
                 }
 
-                edge1Samples.Add(new CaliperEdgeSample(nativePair.Edge1.Point, nativePair.Edge1.Score));
-                edge2Samples.Add(new CaliperEdgeSample(nativePair.Edge2.Point, nativePair.Edge2.Score));
+                edge1Samples.Add(new CaliperEdgeSample(nativePair.Edge1.Point.ToWpfPoint(), nativePair.Edge1.Score));
+                edge2Samples.Add(new CaliperEdgeSample(nativePair.Edge2.Point.ToWpfPoint(), nativePair.Edge2.Score));
             }
 
             if (edge1Samples.Count < minimumValidCalipers || edge2Samples.Count < minimumValidCalipers)
@@ -165,7 +164,7 @@ namespace ImageViewer.Services
             return true;
         }
 
-        public static bool TryDetectLineCaliperEdges(BitmapSource bitmap, LineCaliperMeasureRoi line, out LineCaliperDetectionResult result, ImageAnalysisQualityProfile? profile = null)
+        public static bool TryDetectLineCaliperEdges(BitmapSource bitmap, LineCaliperMeasureRoi line, out LineCaliperDetectionResult result, ImageAnalysisQualityProfile? profile = null, IntensityImage? intensity = null)
         {
             ArgumentNullException.ThrowIfNull(bitmap);
             ArgumentNullException.ThrowIfNull(line);
@@ -183,7 +182,7 @@ namespace ImageViewer.Services
             lineDirection.Normalize();
             Vector measurementDirection = new(-lineDirection.Y, lineDirection.X);
 
-            using JLVisionImageHandle image = JLVisionAlgorithmEntryPoint.CreateIntensity(bitmap);
+            IntensityImage image = intensity ?? VisionAlgorithmEntryPoint.CreateIntensity(bitmap);
 
             int caliperCount = Math.Clamp(line.CaliperCount, 6, 180);
             int minimumValidCalipers = Math.Min(Math.Max(3, line.MinimumValidCalipers), caliperCount);
@@ -196,10 +195,8 @@ namespace ImageViewer.Services
                 Point sampleCenter = new(
                     line.P1.X + (line.P2.X - line.P1.X) * lerp,
                     line.P1.Y + (line.P2.Y - line.P1.Y) * lerp);
-                if (!JLVisionAlgorithmEntryPoint.TryMeasureSingle(
-                        image.Image,
-                        image.Width,
-                        image.Height,
+                if (!VisionAlgorithmEntryPoint.TryMeasureSingle(
+                        image,
                         sampleCenter,
                         measurementDirection,
                         line.CaliperSearchRange,
@@ -208,13 +205,13 @@ namespace ImageViewer.Services
                         line.CaliperMinimumGradient,
                         line.CaliperEdgePolarity,
                         line.EdgeSelection,
-                        out JLVisionEdgeSample nativeSample))
+                        out CaliperEdge nativeSample))
                 {
                     invalidCaliperCenters.Add(sampleCenter);
                     continue;
                 }
 
-                edgeSamples.Add(new CaliperEdgeSample(nativeSample.Point, nativeSample.Score));
+                edgeSamples.Add(new CaliperEdgeSample(nativeSample.Point.ToWpfPoint(), nativeSample.Score));
             }
 
             if (edgeSamples.Count < minimumValidCalipers)
@@ -276,7 +273,7 @@ namespace ImageViewer.Services
             return true;
         }
 
-        public static bool TryDetectCircularCaliperEdges(BitmapSource bitmap, CircularCaliperMeasureRoi caliper, out CircularCaliperDetectionResult result, ImageAnalysisQualityProfile? profile = null)
+        public static bool TryDetectCircularCaliperEdges(BitmapSource bitmap, CircularCaliperMeasureRoi caliper, out CircularCaliperDetectionResult result, ImageAnalysisQualityProfile? profile = null, IntensityImage? intensity = null)
         {
             ArgumentNullException.ThrowIfNull(bitmap);
             ArgumentNullException.ThrowIfNull(caliper);
@@ -286,7 +283,7 @@ namespace ImageViewer.Services
 
             if (caliper is ArcCaliperMeasureRoi arcCaliper)
             {
-                return TryDetectArcCaliperEdges(bitmap, arcCaliper, out result, quality);
+                return TryDetectArcCaliperEdges(bitmap, arcCaliper, out result, quality, intensity);
             }
 
             if (caliper.Radius <= 0 || caliper.CaliperSearchRange <= 0)
@@ -294,18 +291,18 @@ namespace ImageViewer.Services
                 return false;
             }
 
-            using JLVisionImageHandle image = JLVisionAlgorithmEntryPoint.CreateIntensity(bitmap);
+            IntensityImage image = intensity ?? VisionAlgorithmEntryPoint.CreateIntensity(bitmap);
             return TryDetectCircularCaliperEdgesCore(image, caliper, out result, quality, preferNearestRadialEdge: false);
         }
 
         /// <summary>
-        /// 圆卡尺检测核心：通过 JLVision 环形卡尺做径向边缘采样，再进行鲁棒拟合与质量评估。
-        /// Chinese: 每个径向卡尺使用原生环带测量，自动圆搜索仍保持独立的粗定位流程。
-        /// English: Core circular caliper detection using native JLVision arc measures for each
+        /// 圆卡尺检测核心：通过径向卡尺做径向边缘采样，再进行鲁棒拟合与质量评估。
+        /// Chinese: 每个径向卡尺沿半径方向测量，自动圆搜索仍保持独立的粗定位流程。
+        /// English: Core circular caliper detection using a radial caliper for each
         /// radial sample, followed by the existing fit and quality evaluation.
         /// </summary>
         private static bool TryDetectCircularCaliperEdgesCore(
-            JLVisionImageHandle image,
+            IntensityImage image,
             CircularCaliperMeasureRoi caliper,
             out CircularCaliperDetectionResult result,
             ImageAnalysisQualityProfile quality,
@@ -323,12 +320,12 @@ namespace ImageViewer.Services
                 Point origin = caliper.Center.ToWpfPoint();
                 Point sampleCenter = origin + radialDirection * caliper.Radius;
                 bool measured;
-                JLVisionEdgeSample nativeSample = default;
+                CaliperEdge nativeSample = default;
                 if (preferNearestRadialEdge && caliper.Radius > 64)
                 {
                     sampleCenter = origin;
-                    measured = JLVisionAlgorithmEntryPoint.TryMeasureSingle(
-                        image.Image, image.Width, image.Height, sampleCenter,
+                    measured = VisionAlgorithmEntryPoint.TryMeasureSingle(
+                        image, sampleCenter,
                         radialDirection, Math.Min(caliper.CaliperSearchRange, 128),
                         caliper.CaliperSamplingHalfWidth, caliper.CaliperEdgeSigma,
                         caliper.CaliperMinimumGradient, caliper.CaliperEdgePolarity,
@@ -336,8 +333,8 @@ namespace ImageViewer.Services
                 }
                 else if (preferNearestRadialEdge)
                 {
-                    measured = JLVisionAlgorithmEntryPoint.TryMeasureSingle(
-                        image.Image, image.Width, image.Height, sampleCenter,
+                    measured = VisionAlgorithmEntryPoint.TryMeasureSingle(
+                        image, sampleCenter,
                         radialDirection, caliper.CaliperSearchRange,
                         caliper.CaliperSamplingHalfWidth, caliper.CaliperEdgeSigma,
                         caliper.CaliperMinimumGradient, caliper.CaliperEdgePolarity,
@@ -345,9 +342,13 @@ namespace ImageViewer.Services
                 }
                 else
                 {
-                    measured = JLVisionAlgorithmEntryPoint.TryMeasureSingle(
-                        image.Image, image.Width, image.Height, sampleCenter,
-                        radialDirection, caliper.CaliperSearchRange,
+                    // The precision radial path mirrors the direction into the caliper's native
+                    // y-up axis so the profile points truly outward (see TryMeasureCircular). The
+                    // coarse nearest-edge sweep above keeps the native rectangular direction.
+                    Vector caliperDirection = new(radialDirection.X, -radialDirection.Y);
+                    measured = VisionAlgorithmEntryPoint.TryMeasureSingle(
+                        image, sampleCenter,
+                        caliperDirection, caliper.CaliperSearchRange,
                         caliper.CaliperSamplingHalfWidth, caliper.CaliperEdgeSigma,
                         caliper.CaliperMinimumGradient, caliper.CaliperEdgePolarity,
                         caliper.EdgeSelection, out nativeSample);
@@ -357,7 +358,7 @@ namespace ImageViewer.Services
                     invalidSamplePoints.Add(sampleCenter);
                     continue;
                 }
-                edgeSamples.Add(new CaliperEdgeSample(nativeSample.Point, nativeSample.Score));
+                edgeSamples.Add(new CaliperEdgeSample(nativeSample.Point.ToWpfPoint(), nativeSample.Score));
             }
             if (edgeSamples.Count < minimumValidCalipers)
             {
@@ -365,14 +366,15 @@ namespace ImageViewer.Services
             }
             List<CaliperEdgeSample> filteredSamples = FilterCircularInlierSamples(
                 edgeSamples, preferNearestRadialEdge ? 2.5 : caliper.CaliperOutlierThreshold,
-                minimumValidCalipers, caliper.Center.ToWpfPoint(), caliper.Radius);
+                minimumValidCalipers, caliper.Center.ToWpfPoint(), caliper.Radius,
+                caliper.CaliperLineFitMode);
             if (filteredSamples.Count < minimumValidCalipers)
             {
                 return false;
             }
             Point[] filteredPoints = [..filteredSamples.Select(sample => sample.Point)];
             Point[] rejectedPoints = [..edgeSamples.Where(sample => !filteredSamples.Contains(sample)).Select(sample => sample.Point)];
-            if (!TryFitCircle(filteredPoints, out Point detectedCenter, out double detectedRadius) || detectedRadius <= 0)
+            if (!TryFitCircle(filteredPoints, caliper.CaliperLineFitMode, out Point detectedCenter, out double detectedRadius) || detectedRadius <= 0)
             {
                 return false;
             }
@@ -487,7 +489,7 @@ namespace ImageViewer.Services
                 maxDistance = Math.Max(maxDistance, GeometryUtils.Distance(seed, corner));
             }
 
-            // The click is only a seed. Run a JLVision full radial consensus pass
+            // The click is only a seed. Run a full radial consensus pass
             // around it so missing arcs and moderate noise are rejected by the inlier filter
             // instead of becoming a biased coarse fit.
             ImageAnalysisQualityProfile quality = profile ?? ImageAnalysisQualityProfile.Default;
@@ -508,7 +510,7 @@ namespace ImageViewer.Services
                 CaliperEdgePolarity = CaliperEdgePolarity.Any,
                 EdgeSelection = 1
             };
-            using JLVisionImageHandle image = JLVisionAlgorithmEntryPoint.CreateIntensity(bitmap);
+            IntensityImage image = VisionAlgorithmEntryPoint.CreateIntensity(bitmap);
             ImageAnalysisQualityProfile automaticQuality = quality with
             {
                 MinimumDetectionConfidence = Math.Min(quality.MinimumDetectionConfidence, 0.02)
@@ -592,7 +594,7 @@ namespace ImageViewer.Services
         }
 
         /// <summary>
-        /// 在点击点周围沿多方向使用 JLVision 线性卡尺搜索局部边缘并返回最佳点。
+        /// 在点击点周围沿多方向使用线性卡尺搜索局部边缘并返回最佳点。
         /// </summary>
         internal static bool TrySnapPointToEdge(BitmapSource bitmap, Point seed, out Point snapped, out double score, out double confidence, ImageAnalysisQualityProfile? profile = null)
         {
@@ -610,7 +612,7 @@ namespace ImageViewer.Services
                 return false;
             }
 
-            using JLVisionImageHandle image = JLVisionAlgorithmEntryPoint.CreateIntensity(bitmap);
+            IntensityImage image = VisionAlgorithmEntryPoint.CreateIntensity(bitmap);
 
             const int searchRange = 12;
             const int directionCount = 16;
@@ -620,10 +622,8 @@ namespace ImageViewer.Services
             {
                 double angle = i * Math.PI / directionCount;
                 Vector direction = new(Math.Cos(angle), Math.Sin(angle));
-                if (JLVisionAlgorithmEntryPoint.TryMeasureSingle(
-                        image.Image,
-                        image.Width,
-                        image.Height,
+                if (VisionAlgorithmEntryPoint.TryMeasureSingle(
+                        image,
                         seed,
                         direction,
                         searchRange,
@@ -632,9 +632,9 @@ namespace ImageViewer.Services
                         minimumGradient,
                         CaliperEdgePolarity.Any,
                         edgeSelection: 1,
-                        out JLVisionEdgeSample nativeCandidate))
+                        out CaliperEdge nativeCandidate))
                 {
-                    candidates.Add(new CaliperEdgeSample(nativeCandidate.Point, nativeCandidate.Score));
+                    candidates.Add(new CaliperEdgeSample(nativeCandidate.Point.ToWpfPoint(), nativeCandidate.Score));
                 }
             }
 
@@ -665,7 +665,7 @@ namespace ImageViewer.Services
             return confidence >= quality.MinimumDetectionConfidence;
         }
 
-        private static bool TryDetectArcCaliperEdges(BitmapSource bitmap, ArcCaliperMeasureRoi caliper, out CircularCaliperDetectionResult result, ImageAnalysisQualityProfile quality)
+        private static bool TryDetectArcCaliperEdges(BitmapSource bitmap, ArcCaliperMeasureRoi caliper, out CircularCaliperDetectionResult result, ImageAnalysisQualityProfile quality, IntensityImage? intensity = null)
         {
             result = default;
             if (caliper.Radius <= 0 || caliper.CaliperSearchRange <= 0 || Math.Abs(caliper.SweepAngle) < 1)
@@ -673,7 +673,7 @@ namespace ImageViewer.Services
                 return false;
             }
 
-            using JLVisionImageHandle image = JLVisionAlgorithmEntryPoint.CreateIntensity(bitmap);
+            IntensityImage image = intensity ?? VisionAlgorithmEntryPoint.CreateIntensity(bitmap);
 
             int caliperCount = Math.Clamp(caliper.CaliperCount, 4, 180);
             int minimumValidCalipers = Math.Min(Math.Max(3, caliper.MinimumValidCalipers), caliperCount);
@@ -689,10 +689,8 @@ namespace ImageViewer.Services
                 double halfAngularWidth = Math.Atan2(
                     Math.Max(0.5, caliper.CaliperSamplingHalfWidth),
                     caliper.Radius);
-                if (!JLVisionAlgorithmEntryPoint.TryMeasureCircular(
-                        image.Image,
-                        image.Width,
-                        image.Height,
+                if (!VisionAlgorithmEntryPoint.TryMeasureCircular(
+                        image,
                         caliper.Center.ToWpfPoint(),
                         caliper.Radius,
                         angleRadians,
@@ -703,29 +701,13 @@ namespace ImageViewer.Services
                         caliper.CaliperMinimumGradient,
                         caliper.CaliperEdgePolarity,
                         caliper.EdgeSelection,
-                        out JLVisionEdgeSample nativeSample)
-                    // Some native runtimes cannot produce a circular measure for a narrow
-                    // angular strip. Use the same radial rectangular caliper as the full-circle
-                    // detector while retaining the arc angles and all detection/fit thresholds.
-                    && !JLVisionAlgorithmEntryPoint.TryMeasureSingle(
-                        image.Image,
-                        image.Width,
-                        image.Height,
-                        sampleCenter,
-                        radialDirection,
-                        caliper.CaliperSearchRange,
-                        caliper.CaliperSamplingHalfWidth,
-                        caliper.CaliperEdgeSigma,
-                        caliper.CaliperMinimumGradient,
-                        caliper.CaliperEdgePolarity,
-                        caliper.EdgeSelection,
-                        out nativeSample))
+                        out CaliperEdge nativeSample))
                 {
                     invalidSamplePoints.Add(sampleCenter);
                     continue;
                 }
 
-                edgeSamples.Add(new CaliperEdgeSample(nativeSample.Point, nativeSample.Score));
+                edgeSamples.Add(new CaliperEdgeSample(nativeSample.Point.ToWpfPoint(), nativeSample.Score));
             }
 
             if (edgeSamples.Count < minimumValidCalipers)
@@ -738,7 +720,8 @@ namespace ImageViewer.Services
                 caliper.CaliperOutlierThreshold,
                 minimumValidCalipers,
                 caliper.Center.ToWpfPoint(),
-                caliper.Radius);
+                caliper.Radius,
+                caliper.CaliperLineFitMode);
             if (filteredSamples.Count < minimumValidCalipers)
             {
                 return false;
@@ -746,7 +729,7 @@ namespace ImageViewer.Services
 
             Point[] filteredPoints = [..filteredSamples.Select(sample => sample.Point)];
             Point[] rejectedPoints = [..edgeSamples.Where(sample => !filteredSamples.Contains(sample)).Select(sample => sample.Point)];
-            if (!TryFitCircle(filteredPoints, out Point detectedCenter, out double detectedRadius) || detectedRadius <= 0)
+            if (!TryFitCircle(filteredPoints, caliper.CaliperLineFitMode, out Point detectedCenter, out double detectedRadius) || detectedRadius <= 0)
             {
                 return false;
             }

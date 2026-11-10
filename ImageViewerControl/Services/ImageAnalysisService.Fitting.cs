@@ -9,7 +9,7 @@ using ImageViewer.Utils;
 namespace ImageViewer.Services
 {
     /// <summary>
-    /// JLVision-backed geometry fitting and residual calculations.
+    /// Managed geometry fitting and residual calculations.
     /// </summary>
     internal static partial class ImageAnalysisService
     {
@@ -19,7 +19,7 @@ namespace ImageViewer.Services
             double fallbackHalfLength,
             double configuredThreshold,
             int minimumRequired,
-            JLVisionLineFitMode fitMode = JLVisionLineFitMode.Tukey,
+            LineFitMode fitMode = LineFitMode.Tukey,
             int clippingEndPoints = 0)
         {
             if (samples.Count <= minimumRequired)
@@ -65,7 +65,8 @@ namespace ImageViewer.Services
             double configuredThreshold,
             int minimumRequired,
             Point? referenceCenter = null,
-            double referenceRadius = 0)
+            double referenceRadius = 0,
+            LineFitMode fitMode = LineFitMode.Tukey)
         {
             if (samples.Count <= minimumRequired)
             {
@@ -74,16 +75,16 @@ namespace ImageViewer.Services
 
             Point[] points = [.. samples.Select(sample => sample.Point)];
             var candidates = new List<(List<CaliperEdgeSample> Inliers, double Residual, bool IsReference)>(2);
-            if (TryFitCircle(points, out Point center, out double radius) && radius > 0)
+            if (TryFitCircle(points, fitMode, out Point center, out double radius) && radius > 0)
             {
                 (List<CaliperEdgeSample> inliers, double residual) = BuildCircularInliers(samples, center, radius, configuredThreshold);
                 candidates.Add((inliers, residual, false));
             }
 
-            // A partial arc can contain more invalid samples than the native
-            // all-point fit can tolerate. When the ROI supplies a nominal center
-            // and radius, use their radial consensus as a native-fit seed and let
-            // the final JLVision fit run only on the retained arc points.
+            // A partial arc can contain more invalid samples than the all-point
+            // fit can tolerate. When the ROI supplies a nominal center and radius,
+            // use their radial consensus as a fit seed and let the final fit run
+            // only on the retained arc points.
             if (referenceCenter.HasValue)
             {
                 // Automatic-circle search uses a deliberately broad nominal
@@ -197,40 +198,40 @@ namespace ImageViewer.Services
         }
 
         /// <summary>
-        /// Single canonical line fitting entry point. The native operator owns the
+        /// Single canonical line fitting entry point. The managed fitter owns the
         /// fit mode, iteration count and clipping factor; ImageViewer only maps the
         /// point coordinates and forwards the endpoint clipping count.
         /// </summary>
         private static bool TryFitLine(
             Point[] points,
-            JLVisionLineFitMode fitMode,
+            LineFitMode fitMode,
             int clippingEndPoints,
             out LineSegmentOverlay segment)
         {
-            return JLVisionAlgorithmEntryPoint.TryFitLine(points, fitMode, clippingEndPoints, out segment);
+            return VisionAlgorithmEntryPoint.TryFitLine(points, fitMode, clippingEndPoints, out segment);
         }
 
-        private static bool TryFitCircle(Point[] points, out Point center, out double radius)
+        private static bool TryFitCircle(Point[] points, LineFitMode fitMode, out Point center, out double radius)
         {
-            return JLVisionAlgorithmEntryPoint.TryFitCircle(points, out center, out radius);
+            return VisionAlgorithmEntryPoint.TryFitCircle(points, fitMode, out center, out radius);
         }
 
         /// <summary>
-        /// Fits a line through JLVision's XLD implementation. The native XLD
-        /// result defines the segment endpoints.
+        /// Fits a line through the managed robust fitter. The fitted result defines
+        /// the segment endpoints.
         /// </summary>
         internal static LineSegmentOverlay FitLine(
             Point[] points,
             Vector preferredDirection,
             double fallbackHalfLength,
             double[]? weights = null,
-            JLVisionLineFitMode fitMode = JLVisionLineFitMode.Tukey,
+            LineFitMode fitMode = LineFitMode.Tukey,
             int clippingEndPoints = 0)
         {
             _ = weights;
             if (points.Length < 2 || !TryFitLine(points, fitMode, clippingEndPoints, out LineSegmentOverlay segment))
             {
-                throw new InvalidOperationException("JLVision failed to fit a line for the supplied points.");
+                throw new InvalidOperationException("The robust fitter failed to fit a line for the supplied points.");
             }
 
             return segment;

@@ -2,6 +2,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows;
 using System.Windows.Controls;
+using ImageViewer.Core.Display;
 using ImageViewer.Services;
 using ImageViewer.Models;
 using ImageViewer.Plugins;
@@ -15,6 +16,8 @@ namespace ImageViewerControl.Tests
     [Trait("Category", "Wpf")]
     public class ImageViewerRenderServiceTests
     {
+        private static readonly ImageViewerDisplaySettings HotSettings = new(PseudoColorPalette.Hot);
+
         [Fact]
         public void DualEdgeCaliperSummaryAnchor_FollowsDetectedSegmentMidpoint()
         {
@@ -159,7 +162,7 @@ namespace ImageViewerControl.Tests
                     new Size(512, 512),
                     1.0,
                     new Point(0, 0),
-                    PseudoColorPalette.None,
+                    ImageViewerDisplaySettings.PassThrough,
                     enableTiledRendering: true,
                     autoSelectPyramidLevel: true,
                     prefetchAdjacentTiles: false,
@@ -172,7 +175,7 @@ namespace ImageViewerControl.Tests
                     new Size(512, 512),
                     1.0,
                     new Point(0, 0),
-                    PseudoColorPalette.None,
+                    ImageViewerDisplaySettings.PassThrough,
                     enableTiledRendering: true,
                     autoSelectPyramidLevel: true,
                     prefetchAdjacentTiles: false,
@@ -187,7 +190,7 @@ namespace ImageViewerControl.Tests
                     new Size(512, 512),
                     1.0,
                     new Point(0, 0),
-                    PseudoColorPalette.None,
+                    ImageViewerDisplaySettings.PassThrough,
                     enableTiledRendering: true,
                     autoSelectPyramidLevel: true,
                     prefetchAdjacentTiles: false,
@@ -213,7 +216,7 @@ namespace ImageViewerControl.Tests
                     new Size(512, 512),
                     1.0,
                     new Point(0, 0),
-                    PseudoColorPalette.None,
+                    ImageViewerDisplaySettings.PassThrough,
                     enableTiledRendering: true,
                     autoSelectPyramidLevel: true,
                     prefetchAdjacentTiles: true,
@@ -240,7 +243,7 @@ namespace ImageViewerControl.Tests
                     new Size(512, 512),
                     1.0,
                     new Point(0, 0),
-                    PseudoColorPalette.None,
+                    ImageViewerDisplaySettings.PassThrough,
                     enableTiledRendering: true,
                     autoSelectPyramidLevel: true,
                     prefetchAdjacentTiles: false,
@@ -269,7 +272,7 @@ namespace ImageViewerControl.Tests
                     new Size(631, 1240),
                     zoom,
                     new Point(translationX, 0),
-                    PseudoColorPalette.None,
+                    ImageViewerDisplaySettings.PassThrough,
                     enableTiledRendering: true,
                     autoSelectPyramidLevel: false,
                     prefetchAdjacentTiles: false,
@@ -367,10 +370,10 @@ namespace ImageViewerControl.Tests
                 using var cache = new ImageViewerRenderTileCache();
                 BitmapSource source = CreateFrozenLargeBitmap();
                 Func<BitmapSource, BitmapSource> palette = tile =>
-                    ImageViewerDisplaySourceService.ApplyPseudoColor(tile, PseudoColorPalette.Hot);
+                    ImageViewerDisplaySourceService.ApplyDisplayLut(tile, HotSettings);
                 Int32Rect[] rects = BuildInBoundsTileRects();
 
-                cache.Prefetch(source, rects, PseudoColorPalette.Hot, palette);
+                cache.Prefetch(source, rects, HotSettings, palette);
 
                 // 待处理上限：投机预取不允许无上限排队（候选 rect 数远大于上限，入队数必须被截断）。
                 int queued = cache.PendingPrefetchCount;
@@ -405,13 +408,13 @@ namespace ImageViewerControl.Tests
                 Func<BitmapSource, BitmapSource> palette = tile =>
                 {
                     factoryCalls++;
-                    return ImageViewerDisplaySourceService.ApplyPseudoColor(tile, PseudoColorPalette.Hot);
+                    return ImageViewerDisplaySourceService.ApplyDisplayLut(tile, HotSettings);
                 };
 
                 Int32Rect viewRect = new(10, 10, 400, 300);
-                BitmapSource first = cache.GetOrCreateTileView(source, tileRect, PseudoColorPalette.Hot, viewRect, palette);
-                BitmapSource repeated = cache.GetOrCreateTileView(source, tileRect, PseudoColorPalette.Hot, viewRect, palette);
-                BitmapSource other = cache.GetOrCreateTileView(source, tileRect, PseudoColorPalette.Hot, new Int32Rect(50, 20, 100, 100), palette);
+                BitmapSource first = cache.GetOrCreateTileView(source, tileRect, HotSettings, viewRect, palette);
+                BitmapSource repeated = cache.GetOrCreateTileView(source, tileRect, HotSettings, viewRect, palette);
+                BitmapSource other = cache.GetOrCreateTileView(source, tileRect, HotSettings, new Int32Rect(50, 20, 100, 100), palette);
 
                 // 派生视图按 (tile, 视图矩形) 复用：重复帧拿到同一实例（WPF 不会每帧重传纹理）。
                 Assert.Same(first, repeated);
@@ -438,12 +441,12 @@ namespace ImageViewerControl.Tests
                 Func<BitmapSource, BitmapSource> palette = tile =>
                 {
                     factoryCalls++;
-                    return ImageViewerDisplaySourceService.ApplyPseudoColor(tile, PseudoColorPalette.Hot);
+                    return ImageViewerDisplaySourceService.ApplyDisplayLut(tile, HotSettings);
                 };
 
                 cache.SetMaximumBytes(1);
-                cache.GetOrCreateTileView(source, tileRect, PseudoColorPalette.Hot, new Int32Rect(10, 10, 400, 300), palette);
-                cache.GetOrCreateTileView(source, tileRect, PseudoColorPalette.Hot, new Int32Rect(10, 10, 400, 300), palette);
+                cache.GetOrCreateTileView(source, tileRect, HotSettings, new Int32Rect(10, 10, 400, 300), palette);
+                cache.GetOrCreateTileView(source, tileRect, HotSettings, new Int32Rect(10, 10, 400, 300), palette);
 
                 // 条目被预算淘汰后不留下任何账外内存：视图是挂在条目上的，条目没了视图也没了。
                 Assert.Equal(0, cache.CurrentBytes);
@@ -462,17 +465,17 @@ namespace ImageViewerControl.Tests
                 BitmapSource source = CreateFrozenLargeBitmap();
                 Int32Rect tileRect = new(0, 0, 512, 512);
                 Func<BitmapSource, BitmapSource> palette = tile =>
-                    ImageViewerDisplaySourceService.ApplyPseudoColor(tile, PseudoColorPalette.Hot);
+                    ImageViewerDisplaySourceService.ApplyDisplayLut(tile, HotSettings);
 
-                cache.Prefetch(source, [tileRect], PseudoColorPalette.Hot, palette);
+                cache.Prefetch(source, [tileRect], HotSettings, palette);
                 Assert.True(WaitForPrefetchCompletion(cache, 1), "预取任务未在预期时间内结束。");
                 Assert.Empty(failures);
 
-                Assert.True(cache.TryGet(source, tileRect, PseudoColorPalette.Hot, out BitmapSource? prefetched));
+                Assert.True(cache.TryGet(source, tileRect, HotSettings, out BitmapSource? prefetched));
                 Assert.Equal(PixelFormats.Bgra32, prefetched!.Format);
 
                 // 未着色的键下不能有"半成品"：否则可见路径会把它当成已着色结果直接显示。
-                Assert.False(cache.TryGet(source, tileRect, PseudoColorPalette.None, out _));
+                Assert.False(cache.TryGet(source, tileRect, ImageViewerDisplaySettings.PassThrough, out _));
             });
         }
 
@@ -487,16 +490,42 @@ namespace ImageViewerControl.Tests
                 var pyramid = new[] { new ImagePyramidLevel(source, 1.0) };
 
                 ImageViewerRenderFrame first = service.BuildRenderFrame(
-                    source, pyramid, new Size(512, 512), 1.0, new Point(0, 0), PseudoColorPalette.Hot,
+                    source, pyramid, new Size(512, 512), 1.0, new Point(0, 0), HotSettings,
                     enableTiledRendering: false, autoSelectPyramidLevel: true, prefetchAdjacentTiles: false,
                     tileCacheMaximumMegabytes: 64, tilePrefetchRadius: 0);
                 ImageViewerRenderFrame second = service.BuildRenderFrame(
-                    source, pyramid, new Size(512, 512), 1.0, new Point(0, 0), PseudoColorPalette.Hot,
+                    source, pyramid, new Size(512, 512), 1.0, new Point(0, 0), HotSettings,
                     enableTiledRendering: false, autoSelectPyramidLevel: true, prefetchAdjacentTiles: false,
                     tileCacheMaximumMegabytes: 64, tilePrefetchRadius: 0);
 
                 Assert.Equal(PixelFormats.Bgra32, Assert.IsAssignableFrom<BitmapSource>(first.Source).Format);
                 Assert.Same(first.Source, second.Source);
+            });
+        }
+
+        [Fact]
+        public void BuildRenderFrame_DifferentDisplaySettings_DoNotReuseTheCachedTile()
+        {
+            // 显示设置是整个缓存键的一部分：换一组调节必须重新着色，不能显示上一组设置的缓存像素。
+            WpfTestRunner.Run(() =>
+            {
+                using var service = new ImageViewerRenderService();
+                BitmapSource source = CreateFrozenLargeBitmap();
+                var pyramid = new[] { new ImagePyramidLevel(source, 1.0) };
+                var inverted = new ImageViewerDisplaySettings(
+                    PseudoColorPalette.Hot,
+                    DisplayAdjustment.Identity with { Invert = true });
+
+                ImageViewerRenderFrame plain = service.BuildRenderFrame(
+                    source, pyramid, new Size(512, 512), 1.0, new Point(0, 0), HotSettings,
+                    enableTiledRendering: true, autoSelectPyramidLevel: true, prefetchAdjacentTiles: false,
+                    tileCacheMaximumMegabytes: 64, tilePrefetchRadius: 0);
+                ImageViewerRenderFrame adjusted = service.BuildRenderFrame(
+                    source, pyramid, new Size(512, 512), 1.0, new Point(0, 0), inverted,
+                    enableTiledRendering: true, autoSelectPyramidLevel: true, prefetchAdjacentTiles: false,
+                    tileCacheMaximumMegabytes: 64, tilePrefetchRadius: 0);
+
+                Assert.NotSame(plain.Source, adjusted.Source);
             });
         }
 
@@ -510,7 +539,7 @@ namespace ImageViewerControl.Tests
                 var pyramid = new[] { new ImagePyramidLevel(source, 1.0) };
 
                 ImageViewerRenderFrame frame = service.BuildRenderFrame(
-                    source, pyramid, new Size(512, 512), 1.0, new Point(0, 0), PseudoColorPalette.None,
+                    source, pyramid, new Size(512, 512), 1.0, new Point(0, 0), ImageViewerDisplaySettings.PassThrough,
                     enableTiledRendering: false, autoSelectPyramidLevel: true, prefetchAdjacentTiles: false,
                     tileCacheMaximumMegabytes: 64, tilePrefetchRadius: 0);
 
@@ -528,11 +557,11 @@ namespace ImageViewerControl.Tests
                 var pyramid = new[] { new ImagePyramidLevel(source, 1.0) };
 
                 ImageViewerRenderFrame first = service.BuildRenderFrame(
-                    source, pyramid, new Size(512, 512), 1.0, new Point(0, 0), PseudoColorPalette.Hot,
+                    source, pyramid, new Size(512, 512), 1.0, new Point(0, 0), HotSettings,
                     enableTiledRendering: true, autoSelectPyramidLevel: true, prefetchAdjacentTiles: false,
                     tileCacheMaximumMegabytes: 64, tilePrefetchRadius: 0);
                 ImageViewerRenderFrame second = service.BuildRenderFrame(
-                    source, pyramid, new Size(512, 512), 1.0, new Point(0, 0), PseudoColorPalette.Hot,
+                    source, pyramid, new Size(512, 512), 1.0, new Point(0, 0), HotSettings,
                     enableTiledRendering: true, autoSelectPyramidLevel: true, prefetchAdjacentTiles: false,
                     tileCacheMaximumMegabytes: 64, tilePrefetchRadius: 0);
 

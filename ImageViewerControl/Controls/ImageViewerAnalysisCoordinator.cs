@@ -73,7 +73,12 @@ namespace ImageViewer.Controls
         bool EnableGpuRendering { get; }
         bool PreferShaderPseudoColor { get; }
         bool AllowCpuPseudoColorFallback { get; }
-        PseudoColorPalette PseudoColorPalette { get; }
+
+        /// <summary>
+        /// 调色板 + 显示调节合成的一份显示设置。
+        /// Chinese: 只给这一个值、不给分开的调色板与调节参数，渲染路径就不存在"带上了调色板却漏掉调节"的可能。
+        /// </summary>
+        ImageViewerDisplaySettings DisplaySettings { get; }
         bool EnableImagePyramid { get; }
         bool AutoSelectPyramidLevel { get; }
         bool EnableTiledRendering { get; }
@@ -134,17 +139,22 @@ namespace ImageViewer.Controls
 
         private ImageViewerRenderedImagePlan BuildRenderedImagePlan()
         {
-            Effect? pseudoColorEffect = _host.PreferShaderPseudoColor ? _host.RenderService.CreatePseudoColorEffect(_host.PseudoColorPalette) : null;
-            PseudoColorPalette cpuPseudoColorPalette = pseudoColorEffect == null && _host.AllowCpuPseudoColorFallback ? _host.PseudoColorPalette : PseudoColorPalette.None;
+            // 显示处理（调色板 + 窗宽窗位/亮度/对比度/伽马/反色）优先走 GPU；两条路径读同一张 LUT，
+            // 所以"用哪条"只影响性能与内存，不影响像素取值。两条都关掉时退回原始像素（PassThrough）。
+            ImageViewerDisplaySettings displaySettings = _host.DisplaySettings;
+            Effect? displayEffect = _host.PreferShaderPseudoColor ? _host.RenderService.CreateDisplayEffect(displaySettings) : null;
+            ImageViewerDisplaySettings cpuDisplaySettings = displayEffect == null && _host.AllowCpuPseudoColorFallback
+                ? displaySettings
+                : ImageViewerDisplaySettings.PassThrough;
 
             if (_host.AnalysisState.AnalysisBitmapSource == null)
             {
                 double imageWidth = _host.ImageSource is BitmapSource bitmap ? bitmap.PixelWidth : _host.ImageSource?.Width ?? 0;
                 double imageHeight = _host.ImageSource is BitmapSource bitmapSource ? bitmapSource.PixelHeight : _host.ImageSource?.Height ?? 0;
-                ImageSource? source = pseudoColorEffect == null ? _host.RenderService.BuildDisplaySource(_host.ImageSource, cpuPseudoColorPalette) : _host.ImageSource;
+                ImageSource? source = displayEffect == null ? _host.RenderService.BuildDisplaySource(_host.ImageSource, cpuDisplaySettings) : _host.ImageSource;
                 return new ImageViewerRenderedImagePlan(
                     new ImageViewerRenderFrame(source, 0, 0, imageWidth, imageHeight, 1.0, false),
-                    pseudoColorEffect,
+                    displayEffect,
                     _host.EnableGpuRendering);
             }
 
@@ -158,14 +168,14 @@ namespace ImageViewer.Controls
                 _host.ViewportSize,
                 _host.Scale,
                 _host.Translation,
-                cpuPseudoColorPalette,
+                cpuDisplaySettings,
                 _host.EnableTiledRendering,
                 _host.AutoSelectPyramidLevel,
                 _host.PrefetchAdjacentTiles,
                 _host.TileCacheMaximumMegabytes,
                 _host.TilePrefetchRadius);
 
-            return new ImageViewerRenderedImagePlan(frame, pseudoColorEffect, _host.EnableGpuRendering);
+            return new ImageViewerRenderedImagePlan(frame, displayEffect, _host.EnableGpuRendering);
         }
 
         public BitmapSource? GetAnalysisBitmapSource()
@@ -550,13 +560,14 @@ namespace ImageViewer.Controls
                 _host.TilePrefetchRadius,
                 _host.AnalysisState.LastRenderFrame,
                 _host.EnableGpuRendering,
-                _host.PseudoColorPalette,
+                _host.DisplaySettings.Palette,
                 _host.AnalysisState.IsShaderPseudoColorActive,
                 _host.EnableAsyncAnalysis,
                 _host.PauseRealtimeHistogram,
                 _host.AnalysisState.LastHistogramDuration,
                 _host.PauseRealtimeProfile,
-                _host.AnalysisState.LastProfileDuration);
+                _host.AnalysisState.LastProfileDuration,
+                _host.DisplaySettings);
         }
 
         public string BuildRenderStatusSummary()
@@ -571,7 +582,7 @@ namespace ImageViewer.Controls
 
         public ImageViewerPseudoColorMenuState BuildPseudoColorMenuState()
         {
-            return new ImageViewerPseudoColorMenuState(_host.PseudoColorPalette);
+            return new ImageViewerPseudoColorMenuState(_host.DisplaySettings.Palette);
         }
 
         public ImageViewerAnalysisMenuState BuildMenuState()
@@ -596,10 +607,10 @@ namespace ImageViewer.Controls
                 _host.ShowHistogram || _host.ShowProfile,
                 hasAnalysisBitmap || _host.ImageSource != null,
                 _host.EnableGpuRendering,
-                _host.PseudoColorPalette == PseudoColorPalette.None,
-                _host.PseudoColorPalette == PseudoColorPalette.Hot,
-                _host.PseudoColorPalette == PseudoColorPalette.Jet,
-                _host.PseudoColorPalette == PseudoColorPalette.Viridis);
+                _host.DisplaySettings.Palette == PseudoColorPalette.None,
+                _host.DisplaySettings.Palette == PseudoColorPalette.Hot,
+                _host.DisplaySettings.Palette == PseudoColorPalette.Jet,
+                _host.DisplaySettings.Palette == PseudoColorPalette.Viridis);
         }
 
     }

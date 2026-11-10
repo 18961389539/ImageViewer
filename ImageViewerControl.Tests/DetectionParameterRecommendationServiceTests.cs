@@ -67,7 +67,7 @@ public sealed class DetectionParameterRecommendationServiceTests
                 MinimumEdgeGap = 4.5,
                 NominalEdgeGap = 20,
                 NominalEdgeGapTolerance = 2,
-                CaliperLineFitMode = JLVisionLineFitMode.Regression,
+                CaliperLineFitMode = LineFitMode.Regression,
                 CaliperFitClippingEndPoints = 2,
                 AdvancedMeasurements = [new AdvancedMeasurementDefinition { Name = "width", Kind = AdvancedMeasurementKind.Position }]
             };

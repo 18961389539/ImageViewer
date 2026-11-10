@@ -1,5 +1,7 @@
 using System;
+using System.Threading;
 using System.Windows;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using ImageViewer.Models;
 using ImageViewer.Services;
@@ -148,12 +150,18 @@ namespace ImageViewer.Controls
 
         public string? TryGetCurrentImagePath()
         {
-            return _host.ImageSource is BitmapImage { UriSource: { IsFile: true } uri } ? uri.LocalPath : null;
+            ImageSource? source = _host.ImageSource;
+            if (ImageViewerImageSourceRegistry.TryGetPath(source, out string registeredPath))
+            {
+                return registeredPath;
+            }
+
+            return source is BitmapImage { UriSource: { IsFile: true } uri } ? uri.LocalPath : null;
         }
 
         public void LoadImageFromFile(string filePath, bool fitToView)
         {
-            var bitmap = CreateBitmapFromFile(filePath);
+            BitmapSource bitmap = ImageViewerImageDecoder.LoadFromFile(filePath, CancellationToken.None);
             _host.SetImageSource(bitmap);
             if (fitToView)
             {
@@ -164,17 +172,6 @@ namespace ImageViewer.Controls
         public void ResetView()
         {
             ApplyViewportState(ImageViewerViewportState.Default);
-        }
-
-        public static BitmapImage CreateBitmapFromFile(string filePath)
-        {
-            var bitmap = new BitmapImage();
-            bitmap.BeginInit();
-            bitmap.CacheOption = BitmapCacheOption.OnLoad;
-            bitmap.UriSource = new Uri(filePath, UriKind.Absolute);
-            bitmap.EndInit();
-            bitmap.Freeze();
-            return bitmap;
         }
     }
 }

@@ -9,6 +9,7 @@ using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
 using ImageViewer.Abstractions;
 using ImageViewer.Controls;
+using ImageViewer.Core.Display;
 using ImageViewer.Models;
 using ImageViewer.Services;
 using Xunit;
@@ -28,7 +29,7 @@ namespace ImageViewerControl.Tests
                 BitmapSource bitmap = CreateBitmap();
                 var renderService = new FakeRenderService
                 {
-                    PseudoColorEffect = new BlurEffect()
+                    DisplayEffect = new BlurEffect()
                 };
                 var host = CreateHost(renderService, bitmap);
                 host.PreferShaderPseudoColor = true;
@@ -39,9 +40,9 @@ namespace ImageViewerControl.Tests
                 coordinator.HandleRenderingOptionChanged();
 
                 Assert.NotNull(uiFacade.LastRenderedImagePlan);
-                Assert.Same(renderService.PseudoColorEffect, uiFacade.LastRenderedImagePlan!.Effect);
+                Assert.Same(renderService.DisplayEffect, uiFacade.LastRenderedImagePlan!.Effect);
                 Assert.True(host.AnalysisState.IsShaderPseudoColorActive);
-                Assert.Equal(PseudoColorPalette.None, renderService.LastBuildRenderFramePalette);
+                Assert.True(renderService.LastBuildRenderFrameSettings.IsPassThrough);
             });
         }
 
@@ -487,6 +488,10 @@ namespace ImageViewerControl.Tests
 
             public PseudoColorPalette PseudoColorPalette { get; set; }
 
+            public DisplayAdjustment DisplayAdjustment { get; set; } = DisplayAdjustment.Identity;
+
+            public ImageViewerDisplaySettings DisplaySettings => new(PseudoColorPalette, DisplayAdjustment);
+
             public bool EnableImagePyramid { get; set; } = true;
 
             public bool AutoSelectPyramidLevel { get; set; } = true;
@@ -591,7 +596,7 @@ namespace ImageViewerControl.Tests
         {
             public BitmapSource? AnalysisBitmap { get; set; }
 
-            public Effect? PseudoColorEffect { get; set; }
+            public Effect? DisplayEffect { get; set; }
 
             public IReadOnlyList<ImagePyramidLevel> PyramidLevelsResult { get; set; } = [];
 
@@ -619,9 +624,9 @@ namespace ImageViewerControl.Tests
             /// </summary>
             public bool IgnoreProfileCancellation { get; set; }
 
-            public PseudoColorPalette LastBuildRenderFramePalette { get; private set; }
+            public ImageViewerDisplaySettings LastBuildRenderFrameSettings { get; private set; } = ImageViewerDisplaySettings.PassThrough;
 
-            public ImageSource? BuildDisplaySource(ImageSource? source, PseudoColorPalette palette)
+            public ImageSource? BuildDisplaySource(ImageSource? source, ImageViewerDisplaySettings settings)
             {
                 return source;
             }
@@ -640,9 +645,10 @@ namespace ImageViewerControl.Tests
                 return AnalysisBitmap ?? source as BitmapSource;
             }
 
-            public Effect? CreatePseudoColorEffect(PseudoColorPalette palette)
+            public Effect? CreateDisplayEffect(ImageViewerDisplaySettings settings)
             {
-                return PseudoColorEffect;
+                // 与真实实现一致：透传设置不建效果，否则"没有调色板也没有调节"也会走 GPU 分支。
+                return settings.IsPassThrough ? null : DisplayEffect;
             }
 
             public async Task<IReadOnlyList<ImagePyramidLevel>> BuildPyramidAsync(BitmapSource? source, CancellationToken cancellationToken)
@@ -661,10 +667,10 @@ namespace ImageViewerControl.Tests
                 return PyramidLevelsResult;
             }
 
-            public ImageViewerRenderFrame BuildRenderFrame(BitmapSource? source, IReadOnlyList<ImagePyramidLevel>? pyramid, Size viewport, double scale, Point translation, PseudoColorPalette palette, bool enableTiledRendering, bool autoSelectPyramidLevel, bool prefetchAdjacentTiles, int tileCacheMaximumMegabytes, int tilePrefetchRadius)
+            public ImageViewerRenderFrame BuildRenderFrame(BitmapSource? source, IReadOnlyList<ImagePyramidLevel>? pyramid, Size viewport, double scale, Point translation, ImageViewerDisplaySettings settings, bool enableTiledRendering, bool autoSelectPyramidLevel, bool prefetchAdjacentTiles, int tileCacheMaximumMegabytes, int tilePrefetchRadius)
             {
                 BuildRenderFrameCallCount++;
-                LastBuildRenderFramePalette = palette;
+                LastBuildRenderFrameSettings = settings;
                 return new ImageViewerRenderFrame(new DrawingImage(), 10, 20, 30, 40, 1.0, enableTiledRendering);
             }
 

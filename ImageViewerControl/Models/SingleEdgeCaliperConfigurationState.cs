@@ -9,7 +9,7 @@ namespace ImageViewer.Models
         int MinimumValidCalipers,
         double CaliperOutlierThreshold,
         CaliperEdgePolarity CaliperEdgePolarity,
-        JLVisionLineFitMode CaliperLineFitMode,
+        LineFitMode CaliperLineFitMode,
         int CaliperFitClippingEndPoints)
     {
         public static SingleEdgeCaliperConfigurationState Capture(ISingleEdgeCaliperRoi roi)

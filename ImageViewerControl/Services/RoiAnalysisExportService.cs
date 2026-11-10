@@ -86,7 +86,36 @@ namespace ImageViewer.Services
             ArgumentNullException.ThrowIfNull(rois);
 
             var roiList = rois.ToList();
-            var items = roiList.Select(roi =>
+            MeasurementReport report = BuildReportModel(
+                roiList,
+                pixelSize,
+                physicalUnit,
+                calibration,
+                sourceName,
+                sourceSha256,
+                hasKnownReference);
+
+            IReadOnlyList<SpcMeasurementSeries> spcSeries = SpcMeasurementSeriesBuilder.BuildFromRois(roiList, pixelSize, physicalUnit, calibration);
+            return MeasurementReportRenderer.RenderMarkdown(report, SpcReportFormatter.BuildMarkdown(spcSeries));
+        }
+
+        /// <summary>
+        /// 构建报告的结构化模型（不含渲染）。
+        /// Chinese: Markdown 导出与可打印报告共用同一份模型，避免“打印稿”和“文件稿”的数字来自两次独立评估。
+        /// English: One model for both Markdown and printable output so the numbers are evaluated exactly once.
+        /// </summary>
+        public static MeasurementReport BuildReportModel(
+            IEnumerable<RoiBase> rois,
+            double pixelSize,
+            string? physicalUnit,
+            CameraCalibration? calibration,
+            string? sourceName = null,
+            string? sourceSha256 = null,
+            bool hasKnownReference = false)
+        {
+            ArgumentNullException.ThrowIfNull(rois);
+
+            var items = rois.Select(roi =>
             {
                 RoiInspectionResult inspection = RoiInspectionEvaluator.Evaluate(roi, pixelSize, calibration);
                 string unit = IsAngularQuantity(roi) ? "°" : string.IsNullOrWhiteSpace(physicalUnit) ? "px" : physicalUnit!;
@@ -102,7 +131,7 @@ namespace ImageViewer.Services
                     inspection.SpecificationStatus.ToString());
             }).ToList();
 
-            MeasurementReport report = MeasurementReportBuilder.Build(
+            return MeasurementReportBuilder.Build(
                 items,
                 pixelSize,
                 physicalUnit,
@@ -110,8 +139,6 @@ namespace ImageViewer.Services
                 sourceName: sourceName,
                 sourceSha256: sourceSha256,
                 hasKnownReference: hasKnownReference);
-
-            return MeasurementReportRenderer.RenderMarkdown(report);
         }
 
         /// <summary>报告落到 CSV 同目录、同基名的 <c>.report.md</c>。</summary>
@@ -178,7 +205,7 @@ namespace ImageViewer.Services
                 unitLookup: key => unitByKey.TryGetValue(key, out string? itemUnit) ? itemUnit : null);
         }
 
-        private static string DescribeUnit(RoiBase roi, string? physicalUnit) => roi switch
+        internal static string DescribeUnit(RoiBase roi, string? physicalUnit) => roi switch
         {
             ParallelismMeasureRoi or PerpendicularityMeasureRoi or AngleMeasureRoi => "°",
             _ => string.IsNullOrWhiteSpace(physicalUnit) ? "px" : physicalUnit
@@ -194,7 +221,7 @@ namespace ImageViewer.Services
         /// Chinese: 方向公差（平行度/垂直度）与同心度在 2D 图上比较的是角度/直径差，与长度量不同，
         /// 报告必须写清楚量名与单位，否则"0.05"到底是毫米还是度无法判断。
         /// </summary>
-        private static string DescribeQuantity(RoiBase roi) => roi switch
+        internal static string DescribeQuantity(RoiBase roi) => roi switch
         {
             ParallelismMeasureRoi => "平行度角度偏差",
             PerpendicularityMeasureRoi => "垂直度角度偏差",
@@ -261,7 +288,7 @@ namespace ImageViewer.Services
             }
         }
 
-        private static string DescribeRoi(RoiBase roi)
+        internal static string DescribeRoi(RoiBase roi)
         {
             return string.IsNullOrWhiteSpace(roi.Label) ? roi.RoiTypeName : roi.Label;
         }
@@ -465,6 +492,9 @@ namespace ImageViewer.Services
                     .GroupBy(roi => roi.RoiTypeName)
                     .OrderBy(group => group.Key, StringComparer.Ordinal)
                     .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal),
+                // 过程能力按"同一量名"聚合当前图像上的重复特征，与报告中的 SPC 章节同源。
+                ["processCapability"] = SpcReportFormatter.BuildMetadata(
+                    SpcMeasurementSeriesBuilder.BuildFromRois(rois, pixelSize, physicalUnit, calibration)),
                 ["roiDocument"] = roiDocument,
                 ["renderSettings"] = exportContext.RenderSettings
             };

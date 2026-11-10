@@ -600,7 +600,7 @@ namespace ImageViewer.Plugins
             double caliperMinimumGradient,
             double caliperOutlierThreshold,
             CaliperEdgePolarity caliperEdgePolarity,
-            JLVisionLineFitMode caliperLineFitMode,
+            LineFitMode caliperLineFitMode,
             int caliperFitClippingEndPoints)
         {
             data.Measurement.CaliperCount = caliperCount;
@@ -622,11 +622,11 @@ namespace ImageViewer.Plugins
                 : CaliperEdgePolarity.Any;
         }
 
-        private static JLVisionLineFitMode ParseCaliperLineFitMode(string? value)
+        private static LineFitMode ParseCaliperLineFitMode(string? value)
         {
-            return Enum.TryParse<JLVisionLineFitMode>(value, true, out var mode)
+            return Enum.TryParse<LineFitMode>(value, true, out var mode)
                 ? mode
-                : JLVisionLineFitMode.Tukey;
+                : LineFitMode.Tukey;
         }
 
         private static List<IBuiltInPluginRegistration> GetBuiltInRegistrations()

@@ -33,8 +33,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -95,10 +93,21 @@ jobs:
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
+          # Push the .nupkg files first; NuGet.org only accepts a .snupkg once its
+          # matching .nupkg already exists on the feed.
           Get-ChildItem artifacts/packages -Filter *.nupkg |
             Where-Object { $_.Name -notlike '*.symbols.nupkg' } |
             Sort-Object Name |
             ForEach-Object {
               dotnet nuget push $_.FullName --api-key $env:NUGET_API_KEY --source $env:NUGET_SOURCE --skip-duplicate
               if ($LASTEXITCODE -ne 0) { throw "Failed to push $($_.Name)." }
+            }
+
+          # Symbol packages (.snupkg) are accepted on the same source, so push them
+          # in a second pass now that their .nupkg counterparts exist.
+          Get-ChildItem artifacts/packages -Filter *.snupkg |
+            Sort-Object Name |
+            ForEach-Object {
+              dotnet nuget push $_.FullName --api-key $env:NUGET_API_KEY --source $env:NUGET_SOURCE --skip-duplicate
+              if ($LASTEXITCODE -ne 0) { throw "Failed to push symbol package $($_.Name)." }
             }

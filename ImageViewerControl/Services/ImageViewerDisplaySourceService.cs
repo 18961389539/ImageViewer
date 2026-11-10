@@ -3,20 +3,21 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
+using ImageViewer.Core.Display;
 using ImageViewer.Rendering;
 
 namespace ImageViewer.Services
 {
     internal sealed class ImageViewerDisplaySourceService
     {
-        public static ImageSource? BuildDisplaySource(ImageSource? source, PseudoColorPalette palette)
+        public static ImageSource? BuildDisplaySource(ImageSource? source, ImageViewerDisplaySettings settings)
         {
-            if (source is not BitmapSource bitmap || palette == PseudoColorPalette.None)
+            if (source is not BitmapSource bitmap || settings.IsPassThrough)
             {
                 return source;
             }
 
-            return ApplyPseudoColor(bitmap, palette);
+            return ApplyDisplayLut(bitmap, settings);
         }
 
         public static void ApplyGpuCaching(Canvas imageContainer, bool enableGpuRendering)
@@ -57,16 +58,23 @@ namespace ImageViewer.Services
             return clone;
         }
 
-        public static Effect? CreatePseudoColorEffect(PseudoColorPalette palette)
+        /// <summary>
+        /// 创建显示查找表的着色器效果。
+        /// Chinese: 与 CPU 路径共用 <see cref="GetDisplayLut"/>；返回 null 表示"不需要显示处理"或"编译失败"，
+        /// 调用方据此回退到 CPU 路径。
+        /// English: Shares the table with the CPU path; null means "no display processing needed" or "compilation failed".
+        /// </summary>
+        public static Effect? CreateDisplayEffect(ImageViewerDisplaySettings settings)
         {
-            if (palette == PseudoColorPalette.None)
+            ArgumentNullException.ThrowIfNull(settings);
+            if (settings.IsPassThrough)
             {
                 return null;
             }
 
             try
             {
-                return new PseudoColorShaderEffect(palette);
+                return new DisplayLutShaderEffect(settings);
             }
             catch
             {
@@ -75,24 +83,25 @@ namespace ImageViewer.Services
         }
 
         /// <summary>
-        /// CPU 伪彩色。
-        /// Chinese: 强度与 alpha 都按"和 Shader 同一套定义"计算：
-        /// ① 强度用 <see cref="ImageViewerPixelAccess.ReadIntensity"/>，与 Shader 的 `dot(rgb, 0.299/0.587/0.114)` 同权重——
-        ///    早先依赖 WPF 的 Gray8 格式转换，权重由 WPF 内部决定、不可控，且彩色图会与 Shader 结果不同；
-        /// ② 保留输入 alpha（Bgra32/Pbgra32），其余格式按不透明处理——与 Shader 的 `float4(color, inputColor.a)` 对齐；
-        /// ③ 调色板只有一份定义（本文件的 LUT），Shader 改为采样同一张 LUT 纹理。
-        /// English: Intensity uses the same weights as the shader and input alpha is preserved, so the CPU fallback and the
-        /// shader agree by construction; the palette exists only once, in the LUT below.
+        /// CPU 显示查找表（窗宽窗位/亮度/对比度/伽马/反色 + 伪彩色）。
+        /// Chinese: 取值只有一份定义——<see cref="GetDisplayLut"/> 生成的那张表，Shader 采样同一张表。
+        /// 索引方式按模式区分：启用调色板时按**强度**索引（与 Shader 的 `dot(rgb, 0.299/0.587/0.114)` 同权重）；
+        /// 未启用调色板时按**逐通道**索引，这样调节彩色图不会把图变成灰度。灰度格式两种模式取值相同。
+        /// 强度与 alpha 的规则与伪彩路径一致：Gray16 按 v/257 落到 256 级显示码，Bgra32/Pbgra32 保留输入 alpha。
+        /// English: One table for both paths. With a palette the table is indexed by intensity; without one it is indexed
+        /// per channel so adjusting an RGB image keeps its colors. Gray formats agree either way.
         /// </summary>
-        internal static BitmapSource ApplyPseudoColor(BitmapSource source, PseudoColorPalette palette)
+        internal static BitmapSource ApplyDisplayLut(BitmapSource source, ImageViewerDisplaySettings settings)
         {
             ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(settings);
 
-            if (palette == PseudoColorPalette.None)
+            if (settings.IsPassThrough)
             {
                 return source;
             }
 
+            settings.Validate();
             BitmapSource readableSource = NormalizeForColorRead(source);
             int width = readableSource.PixelWidth;
             int height = readableSource.PixelHeight;
@@ -102,16 +111,29 @@ namespace ImageViewer.Services
             readableSource.CopyPixels(sourcePixels, stride, 0);
 
             bool hasAlpha = readableSource.Format == PixelFormats.Bgra32 || readableSource.Format == PixelFormats.Pbgra32;
+            bool isGrayFormat = readableSource.Format == PixelFormats.Gray8 || readableSource.Format == PixelFormats.Gray16;
+            bool perChannel = settings.UsesPerChannelIndex;
+            byte[] displayLut = GetDisplayLut(settings);
             byte[] colorPixels = new byte[width * height * 4];
-            byte[] paletteLut = GetPaletteLut(palette);
             for (int i = 0; i < width * height; i++)
             {
                 int sourceIndex = i * bytesPerPixel;
                 int colorIndex = i * 4;
-                int lutIndex = ReadPaletteIndex(sourcePixels, sourceIndex, bytesPerPixel, readableSource.Format) * 4;
-                colorPixels[colorIndex] = paletteLut[lutIndex];
-                colorPixels[colorIndex + 1] = paletteLut[lutIndex + 1];
-                colorPixels[colorIndex + 2] = paletteLut[lutIndex + 2];
+                if (perChannel && !isGrayFormat)
+                {
+                    // 逐通道：每个通道用自己的 8 位显示码索引同一张表（表项是灰度，取同分量即该通道的新值）。
+                    colorPixels[colorIndex] = displayLut[sourcePixels[sourceIndex] * 4];
+                    colorPixels[colorIndex + 1] = displayLut[sourcePixels[sourceIndex + 1] * 4 + 1];
+                    colorPixels[colorIndex + 2] = displayLut[sourcePixels[sourceIndex + 2] * 4 + 2];
+                }
+                else
+                {
+                    int lutIndex = ReadDisplayIndex(sourcePixels, sourceIndex, bytesPerPixel, readableSource.Format) * 4;
+                    colorPixels[colorIndex] = displayLut[lutIndex];
+                    colorPixels[colorIndex + 1] = displayLut[lutIndex + 1];
+                    colorPixels[colorIndex + 2] = displayLut[lutIndex + 2];
+                }
+
                 colorPixels[colorIndex + 3] = hasAlpha ? sourcePixels[sourceIndex + 3] : byte.MaxValue;
             }
 
@@ -139,11 +161,11 @@ namespace ImageViewer.Services
         }
 
         /// <summary>
-        /// 求调色板索引（0..255）。
+        /// 求显示码索引（0..255）。
         /// Chinese: 16 位强度按 v/257 落到 0..255——与 Shader 的 `intensity * 255`（intensity = v/65535）在数学上同一个映射。
         /// English: 16-bit intensities map as v/257, which is the same mapping as the shader's `intensity * 255`.
         /// </summary>
-        private static int ReadPaletteIndex(byte[] pixels, int index, int bytesPerPixel, PixelFormat format)
+        private static int ReadDisplayIndex(byte[] pixels, int index, int bytesPerPixel, PixelFormat format)
         {
             ushort intensity = ImageViewerPixelAccess.ReadIntensity(pixels, index, bytesPerPixel, format);
             if (format == PixelFormats.Gray16)
@@ -155,41 +177,35 @@ namespace ImageViewer.Services
         }
 
         /// <summary>
-        /// 把调色板 LUT 包成 256×1 位图，供 Shader 采样。
-        /// Chinese: 这是 CPU 与 GPU 共用的唯一定义——Shader 不再自带 hot/jet/viridis 公式。
-        /// English: The LUT as a 256×1 bitmap so the shader can sample the very same table instead of carrying its own ramps.
+        /// 把显示查找表包成 256×1 位图，供 Shader 采样。
+        /// Chinese: 这是 CPU 与 GPU 共用的唯一定义——着色器不再自带调色板公式，也不再自带传递函数。
+        /// English: The table as a 256×1 bitmap so the shader samples it instead of carrying its own formulas.
         /// </summary>
-        internal static BitmapSource CreatePaletteLutBitmap(PseudoColorPalette palette)
+        internal static BitmapSource CreateDisplayLutBitmap(ImageViewerDisplaySettings settings)
         {
-            byte[] lut = GetPaletteLut(palette);
+            byte[] lut = GetDisplayLut(settings);
             var bitmap = BitmapSource.Create(256, 1, 96, 96, PixelFormats.Bgra32, null, lut, 256 * 4);
             bitmap.Freeze();
             return bitmap;
         }
 
-        private static readonly byte[] HotPaletteLut = CreatePaletteLut(PseudoColorPalette.Hot);
-        private static readonly byte[] JetPaletteLut = CreatePaletteLut(PseudoColorPalette.Jet);
-        private static readonly byte[] ViridisPaletteLut = CreatePaletteLut(PseudoColorPalette.Viridis);
-        private static readonly byte[] DefaultPaletteLut = CreatePaletteLut(PseudoColorPalette.None);
-
-        /// <summary>取调色板 LUT（BGRA，256 项）。测试与 Shader 采样路径都读这一份。</summary>
-        internal static byte[] GetPaletteLut(PseudoColorPalette palette)
+        /// <summary>
+        /// 生成显示查找表（BGRA，256 项，表项 i 对应输入 i/255）。
+        /// Chinese: 传递曲线来自 <see cref="DisplayTransfer"/>，调色板取值来自本文件的 <see cref="GetPaletteColor"/>；
+        /// 两者在这里合成一张表，因此调节与伪彩的组合只有一处定义，测试与 Shader 采样路径都读这一份。
+        /// 未启用调色板时表项是灰度（三个分量同值），这正是逐通道索引所要求的形状。
+        /// English: Composes the transfer curve and the palette into one table, so the combination is defined exactly once.
+        /// </summary>
+        internal static byte[] GetDisplayLut(ImageViewerDisplaySettings settings)
         {
-            return palette switch
-            {
-                PseudoColorPalette.Hot => HotPaletteLut,
-                PseudoColorPalette.Jet => JetPaletteLut,
-                PseudoColorPalette.Viridis => ViridisPaletteLut,
-                _ => DefaultPaletteLut,
-            };
-        }
-
-        private static byte[] CreatePaletteLut(PseudoColorPalette palette)
-        {
+            ArgumentNullException.ThrowIfNull(settings);
+            double[] curve = DisplayTransfer.CreateNormalizedLut(settings.Adjustment, 256);
             var lut = new byte[256 * 4];
             for (int i = 0; i < 256; i++)
             {
-                Color color = GetPaletteColor(i / 255d, palette);
+                Color color = settings.Palette == PseudoColorPalette.None
+                    ? ToGrayColor(curve[i])
+                    : GetPaletteColor(curve[i], settings.Palette);
                 int offset = i * 4;
                 lut[offset] = color.B;
                 lut[offset + 1] = color.G;
@@ -198,6 +214,12 @@ namespace ImageViewer.Services
             }
 
             return lut;
+        }
+
+        private static Color ToGrayColor(double value)
+        {
+            byte level = (byte)Math.Clamp((int)Math.Round(Math.Clamp(value, 0d, 1d) * 255d), 0, 255);
+            return Color.FromRgb(level, level, level);
         }
 
         private static Color GetPaletteColor(double value, PseudoColorPalette palette)

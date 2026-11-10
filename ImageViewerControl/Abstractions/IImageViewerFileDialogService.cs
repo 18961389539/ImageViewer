@@ -20,6 +20,8 @@ namespace ImageViewer.Abstractions
 
         string? ShowSaveAnalysisCsvDialog(Window? owner);
 
+        string? ShowSaveXpsDialog(Window? owner);
+
         string? ShowSaveProjectPackageDialog(Window? owner);
 
         string? ShowSaveRecipeDialog(Window? owner);

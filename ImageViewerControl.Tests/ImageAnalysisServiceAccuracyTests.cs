@@ -7,11 +7,12 @@ using System.Windows.Media.Imaging;
 using ImageViewer.Models;
 using ImageViewer.Services;
 using Xunit;
+using IntensityImage = ImageViewer.Core.Analysis.IntensityImage;
 
 namespace ImageViewerControl.Tests
 {
     /// <summary>
-    /// JLVision-backed geometry and measurement accuracy tests.
+    /// Managed geometry and measurement accuracy tests.
     /// </summary>
     public class ImageAnalysisServiceAccuracyTests
     {
@@ -86,6 +87,63 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
+        public void TryDetectLineMeasureEdges_SharedIntensity_MatchesBitmapConversion()
+        {
+            const int size = 40;
+            Color[] pixels = BuildBandPixels(size, leftStart: 13, bandWidthPixels: 4, boundaryGreyPixel: 16, greyLevel: 127);
+            BitmapSource bitmap = CreateBgraBitmap(size, pixels);
+            var line = new CaliperMeasureRoi
+            {
+                P1 = new PointD(5, 20),
+                P2 = new PointD(25, 20),
+                CaliperCount = 12,
+                CaliperSamplingHalfWidth = 1,
+                CaliperMinimumGradient = 10,
+                MinimumValidCalipers = 4
+            };
+            line.EnsureCaliperRegion();
+            IntensityImage intensity = VisionAlgorithmEntryPoint.CreateIntensity(bitmap);
+
+            Assert.True(ImageAnalysisService.TryDetectLineMeasureEdges(bitmap, line, out LineMeasureGradientDetectionResult direct));
+            Assert.True(ImageAnalysisService.TryDetectLineMeasureEdges(
+                bitmap, line, out LineMeasureGradientDetectionResult shared, intensity: intensity));
+
+            Assert.Equal(direct.DetectedP1, shared.DetectedP1);
+            Assert.Equal(direct.DetectedP2, shared.DetectedP2);
+            Assert.Equal(direct.Edge1Points, shared.Edge1Points);
+            Assert.Equal(direct.Edge2Points, shared.Edge2Points);
+            Assert.Equal(direct.WidthSamples, shared.WidthSamples);
+            Assert.Equal(direct.ValidCaliperCount, shared.ValidCaliperCount);
+            Assert.Equal(direct.Confidence, shared.Confidence);
+        }
+
+        [Fact]
+        public void TryDetectCircularCaliperEdges_SharedIntensity_MatchesBitmapConversion()
+        {
+            const int size = 40;
+            Color[] pixels = BuildDiskPixels(size, new Point(20.0, 20.0), 8.4);
+            BitmapSource bitmap = CreateBgraBitmap(size, pixels);
+            var caliper = new CircularCaliperMeasureRoi
+            {
+                Center = new PointD(20.0, 20.0),
+                Radius = 8.0,
+                CaliperCount = 24,
+                CaliperSearchRange = 5
+            };
+            IntensityImage intensity = VisionAlgorithmEntryPoint.CreateIntensity(bitmap);
+
+            Assert.True(ImageAnalysisService.TryDetectCircularCaliperEdges(bitmap, caliper, out CircularCaliperDetectionResult direct));
+            Assert.True(ImageAnalysisService.TryDetectCircularCaliperEdges(
+                bitmap, caliper, out CircularCaliperDetectionResult shared, intensity: intensity));
+
+            Assert.Equal(direct.DetectedCenter, shared.DetectedCenter);
+            Assert.Equal(direct.DetectedRadius, shared.DetectedRadius);
+            Assert.Equal(direct.EdgePoints, shared.EdgePoints);
+            Assert.Equal(direct.ValidCaliperCount, shared.ValidCaliperCount);
+            Assert.Equal(direct.Confidence, shared.Confidence);
+        }
+
+        [Fact]
         public void TryDetectLineMeasureEdgesCore_WhenDetectionFails_DoesNotConvertDefaultResult()
         {
             BitmapSource bitmap = CreateBgraBitmap(12, [.. Enumerable.Repeat(Colors.Gray, 12 * 12)]);
@@ -115,12 +173,12 @@ namespace ImageViewerControl.Tests
                 contour,
                 new Vector(1, 0),
                 fallbackHalfLength: 15,
-                fitMode: JLVisionLineFitMode.Regression);
+                fitMode: LineFitMode.Regression);
             LineSegmentOverlay clipped = ImageAnalysisService.FitLine(
                 contour,
                 new Vector(1, 0),
                 fallbackHalfLength: 15,
-                fitMode: JLVisionLineFitMode.Regression,
+                fitMode: LineFitMode.Regression,
                 clippingEndPoints: 1);
 
             Assert.True(Math.Abs(untrimmed.Start.Y - clipped.Start.Y) > 0.05, "Clipping the first contour point should alter the fitted line.");
@@ -139,9 +197,9 @@ namespace ImageViewerControl.Tests
                 new Point(10, 1),
                 new Point(20, 8)
             ];
-            var results = new Dictionary<JLVisionLineFitMode, LineSegmentOverlay>();
+            var results = new Dictionary<LineFitMode, LineSegmentOverlay>();
 
-            foreach (JLVisionLineFitMode mode in Enum.GetValues<JLVisionLineFitMode>())
+            foreach (LineFitMode mode in Enum.GetValues<LineFitMode>())
             {
                 LineSegmentOverlay fit = ImageAnalysisService.FitLine(
                     contour,
@@ -153,7 +211,7 @@ namespace ImageViewerControl.Tests
             }
 
             Assert.True(
-                Math.Abs(GetSegmentAngleDegrees(results[JLVisionLineFitMode.Gauss]) - GetSegmentAngleDegrees(results[JLVisionLineFitMode.Regression])) > 0.01,
+                Math.Abs(GetSegmentAngleDegrees(results[LineFitMode.Gauss]) - GetSegmentAngleDegrees(results[LineFitMode.Regression])) > 0.01,
                 "The robust Gauss fit should differ from unweighted regression on the asymmetric outlier contour.");
         }
 

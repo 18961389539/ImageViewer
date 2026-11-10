@@ -160,23 +160,26 @@ namespace ImageViewer.Services
 
         public BitmapSource GetOrCreate(BitmapSource source, Int32Rect rect)
         {
-            return GetOrCreate(source, rect, PseudoColorPalette.None, valueFactory: null);
+            return GetOrCreate(source, rect, ImageViewerDisplaySettings.PassThrough, valueFactory: null);
         }
 
         /// <summary>
         /// 取"最终可显示的 tile"，缺失时用 <paramref name="valueFactory"/> 生成后入缓存。
-        /// Chinese: 键是 (源, 网格对齐矩形, palette)，条目就是已经着色好的 tile——它是唯一被记账的对象。
-        /// English: Keyed by (source, grid-aligned rect, palette); the entry is the colorized tile and the only accounted object.
+        /// Chinese: 键是 (源, 网格对齐矩形, 显示设置)，条目就是已经处理好的 tile——它是唯一被记账的对象。
+        /// 显示设置整体入键：只带调色板不带调节参数会让调过亮度的 tile 被当成合法缓存直接复用。
+        /// English: Keyed by (source, grid-aligned rect, display settings); the entry is the processed tile and the only
+        /// accounted object. The settings enter the key as one value so a brightness change cannot reuse a stale tile.
         /// </summary>
         public BitmapSource GetOrCreate(
             BitmapSource source,
             Int32Rect rect,
-            PseudoColorPalette palette,
+            ImageViewerDisplaySettings settings,
             Func<BitmapSource, BitmapSource>? valueFactory)
         {
             ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(settings);
 
-            RenderTileCacheKey key = new(source, rect, palette);
+            RenderTileCacheKey key = new(source, rect, settings);
             lock (_gate)
             {
                 if (_entries.TryGetValue(key, out CacheEntry? entry))
@@ -216,13 +219,14 @@ namespace ImageViewer.Services
         public BitmapSource GetOrCreateTileView(
             BitmapSource source,
             Int32Rect tileRect,
-            PseudoColorPalette palette,
+            ImageViewerDisplaySettings settings,
             Int32Rect viewRect,
             Func<BitmapSource, BitmapSource>? tileValueFactory)
         {
             ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(settings);
 
-            RenderTileCacheKey key = new(source, tileRect, palette);
+            RenderTileCacheKey key = new(source, tileRect, settings);
             lock (_gate)
             {
                 if (_entries.TryGetValue(key, out CacheEntry? entry))
@@ -275,11 +279,12 @@ namespace ImageViewer.Services
             return view;
         }
 
-        public bool TryGet(BitmapSource source, Int32Rect rect, PseudoColorPalette palette, out BitmapSource? bitmap)
+        public bool TryGet(BitmapSource source, Int32Rect rect, ImageViewerDisplaySettings settings, out BitmapSource? bitmap)
         {
             ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(settings);
 
-            RenderTileCacheKey key = new(source, rect, palette);
+            RenderTileCacheKey key = new(source, rect, settings);
             lock (_gate)
             {
                 if (_entries.TryGetValue(key, out CacheEntry? entry))
@@ -296,44 +301,45 @@ namespace ImageViewer.Services
 
         public bool TryGet(BitmapSource source, Int32Rect rect, out BitmapSource? bitmap)
         {
-            return TryGet(source, rect, PseudoColorPalette.None, out bitmap);
+            return TryGet(source, rect, ImageViewerDisplaySettings.PassThrough, out bitmap);
         }
 
         public void Prefetch(BitmapSource source, IEnumerable<Int32Rect> rects)
         {
-            Prefetch(source, rects, PseudoColorPalette.None, valueFactory: null);
+            Prefetch(source, rects, ImageViewerDisplaySettings.PassThrough, valueFactory: null);
         }
 
         /// <summary>
         /// 预取若干 tile。
-        /// Chinese: 预取必须与可见路径写同一把键、同一个变换——否则预取出来的条目要么用不上（palette 不一致），
-        /// 要么被当成已着色的结果直接显示（颜色错误）。
+        /// Chinese: 预取必须与可见路径写同一把键、同一个变换——否则预取出来的条目要么用不上（显示设置不一致），
+        /// 要么被当成已处理好的结果直接显示（亮度/调色板错误）。
         /// English: Prefetch must use the same key and the same transform as the visible path, otherwise prefetched entries
-        /// are either unusable or get displayed as if they were already colorized.
+        /// are either unusable or get displayed as if they were already processed.
         /// </summary>
         public void Prefetch(
             BitmapSource source,
             IEnumerable<Int32Rect> rects,
-            PseudoColorPalette palette,
+            ImageViewerDisplaySettings settings,
             Func<BitmapSource, BitmapSource>? valueFactory)
         {
             ArgumentNullException.ThrowIfNull(source);
             ArgumentNullException.ThrowIfNull(rects);
+            ArgumentNullException.ThrowIfNull(settings);
 
             foreach (Int32Rect rect in rects)
             {
-                QueuePrefetch(source, rect, palette, valueFactory);
+                QueuePrefetch(source, rect, settings, valueFactory);
             }
         }
 
-        private void QueuePrefetch(BitmapSource source, Int32Rect rect, PseudoColorPalette palette, Func<BitmapSource, BitmapSource>? valueFactory)
+        private void QueuePrefetch(BitmapSource source, Int32Rect rect, ImageViewerDisplaySettings settings, Func<BitmapSource, BitmapSource>? valueFactory)
         {
             if (rect.Width <= 0 || rect.Height <= 0)
             {
                 return;
             }
 
-            RenderTileCacheKey key = new(source, rect, palette);
+            RenderTileCacheKey key = new(source, rect, settings);
             PrefetchTicket ticket;
             CancellationToken cancellationToken;
             lock (_gate)
@@ -661,7 +667,7 @@ namespace ImageViewer.Services
             public Dictionary<Int32Rect, BitmapSource> DerivedViews { get; } = new();
         }
 
-        private readonly record struct RenderTileCacheKey(BitmapSource Source, Int32Rect Rect, PseudoColorPalette Palette);
+        private readonly record struct RenderTileCacheKey(BitmapSource Source, Int32Rect Rect, ImageViewerDisplaySettings Settings);
 
         /// <summary>
         /// 一次预取任务的登记凭据。

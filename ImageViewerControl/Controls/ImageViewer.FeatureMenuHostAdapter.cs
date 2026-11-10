@@ -270,6 +270,10 @@ namespace ImageViewer.Controls
             _dialogs.ShowReadOnlyText(UiText.Get("DialogAnalysisSummaryTitle"), summary);
         }
 
+        public void ShowProcessCapability() => _dialogs.ShowProcessCapability();
+
+        public void ShowPrintableReport() => _dialogs.ShowPrintableReport();
+
         /// <summary>
         /// “标定检查”步骤。
         /// Chinese: 这是离线工作流里"测量"与"出报告"之间的关口。它不做测量，只回答一个问题：
@@ -387,6 +391,12 @@ namespace ImageViewer.Controls
             ["tilePrefetchRadius"] = _owner.RuntimeOptions.TilePrefetchRadius.ToString(CultureInfo.InvariantCulture),
             ["enableGpuRendering"] = _owner.EnableGpuRendering.ToString(),
             ["pseudoColorPalette"] = _owner.PseudoColorPalette.ToString(),
+            ["displayWindowWidth"] = _owner.DisplayAdjustment.WindowWidth.ToString(CultureInfo.InvariantCulture),
+            ["displayWindowLevel"] = _owner.DisplayAdjustment.WindowLevel.ToString(CultureInfo.InvariantCulture),
+            ["displayBrightness"] = _owner.DisplayAdjustment.Brightness.ToString(CultureInfo.InvariantCulture),
+            ["displayContrast"] = _owner.DisplayAdjustment.Contrast.ToString(CultureInfo.InvariantCulture),
+            ["displayGamma"] = _owner.DisplayAdjustment.Gamma.ToString(CultureInfo.InvariantCulture),
+            ["displayInvert"] = _owner.DisplayAdjustment.Invert.ToString(),
             ["enableAsyncAnalysis"] = _owner.RuntimeOptions.EnableAsyncAnalysis.ToString()
         };
     }
@@ -406,6 +416,10 @@ namespace ImageViewer.Controls
         public string? ShowSaveAnalysisCsvDialog() => _dialogWorkflowService.ShowSaveAnalysisCsvDialog();
         public string[] ShowOpenBatchImageFilesDialog() => _owner.FileDialogService.ShowOpenImageFilesDialog(Window.GetWindow(_owner));
         public void ShowReadOnlyText(string title, string text) => _dialogWorkflowService.ShowReadOnlyText(title, text);
+
+        public void ShowProcessCapability() => _owner.ShowProcessCapability();
+
+        public void ShowPrintableReport() => _owner.ShowPrintableReport();
     }
 
     internal sealed class ImageViewerFeatureFeedbackCapability : IImageViewerFeatureFeedbackCapability

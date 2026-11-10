@@ -56,6 +56,10 @@ namespace ImageViewer.Controls
 
         public void ShowSmartDisplaySuggestion() => _operations.ShowSmartDisplaySuggestion();
 
+        public void ShowDisplayAdjustment() => _operations.ShowDisplayAdjustment();
+
+        public void ResetDisplayAdjustment() => _operations.ResetDisplayAdjustment();
+
         public void ShowRenderStatus() => _operations.ShowRenderStatus();
     }
 
@@ -106,6 +110,8 @@ namespace ImageViewer.Controls
         public void RebuildPyramidIfNeeded() => _owner.RebuildPyramidIfNeeded();
         public void SetPseudoColorPalette(PseudoColorPalette palette) => _owner.PseudoColorPalette = palette;
         public void ShowSmartDisplaySuggestion() => _owner.ShowSmartDisplaySuggestion(_dialogWorkflowService);
+        public void ShowDisplayAdjustment() => _owner.ShowDisplayAdjustment();
+        public void ResetDisplayAdjustment() => _owner.ResetDisplayAdjustment();
         public void ShowRenderStatus() => _dialogWorkflowService.ShowReadOnlyText(UiText.Get("DialogRenderStatusTitle"), _owner.BuildRenderStatusSummary());
     }
 }

@@ -2,16 +2,11 @@
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
-  <!-- JLVision keeps its own explicit Obfuscar package version. Keep the
-       third-party project isolated from ImageViewer's central package mode. -->
-  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'JLVisionLib'">
-    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
-    <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
-  </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
     <PackageVersion Include="HelixToolkit.Wpf.SharpDX" Version="3.1.2" />
+    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.403" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />
     <PackageVersion Include="xunit" Version="2.9.0" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />

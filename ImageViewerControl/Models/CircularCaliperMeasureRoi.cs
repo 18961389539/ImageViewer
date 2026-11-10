@@ -14,7 +14,7 @@ namespace ImageViewer.Models
         private int _minimumValidCalipers = 8;
         private double _caliperOutlierThreshold = 2.5;
         private CaliperEdgePolarity _caliperEdgePolarity = CaliperEdgePolarity.Any;
-        private JLVisionLineFitMode _caliperLineFitMode = JLVisionLineFitMode.Tukey;
+        private LineFitMode _caliperLineFitMode = LineFitMode.Tukey;
         private int _caliperFitClippingEndPoints;
         private CircularCaliperQualityStatus _qualityStatus = CircularCaliperQualityStatus.NotMeasured;
         private CircularCaliperQualityReason _qualityReason = CircularCaliperQualityReason.NotMeasured;
@@ -169,14 +169,14 @@ namespace ImageViewer.Models
             set => SetProperty(ref _caliperEdgePolarity, value);
         }
 
-        /// <summary>共享卡尺配置槽；当前圆拟合路径不使用直线拟合模式。</summary>
-        public JLVisionLineFitMode CaliperLineFitMode
+        /// <summary>圆拟合的稳健加权模式，与直线卡尺共用同一配置槽。</summary>
+        public LineFitMode CaliperLineFitMode
         {
             get => _caliperLineFitMode;
             set => SetProperty(ref _caliperLineFitMode, value);
         }
 
-        /// <summary>共享卡尺配置槽；当前圆拟合路径不使用直线端点裁剪。</summary>
+        /// <summary>共享卡尺配置槽；圆形轮廓没有有序端点，因此圆拟合不使用端点裁剪。</summary>
         public int CaliperFitClippingEndPoints
         {
             get => _caliperFitClippingEndPoints;

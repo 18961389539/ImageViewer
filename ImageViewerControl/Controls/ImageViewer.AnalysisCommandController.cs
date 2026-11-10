@@ -71,6 +71,12 @@ namespace ImageViewer.Controls
                 case ImageViewerAnalysisCommand.ShowSmartDisplaySuggestion:
                     Host.ShowSmartDisplaySuggestion();
                     break;
+                case ImageViewerAnalysisCommand.ShowDisplayAdjustment:
+                    Host.ShowDisplayAdjustment();
+                    break;
+                case ImageViewerAnalysisCommand.ResetDisplayAdjustment:
+                    Host.ResetDisplayAdjustment();
+                    break;
                 case ImageViewerAnalysisCommand.ShowRenderStatus:
                     Host.ShowRenderStatus();
                     break;

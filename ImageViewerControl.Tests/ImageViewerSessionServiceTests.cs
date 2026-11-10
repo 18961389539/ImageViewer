@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using ImageViewer.Abstractions;
+using ImageViewer.Core.Display;
 using ImageViewer.Models;
 using ImageViewer.Plugins;
 using ImageViewer.Services;
@@ -157,6 +158,41 @@ namespace ImageViewerControl.Tests
             Assert.Equal(profile, result.QualityProfile);
             Assert.Contains("\"QualityProfile\"", sessionJson, StringComparison.Ordinal);
             Assert.Contains("\"PassResidualRms\": 0.9", sessionJson, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public void SerializeSession_RoundTripsDisplayAdjustment()
+        {
+            var service = new ImageViewerSessionService();
+            var registry = RoiPluginRegistry.CreateBuiltIn();
+            var adjustment = DisplayAdjustment.Identity with
+            {
+                WindowWidth = 0.4,
+                WindowLevel = 0.6,
+                Brightness = 0.1,
+                Contrast = -0.2,
+                Gamma = 1.8,
+                Invert = true
+            };
+
+            ImageViewerPersistenceSnapshot snapshot = CreateSnapshot(null, []) with { Display = adjustment };
+            string sessionJson = service.SerializeSession("display", snapshot, registry);
+            ImageViewerSessionData result = service.LoadFromJson(sessionJson, registry);
+
+            Assert.Equal(adjustment, result.Display);
+            Assert.Contains("\"Display\"", sessionJson, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public void LoadFromJson_InvalidDisplayAdjustment_FallsBackToIdentity()
+        {
+            var service = new ImageViewerSessionService();
+            const string sessionJson =
+                "{\"SessionName\":\"sample\",\"RoiDocumentJson\":\"{}\",\"Display\":{\"WindowWidth\":0,\"WindowLevel\":1.5}}";
+
+            ImageViewerSessionData result = service.LoadFromJson(sessionJson, RoiPluginRegistry.CreateBuiltIn());
+
+            Assert.Same(DisplayAdjustment.Identity, result.Display);
         }
 
         [Fact]

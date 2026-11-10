@@ -3,6 +3,8 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using ImageViewer.Core.Display;
+using ImageViewer.Dialogs;
 using ImageViewer.Localization;
 using ImageViewer.Models;
 using ImageViewer.Services;
@@ -111,6 +113,41 @@ namespace ImageViewer.Controls
 
         private void UpdatePseudoColorMenuState() => _analysisController.UpdatePseudoColorMenuState();
 
+        /// <summary>
+        /// 打开显示调节对话框。
+        /// Chinese: 预览直接写回依赖属性（于是走的就是正常渲染路径，不存在"预览一套、应用另一套"），
+        /// 取消时还原为打开前的值。"自动窗宽窗位"按钮按当前直方图的分位数给出建议，可把有效范围铺满显示。
+        /// </summary>
+        internal void ShowDisplayAdjustment()
+        {
+            DisplayAdjustment initial = DisplayAdjustment;
+            var dialog = new DisplayAdjustmentDialog(initial, CreateAutoWindowLevel, value => DisplayAdjustment = value);
+            if (Window.GetWindow(this) is { } owner)
+            {
+                dialog.Owner = owner;
+            }
+
+            DisplayAdjustment = dialog.ShowDialog() == true ? dialog.Result : initial;
+        }
+
+        /// <summary>还原显示调节（像素数据本来就没被改过）。</summary>
+        internal void ResetDisplayAdjustment() => DisplayAdjustment = DisplayAdjustment.Identity;
+
+        /// <summary>
+        /// 从当前图像的强度直方图求自动窗宽窗位。
+        /// Chinese: 读的是**原始**分析位图而不是显示位图——显示调节不该参与自身的取值，否则调一次就自我强化。
+        /// </summary>
+        private DisplayAdjustment? CreateAutoWindowLevel()
+        {
+            BitmapSource? bitmap = GetAnalysisBitmapSource();
+            if (bitmap == null)
+            {
+                return null;
+            }
+
+            return DisplayTransfer.CreateAutoWindowLevel(ImageAnalysisService.CreateHistogram(bitmap, ImageViewerAnalysisCoordinator.HistogramBinCount));
+        }
+
         private static void OnEnableGpuRenderingChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             if (d is ImageViewer viewer)
@@ -124,6 +161,19 @@ namespace ImageViewer.Controls
             if (d is ImageViewer viewer)
             {
                 viewer._analysisController.HandlePseudoColorPaletteChanged();
+            }
+        }
+
+        /// <summary>
+        /// 显示调节变化。
+        /// Chinese: 和调色板一样只需重绘——调节参数已经在显示设置的缓存键里，不同取值天然是不同条目，
+        /// 因此不必清缓存；直方图/剖面读的是原始强度图，也不受显示调节影响。
+        /// </summary>
+        private static void OnDisplayAdjustmentChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is ImageViewer viewer)
+            {
+                viewer._analysisController.HandleRenderingOptionChanged();
             }
         }
 

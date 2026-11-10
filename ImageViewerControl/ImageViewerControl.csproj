@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <TargetFrameworks>net8.0-windows;net10.0-windows</TargetFrameworks>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
@@ -17,18 +17,18 @@
 
   <ItemGroup>
     <!-- 用 Resource 而不是 EmbeddedResource：WPF 工程会忽略非 XAML 的 EmbeddedResource，
-         于是着色器源码根本进不了程序集（PseudoColorShaderCompiler 一直找不到它，GPU 伪彩路径静默失效）。
+         于是着色器源码根本进不了程序集（DisplayLutShaderCompiler 一直找不到它，GPU 显示调节路径静默失效）。
          Resource 会把它并进 <Assembly>.g.resources，键是小写化的相对路径。 -->
-    <Resource Include="Shaders\PseudoColorEffect.ps.hlsl" />
+    <Resource Include="Shaders\DisplayLutEffect.ps.hlsl" />
   </ItemGroup>
 
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\ImageViewer.Core\ImageViewer.Core.csproj" />
-    <ProjectReference Include="..\third_party\JLVision\JLVisionLib.csproj" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="HelixToolkit.Wpf.SharpDX" />

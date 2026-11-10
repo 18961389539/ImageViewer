@@ -179,7 +179,7 @@ namespace ImageViewer.Controls
                                 imageLoading.SetImageLoadState(true, UiText.Get("ImageLoadStatusDecoding"), progress, false);
                             }
                         });
-                        BitmapImage bitmap = await Task.Run(
+                        BitmapSource bitmap = await Task.Run(
                             () => CreateBitmapFromFile(filePath, cancellation.Token, decodeProgress),
                             cancellation.Token);
                         if (!IsCurrentImageLoad(cancellation, generation))
@@ -207,7 +207,7 @@ namespace ImageViewer.Controls
                         }
 
                         lastException = ex;
-                        if (attempt >= retryCount)
+                        if (ex is ImageViewerImageTooLargeException || attempt >= retryCount)
                         {
                             break;
                         }
@@ -221,7 +221,17 @@ namespace ImageViewer.Controls
 
                 _lastFailedImagePath = filePath;
                 imageLoading.SetImageLoadState(true, UiText.Get("ImageLoadStatusFailed"), 0, true);
-                imageLoading.ShowNonCriticalError(UiText.Get("ErrorOpenImageTitle"), UiText.Get("ErrorOpenImageMessage"), lastException ?? new InvalidOperationException("Image load failed."));
+                if (lastException is ImageViewerImageTooLargeException tooLarge)
+                {
+                    imageLoading.ShowNonCriticalError(
+                        UiText.Get("ErrorImageTooLargeTitle"),
+                        UiText.Format("ErrorImageTooLargeMessage", tooLarge.PixelWidth, tooLarge.PixelHeight, tooLarge.MaxPixelCount),
+                        tooLarge);
+                }
+                else
+                {
+                    imageLoading.ShowNonCriticalError(UiText.Get("ErrorOpenImageTitle"), UiText.Get("ErrorOpenImageMessage"), lastException ?? new InvalidOperationException("Image load failed."));
+                }
             }
             finally
             {
@@ -509,83 +519,9 @@ namespace ImageViewer.Controls
             target.Radius = source.Radius;
         }
 
-        private static BitmapImage CreateBitmapFromFile(string filePath, CancellationToken cancellationToken, IProgress<double> progress)
+        private static BitmapSource CreateBitmapFromFile(string filePath, CancellationToken cancellationToken, IProgress<double> progress)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            using var fileStream = File.OpenRead(filePath);
-            using var progressStream = new CancellationProgressStream(fileStream, cancellationToken, progress);
-            var bitmap = new BitmapImage();
-            bitmap.BeginInit();
-            bitmap.CacheOption = BitmapCacheOption.OnLoad;
-            bitmap.StreamSource = progressStream;
-            bitmap.EndInit();
-            cancellationToken.ThrowIfCancellationRequested();
-            progress.Report(80);
-            bitmap.Freeze();
-            return bitmap;
-        }
-
-        private sealed class CancellationProgressStream : Stream
-        {
-            private readonly Stream _inner;
-            private readonly CancellationToken _cancellationToken;
-            private readonly IProgress<double> _progress;
-
-            public CancellationProgressStream(Stream inner, CancellationToken cancellationToken, IProgress<double> progress)
-            {
-                _inner = inner;
-                _cancellationToken = cancellationToken;
-                _progress = progress;
-            }
-
-            public override bool CanRead => _inner.CanRead;
-            public override bool CanSeek => _inner.CanSeek;
-            public override bool CanWrite => false;
-            public override long Length => _inner.Length;
-
-            public override long Position
-            {
-                get => _inner.Position;
-                set => _inner.Position = value;
-            }
-
-            public override void Flush() => _inner.Flush();
-
-            public override int Read(byte[] buffer, int offset, int count)
-            {
-                _cancellationToken.ThrowIfCancellationRequested();
-                int read = _inner.Read(buffer, offset, count);
-                ReportProgress();
-                _cancellationToken.ThrowIfCancellationRequested();
-                return read;
-            }
-
-            public override long Seek(long offset, SeekOrigin origin) => _inner.Seek(offset, origin);
-
-            public override void SetLength(long value) => throw new NotSupportedException();
-
-            public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
-
-            protected override void Dispose(bool disposing)
-            {
-                if (disposing)
-                {
-                    _inner.Dispose();
-                }
-
-                base.Dispose(disposing);
-            }
-
-            private void ReportProgress()
-            {
-                if (_inner.Length <= 0)
-                {
-                    return;
-                }
-
-                double fraction = Math.Clamp((double)_inner.Position / _inner.Length, 0, 1);
-                _progress.Report(10 + fraction * 70);
-            }
+            return ImageViewerImageDecoder.LoadFromFile(filePath, cancellationToken, progress);
         }
     }
 }

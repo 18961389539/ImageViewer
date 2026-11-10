@@ -101,6 +101,18 @@ namespace ImageViewer.Dialogs
             return dialog.ShowDialog(owner) == true ? dialog.FileName : null;
         }
 
+        public string? ShowSaveXpsDialog(Window? owner)
+        {
+            var dialog = new SaveFileDialog
+            {
+                Title = UiText.Get("FileDialogSaveXpsTitle"),
+                Filter = UiText.Get("FileDialogXpsFilter"),
+                DefaultExt = ".xps"
+            };
+
+            return dialog.ShowDialog(owner) == true ? dialog.FileName : null;
+        }
+
         public string? ShowSaveProjectPackageDialog(Window? owner)
         {
             var dialog = new SaveFileDialog

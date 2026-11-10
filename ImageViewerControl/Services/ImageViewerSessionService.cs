@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using ImageViewer.Abstractions;
+using ImageViewer.Core.Display;
 using ImageViewer.Models;
 using ImageViewer.Plugins;
 
@@ -73,7 +74,8 @@ namespace ImageViewer.Services
                 Scale = snapshot.Scale,
                 TranslateX = snapshot.TranslateX,
                 TranslateY = snapshot.TranslateY,
-                Calibration = snapshot.Calibration
+                Calibration = snapshot.Calibration,
+                Display = snapshot.Display
             };
 
             return JsonSerializer.Serialize(session, ImageViewer.Core.Persistence.ImageViewerCoreJsonSerializationContext.Default.ImageViewerSessionDocument);
@@ -107,7 +109,10 @@ namespace ImageViewer.Services
             return new ImageViewerSessionData(session.SessionName, session.SavedAtUtc, ResolveImagePath(session.ImagePath, sessionBaseDirectory), roiData.Rois, roiData.PixelSize, roiData.PhysicalUnit, session.Scale, session.TranslateX, session.TranslateY, session.Calibration)
             {
                 UnresolvedRois = roiData.UnresolvedItems,
-                QualityProfile = qualityProfile
+                QualityProfile = qualityProfile,
+                Display = session.Display is { } display && display.TryValidate(out _)
+                    ? display
+                    : DisplayAdjustment.Identity
             };
         }
 
@@ -158,5 +163,8 @@ namespace ImageViewer.Services
         public IReadOnlyList<RoiPersistenceData> UnresolvedRois { get; init; } = [];
 
         public ImageAnalysisQualityProfile QualityProfile { get; init; } = ImageAnalysisQualityProfile.Default;
+
+        /// <summary>会话里保存的显示调节；旧文件按默认参数（透传）处理。</summary>
+        public DisplayAdjustment Display { get; init; } = DisplayAdjustment.Identity;
     }
 }

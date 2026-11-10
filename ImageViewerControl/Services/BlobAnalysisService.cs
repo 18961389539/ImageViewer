@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Windows;
 using System.Windows.Media.Imaging;
+using ImageViewer.Core.Analysis;
 using ImageViewer.Models;
 
 namespace ImageViewer.Services
@@ -10,7 +11,7 @@ namespace ImageViewer.Services
     internal static class BlobAnalysisService
     {
         /// <summary>
-        /// 使用 JLVision 完成斑点分割、连通域分析和几何特征提取。
+        /// 使用托管算法完成斑点分割、连通域分析和几何特征提取。
         /// </summary>
         public static List<BlobFeature> DetectBlobs(
             BitmapSource bitmap,
@@ -45,46 +46,29 @@ namespace ImageViewer.Services
                 crop.Freeze();
             }
 
-            using JLVisionImageHandle imageHandle = JLVisionAlgorithmEntryPoint.CreateIntensity(crop);
-            cancellationToken.ThrowIfCancellationRequested();
-
-            using var segmented = JLVisionAlgorithmEntryPoint.SegmentBlob(imageHandle, useOtsu, threshold, detectDark);
-            cancellationToken.ThrowIfCancellationRequested();
-
-            using var connected = JLVisionAlgorithmEntryPoint.ConnectRegion(segmented);
+            IntensityImage image = VisionAlgorithmEntryPoint.CreateIntensity(crop);
             cancellationToken.ThrowIfCancellationRequested();
 
             int areaThreshold = Math.Max(1, minArea);
-            using var filtered = JLVisionAlgorithmEntryPoint.SelectBlobArea(connected, areaThreshold);
+            IReadOnlyList<BlobFeature> regions = VisionAlgorithmEntryPoint.ExtractBlobs(
+                image, useOtsu, threshold, detectDark, areaThreshold);
 
-            int count = filtered.CountObj();
-            for (int index = 1; index <= count; index++)
+            for (int i = 0; i < regions.Count; i++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                using var blob = filtered.SelectObj(index);
-
-                int area = JLVisionAlgorithmEntryPoint.GetAreaCenter(blob, out double row, out double column);
-                if (area < areaThreshold)
+                BlobFeature region = regions[i];
+                results.Add(region with
                 {
-                    continue;
-                }
-
-                JLVisionAlgorithmEntryPoint.GetBoundingRectangle(
-                    blob,
-                    out int row1,
-                    out int column1,
-                    out int row2,
-                    out int column2);
-
-                results.Add(new BlobFeature(
-                    index,
-                    area,
-                    new PointD(column + x, row + y),
-                    new RectD(
-                        column1 + x,
-                        row1 + y,
-                        column2 - column1 + 1,
-                        row2 - row1 + 1)));
+                    // Rendering shows "#<Label>", so keep the dense 1-based numbering the
+                    // control has always produced rather than the raw component label.
+                    Label = i + 1,
+                    Centroid = new PointD(region.Centroid.X + x, region.Centroid.Y + y),
+                    BoundingBox = new RectD(
+                        region.BoundingBox.X + x,
+                        region.BoundingBox.Y + y,
+                        region.BoundingBox.Width,
+                        region.BoundingBox.Height)
+                });
             }
 
             return results;
