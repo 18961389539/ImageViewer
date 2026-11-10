@@ -74,7 +74,7 @@ jobs:
     environment: nuget
     steps:
       - name: Download NuGet artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: imageviewer-nuget-${{ needs.pack.outputs.version }}
           path: artifacts/packages
