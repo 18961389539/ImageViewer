@@ -108,6 +108,59 @@ namespace ImageViewer.Core.Tests
             }
         }
 
+        [Theory]
+        [InlineData(LineFitMode.Huber)]
+        [InlineData(LineFitMode.Tukey)]
+        [InlineData(LineFitMode.Drop)]
+        [InlineData(LineFitMode.Gauss)]
+        public void TryFitLine_RobustModes_SingleOutlier_KeepTrueLine(LineFitMode fitMode)
+        {
+            PointD[] clean = BuildLinePoints();
+            PointD[] withOutlier = [.. clean, new PointD(60.0, 90.0)];
+
+            Assert.True(RobustFitAlgorithm.TryFitLine(withOutlier, fitMode, 0, out DetectedLineSegment segment));
+
+            double maximumResidual = MaximumResidualFromLine(clean, segment);
+            Assert.True(maximumResidual < 0.05, $"{fitMode} should keep the clean line (max residual {maximumResidual:F4}).");
+        }
+
+        [Fact]
+        public void TryFitLine_Regression_SingleOutlier_IsPulledOffCleanLine()
+        {
+            PointD[] clean = BuildLinePoints();
+            PointD[] withOutlier = [.. clean, new PointD(60.0, 90.0)];
+
+            Assert.True(RobustFitAlgorithm.TryFitLine(withOutlier, LineFitMode.Regression, 0, out DetectedLineSegment segment));
+
+            double maximumResidual = MaximumResidualFromLine(clean, segment);
+            Assert.True(maximumResidual > 0.5, $"Regression is expected to be pulled by the outlier (max residual {maximumResidual:F4}).");
+        }
+
+        private static PointD[] BuildLinePoints()
+        {
+            var points = new PointD[10];
+            for (int i = 0; i < points.Length; i++)
+            {
+                double x = i * 5.0;
+                points[i] = new PointD(x, (x * 0.5) + 3.0);
+            }
+
+            return points;
+        }
+
+        private static double MaximumResidualFromLine(PointD[] points, DetectedLineSegment segment)
+        {
+            VectorD direction = segment.End - segment.Start;
+            Assert.True(direction.LengthSquared > 1e-9);
+            double maximum = 0;
+            foreach (PointD point in points)
+            {
+                maximum = Math.Max(maximum, DistanceToLine(point, segment.Start, direction));
+            }
+
+            return maximum;
+        }
+
         private static PointD[] BuildCirclePoints(double centerX, double centerY, double radius, int count)
         {
             var points = new PointD[count];

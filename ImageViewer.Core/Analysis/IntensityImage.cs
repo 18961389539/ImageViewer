@@ -79,4 +79,33 @@ public sealed class IntensityImage
 
         return _pixels[(iy * Width) + ix];
     }
+
+    /// <summary>
+    /// 双线性采样，越界坐标钳位到边缘像素。
+    /// English: Bilinear sample; coordinates outside the image clamp to the border pixel,
+    /// matching the nearest-neighbor border behaviour used by the caliper profiles.
+    /// </summary>
+    public double SampleBilinear(double x, double y)
+    {
+        if (!double.IsFinite(x) || !double.IsFinite(y))
+        {
+            return 0;
+        }
+
+        double clampedX = Math.Clamp(x, 0, Width - 1);
+        double clampedY = Math.Clamp(y, 0, Height - 1);
+        int x0 = (int)Math.Floor(clampedX);
+        int y0 = (int)Math.Floor(clampedY);
+        int x1 = Math.Min(x0 + 1, Width - 1);
+        int y1 = Math.Min(y0 + 1, Height - 1);
+        double tx = clampedX - x0;
+        double ty = clampedY - y0;
+        int topLeft = (y0 * Width) + x0;
+        int topRight = (y0 * Width) + x1;
+        int bottomLeft = (y1 * Width) + x0;
+        int bottomRight = (y1 * Width) + x1;
+        double top = (_pixels[topLeft] * (1 - tx)) + (_pixels[topRight] * tx);
+        double bottom = (_pixels[bottomLeft] * (1 - tx)) + (_pixels[bottomRight] * tx);
+        return (top * (1 - ty)) + (bottom * ty);
+    }
 }

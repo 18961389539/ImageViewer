@@ -5,10 +5,13 @@ namespace ImageViewer.Core.Analysis;
 
 /// <summary>
 /// Managed robust geometry fitting for edge-point sequences.
-/// Chinese: 直线拟合采用正交（总体最小二乘）回归，稳健模式用 IRLS 重加权；
+/// Chinese: 直线拟合采用正交（总体最小二乘）回归；稳健模式先用"最小中位数残差"种子线定向，
+/// 再做 IRLS 重加权，避免单个远端点把 PCA 主轴拉斜后连带污染残差尺度。
 /// 圆拟合以 Kasa 代数拟合初始化，再做 Gauss-Newton 几何距离迭代。
-/// English: Lines use orthogonal regression with IRLS reweighting for robust modes;
-/// circles use a Kasa algebraic seed followed by Gauss-Newton geometric refinement.
+/// English: Lines use orthogonal regression; robust modes seed the IRLS loop with a
+/// least-median-of-squares line so one far outlier cannot tilt the principal axis before the
+/// residual scale is estimated. Circles use a Kasa algebraic seed followed by Gauss-Newton
+/// geometric refinement.
 /// </summary>
 public static class RobustFitAlgorithm
 {
@@ -327,7 +330,14 @@ public static class RobustFitAlgorithm
         int iterations = fitMode == LineFitMode.Regression ? 1 : 3;
         for (int iteration = 0; iteration < iterations; iteration++)
         {
-            if (!WeightedOrthogonal(points, begin, count, weights, out linePoint, out direction))
+            // Robust modes must not start from the unweighted PCA fit: one far outlier adds
+            // O(d^2) variance, tilts the principal axis, and inflates the clean-point residuals
+            // before the scale is estimated. The LMedS seed locates the dominant line first;
+            // the IRLS loop then refines it with data-driven weights.
+            bool fitted = iteration == 0 && fitMode != LineFitMode.Regression
+                ? TrySeedRobustLine(points, begin, count, out linePoint, out direction)
+                : WeightedOrthogonal(points, begin, count, weights, out linePoint, out direction);
+            if (!fitted)
             {
                 return false;
             }
@@ -411,6 +421,105 @@ public static class RobustFitAlgorithm
         direction = new VectorD(Math.Cos(theta), Math.Sin(theta));
         linePoint = new PointD(meanX, meanY);
         return direction.LengthSquared > 1e-12;
+    }
+
+    /// <summary>上限：LMedS 种子只评这么多条锚点候选线，保证大点集下仍是 O(n log n) 级别的额外开销。</summary>
+    private const int MaxSeedCandidateCount = 128;
+
+    /// <summary>
+    /// Deterministic least-median-of-squares seed for robust line modes. The anchor is the
+    /// coordinate-wise median sample, which ignores a minority of gross outliers; each
+    /// candidate line runs from the anchor to one evenly spaced sample, and the candidate with
+    /// the smallest median absolute orthogonal residual becomes the seed. Scoring by a median
+    /// needs no residual scale, so the contamination that defeats the PCA initialization cannot
+    /// move the seed by more than it moves the median.
+    /// </summary>
+    private static bool TrySeedRobustLine(
+        PointD[] points,
+        int begin,
+        int count,
+        out PointD linePoint,
+        out VectorD direction)
+    {
+        linePoint = default;
+        direction = default;
+        if (count < 2)
+        {
+            return false;
+        }
+
+        var xValues = new double[count];
+        var yValues = new double[count];
+        for (int i = 0; i < count; i++)
+        {
+            PointD point = points[begin + i];
+            xValues[i] = point.X;
+            yValues[i] = point.Y;
+        }
+
+        Array.Sort(xValues);
+        Array.Sort(yValues);
+        double anchorX = MedianOfSorted(xValues);
+        double anchorY = MedianOfSorted(yValues);
+        if (!double.IsFinite(anchorX) || !double.IsFinite(anchorY))
+        {
+            return false;
+        }
+
+        PointD anchor = new(anchorX, anchorY);
+        int candidateCount = Math.Min(count, MaxSeedCandidateCount);
+        var residuals = new double[count];
+        var sortedResiduals = new double[count];
+        double bestMedian = double.PositiveInfinity;
+        double bestDirectionX = 0;
+        double bestDirectionY = 0;
+        for (int candidate = 0; candidate < candidateCount; candidate++)
+        {
+            int index = candidateCount == 1
+                ? 0
+                : (int)(((long)candidate * (count - 1)) / (candidateCount - 1));
+            VectorD delta = points[begin + index] - anchor;
+            double length = delta.Length;
+            if (length <= 1e-12)
+            {
+                continue;
+            }
+
+            double ux = delta.X / length;
+            double uy = delta.Y / length;
+            for (int i = 0; i < count; i++)
+            {
+                VectorD sampleDelta = points[begin + i] - anchor;
+                residuals[i] = Math.Abs((sampleDelta.X * uy) - (sampleDelta.Y * ux));
+            }
+
+            Array.Copy(residuals, sortedResiduals, count);
+            Array.Sort(sortedResiduals, 0, count);
+            double median = MedianOfSorted(sortedResiduals);
+            if (median < bestMedian)
+            {
+                bestMedian = median;
+                bestDirectionX = ux;
+                bestDirectionY = uy;
+            }
+        }
+
+        if (!double.IsFinite(bestMedian))
+        {
+            return false;
+        }
+
+        linePoint = anchor;
+        direction = new VectorD(bestDirectionX, bestDirectionY);
+        return true;
+    }
+
+    private static double MedianOfSorted(double[] sorted)
+    {
+        int middle = sorted.Length / 2;
+        return sorted.Length % 2 == 1
+            ? sorted[middle]
+            : (sorted[middle - 1] + sorted[middle]) / 2;
     }
 
     private static double RobustResidualScale(double[] residuals)

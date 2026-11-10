@@ -155,7 +155,9 @@ public static class BlobAlgorithm
     private static double OtsuThreshold(IntensityImage image)
     {
         int maximum = image.MaxValue;
-        var histogram = new long[maximum + 1];
+        // Pixel count is bounded by the intensity buffer length (an int), so an int histogram
+        // cannot overflow and avoids the extra 512 KB a long histogram would allocate per call.
+        var histogram = new int[maximum + 1];
         for (int y = 0; y < image.Height; y++)
         {
             for (int x = 0; x < image.Width; x++)

@@ -612,11 +612,28 @@ namespace ImageViewer.Services
                 return false;
             }
 
-            IntensityImage image = VisionAlgorithmEntryPoint.CreateIntensity(bitmap);
-
             const int searchRange = 12;
+            const int averagingHalfWidth = 1;
             const int directionCount = 16;
             const double minimumGradient = 10;
+
+            // The probe never samples farther than searchRange + averagingHalfWidth from the
+            // seed, so converting a clamped local window keeps snap feedback interactive on
+            // large images instead of rebuilding a full-image intensity plane per pointer move.
+            const int windowMargin = 2;
+            int windowHalfExtent = searchRange + averagingHalfWidth + windowMargin;
+            int windowX = Math.Max(0, (int)Math.Floor(seed.X) - windowHalfExtent);
+            int windowY = Math.Max(0, (int)Math.Floor(seed.Y) - windowHalfExtent);
+            int windowRight = Math.Min(bitmap.PixelWidth, (int)Math.Ceiling(seed.X) + windowHalfExtent + 1);
+            int windowBottom = Math.Min(bitmap.PixelHeight, (int)Math.Ceiling(seed.Y) + windowHalfExtent + 1);
+            if (windowRight <= windowX || windowBottom <= windowY)
+            {
+                return false;
+            }
+
+            var window = new Int32Rect(windowX, windowY, windowRight - windowX, windowBottom - windowY);
+            IntensityImage image = VisionAlgorithmEntryPoint.CreateIntensity(bitmap, window);
+            var localSeed = new Point(seed.X - windowX, seed.Y - windowY);
             var candidates = new List<CaliperEdgeSample>(directionCount);
             for (int i = 0; i < directionCount; i++)
             {
@@ -624,10 +641,10 @@ namespace ImageViewer.Services
                 Vector direction = new(Math.Cos(angle), Math.Sin(angle));
                 if (VisionAlgorithmEntryPoint.TryMeasureSingle(
                         image,
-                        seed,
+                        localSeed,
                         direction,
                         searchRange,
-                        averagingHalfWidth: 1,
+                        averagingHalfWidth,
                         sigma: 1.0,
                         minimumGradient,
                         CaliperEdgePolarity.Any,
@@ -644,15 +661,15 @@ namespace ImageViewer.Services
             }
 
             CaliperEdgeSample best = candidates
-                .OrderByDescending(candidate => candidate.Score * (0.65 + 0.35 * Math.Clamp(1 - GeometryUtils.Distance(seed, candidate.Point) / searchRange, 0, 1)))
+                .OrderByDescending(candidate => candidate.Score * (0.65 + 0.35 * Math.Clamp(1 - GeometryUtils.Distance(localSeed, candidate.Point) / searchRange, 0, 1)))
                 .First();
-            double distance = GeometryUtils.Distance(seed, best.Point);
+            double distance = GeometryUtils.Distance(localSeed, best.Point);
             if (best.Score < minimumGradient || distance > searchRange + 1)
             {
                 return false;
             }
 
-            snapped = best.Point;
+            snapped = new Point(best.Point.X + windowX, best.Point.Y + windowY);
             score = best.Score;
             int consensusCount = candidates.Count(candidate => GeometryUtils.Distance(candidate.Point, best.Point) <= 3.0);
             double consensus = Math.Clamp((double)consensusCount / Math.Max(2, directionCount * 0.35), 0, 1);

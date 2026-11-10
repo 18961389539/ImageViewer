@@ -13,6 +13,8 @@ namespace ImageViewer.Models
     public sealed class CameraCalibration
     {
         private const double MinScaleDenominator = 0.2;
+        private const int MaximumUndistortIterations = 20;
+        private const double UndistortResidualTolerancePixels = 1e-6;
 
         /// <summary>
         /// 主点 X（像素）。Chinese: 默认取图像中心。English: Principal PointD X in pixels.
@@ -169,32 +171,104 @@ namespace ImageViewer.Models
         }
 
         /// <summary>
-        /// 通过固定点迭代将畸变像点还原为理想像点。
+        /// 通过牛顿迭代将畸变像点还原为理想像点。
+        /// English: Inverts the distortion model with Newton iterations.
         /// </summary>
-        public PointD UndistortPoint(PointD distortedPoint)
+        public PointD UndistortPoint(PointD distortedPoint) => Undistort(distortedPoint).Point;
+
+        /// <summary>
+        /// 反解畸变模型并报告收敛状态。
+        /// Chinese: 以解析 Jacobian 的牛顿迭代替代固定点迭代，残差按像素与阈值比较；
+        /// Jacobian 退化时回退到固定点步长，参数导致模型不可逆时返回未收敛而非静默给出错点。
+        /// English: Newton inversion with an analytic Jacobian and a pixel residual threshold.
+        /// A degenerate Jacobian falls back to the fixed-point step; a non-invertible model is
+        /// reported as not converged instead of silently returning a wrong point.
+        /// </summary>
+        public UndistortResult Undistort(PointD distortedPoint)
         {
             if (!IsEnabled || !IsValid)
             {
-                return distortedPoint;
+                return new UndistortResult(distortedPoint, Converged: true, Iterations: 0, ResidualPixels: 0);
+            }
+
+            if (!double.IsFinite(distortedPoint.X) || !double.IsFinite(distortedPoint.Y))
+            {
+                return new UndistortResult(distortedPoint, Converged: false, Iterations: 0, ResidualPixels: double.PositiveInfinity);
             }
 
             (double targetX, double targetY) = ToNormalized(distortedPoint);
             double x = targetX;
             double y = targetY;
-            for (int iteration = 0; iteration < 12; iteration++)
+            for (int iteration = 0; iteration < MaximumUndistortIterations; iteration++)
             {
                 (double projectedX, double projectedY) = ApplyDistortion(x, y);
                 double errorX = targetX - projectedX;
                 double errorY = targetY - projectedY;
-                x += errorX;
-                y += errorY;
-                if (errorX * errorX + errorY * errorY < 1e-18)
+                double residualPixels = Math.Sqrt((errorX * errorX) + (errorY * errorY)) * NormalizationRadius;
+                if (!double.IsFinite(residualPixels))
                 {
                     break;
                 }
+
+                if (residualPixels <= UndistortResidualTolerancePixels)
+                {
+                    return new UndistortResult(FromNormalized(x, y), Converged: true, iteration, residualPixels);
+                }
+
+                (double dXdx, double dXdy, double dYdx, double dYdy) = DistortionJacobian(x, y);
+                double determinant = (dXdx * dYdy) - (dXdy * dYdx);
+                double stepX;
+                double stepY;
+                if (Math.Abs(determinant) > 1e-12 && double.IsFinite(determinant))
+                {
+                    stepX = ((dYdy * errorX) - (dXdy * errorY)) / determinant;
+                    stepY = ((dXdx * errorY) - (dYdx * errorX)) / determinant;
+                }
+                else
+                {
+                    stepX = errorX;
+                    stepY = errorY;
+                }
+
+                double nextX = x + stepX;
+                double nextY = y + stepY;
+                if (!double.IsFinite(nextX) || !double.IsFinite(nextY))
+                {
+                    break;
+                }
+
+                x = nextX;
+                y = nextY;
             }
 
-            return FromNormalized(x, y);
+            (double finalX, double finalY) = ApplyDistortion(x, y);
+            double finalErrorX = targetX - finalX;
+            double finalErrorY = targetY - finalY;
+            double finalResidual = Math.Sqrt((finalErrorX * finalErrorX) + (finalErrorY * finalErrorY)) * NormalizationRadius;
+            if (!double.IsFinite(finalResidual))
+            {
+                finalResidual = double.PositiveInfinity;
+            }
+
+            return new UndistortResult(FromNormalized(x, y), Converged: false, MaximumUndistortIterations, finalResidual);
+        }
+
+        /// <summary>
+        /// 点的 1σ 不确定度：标定记录的不确定度，反解未收敛时取不小于未收敛残差的值。
+        /// English: 1-sigma point uncertainty: the recorded calibration uncertainty, inflated to
+        /// the undistortion residual when the inverse model does not converge.
+        /// </summary>
+        public double GetPointUncertaintyPixels(PointD distortedPoint)
+        {
+            if (!IsEnabled || !IsValid)
+            {
+                return MeasurementUncertaintyPixels;
+            }
+
+            UndistortResult result = Undistort(distortedPoint);
+            return result.Converged
+                ? MeasurementUncertaintyPixels
+                : Math.Max(MeasurementUncertaintyPixels, result.ResidualPixels);
         }
 
         /// <summary>
@@ -261,6 +335,18 @@ namespace ImageViewer.Models
             double xd = x * radial + 2 * TangentialP1 * x * y + TangentialP2 * (r2 + 2 * x * x);
             double yd = y * radial + TangentialP1 * (r2 + 2 * y * y) + 2 * TangentialP2 * x * y;
             return (xd, yd);
+        }
+
+        private (double Dxdx, double Dxdy, double Dydx, double Dydy) DistortionJacobian(double x, double y)
+        {
+            double r2 = x * x + y * y;
+            double radial = 1.0 + K1 * r2 + K2 * r2 * r2 + K3 * r2 * r2 * r2;
+            double radialSlope = K1 + (2 * K2 * r2) + (3 * K3 * r2 * r2);
+            double dXdx = radial + (2 * x * x * radialSlope) + (2 * TangentialP1 * y) + (6 * TangentialP2 * x);
+            double dXdy = (2 * x * y * radialSlope) + (2 * TangentialP1 * x) + (2 * TangentialP2 * y);
+            double dYdy = radial + (2 * y * y * radialSlope) + (6 * TangentialP1 * y) + (2 * TangentialP2 * x);
+            // Brown-Conrady is irrotational here: the two mixed partials are equal.
+            return (dXdx, dXdy, dXdy, dYdy);
         }
 
         private static double Distance(PointD left, PointD right)

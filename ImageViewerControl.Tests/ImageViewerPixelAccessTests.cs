@@ -7,6 +7,7 @@ using ImageViewer.Controls;
 using ImageViewer.Models;
 using ImageViewer.Services;
 using Xunit;
+using IntensityImage = ImageViewer.Core.Analysis.IntensityImage;
 
 namespace ImageViewerControl.Tests;
 
@@ -114,6 +115,127 @@ public sealed class ImageViewerPixelAccessTests
         Assert.Equal(ushort.MaxValue, statistics.Max);
         Assert.Equal((0d + 65535 + 32768 + 16384) / 4, statistics.Mean, precision: 6);
         Assert.True(statistics.StandardDeviation > 20_000);
+    }
+
+    [Fact]
+    public void CreateIntensity_RegionMatchesFullImageCrop()
+    {
+        BitmapSource gray16 = CreateGray16Bitmap(4, 3,
+        [
+            0x0102, 0x0304, 0x0506, 0x0708,
+            0x1112, 0x1314, 0x1516, 0x1718,
+            0x2122, 0x2324, 0x2526, 0x2728
+        ]);
+        var region = new Int32Rect(1, 1, 2, 2);
+
+        IntensityImage fullGray = VisionAlgorithmEntryPoint.CreateIntensity(gray16);
+        IntensityImage croppedGray = VisionAlgorithmEntryPoint.CreateIntensity(gray16, region);
+
+        Assert.Equal(2, croppedGray.Width);
+        Assert.Equal(2, croppedGray.Height);
+        for (int y = 0; y < region.Height; y++)
+        {
+            for (int x = 0; x < region.Width; x++)
+            {
+                Assert.Equal(fullGray[region.X + x, region.Y + y], croppedGray[x, y]);
+            }
+        }
+
+        byte[] bgr = Enumerable.Range(0, 4 * 3 * 3).Select(value => (byte)value).ToArray();
+        BitmapSource bgr24 = CreateBgr24Bitmap(4, 3, bgr);
+        IntensityImage fullColor = VisionAlgorithmEntryPoint.CreateIntensity(bgr24);
+        IntensityImage croppedColor = VisionAlgorithmEntryPoint.CreateIntensity(bgr24, region);
+
+        for (int y = 0; y < region.Height; y++)
+        {
+            for (int x = 0; x < region.Width; x++)
+            {
+                Assert.Equal(fullColor[region.X + x, region.Y + y], croppedColor[x, y]);
+            }
+        }
+    }
+
+    [Fact]
+    public void ReadBilinearIntensity_Gray16_PreservesFullRangeAndClampsBorders()
+    {
+        ushort[] values = { 0, 10000, 30000, 40000 };
+        byte[] pixels = new byte[values.Length * 2];
+        for (int index = 0; index < values.Length; index++)
+        {
+            pixels[index * 2] = (byte)values[index];
+            pixels[(index * 2) + 1] = (byte)(values[index] >> 8);
+        }
+
+        double midpoint = ImageViewerPixelAccess.ReadBilinearIntensity(
+            pixels, 4, 2, 2, 2, PixelFormats.Gray16, 0.5, 0.5);
+        double border = ImageViewerPixelAccess.ReadBilinearIntensity(
+            pixels, 4, 2, 2, 2, PixelFormats.Gray16, -5, 0.5);
+
+        Assert.Equal(20000.0, midpoint, 6);
+        Assert.Equal(15000.0, border, 6);
+    }
+
+    [Fact]
+    public void CreateIntensity_RegionRejectsInvalidBounds()
+    {
+        BitmapSource bitmap = CreateGray16Bitmap(4, 3, new ushort[12]);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => VisionAlgorithmEntryPoint.CreateIntensity(bitmap, new Int32Rect(0, 0, 0, 1)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => VisionAlgorithmEntryPoint.CreateIntensity(bitmap, new Int32Rect(-1, 0, 2, 2)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => VisionAlgorithmEntryPoint.CreateIntensity(bitmap, new Int32Rect(3, 0, 2, 1)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => VisionAlgorithmEntryPoint.CreateIntensity(bitmap, new Int32Rect(0, 2, 1, 2)));
+    }
+
+    [Fact]
+    public void SnapToEdge_LocalWindowMatchesCroppedReference()
+    {
+        const int width = 500;
+        const int height = 80;
+        byte[] pixels = new byte[width * height * 3];
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                byte level = x >= 320 ? (byte)255 : (byte)0;
+                int offset = ((y * width) + x) * 3;
+                pixels[offset] = level;
+                pixels[offset + 1] = level;
+                pixels[offset + 2] = level;
+            }
+        }
+
+        BitmapSource bitmap = CreateBgr24Bitmap(width, height, pixels);
+        var seed = new Point(327.5, 41.5);
+        Assert.True(ImageAnalysisService.TrySnapPointToEdge(bitmap, seed, out Point snapped, out double score, out double confidence));
+
+        // Mirrors the probe's clamped window: searchRange 12 + averaging half-width 1 + margin 2.
+        var window = new Int32Rect(312, 26, 32, 32);
+        var crop = new CroppedBitmap(bitmap, window);
+        var localSeed = new Point(seed.X - window.X, seed.Y - window.Y);
+        Assert.True(ImageAnalysisService.TrySnapPointToEdge(crop, localSeed, out Point localSnapped, out double localScore, out double localConfidence));
+
+        Assert.Equal(localSnapped.X + window.X, snapped.X, precision: 9);
+        Assert.Equal(localSnapped.Y + window.Y, snapped.Y, precision: 9);
+        Assert.Equal(localScore, score, precision: 9);
+        Assert.Equal(localConfidence, confidence, precision: 9);
+        Assert.InRange(snapped.X, 318.5, 320.5);
+    }
+
+    [Fact]
+    public void CreateHistogram_AcrossMultipleBands_CountsEveryRow()
+    {
+        const int width = 4096;
+        const int height = 1500;
+        var pixels = new byte[width * height];
+        for (int y = 1000; y < height; y++)
+        {
+            Array.Fill(pixels, (byte)255, y * width, width);
+        }
+
+        BitmapSource bitmap = BitmapSource.Create(width, height, 96, 96, PixelFormats.Gray8, null, pixels, width);
+        int[] histogram = ImageAnalysisService.CreateHistogram(bitmap, 2);
+
+        Assert.Equal(new[] { 1000 * width, 500 * width }, histogram);
     }
 
     [Fact]

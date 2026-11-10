@@ -5,12 +5,21 @@ param(
 
     [string] $AssemblyPattern,
 
-    [double] $MinimumLineRate = 0
+    [double] $MinimumLineRate = 0,
+
+    # Multi-target test runs emit one coverage file per target framework. Requiring a
+    # minimum count surfaces a silently skipped target instead of merging the survivors.
+    [int] $MinimumFiles = 0
 )
 
 $coverageFiles = Get-ChildItem -Path $CoverageRoot -Filter coverage.cobertura.xml -File -Recurse -ErrorAction SilentlyContinue
 if ($coverageFiles.Count -eq 0) {
     throw "No Cobertura coverage file was found under '$CoverageRoot'."
+}
+
+Write-Output ("Coverage files: {0}" -f $coverageFiles.Count)
+if ($MinimumFiles -gt 0 -and $coverageFiles.Count -lt $MinimumFiles) {
+    throw ("Expected at least {0} coverage files under '{1}', found {2}; a target framework run may have been skipped." -f $MinimumFiles, $CoverageRoot, $coverageFiles.Count)
 }
 
 $selectedModules = @()
@@ -19,12 +28,15 @@ $totalLines = 0
 foreach ($coverageFile in $coverageFiles) {
     [xml] $document = Get-Content -LiteralPath $coverageFile.FullName -Raw
     foreach ($package in @($document.coverage.packages.package)) {
+        # Match the assembly package name rather than class file paths: coverlet changes
+        # the reported source root (and therefore the filename prefix) depending on which
+        # assemblies a test run covers, while the package name stays stable.
+        if ($AssemblyPattern -and ([string] $package.name) -notmatch $AssemblyPattern) {
+            continue
+        }
+
         foreach ($class in @($package.classes.class)) {
             $moduleName = [string] $class.filename
-            if ($AssemblyPattern -and $moduleName -notmatch $AssemblyPattern) {
-                continue
-            }
-
             $selectedModules += $moduleName
             foreach ($line in @($class.lines.line)) {
                 $totalLines++

@@ -81,7 +81,7 @@ public static class CaliperAlgorithm
                         continue;
                     }
 
-                    sum += image.SampleNearest(sample.X, sample.Y);
+                    sum += image.SampleBilinear(sample.X, sample.Y);
                     averaged++;
                 }
 

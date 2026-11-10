@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Windows;
-using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using ImageViewer.Models;
 
@@ -444,8 +443,8 @@ internal static class DetectionParameterRecommendationService
                 {
                     double offset = i - searchRange;
                     SamplePoint point = Add(Add(spec.Center, Scale(spec.Direction, offset)), lateral);
-                    values[i] += SampleBilinear(pixels, width, height, stride, bytesPerPixel,
-                        source.Format, point.X - left, point.Y - top) / acrossCount;
+                    values[i] += ImageViewerPixelAccess.ReadBilinearIntensity(pixels, stride, width, height,
+                        bytesPerPixel, source.Format, point.X - left, point.Y - top) / acrossCount;
                 }
             }
 
@@ -536,21 +535,6 @@ internal static class DetectionParameterRecommendationService
         }
 
         return result;
-    }
-
-    private static double SampleBilinear(byte[] pixels, int width, int height, int stride, int bytesPerPixel,
-        PixelFormat format, double x, double y)
-    {
-        x = Math.Clamp(x, 0, width - 1);
-        y = Math.Clamp(y, 0, height - 1);
-        int x0 = (int)Math.Floor(x), y0 = (int)Math.Floor(y);
-        int x1 = Math.Min(x0 + 1, width - 1), y1 = Math.Min(y0 + 1, height - 1);
-        double tx = x - x0, ty = y - y0;
-        double a = Read(x0, y0), b = Read(x1, y0), c = Read(x0, y1), d = Read(x1, y1);
-        return (a * (1 - tx) + b * tx) * (1 - ty) + (c * (1 - tx) + d * tx) * ty;
-
-        double Read(int px, int py) => ImageViewerPixelAccess.ReadIntensity(pixels,
-            py * stride + px * bytesPerPixel, bytesPerPixel, format);
     }
 
     private static DetectionParameterProposal Failure(string key, DetectionParameterEvidence? evidence = null) =>

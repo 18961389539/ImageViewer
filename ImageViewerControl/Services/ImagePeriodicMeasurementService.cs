@@ -72,7 +72,8 @@ public static class ImagePeriodicMeasurementService
                 double distance = i * step;
                 double x = start.X + (dx / length) * distance;
                 double y = start.Y + (dy / length) * distance;
-                double intensity = BilinearIntensity(pixels, stride, bytesPerPixel, normalized.Format, cropWidth, cropHeight, left, top, x, y);
+                double intensity = ImageViewerPixelAccess.ReadBilinearIntensity(
+                    pixels, stride, cropWidth, cropHeight, bytesPerPixel, normalized.Format, x - left, y - top);
                 if (!double.IsFinite(intensity)) return Failure("The sampled line profile contains a non-finite intensity.");
                 profile[i] = intensity;
                 histogram[Math.Clamp((int)Math.Round(intensity), 0, histogram.Length - 1)]++;
@@ -119,34 +120,6 @@ public static class ImagePeriodicMeasurementService
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException or NotSupportedException)
         {
             return Failure($"Could not sample the source image: {exception.Message}");
-        }
-    }
-
-    private static double BilinearIntensity(
-        byte[] pixels,
-        int stride,
-        int bytesPerPixel,
-        System.Windows.Media.PixelFormat format,
-        int width,
-        int height,
-        int left,
-        int top,
-        double x,
-        double y)
-    {
-        double localX = x - left, localY = y - top;
-        int x0 = Math.Clamp((int)Math.Floor(localX), 0, width - 1);
-        int y0 = Math.Clamp((int)Math.Floor(localY), 0, height - 1);
-        int x1 = Math.Min(x0 + 1, width - 1), y1 = Math.Min(y0 + 1, height - 1);
-        double tx = Math.Clamp(localX - Math.Floor(localX), 0, 1);
-        double ty = Math.Clamp(localY - Math.Floor(localY), 0, 1);
-        double i00 = Read(x0, y0), i10 = Read(x1, y0), i01 = Read(x0, y1), i11 = Read(x1, y1);
-        return (i00 * (1 - tx) + i10 * tx) * (1 - ty) + (i01 * (1 - tx) + i11 * tx) * ty;
-
-        double Read(int pixelX, int pixelY)
-        {
-            int index = pixelY * stride + pixelX * bytesPerPixel;
-            return ImageViewerPixelAccess.ReadIntensity(pixels, index, bytesPerPixel, format);
         }
     }
 

@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -16,6 +17,8 @@ namespace ImageViewer.Services
     /// </summary>
     internal static partial class ImageAnalysisService
     {
+        /// <summary>直方图按行带读取，避免为大图额外分配整幅字节缓冲。</summary>
+        private const int HistogramBandBytes = 4 * 1024 * 1024;
 
         public static int[] CreateHistogram(BitmapSource bitmap, int binCount)
         {
@@ -26,21 +29,37 @@ namespace ImageViewer.Services
 
             int bytesPerPixel = Math.Max(1, (bitmap.Format.BitsPerPixel + 7) / 8);
             int stride = bitmap.PixelWidth * bytesPerPixel;
-            byte[] pixels = new byte[bitmap.PixelHeight * stride];
-            bitmap.CopyPixels(pixels, stride, 0);
-
-            int[] histogram = new int[binCount];
             int intensityRange = ImageViewerPixelAccess.GetIntensityMaximum(bitmap.Format) + 1;
-            for (int index = 0; index < pixels.Length; index += bytesPerPixel)
-            {
-                ushort intensity = GetPixelIntensity(pixels, index, bytesPerPixel, bitmap.Format);
-                int binIndex = (int)((long)intensity * binCount / intensityRange);
-                if (binIndex >= binCount)
-                {
-                    binIndex = binCount - 1;
-                }
+            int[] histogram = new int[binCount];
 
-                histogram[binIndex]++;
+            int bandRows = Math.Max(1, Math.Min(bitmap.PixelHeight, HistogramBandBytes / Math.Max(1, stride)));
+            byte[] pixels = ArrayPool<byte>.Shared.Rent(stride * bandRows);
+            try
+            {
+                int copiedRows = 0;
+                while (copiedRows < bitmap.PixelHeight)
+                {
+                    int rows = Math.Min(bandRows, bitmap.PixelHeight - copiedRows);
+                    bitmap.CopyPixels(new Int32Rect(0, copiedRows, bitmap.PixelWidth, rows), pixels, stride, 0);
+                    int bandLength = rows * stride;
+                    for (int index = 0; index < bandLength; index += bytesPerPixel)
+                    {
+                        ushort intensity = GetPixelIntensity(pixels, index, bytesPerPixel, bitmap.Format);
+                        int binIndex = (int)((long)intensity * binCount / intensityRange);
+                        if (binIndex >= binCount)
+                        {
+                            binIndex = binCount - 1;
+                        }
+
+                        histogram[binIndex]++;
+                    }
+
+                    copiedRows += rows;
+                }
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(pixels);
             }
 
             return histogram;

@@ -81,5 +81,39 @@ namespace ImageViewer.Services
         {
             return format == PixelFormats.Gray16 ? ushort.MaxValue : byte.MaxValue;
         }
+
+        /// <summary>
+        /// Bilinear intensity read from a packed pixel buffer. Coordinates clamp to the buffer
+        /// bounds so callers can sample near the border without special cases; Gray16 keeps its
+        /// full sample range.
+        /// </summary>
+        public static double ReadBilinearIntensity(
+            byte[] pixels,
+            int stride,
+            int width,
+            int height,
+            int bytesPerPixel,
+            PixelFormat format,
+            double x,
+            double y)
+        {
+            ArgumentNullException.ThrowIfNull(pixels);
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
+
+            double clampedX = Math.Clamp(x, 0, width - 1);
+            double clampedY = Math.Clamp(y, 0, height - 1);
+            int x0 = (int)Math.Floor(clampedX);
+            int y0 = (int)Math.Floor(clampedY);
+            int x1 = Math.Min(x0 + 1, width - 1);
+            int y1 = Math.Min(y0 + 1, height - 1);
+            double tx = clampedX - x0;
+            double ty = clampedY - y0;
+            double top = (ReadIntensity(pixels, (y0 * stride) + (x0 * bytesPerPixel), bytesPerPixel, format) * (1 - tx))
+                       + (ReadIntensity(pixels, (y0 * stride) + (x1 * bytesPerPixel), bytesPerPixel, format) * tx);
+            double bottom = (ReadIntensity(pixels, (y1 * stride) + (x0 * bytesPerPixel), bytesPerPixel, format) * (1 - tx))
+                          + (ReadIntensity(pixels, (y1 * stride) + (x1 * bytesPerPixel), bytesPerPixel, format) * tx);
+            return (top * (1 - ty)) + (bottom * ty);
+        }
     }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Media;
@@ -15,44 +16,90 @@ namespace ImageViewer.Services;
 /// </summary>
 internal static class VisionAlgorithmEntryPoint
 {
+    /// <summary>每行带最多拷贝这么多字节，避免大图转换时再额外持有一整幅字节缓冲。</summary>
+    private const int ConversionBandBytes = 4 * 1024 * 1024;
+
     public static IntensityImage CreateIntensity(BitmapSource bitmap)
     {
         ArgumentNullException.ThrowIfNull(bitmap);
+        return CreateIntensity(bitmap, new Int32Rect(0, 0, bitmap.PixelWidth, bitmap.PixelHeight));
+    }
+
+    /// <summary>
+    /// Converts one bitmap region into an intensity plane. Interactive probes only need a small
+    /// neighborhood, so they avoid building a full-image plane for every pointer move.
+    /// </summary>
+    public static IntensityImage CreateIntensity(BitmapSource bitmap, Int32Rect region)
+    {
+        ArgumentNullException.ThrowIfNull(bitmap);
         BitmapSource source = ImageViewerPixelAccess.NormalizeForIntensity(bitmap);
-        int width = source.PixelWidth;
-        int height = source.PixelHeight;
+        if (region.Width <= 0 || region.Height <= 0 ||
+            region.X < 0 || region.Y < 0 ||
+            region.X + region.Width > source.PixelWidth ||
+            region.Y + region.Height > source.PixelHeight)
+        {
+            throw new ArgumentOutOfRangeException(nameof(region), region, "The region must lie inside the bitmap.");
+        }
+
+        return CreateIntensityCore(source, region);
+    }
+
+    private static IntensityImage CreateIntensityCore(BitmapSource source, Int32Rect region)
+    {
+        int width = region.Width;
+        int height = region.Height;
         PixelFormat format = source.Format;
         int stride = checked(((width * format.BitsPerPixel) + 31) / 32 * 4);
-        byte[] buffer = GC.AllocateUninitializedArray<byte>(checked(stride * height));
-        source.CopyPixels(buffer, stride, 0);
-
         var pixels = GC.AllocateUninitializedArray<ushort>(checked(width * height));
-        if (format == PixelFormats.Gray8)
+
+        int bandRows = Math.Max(1, Math.Min(height, ConversionBandBytes / Math.Max(1, stride)));
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(checked(stride * bandRows));
+        try
         {
-            ConvertGray8(buffer, pixels, width, height, stride);
+            int copiedRows = 0;
+            while (copiedRows < height)
+            {
+                int rows = Math.Min(bandRows, height - copiedRows);
+                source.CopyPixels(
+                    new Int32Rect(region.X, region.Y + copiedRows, width, rows),
+                    buffer,
+                    stride,
+                    0);
+                int outputOffset = copiedRows * width;
+                if (format == PixelFormats.Gray8)
+                {
+                    ConvertGray8(buffer, pixels, outputOffset, width, rows, stride);
+                }
+                else if (format == PixelFormats.Gray16)
+                {
+                    ConvertGray16(buffer, pixels, outputOffset, width, rows, stride);
+                }
+                else if (format == PixelFormats.Bgr24)
+                {
+                    ConvertBgr24(buffer, pixels, outputOffset, width, rows, stride);
+                }
+                else
+                {
+                    ConvertBgra32(buffer, pixels, outputOffset, width, rows, stride, format);
+                }
+
+                copiedRows += rows;
+            }
         }
-        else if (format == PixelFormats.Gray16)
+        finally
         {
-            ConvertGray16(buffer, pixels, width, height, stride);
-        }
-        else if (format == PixelFormats.Bgr24)
-        {
-            ConvertBgr24(buffer, pixels, width, height, stride);
-        }
-        else
-        {
-            ConvertBgra32(buffer, pixels, width, height, stride, format);
+            ArrayPool<byte>.Shared.Return(buffer);
         }
 
         return new IntensityImage(width, height, ImageViewerPixelAccess.GetIntensityMaximum(format), pixels);
     }
 
-    private static void ConvertGray8(byte[] buffer, ushort[] pixels, int width, int height, int stride)
+    private static void ConvertGray8(byte[] buffer, ushort[] pixels, int outputOffset, int width, int rows, int stride)
     {
-        for (int y = 0; y < height; y++)
+        for (int y = 0; y < rows; y++)
         {
             int sourceRow = y * stride;
-            int outputRow = y * width;
+            int outputRow = outputOffset + (y * width);
             for (int x = 0; x < width; x++)
             {
                 pixels[outputRow + x] = buffer[sourceRow + x];
@@ -60,12 +107,12 @@ internal static class VisionAlgorithmEntryPoint
         }
     }
 
-    private static void ConvertGray16(byte[] buffer, ushort[] pixels, int width, int height, int stride)
+    private static void ConvertGray16(byte[] buffer, ushort[] pixels, int outputOffset, int width, int rows, int stride)
     {
-        for (int y = 0; y < height; y++)
+        for (int y = 0; y < rows; y++)
         {
             int sourceRow = y * stride;
-            int outputRow = y * width;
+            int outputRow = outputOffset + (y * width);
             for (int x = 0; x < width; x++)
             {
                 int offset = sourceRow + (x * 2);
@@ -74,12 +121,12 @@ internal static class VisionAlgorithmEntryPoint
         }
     }
 
-    private static void ConvertBgr24(byte[] buffer, ushort[] pixels, int width, int height, int stride)
+    private static void ConvertBgr24(byte[] buffer, ushort[] pixels, int outputOffset, int width, int rows, int stride)
     {
-        for (int y = 0; y < height; y++)
+        for (int y = 0; y < rows; y++)
         {
             int sourceRow = y * stride;
-            int outputRow = y * width;
+            int outputRow = outputOffset + (y * width);
             for (int x = 0; x < width; x++)
             {
                 int offset = sourceRow + (x * 3);
@@ -88,15 +135,15 @@ internal static class VisionAlgorithmEntryPoint
         }
     }
 
-    private static void ConvertBgra32(byte[] buffer, ushort[] pixels, int width, int height, int stride, PixelFormat format)
+    private static void ConvertBgra32(byte[] buffer, ushort[] pixels, int outputOffset, int width, int rows, int stride, PixelFormat format)
     {
         if (format != PixelFormats.Bgr32 && format != PixelFormats.Bgra32)
         {
             int bytesPerPixel = Math.Max(1, (format.BitsPerPixel + 7) / 8);
-            for (int y = 0; y < height; y++)
+            for (int y = 0; y < rows; y++)
             {
                 int sourceRow = y * stride;
-                int outputRow = y * width;
+                int outputRow = outputOffset + (y * width);
                 for (int x = 0; x < width; x++)
                 {
                     pixels[outputRow + x] = ImageViewerPixelAccess.ReadIntensity(
@@ -107,10 +154,10 @@ internal static class VisionAlgorithmEntryPoint
             return;
         }
 
-        for (int y = 0; y < height; y++)
+        for (int y = 0; y < rows; y++)
         {
             int sourceRow = y * stride;
-            int outputRow = y * width;
+            int outputRow = outputOffset + (y * width);
             for (int x = 0; x < width; x++)
             {
                 int offset = sourceRow + (x * 4);

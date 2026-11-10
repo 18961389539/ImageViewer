@@ -25,9 +25,42 @@ env:
   NUGET_SOURCE: https://api.nuget.org/v3/index.json
 
 jobs:
+  verify:
+    name: Verify release commit
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.302
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json', 'Directory.Packages.props') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore locked dependencies
+        run: dotnet restore ImageViewer.sln --locked-mode
+
+      - name: Build Release
+        run: dotnet build ImageViewer.sln --configuration Release --no-restore --nologo
+
+      - name: Run full test suite
+        run: dotnet test ImageViewer.sln --configuration Release --no-build --nologo
+
   pack:
     name: Pack NuGet artifacts
     runs-on: windows-latest
+    needs: verify
     outputs:
       version: ${{ steps.version.outputs.value }}
     steps:
