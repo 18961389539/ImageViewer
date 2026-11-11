@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <Content Include="Resources\TestImage.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Resources\MeasurementSample.ivsession" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

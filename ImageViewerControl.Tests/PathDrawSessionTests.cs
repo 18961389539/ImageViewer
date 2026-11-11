@@ -14,6 +14,7 @@ namespace ImageViewerControl.Tests
     /// English: Behavior tests for the path tools, covering the commit-vs-discard difference on mode
     /// exit, closing detection, the minimum point threshold, and drag accumulation.
     /// </summary>
+    [Collection(WpfTestCollection.Name)]
     public class PathDrawSessionTests
     {
         [Fact]

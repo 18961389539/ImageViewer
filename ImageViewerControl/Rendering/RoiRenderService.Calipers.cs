@@ -223,6 +223,17 @@ namespace ImageViewer.Rendering
                 context.DrawHandle(line.P1.ToWpfPoint(), isSelected ? ResizeHandle.P1 : ResizeHandle.None, handleSize, false, brush);
                 context.DrawHandle(line.P2.ToWpfPoint(), isSelected ? ResizeHandle.P2 : ResizeHandle.None, handleSize, false, brush);
 
+                if (isSelected)
+                {
+                    // 黄框两侧长边中点：拖动即改变搜索范围，与交互行为使用同一组位置。
+                    var regionCenter = new Point((line.P1.X + line.P2.X) / 2, (line.P1.Y + line.P2.Y) / 2);
+                    double radians = Math.Atan2(line.P2.Y - line.P1.Y, line.P2.X - line.P1.X);
+                    var normal = new Vector(-Math.Sin(radians), Math.Cos(radians));
+                    double halfRange = line.CaliperSearchRange;
+                    context.DrawHandle(regionCenter + (normal * halfRange), ResizeHandle.BottomCenter, handleSize, false, brush);
+                    context.DrawHandle(regionCenter - (normal * halfRange), ResizeHandle.TopCenter, handleSize, false, brush);
+                }
+
                 if (showDetails)
                 {
                     PointD measurementP1 = line.MeasurementP1;

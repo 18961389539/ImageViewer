@@ -12,13 +12,13 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <ContentControl x:Name="sliceViewerHost" />
-        <Border Grid.Row="1" Padding="8,6" Background="#E618212E">
+        <Border Grid.Row="1" Padding="8,6" Background="{DynamicResource ViewerSurfaceAltBrush}">
             <DockPanel LastChildFill="True">
                 <TextBlock x:Name="sliceStatusText"
                            DockPanel.Dock="Left"
                            Margin="0,0,12,0"
                            VerticalAlignment="Center"
-                           Foreground="#F5F8FC"
+                           Foreground="{DynamicResource ViewerTextPrimaryBrush}"
                            automation:AutomationProperties.Name="{localization:UiText VolumeSliceStatusName}"
                            automation:AutomationProperties.LiveSetting="Polite" />
                 <Slider x:Name="sliceSlider" x:FieldModifier="internal"

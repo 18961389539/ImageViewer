@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -157,16 +156,6 @@ namespace ImageViewer.Controls
             }
 
             return source is BitmapImage { UriSource: { IsFile: true } uri } ? uri.LocalPath : null;
-        }
-
-        public void LoadImageFromFile(string filePath, bool fitToView)
-        {
-            BitmapSource bitmap = ImageViewerImageDecoder.LoadFromFile(filePath, CancellationToken.None);
-            _host.SetImageSource(bitmap);
-            if (fitToView)
-            {
-                FitToView();
-            }
         }
 
         public void ResetView()

@@ -153,7 +153,7 @@ namespace ImageViewer.Services
                         throw new FileNotFoundException("找不到输入图像。", sourcePath);
                     }
 
-                    BitmapSource bitmap = await LoadBitmapAsync(sourcePath, cancellationToken).ConfigureAwait(false);
+                    BitmapSource bitmap = await ImageViewerImageDecoder.LoadFromFileAsync(sourcePath, cancellationToken: cancellationToken).ConfigureAwait(false);
                     bitmapLoaded = true;
                     decodedFileCount++;
                     inputTrace.PixelWidth = bitmap.PixelWidth;
@@ -165,7 +165,7 @@ namespace ImageViewer.Services
                     inputTrace.RowCount = sourceRows.Length;
                     inputTrace.RowErrors.AddRange(sourceRows
                         .Where(row => !string.IsNullOrWhiteSpace(row.Error))
-                        .Select(row => $"{row.Roi.Label}: {row.Error}"));
+                        .Select(row => $"{row.RoiLabel}: {row.Error}"));
                     bool allRowsSuccessful = sourceRows.All(row => string.IsNullOrWhiteSpace(row.Error));
                     bool anyRowsSuccessful = sourceRows.Any(row => string.IsNullOrWhiteSpace(row.Error));
                     if (allRowsSuccessful)
@@ -233,7 +233,7 @@ namespace ImageViewer.Services
                 rows, physicalUnit, repeatabilityOptions, inputTraces.Select(trace => trace.InputIndex));
             string repeatabilityMarkdown = RepeatabilityStudyRenderer.RenderMarkdown(repeatabilityStudy);
             // 跨图同名项才是真正的过程随时间样本；能力指数附在重复性报告尾部，避免再产出一个只多几行的文件。
-            IReadOnlyList<SpcMeasurementSeries> spcSeries = SpcMeasurementSeriesBuilder.BuildFromBatchRows(rows, physicalUnit);
+            IReadOnlyList<SpcMeasurementSeries> spcSeries = SpcMeasurementSeriesBuilder.BuildFromBatchRows(rows);
             string processCapabilityMarkdown = SpcReportFormatter.BuildMarkdown(spcSeries);
             if (processCapabilityMarkdown.Length > 0)
             {
@@ -275,6 +275,8 @@ namespace ImageViewer.Services
                     ["camera"] = calibration
                 },
                 ["qualityThresholds"] = quality,
+                ["distortionAudit"] = RoiAnalysisExportService.BuildDistortionMetadata(
+                    rows.Aggregate(DistortionAudit.Empty, (audit, row) => audit.Combine(row.Inspection.DistortionAudit))),
                 ["roiCount"] = templates.Length,
                 ["processCapability"] = SpcReportFormatter.BuildMetadata(spcSeries),
                 ["repeatability"] = new Dictionary<string, object?>
@@ -426,9 +428,12 @@ namespace ImageViewer.Services
                     error = ex.Message;
                 }
 
-                rows[i] = new RoiAnalysisBatchCsvRow(sourcePath, status, error, roi, bitmap, pixelSize, physicalUnit, calibration, sourceIndex, $"roi:{i}");
+                cancellationToken.ThrowIfCancellationRequested();
+                rows[i] = RoiAnalysisExportService.CaptureBatchRow(
+                    sourcePath, status, error, roi, bitmap, pixelSize, physicalUnit, calibration, sourceIndex, $"roi:{i}");
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             return rows;
         }
 
@@ -459,12 +464,12 @@ namespace ImageViewer.Services
             CameraCalibration? calibration)
         {
             return templates
-                .Select((template, index) => new RoiAnalysisBatchCsvRow(
+                .Select((template, index) => RoiAnalysisExportService.CaptureBatchRow(
                     sourcePath,
                     status,
                     error,
-                    template.Clone(),
-                    Bitmap: null,
+                    template,
+                    bitmap: null,
                     pixelSize,
                     physicalUnit,
                     calibration,
@@ -493,23 +498,6 @@ namespace ImageViewer.Services
                 default:
                     return true;
             }
-        }
-
-        private static Task<BitmapSource> LoadBitmapAsync(string path, CancellationToken cancellationToken)
-        {
-            return Task.Run(() =>
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (!File.Exists(path))
-                {
-                    throw new FileNotFoundException("找不到输入图像。", path);
-                }
-
-                using FileStream stream = File.OpenRead(path);
-                BitmapFrame frame = BitmapFrame.Create(stream, BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad);
-                frame.Freeze();
-                return (BitmapSource)frame;
-            }, cancellationToken);
         }
 
         private static async Task<BatchInputTrace> CaptureInputTraceAsync(int inputIndex, string path, CancellationToken cancellationToken)

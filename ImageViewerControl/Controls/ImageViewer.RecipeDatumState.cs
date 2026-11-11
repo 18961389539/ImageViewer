@@ -47,6 +47,12 @@ namespace ImageViewer.Controls
             }
         }
 
+        internal void SetRecipeCurrentDatums(IReadOnlyList<RecipeDatumPoint> points)
+        {
+            _recipeCurrentDatum1 = points.Count > 0 ? points[0] : null;
+            _recipeCurrentDatum2 = points.Count > 1 ? points[1] : null;
+        }
+
         internal void ClearRecipeCurrentDatums()
         {
             _recipeCurrentDatum1 = null;

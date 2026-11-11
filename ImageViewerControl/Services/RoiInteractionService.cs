@@ -39,7 +39,7 @@ namespace ImageViewer.Services
                 [typeof(TextAnnotationRoi)] = new TextAnnotationBehavior(),
                 [typeof(ArrowAnnotationRoi)] = new LineMeasureBehavior(),
                 [typeof(LineMeasureRoi)] = new LineMeasureBehavior(),
-                [typeof(LineCaliperMeasureRoi)] = new LineMeasureBehavior(),
+                [typeof(LineCaliperMeasureRoi)] = new LineCaliperMeasureBehavior(),
                 [typeof(CaliperMeasureRoi)] = new CaliperMeasureBehavior(),
                 [typeof(AngleMeasureRoi)] = new AngleMeasureBehavior(),
                 [typeof(ArcMeasureRoi)] = new ArcMeasureBehavior(),

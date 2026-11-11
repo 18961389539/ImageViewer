@@ -1,17 +1,20 @@
 using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
 using ImageViewer.Drawing;
+using ImageViewer.Localization;
 using ImageViewer.Models;
 using ImageViewer.Plugins;
+using ImageViewer.Rendering;
 using Xunit;
 
 namespace ImageViewerControl.Tests
 {
     /// <summary>
     /// 各内置拖拽工具的绘制行为测试。
-    /// Chinese: 覆盖圆环两段式、斑块/卡尺的提交前检测顺序、克隆式预览等既有语义。
-    /// English: Per-tool behavior tests for the built-in drag tools, covering the ring's two-stage flow,
-    /// pre-commit analysis ordering, and the clone-based preview path.
+    /// Chinese: 覆盖圆环的单段拖拽 + 确认点击、斑块/卡尺的提交前检测顺序、克隆式预览等既有语义。
+    /// English: Per-tool behavior tests for the built-in drag tools, covering the ring's single drag plus
+    /// confirmation click, pre-commit analysis ordering, and the clone-based preview path.
     /// </summary>
     public class DragDrawSessionToolTests
     {
@@ -63,18 +66,26 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
-        public void Ring_FirstRelease_AdvancesStageWithoutCommitting()
+        public void Ring_FirstRelease_EntersConfirmationWithoutCommitting()
         {
             var host = new FakeRoiDrawHost();
             IRoiDrawSession session = BuiltInDrawControllers.Ring.CreateSession();
 
             session.OnPointerDown(host, LeftDown(0, 0));
             session.OnPointerMove(host, Move(100, 0));
+
+            // Single-drag preview already shows the final proportions: inner radius follows the outer one.
+            var preview = Assert.IsType<RingRoi>(session.ActiveRoi);
+            Assert.Equal(100, preview.OuterRadius, 6);
+            Assert.Equal(50, preview.InnerRadius, 6);
+
             session.OnPointerUp(host, LeftUp(100, 0));
 
             Assert.Empty(host.CommittedRois);
             Assert.Equal(0, host.EndDrawCount);
-            Assert.Equal(1, host.ReleaseCaptureCount);
+            // Capture stays with the host: releasing it would raise LostMouseCapture and cancel the
+            // pending ring, which is exactly the bug this assertion guards against.
+            Assert.Equal(0, host.ReleaseCaptureCount);
 
             var ring = Assert.IsType<RingRoi>(session.ActiveRoi);
             Assert.Equal(100, ring.OuterRadius, 6);
@@ -82,7 +93,27 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
-        public void Ring_SecondRelease_CommitsWithHalfInnerRadius()
+        public void Ring_FirstRelease_SurvivesHostDroppingCapture()
+        {
+            var host = new FakeRoiDrawHost();
+            IRoiDrawSession session = BuiltInDrawControllers.Ring.CreateSession();
+
+            // Replay the real control: rootGrid.ReleaseMouseCapture raises LostMouseCapture, which
+            // the host forwards to the session as OnCaptureLost.
+            host.ReleaseCaptureCallback = () => session.OnCaptureLost(host);
+
+            session.OnPointerDown(host, LeftDown(0, 0));
+            session.OnPointerMove(host, Move(100, 0));
+            session.OnPointerUp(host, LeftUp(100, 0));
+
+            Assert.Equal(0, host.ReleaseCaptureCount);
+            Assert.Equal(0, host.EndDrawCount);
+            var ring = Assert.IsType<RingRoi>(session.ActiveRoi);
+            Assert.Equal(50, ring.InnerRadius, 6);
+        }
+
+        [Fact]
+        public void Ring_ConfirmationClick_CommitsWithHalfInnerRadius()
         {
             var host = new FakeRoiDrawHost();
             IRoiDrawSession session = BuiltInDrawControllers.Ring.CreateSession();
@@ -99,7 +130,7 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
-        public void Ring_DoesNotFollowPointerAfterStageAdvance()
+        public void Ring_IgnoresPointerWhileAwaitingConfirmation()
         {
             var host = new FakeRoiDrawHost();
             IRoiDrawSession session = BuiltInDrawControllers.Ring.CreateSession();
@@ -107,6 +138,8 @@ namespace ImageViewerControl.Tests
             session.OnPointerDown(host, LeftDown(0, 0));
             session.OnPointerMove(host, Move(100, 0));
             session.OnPointerUp(host, LeftUp(100, 0));
+
+            // The geometry is frozen while waiting for the confirmation click.
             session.OnPointerMove(host, Move(20, 0));
 
             var ring = Assert.IsType<RingRoi>(session.ActiveRoi);
@@ -224,6 +257,50 @@ namespace ImageViewerControl.Tests
             var arrow = Assert.IsType<ArrowAnnotationRoi>(Assert.Single(host.CommittedRois));
             Assert.Equal(new PointD(5, 5), arrow.P1);
             Assert.Equal(new PointD(25, 5), arrow.P2);
+        }
+
+        [Fact]
+        public void Ring_AwaitingConfirmation_DrawsConfirmHint()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                var host = new FakeRoiDrawHost();
+                IRoiDrawSession session = BuiltInDrawControllers.Ring.CreateSession();
+                var overlayCanvas = new Canvas();
+                var screenOverlayCanvas = new Canvas();
+                RoiRenderContext context = CreateContext(overlayCanvas, screenOverlayCanvas);
+
+                session.OnPointerDown(host, LeftDown(0, 0));
+                session.OnPointerMove(host, Move(100, 0));
+
+                // While dragging there is nothing to confirm yet.
+                session.DrawOverlay(host, context);
+                Assert.Empty(screenOverlayCanvas.Children);
+
+                session.OnPointerUp(host, LeftUp(100, 0));
+                session.DrawOverlay(host, context);
+
+                var hint = Assert.Single(screenOverlayCanvas.Children.OfType<TextBlock>());
+                Assert.Equal(UiText.Get("RoiDrawClickToConfirm"), hint.Text);
+            });
+        }
+
+        private static RoiRenderContext CreateContext(Canvas overlayCanvas, Canvas screenOverlayCanvas)
+        {
+            return new RoiRenderContext(
+                overlayCanvas,
+                screenOverlayCanvas,
+                static point => point,
+                scale: 1,
+                pixelSize: 1,
+                physicalUnit: "px",
+                showCaliperScores: false,
+                handleSize: 8,
+                infoTextOffset: 20,
+                angleArcRadius: 20,
+                pointAnnotationSize: 10,
+                polygonResizeHandlePadding: 4,
+                polygonCloseHighlightPadding: 6);
         }
 
         private static DrawPointerEvent LeftDown(double x, double y)

@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
 
@@ -14,13 +15,13 @@ namespace ImageViewer.Controls
     {
         private static readonly ConditionalWeakTable<ImageSource, PathHolder> Paths = new();
 
-        internal static void Register(ImageSource source, string filePath)
+        internal static void Register(ImageSource source, string filePath, FileStream? cacheLease = null, string? sha256 = null)
         {
             ArgumentNullException.ThrowIfNull(source);
             ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
 
             Paths.Remove(source);
-            Paths.Add(source, new PathHolder(filePath));
+            Paths.Add(source, new PathHolder(filePath, cacheLease, sha256));
         }
 
         internal static bool TryGetPath(ImageSource? source, out string filePath)
@@ -35,14 +36,24 @@ namespace ImageViewer.Controls
             return false;
         }
 
+        internal static string? GetSha256(ImageSource? source) =>
+            source != null && Paths.TryGetValue(source, out PathHolder? holder) ? holder.Sha256 : null;
+
         private sealed class PathHolder
         {
-            public PathHolder(string path)
+            public PathHolder(string path, FileStream? cacheLease, string? sha256)
             {
                 Path = path;
+                CacheLease = cacheLease;
+                Sha256 = sha256;
             }
 
             public string Path { get; }
+
+            public string? Sha256 { get; }
+
+            // Retain the cross-process lease for exactly as long as the bitmap is reachable.
+            public FileStream? CacheLease { get; }
         }
     }
 }

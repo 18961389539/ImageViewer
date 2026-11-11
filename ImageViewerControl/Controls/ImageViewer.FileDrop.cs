@@ -12,6 +12,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using ImageViewer.Dialogs;
 using ImageViewer.Localization;
 using ImageViewer.Models;
 using ImageViewer.Plugins;
@@ -54,7 +55,15 @@ namespace ImageViewer.Controls
         {
             await RunUiOperationAsync(
                 "恢复自动保存",
-                _controlComposition.SessionController.RecoverLatestAutoSaveAsync);
+                () => _controlComposition.SessionController.RecoverAutoSaveAsync(candidates =>
+                {
+                    if (Window.GetWindow(this) is not { } owner)
+                    {
+                        return null;
+                    }
+                    var dialog = new RecoverySnapshotDialog(owner, candidates);
+                    return dialog.ShowDialog() == true ? dialog.SelectedSnapshot : null;
+                }));
         }
 
         private void OnDismissRecoveryClick(object sender, RoutedEventArgs e)

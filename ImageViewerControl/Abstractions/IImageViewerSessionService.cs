@@ -11,6 +11,10 @@ namespace ImageViewer.Abstractions
 
         Task SaveToFileAsync(string filePath, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry pluginRegistry, CancellationToken cancellationToken = default);
 
+        /// <summary>Saves a recovery snapshot that may later be removed by the autosave controller.</summary>
+        Task SaveRecoveryToFileAsync(string filePath, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry pluginRegistry, CancellationToken cancellationToken = default)
+            => SaveToFileAsync(filePath, snapshot, pluginRegistry, cancellationToken);
+
         string SerializeSession(string? sessionName, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry pluginRegistry);
 
         ImageViewerSessionData LoadFromFile(string filePath, RoiPluginRegistry pluginRegistry);

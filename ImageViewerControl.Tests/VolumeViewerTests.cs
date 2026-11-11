@@ -1,3 +1,4 @@
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -21,15 +22,30 @@ namespace ImageViewerControl.Tests
                 var volume = new VolumeData([first, second]);
                 using var viewer = new VolumeViewer { Volume = volume };
                 Slider slider = viewer.sliceSlider;
+                var window = new Window { Content = viewer };
 
-                Assert.Equal(0, viewer.CurrentSliceIndex);
-                Assert.Equal(10, ReadFirstPixel(viewer.SliceViewer.ImageSource));
+                try
+                {
+                    window.Show();
+                    WpfTestRunner.DrainDispatcher();
+                    viewer.SliceViewer.MarkDocumentClean();
+                    Assert.Equal(0, viewer.CurrentSliceIndex);
+                    Assert.Equal(10, ReadFirstPixel(viewer.SliceViewer.ImageSource));
 
-                slider.Value = 1;
-                WpfTestRunner.DrainDispatcher();
+                    slider.Value = 1;
+                    WpfTestRunner.DrainDispatcher();
+                    Assert.Equal(1, viewer.CurrentSliceIndex);
+                    Assert.Equal(20, ReadFirstPixel(viewer.SliceViewer.ImageSource));
+                    Assert.False(viewer.SliceViewer.IsDirty);
 
-                Assert.Equal(1, viewer.CurrentSliceIndex);
-                Assert.Equal(20, ReadFirstPixel(viewer.SliceViewer.ImageSource));
+                    Assert.True(viewer.SliceViewer.AddRoi(new CircleRoi { Radius = 1 }));
+                    viewer.SelectSlice(0);
+                    Assert.True(viewer.SliceViewer.IsDirty);
+                }
+                finally
+                {
+                    window.Close();
+                }
             });
         }
 

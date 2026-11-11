@@ -7,7 +7,9 @@ using System.Threading.Tasks;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using ImageViewer.Core.Analysis;
+using ImageViewer.Core.Measurements;
 using ImageViewer.Models;
+using ImageViewer.Plugins;
 using ImageViewer.Services;
 using Xunit;
 
@@ -15,6 +17,68 @@ namespace ImageViewerControl.Tests
 {
     public class BatchRoiAnalysisExportServiceTests
     {
+        [Fact]
+        public async Task UndistortionFailureIsReportedAndExcludedFromMeasurementOutputs()
+        {
+            string root = Path.Combine(Path.GetTempPath(), $"image-viewer-audit-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(root);
+            try
+            {
+                string input = Path.Combine(root, "input.png");
+                string csvPath = Path.Combine(root, "results.csv");
+                SaveBitmap(input, CreateBitmap(220, 220, 80));
+                var calibration = new CameraCalibration
+                {
+                    PrincipalX = 100, PrincipalY = 100, NormalizationRadius = 100, K1 = -1, MeasurementUncertaintyPixels = 0.25
+                };
+                var roi = new LineMeasureRoi
+                {
+                    P1 = new PointD(100, 100), P2 = new PointD(200, 100), Label = "unreliable",
+                    Tolerance = new MeasurementTolerance { Nominal = 100, TolerancePlus = 10, ToleranceMinus = 10 }
+                };
+
+                MeasurementReport report = RoiAnalysisExportService.BuildReportModel([roi], 1, "mm", calibration);
+                MeasurementReportItem item = Assert.Single(report.Items);
+                Assert.Null(item.MeasuredValue);
+                Assert.Equal("NotEvaluable", item.SpecificationStatus);
+                Assert.Equal(1, report.DistortionAudit!.NonConvergedPointCount);
+                Assert.False(report.Readiness.CanProduceSpecificationVerdict);
+                Assert.Contains(report.Readiness.Checks,
+                    check => check.Code == MeasurementWorkflowReadinessEvaluator.CodeCalibrationUndistortionNotConverged);
+                var valid = new LineMeasureRoi
+                {
+                    P1 = new PointD(100, 100), P2 = new PointD(110, 100),
+                    Tolerance = new MeasurementTolerance { Nominal = 10, TolerancePlus = 1, ToleranceMinus = 1 }
+                };
+                MeasurementReport mixed = RoiAnalysisExportService.BuildReportModel([roi, valid], 1, "mm", calibration);
+                Assert.Equal(1, mixed.PassedCount);
+                Assert.Equal("NoVerdict", mixed.OverallVerdict);
+                Assert.Contains("畸变反解未收敛", RoiAnalysisExportService.BuildReport([roi], null, 1, "mm", calibration));
+                Assert.Contains("相关尺寸和公差判定不可评估", RoiInfoService.BuildInfo(
+                    roi, null, 1, "mm", RoiPluginRegistry.CreateBuiltIn(), calibration: calibration));
+                Assert.DoesNotContain("Length=", RoiAnalysisExportService.BuildCsv([roi], null, 1, "mm", calibration));
+
+                var definition = new AdvancedMeasurementDefinition { Kind = AdvancedMeasurementKind.Midpoint, Sources = [roi.MeasurementId] };
+                var advanced = AdvancedMeasurementService.Evaluate(definition, [roi], 1, "mm", calibration);
+                Assert.False(advanced.Success);
+                Assert.Empty(advanced.Metrics);
+                Assert.Contains("did not converge", advanced.Error);
+
+                await BatchRoiAnalysisExportService.ExportAsync(csvPath, [input], [roi], 1, "mm", calibration);
+                string csv = await File.ReadAllTextAsync(csvPath);
+                Assert.Contains("\"NotEvaluable\",,100", csv);
+                Assert.DoesNotContain("Length=", csv);
+                using JsonDocument metadata = JsonDocument.Parse(await File.ReadAllTextAsync(Path.ChangeExtension(csvPath, ".metadata.json")));
+                JsonElement audit = metadata.RootElement.GetProperty("distortionAudit");
+                Assert.Equal(1, audit.GetProperty("nonConvergedPointCount").GetInt32());
+                Assert.True(audit.GetProperty("maximumUncertaintyPixels").GetDouble() > calibration.MeasurementUncertaintyPixels);
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
         [Fact]
         public async Task ExportAsync_CombinesRowsAndKeepsPerFileFailures()
         {

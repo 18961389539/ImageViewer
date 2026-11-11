@@ -5,11 +5,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using ImageViewer.Abstractions;
 using ImageViewer.Controls;
+using ImageViewer.Core.Geometry;
 using ImageViewer.Dialogs;
 using ImageViewer.Models;
 using ImageViewer.Plugins;
@@ -531,13 +533,19 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
-        public void DroppingImageFile_ClearsUndoHistory()
+        public void DroppingImageFile_ResetsDocumentOnlyAfterReplacementIsAccepted()
         {
-            WpfTestRunner.Run(() =>
+            WpfTestRunner.RunAsync(async () =>
             {
                 using var viewer = new ImageViewer.Controls.ImageViewer();
                 DroppedContentController droppedContentController = GetDroppedContentController(viewer);
+                BitmapSource previousImage = BitmapSource.Create(1, 1, 96, 96, PixelFormats.Bgra32, null, new byte[4], 4);
+                BindingOperations.SetBinding(viewer, ImageViewer.Controls.ImageViewer.ImageSourceProperty, new Binding { Source = previousImage });
                 PopulateUndoHistory(viewer);
+                var previousRoi = Assert.Single(viewer.ViewerState.AllRois);
+                viewer.PixelSize = 0.25;
+                viewer.PhysicalUnit = "mm";
+                viewer.WorkpieceCoordinateSystem = new WorkpieceCoordinateSystem { Origin = new PointD(1, 2) };
                 Assert.True(viewer.ViewerState.UndoRedo.CanUndo);
 
                 string imagePath = CreateTempPngPath();
@@ -547,14 +555,81 @@ namespace ImageViewerControl.Tests
                     data.SetData(DataFormats.FileDrop, new[] { imagePath });
                     DragEventArgs args = CreateDropArgs(data, target: viewer);
 
-                    droppedContentController.HandleDropAsync(args).GetAwaiter().GetResult();
-                    WpfTestRunner.DrainDispatcher();
+                    // No owner is available to confirm discarding the dirty document.
+                    await droppedContentController.HandleDropAsync(args);
+                    Assert.Same(previousImage, viewer.ImageSource);
+                    Assert.Same(previousRoi, Assert.Single(viewer.ViewerState.AllRois));
+                    Assert.Equal(0.25, viewer.PixelSize);
+                    Assert.NotNull(viewer.WorkpieceCoordinateSystem);
+                    Assert.True(viewer.ViewerState.UndoRedo.CanUndo);
 
+                    viewer.MarkDocumentClean();
+                    Task load = droppedContentController.HandleDropAsync(args);
+                    Assert.True(viewer.CanCancelImageLoad);
+                    await load;
+
+                    Assert.NotNull(viewer.ImageSource);
+                    Assert.NotSame(previousImage, viewer.ImageSource);
+                    Assert.Empty(viewer.ViewerState.AllRois);
+                    Assert.Equal(1, viewer.PixelSize);
+                    Assert.Equal("px", viewer.PhysicalUnit);
+                    Assert.Null(viewer.WorkpieceCoordinateSystem);
+                    Assert.True(viewer.IsDirty);
+                    Assert.True(BindingOperations.IsDataBound(viewer, ImageViewer.Controls.ImageViewer.ImageSourceProperty));
+                    Assert.False(viewer.IsImageLoading);
                     Assert.False(viewer.ViewerState.UndoRedo.CanUndo, "拖放打开新图像后撤销历史应被清空。");
                 }
                 finally
                 {
                     File.Delete(imagePath);
+                }
+            });
+        }
+
+        [Fact]
+        public void CancelingOrFailingProjectLoadKeepsCurrentDocumentAndUndoHistory()
+        {
+            WpfTestRunner.RunAsync(async () =>
+            {
+                using var viewer = new ImageViewer.Controls.ImageViewer();
+                string imagePath = CreateTempPngPath();
+                string sessionPath = Path.ChangeExtension(imagePath, ".ivsession");
+                try
+                {
+                    viewer.ImageSource = await ImageViewerImageDecoder.LoadFromFileAsync(imagePath);
+                    var previousImage = viewer.ImageSource;
+                    PopulateUndoHistory(viewer);
+                    var previousRoi = Assert.Single(viewer.ViewerState.AllRois);
+                    string imageName = Path.GetFileName(imagePath);
+                    await File.WriteAllTextAsync(sessionPath, $$"""{"Version":2,"ImagePath":"{{imageName}}","Scale":1}""");
+
+                    Task<bool> open = viewer.OpenProjectFromFileAsync(sessionPath);
+                    Assert.True(viewer.CanCancelImageLoad);
+                    viewer.CancelImageLoad();
+
+                    Assert.False(await open);
+                    Assert.False(viewer.IsImageLoading);
+                    Assert.Same(previousImage, viewer.ImageSource);
+                    Assert.Same(previousRoi, Assert.Single(viewer.ViewerState.AllRois));
+                    Assert.True(viewer.ViewerState.UndoRedo.CanUndo);
+
+                    // A valid project still cannot replace a dirty document when no dialog owner is available.
+                    Assert.False(await viewer.OpenProjectFromFileAsync(sessionPath));
+                    Assert.Same(previousImage, viewer.ImageSource);
+                    Assert.Same(previousRoi, Assert.Single(viewer.ViewerState.AllRois));
+                    Assert.True(viewer.ViewerState.UndoRedo.CanUndo);
+
+                    await File.WriteAllTextAsync(sessionPath, "{invalid");
+                    Assert.False(await viewer.OpenProjectFromFileAsync(sessionPath));
+                    Assert.True(viewer.HasDiagnosticError);
+                    Assert.Same(previousImage, viewer.ImageSource);
+                    Assert.Same(previousRoi, Assert.Single(viewer.ViewerState.AllRois));
+                    Assert.True(viewer.ViewerState.UndoRedo.CanUndo);
+                }
+                finally
+                {
+                    File.Delete(imagePath);
+                    File.Delete(sessionPath);
                 }
             });
         }

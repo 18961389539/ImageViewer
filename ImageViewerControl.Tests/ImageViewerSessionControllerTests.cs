@@ -4,9 +4,11 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Threading;
 using ImageViewer.Abstractions;
 using ImageViewer.Controls;
+using ImageViewer.Core.Geometry;
 using ImageViewer.Localization;
 using ImageViewer.Models;
 using ImageViewer.Plugins;
@@ -20,6 +22,77 @@ namespace ImageViewerControl.Tests
     [Trait("Category", "Wpf")]
     public class ImageViewerSessionControllerTests
     {
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void PersistenceSnapshots_KeepCapturedCalibrationWhenTheLiveCalibrationChanges(bool autoSave)
+        {
+            var calibration = new CameraCalibration
+            {
+                PrincipalX = 100, PrincipalY = 80, NormalizationRadius = 120,
+                K1 = 0.01, K2 = -0.002, K3 = 0.0003,
+                TangentialP1 = 0.0004, TangentialP2 = -0.0005,
+                ReprojectionErrorRms = 0.2, MeasurementUncertaintyPixels = 0.03,
+                CalibrationId = "captured", CalibratedAtUtc = new DateTimeOffset(2026, 1, 2, 3, 4, 5, TimeSpan.Zero)
+            };
+            var host = new RecordingSessionHost(new RecordingSessionService(), new RecordingRecentProjectService(), new RecordingProjectPackageService())
+            {
+                Calibration = calibration
+            };
+            var dependencies = CreateDependencies(host);
+            ImageViewerPersistenceSnapshot snapshot = autoSave
+                ? dependencies.AutoSave.CaptureSnapshot()
+                : dependencies.Persistence.CaptureSnapshot();
+            var service = new ImageViewerSessionService();
+            string capturedJson = service.SerializeSession("captured", snapshot, host.PluginRegistry);
+
+            calibration.PrincipalX = 999;
+            calibration.K1 = 0.5;
+            calibration.CalibrationId = "edited";
+            calibration.CalibratedAtUtc = null;
+            string savedJson = service.SerializeSession("saved", snapshot, host.PluginRegistry);
+            CameraCalibration saved = service.LoadFromJson(savedJson, host.PluginRegistry).Calibration!;
+            CameraCalibration expected = service.LoadFromJson(capturedJson, host.PluginRegistry).Calibration!;
+
+            Assert.NotSame(calibration, snapshot.Calibration);
+            Assert.Equal(expected.CorrectPixelLength(new PointD(10, 20), new PointD(70, 40)),
+                saved.CorrectPixelLength(new PointD(10, 20), new PointD(70, 40)));
+            foreach (var property in typeof(CameraCalibration).GetProperties().Where(property => property.CanWrite))
+            {
+                Assert.Equal(property.GetValue(expected), property.GetValue(saved));
+            }
+        }
+
+        [Fact]
+        public void PersistenceSnapshots_DetachReferenceAndCurrentDatumPoints()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                var reference = new RecipeDatumPoint { Name = "reference", X = 12, Y = 34 };
+                var current = new RecipeDatumPoint { Name = "current", X = 56, Y = 78 };
+                var coordinates = new WorkpieceCoordinateSystem { Origin = new PointD(3, 4), AxisX = new VectorD(0, 1) };
+                var host = new RecordingSessionHost(new RecordingSessionService(), new RecordingRecentProjectService(), new RecordingProjectPackageService())
+                {
+                    CoordinateSystem = coordinates,
+                    RecipeDatumPoints = [reference],
+                    CurrentRecipeDatumPoints = [current]
+                };
+                var workflows = CreateDependencies(host);
+                ImageViewerPersistenceSnapshot manual = workflows.Persistence.CaptureSnapshot();
+                ImageViewerPersistenceSnapshot recovery = workflows.AutoSave.CaptureSnapshot();
+
+                reference.X = 999;
+                current.Y = 999;
+
+                Assert.Equal(coordinates, manual.CoordinateSystem);
+                Assert.Equal(coordinates, recovery.CoordinateSystem);
+                Assert.Equal(12, Assert.Single(manual.ReferenceDatumPoints).X);
+                Assert.Equal(12, Assert.Single(recovery.ReferenceDatumPoints).X);
+                Assert.Equal(78, Assert.Single(manual.CurrentDatumPoints).Y);
+                Assert.Equal(78, Assert.Single(recovery.CurrentDatumPoints).Y);
+            });
+        }
+
         [Fact]
         public void SaveSessionAsync_SavesStateAndTracksRecentProject()
         {
@@ -279,6 +352,53 @@ namespace ImageViewerControl.Tests
             });
         }
 
+        [Theory]
+        [InlineData(MessageBoxResult.Yes, true, false, true)]
+        [InlineData(MessageBoxResult.Yes, false, false, false)]
+        [InlineData(MessageBoxResult.Yes, true, true, false)]
+        [InlineData(MessageBoxResult.No, false, false, true)]
+        [InlineData(MessageBoxResult.Cancel, false, false, false)]
+        public void OpenProjectAsync_DirtyDocumentRespectsSaveDecision(
+            MessageBoxResult decision, bool chooseSavePath, bool failSave, bool opened)
+        {
+            WpfTestRunner.Run(() =>
+            {
+                string rootPath = CreateTempRoot();
+                try
+                {
+                    string nextProject = Path.Combine(rootPath, "next.ivsession");
+                    string savedProject = Path.Combine(rootPath, "saved.ivsession");
+                    File.WriteAllText(nextProject, "session");
+                    var sessionService = new RecordingSessionService { ThrowOnSave = failSave };
+                    var originalRoi = new LineMeasureRoi();
+                    var host = new RecordingSessionHost(sessionService, new RecordingRecentProjectService(), new RecordingProjectPackageService())
+                    {
+                        AllRois = [originalRoi],
+                        UnsavedChangesDecision = decision,
+                        SaveSessionDialogPath = chooseSavePath ? savedProject : null
+                    };
+                    using var controller = CreateController(host, new RecordingPeriodicTaskSchedulerFactory(), rootPath);
+                    controller.MarkDirty();
+
+                    controller.OpenProjectAsync(nextProject).GetAwaiter().GetResult();
+
+                    Assert.Equal(1, host.UnsavedChangesPromptCount);
+                    Assert.Equal(opened, host.LastReplacedRois != null);
+                    Assert.Equal(!opened, controller.IsDirty);
+                    Assert.Equal(opened ? 1 : 0, host.ClearUndoHistoryCount);
+                    Assert.Equal(decision == MessageBoxResult.Yes && chooseSavePath && !failSave, File.Exists(savedProject));
+                    if (!opened)
+                    {
+                        Assert.Same(originalRoi, Assert.Single(host.AllRois));
+                    }
+                }
+                finally
+                {
+                    Directory.Delete(rootPath, recursive: true);
+                }
+            });
+        }
+
         [Fact]
         public void OpenProjectAsync_SessionFile_LoadsAndAppliesSessionState()
         {
@@ -413,13 +533,12 @@ namespace ImageViewerControl.Tests
                     using (var firstController = CreateController(firstHost, firstScheduler, rootPath, "run-one-document"))
                     {
                         firstScheduler.Scheduler.InvokeCallbackAsync().GetAwaiter().GetResult();
+                        // Simulate a crashed owner without performing that owner's graceful cleanup.
+                        WriteStaleHeartbeatEntry(rootPath, firstService.LastSaveFilePath!, "crashed-run-one");
                     }
 
                     string autoSaveFileName = Path.GetFileName(firstService.LastSaveFilePath!);
                     Assert.Equal("autosave-run-one-document.ivsession", autoSaveFileName);
-
-                    // 模拟上一次运行崩溃：把心跳改成很久以前（进程没来得及清理所有权）。
-                    WriteStaleHeartbeatEntry(rootPath, firstService.LastSaveFilePath!, "crashed-run-one");
 
                     // 第二次运行：全新的 DocumentId（模拟重启），必须仍能发现上次崩溃留下的未保存文档。
                     string sourceImage = Path.Combine(rootPath, "source.png");
@@ -446,6 +565,228 @@ namespace ImageViewerControl.Tests
                     secondController.RecoverLatestAutoSaveAsync().GetAwaiter().GetResult();
 
                     Assert.EndsWith(autoSaveFileName, secondService.LastLoadFilePath, StringComparison.OrdinalIgnoreCase);
+                }
+                finally
+                {
+                    Directory.Delete(rootPath, recursive: true);
+                }
+            });
+        }
+
+        [Fact]
+        public void RecoverAutoSave_OffersNewestFirstAndCanRestoreAnOlderSnapshot()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                string rootPath = CreateTempRoot();
+                try
+                {
+                    string autoSaveDirectory = Path.Combine(rootPath, "Autosave");
+                    Directory.CreateDirectory(autoSaveDirectory);
+                    string older = Path.Combine(autoSaveDirectory, "autosave-older.ivsession");
+                    string newer = Path.Combine(autoSaveDirectory, "autosave-newer.ivsession");
+                    File.WriteAllText(older, "older");
+                    File.WriteAllText(newer, "newer");
+                    File.SetLastWriteTimeUtc(older, DateTime.UtcNow.AddMinutes(-2));
+                    WriteStaleHeartbeatEntry(rootPath, older, "older-owner");
+                    var index = new ImageViewerRecoveryIndex(autoSaveDirectory);
+                    index.Register(newer, DateTimeOffset.UtcNow, projectName: "newest.ivpkg", imageName: "inspection.png");
+                    var service = new RecordingSessionService();
+                    var host = new RecordingSessionHost(service, new RecordingRecentProjectService(), new RecordingProjectPackageService());
+                    using var controller = CreateController(host, new RecordingPeriodicTaskSchedulerFactory(), rootPath);
+
+                    controller.RecoverAutoSaveAsync(choices =>
+                    {
+                        Assert.Equal([newer, older], choices.Select(choice => choice.Path));
+                        Assert.Equal("newest.ivpkg", choices[0].ProjectName);
+                        Assert.Equal("inspection.png", choices[0].ImageName);
+                        return choices[1];
+                    }).GetAwaiter().GetResult();
+
+                    Assert.Equal(older, service.LastLoadFilePath);
+                    Assert.True(controller.IsDirty);
+                    Assert.True(controller.HasRecoverySnapshot);
+                    controller.RecoverAutoSaveAsync(choices =>
+                    {
+                        Assert.Equal(newer, Assert.Single(choices).Path);
+                        return null;
+                    }).GetAwaiter().GetResult();
+                    Assert.Equal(older, service.LastLoadFilePath);
+                    Assert.True(File.Exists(newer));
+                }
+                finally
+                {
+                    Directory.Delete(rootPath, recursive: true);
+                }
+            });
+        }
+
+        [Fact]
+        public void RecoverAutoSave_WhenSelectedSnapshotChangesWhilePickerIsOpen_DoesNotReplaceDocument()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                string rootPath = CreateTempRoot();
+                try
+                {
+                    string recovery = Path.Combine(rootPath, "Autosave", "autosave.ivsession");
+                    Directory.CreateDirectory(Path.GetDirectoryName(recovery)!);
+                    File.WriteAllText(recovery, "earlier");
+                    var service = new RecordingSessionService();
+                    var host = new RecordingSessionHost(service, new RecordingRecentProjectService(), new RecordingProjectPackageService());
+                    using var controller = CreateController(host, new RecordingPeriodicTaskSchedulerFactory(), rootPath);
+
+                    controller.RecoverAutoSaveAsync(choices =>
+                    {
+                        RecoverySnapshotOption original = Assert.Single(choices);
+                        File.WriteAllText(recovery, "new contents");
+                        File.SetLastWriteTimeUtc(recovery, original.LastWriteUtc.AddMinutes(1));
+                        return original;
+                    }).GetAwaiter().GetResult();
+
+                    Assert.Null(service.LastLoadFilePath);
+                    Assert.Null(host.LastReplacedRois);
+                    Assert.True(controller.HasRecoverySnapshot);
+                }
+                finally
+                {
+                    Directory.Delete(rootPath, recursive: true);
+                }
+            });
+        }
+
+        [Fact]
+        public void RecoverAutoSave_CanOfferAFreshCrashSnapshotAsSoonAsTheLeaseIsReleased()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                string rootPath = CreateTempRoot();
+                try
+                {
+                    string directory = Path.Combine(rootPath, "Autosave");
+                    Directory.CreateDirectory(directory);
+                    string recovery = Path.Combine(directory, "autosave-crash.ivsession");
+                    File.WriteAllText(recovery, "work");
+                    string owner = Guid.NewGuid().ToString("N");
+                    var index = new ImageViewerRecoveryIndex(directory);
+                    var service = new RecordingSessionService();
+                    var host = new RecordingSessionHost(service, new RecordingRecentProjectService(), new RecordingProjectPackageService());
+                    using var editor = CreateController(host, new RecordingPeriodicTaskSchedulerFactory(), rootPath);
+                    using (FileStream lease = Assert.IsType<FileStream>(index.TryAcquireOwnerLease(owner)))
+                    {
+                        DateTimeOffset now = DateTimeOffset.UtcNow;
+                        index.Register(recovery, now, owner, now, hasOwnerLease: true);
+                        editor.RecoverLatestAutoSaveAsync().GetAwaiter().GetResult();
+                        Assert.Null(service.LastLoadFilePath);
+                    }
+
+                    editor.RecoverLatestAutoSaveAsync().GetAwaiter().GetResult();
+                    Assert.Equal(recovery, service.LastLoadFilePath);
+                }
+                finally
+                {
+                    Directory.Delete(rootPath, recursive: true);
+                }
+            });
+        }
+
+        [Fact]
+        public void AutoSave_ClosingWhileAWriteIsPendingFinishesCleanup()
+        {
+            WpfTestRunner.RunAsync(async () =>
+            {
+                string rootPath = CreateTempRoot();
+                try
+                {
+                    var service = new RecordingSessionService();
+                    var host = new RecordingSessionHost(service, new RecordingRecentProjectService(), new RecordingProjectPackageService());
+                    var scheduler = new RecordingPeriodicTaskSchedulerFactory();
+                    using var editor = CreateController(host, scheduler, rootPath);
+                    await scheduler.Scheduler.InvokeCallbackAsync();
+                    string snapshot = service.LastSaveFilePath!;
+                    Assert.True(File.Exists(snapshot));
+
+                    var blockedWrite = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    service.AllowAutoSave = blockedWrite.Task;
+                    Task writing = scheduler.Scheduler.InvokeCallbackAsync();
+                    Assert.False(writing.IsCompleted);
+                    editor.Dispose();
+                    await Task.WhenAll(writing, editor.CloseCompletion).WaitAsync(TimeSpan.FromSeconds(5));
+
+                    Assert.False(File.Exists(snapshot));
+                    Assert.Empty(new ImageViewerRecoveryIndex(Path.GetDirectoryName(snapshot)!).Read());
+                }
+                finally
+                {
+                    Directory.Delete(rootPath, recursive: true);
+                }
+            });
+        }
+
+        [Fact]
+        public void AutoSave_PausingPreservesLiveSnapshotAndClosingDeletesIt()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                string rootPath = CreateTempRoot();
+                try
+                {
+                    var service = new RecordingSessionService();
+                    var host = new RecordingSessionHost(service, new RecordingRecentProjectService(), new RecordingProjectPackageService());
+                    var scheduler = new RecordingPeriodicTaskSchedulerFactory();
+                    string snapshot;
+                    var index = new ImageViewerRecoveryIndex(Path.Combine(rootPath, "Autosave"));
+                    using (var editor = CreateController(host, scheduler, rootPath, "editor"))
+                    {
+                        scheduler.Scheduler.InvokeCallbackAsync().GetAwaiter().GetResult();
+                        snapshot = service.LastSaveFilePath!;
+                        editor.StopAutoSave();
+                        editor.DrainAutoSaveAsync().GetAwaiter().GetResult();
+                        ImageViewerRecoveryIndexEntry entry = Assert.Single(index.Read());
+                        index.Register(snapshot, entry.TimestampUtc, entry.OwnerInstanceId, DateTimeOffset.UtcNow.AddHours(-1));
+                        using var observer = CreateController(
+                            new RecordingSessionHost(new RecordingSessionService(), new RecordingRecentProjectService(), new RecordingProjectPackageService()),
+                            new RecordingPeriodicTaskSchedulerFactory(), rootPath, "observer");
+                        Assert.True(File.Exists(snapshot));
+                        Assert.False(observer.HasRecoverySnapshot);
+                    }
+                    Assert.False(File.Exists(snapshot));
+                    Assert.Empty(index.Read());
+                }
+                finally
+                {
+                    Directory.Delete(rootPath, recursive: true);
+                }
+            });
+        }
+
+        [Theory]
+        [InlineData(MessageBoxResult.No, false)]
+        [InlineData(MessageBoxResult.Cancel, true)]
+        public void OpenProjectAsync_CleansThePreviousSnapshotOnlyAfterTheReplacementCommits(
+            MessageBoxResult decision, bool keepsSnapshot)
+        {
+            WpfTestRunner.Run(() =>
+            {
+                string rootPath = CreateTempRoot();
+                try
+                {
+                    string project = Path.Combine(rootPath, "next.ivsession");
+                    File.WriteAllText(project, "session");
+                    var service = new RecordingSessionService();
+                    var host = new RecordingSessionHost(service, new RecordingRecentProjectService(), new RecordingProjectPackageService())
+                    {
+                        UnsavedChangesDecision = decision
+                    };
+                    var scheduler = new RecordingPeriodicTaskSchedulerFactory();
+                    using var editor = CreateController(host, scheduler, rootPath, "editor");
+                    editor.MarkDirty();
+                    scheduler.Scheduler.InvokeCallbackAsync().GetAwaiter().GetResult();
+                    string snapshot = service.LastSaveFilePath!;
+                    Assert.True(File.Exists(snapshot));
+
+                    Assert.Equal(!keepsSnapshot, editor.OpenProjectAsync(project).GetAwaiter().GetResult());
+                    Assert.Equal(keepsSnapshot, File.Exists(snapshot));
                 }
                 finally
                 {
@@ -585,6 +926,179 @@ namespace ImageViewerControl.Tests
                 finally
                 {
                     Directory.Delete(rootPath, recursive: true);
+                }
+            });
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void SaveSessionAsync_CleansOnlyTheUnchangedRecoveryActuallyOpened(bool recoveryWasUpdated)
+        {
+            WpfTestRunner.Run(() =>
+            {
+                string root = CreateTempRoot();
+                try
+                {
+                    string recovery = Path.Combine(root, "Autosave", "autosave-previous.ivsession");
+                    Directory.CreateDirectory(Path.GetDirectoryName(recovery)!);
+                    File.WriteAllText(recovery, "previous work");
+                    WriteStaleHeartbeatEntry(root, recovery, "previous-window");
+                    var service = new RecordingSessionService();
+                    var host = new RecordingSessionHost(service, new RecordingRecentProjectService(), new RecordingProjectPackageService())
+                    {
+                        SaveSessionDialogPath = Path.Combine(root, "saved.ivsession")
+                    };
+                    using var controller = CreateController(host, new RecordingPeriodicTaskSchedulerFactory(), root);
+                    Assert.True(controller.HasRecoverySnapshot);
+
+                    controller.SaveSessionAsync().GetAwaiter().GetResult();
+                    Assert.True(controller.HasRecoverySnapshot);
+                    Assert.Equal("previous work", File.ReadAllText(recovery));
+
+                    controller.RecoverLatestAutoSaveAsync().GetAwaiter().GetResult();
+                    Assert.Equal(recovery, service.LastLoadFilePath);
+                    if (recoveryWasUpdated)
+                    {
+                        File.WriteAllText(recovery, "newer recovery");
+                        File.SetLastWriteTimeUtc(recovery, DateTime.UtcNow.AddMinutes(1));
+                    }
+                    controller.SaveSessionAsync().GetAwaiter().GetResult();
+                    Assert.Equal(recoveryWasUpdated, File.Exists(recovery));
+                    Assert.Equal(recoveryWasUpdated, controller.HasRecoverySnapshot);
+                    if (recoveryWasUpdated)
+                    {
+                        Assert.Equal("newer recovery", File.ReadAllText(recovery));
+                    }
+                }
+                finally
+                {
+                    Directory.Delete(root, recursive: true);
+                }
+            });
+        }
+
+        [Fact]
+        public void SaveSessionAsync_AnInFlightAutoSaveCannotRecreateTheRecoveryFile()
+        {
+            WpfTestRunner.RunAsync(async () =>
+            {
+                string root = CreateTempRoot();
+                try
+                {
+                    var allowAutoSave = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    var service = new RecordingSessionService { AllowAutoSave = allowAutoSave.Task };
+                    var host = new RecordingSessionHost(service, new RecordingRecentProjectService(), new RecordingProjectPackageService())
+                    {
+                        SaveSessionDialogPath = Path.Combine(root, "saved.ivsession")
+                    };
+                    var scheduler = new RecordingPeriodicTaskSchedulerFactory();
+                    using var controller = CreateController(host, scheduler, root, "same-document");
+                    controller.MarkDirty();
+
+                    Task autoSave = scheduler.Scheduler.InvokeCallbackAsync();
+                    Task manualSave = controller.SaveSessionAsync();
+                    try
+                    {
+                        Assert.True(File.Exists(host.SaveSessionDialogPath));
+                        Assert.False(manualSave.IsCompleted);
+                    }
+                    finally
+                    {
+                        allowAutoSave.SetResult();
+                        await Task.WhenAll(autoSave, manualSave);
+                    }
+
+                    string snapshot = Path.Combine(root, "Autosave", "autosave-same-document.ivsession");
+                    Assert.False(File.Exists(snapshot));
+                    Assert.False(controller.IsDirty);
+                }
+                finally
+                {
+                    Directory.Delete(root, recursive: true);
+                }
+            });
+        }
+
+        [Fact]
+        public void ReplacingImageDocument_StartsAnIndependentAutoSave()
+        {
+            WpfTestRunner.RunAsync(async () =>
+            {
+                string root = CreateTempRoot();
+                try
+                {
+                    string project = Path.Combine(root, "old-project.ivsession");
+                    File.WriteAllText(project, "session");
+                    var service = new RecordingSessionService();
+                    var host = new RecordingSessionHost(service, new RecordingRecentProjectService(), new RecordingProjectPackageService());
+                    var scheduler = new RecordingPeriodicTaskSchedulerFactory();
+                    using var controller = CreateController(host, scheduler, root, "new-document");
+                    Assert.True(await controller.OpenProjectAsync(project));
+                    await scheduler.Scheduler.InvokeCallbackAsync();
+                    string oldSnapshot = service.LastSaveFilePath!;
+                    Assert.Contains("autosave-old-project-", oldSnapshot, StringComparison.Ordinal);
+                    Assert.True(File.Exists(oldSnapshot));
+
+                    string newImage = Path.Combine(root, "new-image.png");
+                    Assert.True(await controller.ReplaceImageDocumentAsync(
+                        _ => Task.FromResult<Action?>(() => host.CurrentImagePath = newImage), CancellationToken.None));
+                    Assert.False(File.Exists(oldSnapshot));
+                    Assert.True(controller.IsDirty);
+                    await scheduler.Scheduler.InvokeCallbackAsync();
+
+                    Assert.Equal("autosave-new-document.ivsession", Path.GetFileName(service.LastSaveFilePath));
+                    Assert.True(File.Exists(service.LastSaveFilePath));
+                }
+                finally
+                {
+                    Directory.Delete(root, recursive: true);
+                }
+            });
+        }
+
+        [Fact]
+        public void AutoSave_TwoEditorsOfTheSameProjectKeepIndependentSnapshots()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                string root = CreateTempRoot();
+                try
+                {
+                    string project = Path.Combine(root, "shared.ivsession");
+                    File.WriteAllText(project, "project");
+                    var firstService = new RecordingSessionService();
+                    var secondService = new RecordingSessionService();
+                    var firstHost = new RecordingSessionHost(firstService, new RecordingRecentProjectService(), new RecordingProjectPackageService());
+                    var secondHost = new RecordingSessionHost(secondService, new RecordingRecentProjectService(), new RecordingProjectPackageService());
+                    var firstScheduler = new RecordingPeriodicTaskSchedulerFactory();
+                    var secondScheduler = new RecordingPeriodicTaskSchedulerFactory();
+                    using var first = CreateController(firstHost, firstScheduler, root, "first");
+                    using var second = CreateController(secondHost, secondScheduler, root, "second");
+                    Assert.True(first.OpenProjectAsync(project).GetAwaiter().GetResult());
+                    Assert.True(second.OpenProjectAsync(project).GetAwaiter().GetResult());
+
+                    first.MarkDirty();
+                    second.MarkDirty();
+                    firstScheduler.Scheduler.InvokeCallbackAsync().GetAwaiter().GetResult();
+                    secondScheduler.Scheduler.InvokeCallbackAsync().GetAwaiter().GetResult();
+                    string firstSnapshot = firstService.LastSaveFilePath!;
+                    string secondSnapshot = secondService.LastSaveFilePath!;
+                    Assert.NotEqual(firstSnapshot, secondSnapshot);
+                    Assert.True(File.Exists(firstSnapshot));
+                    Assert.True(File.Exists(secondSnapshot));
+
+                    first.RecoverLatestAutoSaveAsync().GetAwaiter().GetResult();
+                    Assert.Equal(project, firstService.LastLoadFilePath);
+                    firstHost.SaveSessionDialogPath = project;
+                    first.SaveSessionAsync().GetAwaiter().GetResult();
+                    Assert.False(File.Exists(firstSnapshot));
+                    Assert.True(File.Exists(secondSnapshot));
+                    Assert.True(second.IsDirty);
+                }
+                finally
+                {
+                    Directory.Delete(root, recursive: true);
                 }
             });
         }
@@ -931,6 +1445,11 @@ namespace ImageViewerControl.Tests
                 {
                     var host = new RecordingSessionHost(new RecordingSessionService(), new RecordingRecentProjectService(), new RecordingProjectPackageService());
                     string recipePath = Path.Combine(rootPath, "loaded.ivrecipe");
+                    var qualityProfile = ImageAnalysisQualityProfile.Default with
+                    {
+                        PassConfidence = 0.82,
+                        AutomaticCircleMinimumValidCalipers = 36
+                    };
                     MeasurementRecipeDocument recipe = MeasurementRecipeService.Create(
                         "配方",
                         null,
@@ -946,7 +1465,8 @@ namespace ImageViewerControl.Tests
                         0.05,
                         "mm",
                         host.PluginRegistry,
-                        calibration: new CameraCalibration { K1 = 0.01, NormalizationRadius = 500, CalibrationId = "C-9" });
+                        calibration: new CameraCalibration { K1 = 0.01, NormalizationRadius = 500, CalibrationId = "C-9" },
+                        qualityProfile: qualityProfile);
                     MeasurementRecipeService.SaveToFile(recipePath, recipe);
 
                     host.OpenRecipeDialogPath = recipePath;
@@ -959,6 +1479,9 @@ namespace ImageViewerControl.Tests
                     Assert.Equal(0.05, host.PixelSize);
                     Assert.Equal("mm", host.PhysicalUnit);
                     Assert.Equal("C-9", host.Calibration?.CalibrationId);
+                    Assert.Equal(qualityProfile, host.QualityProfile);
+                    Assert.True(controller.IsDirty);
+                    Assert.Equal(1, host.ClearUndoHistoryCount);
 
                     // "载入配方"必须当场给出可判定性，而不是让操作员以为一切就绪。
                     Assert.NotEmpty(host.StatusHints);
@@ -989,6 +1512,11 @@ namespace ImageViewerControl.Tests
                         ]
                     };
                     string recipePath = Path.Combine(rootPath, "aligned.ivrecipe");
+                    var qualityProfile = ImageAnalysisQualityProfile.Default with
+                    {
+                        PassValidRatio = 0.86,
+                        PassResidualRms = 0.65
+                    };
                     MeasurementRecipeDocument recipe = MeasurementRecipeService.Create(
                         "配方",
                         null,
@@ -1000,7 +1528,7 @@ namespace ImageViewerControl.Tests
                         [
                             new RecipeDatumPoint { Name = "D1", X = 100, Y = 100 },
                             new RecipeDatumPoint { Name = "D2", X = 200, Y = 100 }
-                        ]);
+                        ], qualityProfile: qualityProfile);
                     MeasurementRecipeService.SaveToFile(recipePath, recipe);
                     host.OpenRecipeDialogPath = recipePath;
 
@@ -1013,6 +1541,7 @@ namespace ImageViewerControl.Tests
                     Assert.Equal(new PointD(300, 440), line.P2);
                     Assert.Equal(0.2, host.PixelSize);
                     Assert.Equal("mm", host.PhysicalUnit);
+                    Assert.Equal(qualityProfile, host.QualityProfile);
                     Assert.Equal(300, host.RecipeDatumPoints[0].X);
                     Assert.Equal(400, host.RecipeDatumPoints[0].Y);
                     Assert.Contains(host.StatusHints, hint => hint.Contains(UiText.Get("StatusRecipeManualAlignmentApplied"), StringComparison.Ordinal));
@@ -1024,6 +1553,7 @@ namespace ImageViewerControl.Tests
                     Assert.Equal(400, rebased.DatumPoints[0].Y);
                     Assert.Equal(300, rebased.DatumPoints[1].X);
                     Assert.Equal(500, rebased.DatumPoints[1].Y);
+                    Assert.Equal(qualityProfile, rebased.QualityProfile);
                 }
                 finally
                 {
@@ -1105,6 +1635,191 @@ namespace ImageViewerControl.Tests
             });
         }
 
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(true, false)]
+        [InlineData(false, true)]
+        [InlineData(true, true)]
+        public void RecipeLoad_HandlesMissingAndInvalidQualityProfile(bool aligned, bool invalidProfile)
+        {
+            WpfTestRunner.Run(() =>
+            {
+                string root = CreateTempRoot();
+                try
+                {
+                    var originalRoi = new CircleRoi { Center = new PointD(1, 2), Radius = 3 };
+                    var existingProfile = ImageAnalysisQualityProfile.Default with { PassConfidence = 0.91 };
+                    var host = new RecordingSessionHost(new RecordingSessionService(), new RecordingRecentProjectService(), new RecordingProjectPackageService())
+                    {
+                        AllRois = [originalRoi],
+                        PixelSize = 0.25,
+                        QualityProfile = existingProfile,
+                        CurrentRecipeDatumPoints =
+                        [
+                            new RecipeDatumPoint { X = 30, Y = 40 },
+                            new RecipeDatumPoint { X = 40, Y = 40 }
+                        ],
+                        OpenRecipeDialogPath = Path.Combine(root, "recipe.ivrecipe")
+                    };
+
+                    // Write the external file directly, so serializer validation cannot hide an invalid input.
+                    string qualityField = invalidProfile ? "\"QualityProfile\": { \"PassConfidence\": 1.25 }," : string.Empty;
+                    File.WriteAllText(host.OpenRecipeDialogPath, $$"""
+                        {
+                          "Version": 1,
+                          "PixelSize": 0.5,
+                          "PhysicalUnit": "mm",
+                          {{qualityField}}
+                          "DatumPoints": [{ "X": 10, "Y": 20 }, { "X": 20, "Y": 20 }],
+                          "Items": [{ "Key": "circle#0", "Template": { "Type": "circle", "Center": { "X": 12, "Y": 22 }, "Radius": 2 } }]
+                        }
+                        """);
+
+                    using var controller = CreateController(host, new RecordingPeriodicTaskSchedulerFactory(), root);
+                    (aligned ? controller.LoadAlignedRecipeAsync() : controller.LoadRecipeAsync()).GetAwaiter().GetResult();
+
+                    Assert.Same(existingProfile, host.QualityProfile);
+                    if (invalidProfile)
+                    {
+                        var error = Assert.IsType<System.Text.Json.JsonException>(Assert.Single(host.Errors).Exception);
+                        Assert.Equal(nameof(ImageAnalysisQualityProfile.PassConfidence),
+                            Assert.IsType<ArgumentOutOfRangeException>(error.InnerException).ParamName);
+                        Assert.Same(originalRoi, Assert.Single(host.AllRois));
+                        Assert.Equal(0.25, host.PixelSize);
+                        Assert.Null(host.LastReplacedRois);
+                        Assert.Equal(0, host.DrawRoisCallCount);
+                    }
+                    else
+                    {
+                        Assert.Empty(host.Errors);
+                        Assert.Equal(0.5, host.PixelSize);
+                        var loaded = Assert.IsType<CircleRoi>(Assert.Single(host.LastReplacedRois!));
+                        Assert.Equal(aligned ? new PointD(32, 42) : new PointD(12, 22), loaded.Center);
+                    }
+                }
+                finally
+                {
+                    Directory.Delete(root, recursive: true);
+                }
+            });
+        }
+
+        [Fact]
+        public void LoadRecipeAsync_MissingPluginRejectsTheEntireRecipe()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                string root = CreateTempRoot();
+                try
+                {
+                    var original = new CircleRoi { Center = new PointD(1, 2), Radius = 3 };
+                    var host = new RecordingSessionHost(new RecordingSessionService(), new RecordingRecentProjectService(), new RecordingProjectPackageService())
+                    {
+                        AllRois = [original],
+                        OpenRecipeDialogPath = Path.Combine(root, "plugin.ivrecipe"),
+                        PixelSize = 0.25
+                    };
+                    MeasurementRecipeDocument recipe = MeasurementRecipeService.Create("mixed", null,
+                        [new CircleRoi { Center = new PointD(30, 40), Radius = 5 }], 0.5, "mm", host.PluginRegistry,
+                        qualityProfile: ImageAnalysisQualityProfile.Default with { PassConfidence = 0.8 });
+                    recipe.Items.Add(new MeasurementRecipeItem
+                    {
+                        Key = "custom#0",
+                        Template = new RoiPersistenceData { Type = "missing-plugin-circle" }
+                    });
+                    MeasurementRecipeService.SaveToFile(host.OpenRecipeDialogPath, recipe);
+
+                    using var controller = CreateController(host, new RecordingPeriodicTaskSchedulerFactory(), root);
+                    controller.MarkDirty();
+                    controller.LoadRecipeAsync().GetAwaiter().GetResult();
+
+                    Assert.Same(original, Assert.Single(host.AllRois));
+                    Assert.Equal(0.25, host.PixelSize);
+                    Assert.Equal(ImageAnalysisQualityProfile.Default, host.QualityProfile);
+                    Assert.Equal(0, host.UnsavedChangesPromptCount);
+                    Assert.Equal(0, host.ClearUndoHistoryCount);
+                    Assert.Contains(host.StatusHints, hint => hint.Contains("missing-plugin-circle", StringComparison.Ordinal));
+                }
+                finally
+                {
+                    Directory.Delete(root, recursive: true);
+                }
+            });
+        }
+
+        [Theory]
+        [InlineData(false, "cancel")]
+        [InlineData(true, "cancel")]
+        [InlineData(false, "image")]
+        [InlineData(true, "image")]
+        [InlineData(false, "edit")]
+        [InlineData(true, "edit")]
+        public void RecipeLoad_PreservesCurrentStateWhenCanceledOrTargetChanges(bool aligned, string interruption)
+        {
+            WpfTestRunner.Run(() =>
+            {
+                string root = CreateTempRoot();
+                try
+                {
+                    var original = new CircleRoi { Center = new PointD(1, 2), Radius = 3 };
+                    var host = new RecordingSessionHost(new RecordingSessionService(), new RecordingRecentProjectService(), new RecordingProjectPackageService())
+                    {
+                        AllRois = [original],
+                        OpenRecipeDialogPath = Path.Combine(root, "candidate.ivrecipe"),
+                        CurrentRecipeDatumPoints = [new() { X = 30, Y = 40 }, new() { X = 40, Y = 40 }],
+                        UnsavedChangesDecision = MessageBoxResult.Cancel
+                    };
+                    MeasurementRecipeDocument recipe = MeasurementRecipeService.Create("candidate", null,
+                        [new CircleRoi { Center = new PointD(30, 40), Radius = 5 }], 0.5, "mm", host.PluginRegistry,
+                        datumPoints: [new() { X = 10, Y = 20 }, new() { X = 20, Y = 20 }]);
+                    MeasurementRecipeService.SaveToFile(host.OpenRecipeDialogPath, recipe);
+
+                    using var controller = CreateController(host, new RecordingPeriodicTaskSchedulerFactory(), root);
+                    if (interruption == "cancel")
+                    {
+                        controller.MarkDirty();
+                    }
+                    else
+                    {
+                        // Simulate a change after preparation has finished but before its apply callback runs.
+                        host.BeforeApplyDocumentLoad = () =>
+                        {
+                            if (interruption == "image")
+                            {
+                                host.CurrentImageIdentity = new object();
+                            }
+                            else
+                            {
+                                original.Radius = 8;
+                                controller.MarkDirty();
+                            }
+                        };
+                    }
+
+                    (aligned ? controller.LoadAlignedRecipeAsync() : controller.LoadRecipeAsync()).GetAwaiter().GetResult();
+
+                    Assert.Same(original, Assert.Single(host.AllRois));
+                    Assert.Equal(interruption == "edit" ? 8 : 3, original.Radius);
+                    Assert.Equal(1, host.PixelSize);
+                    Assert.Equal(0, host.ClearUndoHistoryCount);
+                    Assert.Empty(host.Errors);
+                    if (interruption == "cancel")
+                    {
+                        Assert.Equal(1, host.UnsavedChangesPromptCount);
+                        Assert.True(controller.IsDirty);
+                    }
+                    else
+                    {
+                        Assert.Contains(UiText.Get("StatusRecipeTargetChanged"), host.StatusHints);
+                    }
+                }
+                finally
+                {
+                    Directory.Delete(root, recursive: true);
+                }
+            });
+        }
+
         private static ImageViewerSessionControllerDependencies CreateDependencies(RecordingSessionHost host)
         {
             return new ImageViewerSessionControllerDependencies
@@ -1112,6 +1827,11 @@ namespace ImageViewerControl.Tests
                 Persistence = new ImageViewerSessionPersistenceWorkflow
                 {
                     ShowSaveSessionDialog = () => host.SaveSessionDialogPath,
+                    ConfirmUnsavedChanges = () =>
+                    {
+                        host.UnsavedChangesPromptCount++;
+                        return host.UnsavedChangesDecision;
+                    },
                     ShowOpenSessionDialog = () => host.OpenSessionDialogPath,
                     ShowSaveProjectPackageDialog = () => host.SaveProjectPackageDialogPath,
                     ShowSaveRecipeDialog = () => host.SaveRecipeDialogPath,
@@ -1127,13 +1847,29 @@ namespace ImageViewerControl.Tests
                     SetPhysicalUnit = value => host.PhysicalUnit = value,
                     GetCalibration = () => host.Calibration,
                     SetCalibration = value => host.Calibration = value,
+                    GetQualityProfile = () => host.QualityProfile,
+                    SetQualityProfile = value => host.QualityProfile = value,
+                    GetWorkpieceCoordinateSystem = () => host.CoordinateSystem,
+                    SetWorkpieceCoordinateSystem = value => host.CoordinateSystem = value,
                     GetRecipeDatumPoints = () => host.RecipeDatumPoints,
                     GetCurrentRecipeDatumPoints = () => host.CurrentRecipeDatumPoints,
                     GetCurrentImageIdentity = () => host.CurrentImageIdentity,
                     SetRecipeDatumPoints = value => host.RecipeDatumPoints = value.ToArray(),
+                    SetCurrentRecipeDatumPoints = value => host.CurrentRecipeDatumPoints = value.ToArray(),
                     GetCurrentViewportState = () => host.CurrentViewportState,
                     TryGetCurrentImagePath = () => host.CurrentImagePath,
-                    LoadImageFromFile = host.LoadImageFromFile,
+                    RunDocumentLoadAsync = async prepare =>
+                    {
+                        Action? apply = await prepare(CancellationToken.None, new Progress<double>()).ConfigureAwait(false);
+                        if (apply != null)
+                        {
+                            host.BeforeApplyDocumentLoad?.Invoke();
+                            apply();
+                        }
+                        return apply != null;
+                    },
+                    PrepareImageAsync = (path, _, _, _) => Task.FromResult<Action>(() => host.LoadImageFromFile(path, false)),
+                    ClearImage = () => host.CurrentImagePath = null,
                     ReplaceAllRois = host.ReplaceAllRois,
                     ApplyViewportState = host.ApplyViewportState,
                     DrawRois = host.DrawRois,
@@ -1153,6 +1889,9 @@ namespace ImageViewerControl.Tests
                     GetPixelSize = () => host.PixelSize,
                     GetPhysicalUnit = () => host.PhysicalUnit,
                     GetCalibration = () => host.Calibration,
+                    GetWorkpieceCoordinateSystem = () => host.CoordinateSystem,
+                    GetRecipeDatumPoints = () => host.RecipeDatumPoints,
+                    GetCurrentRecipeDatumPoints = () => host.CurrentRecipeDatumPoints,
                     SessionService = host.SessionService,
                     GetPluginRegistry = () => host.PluginRegistry,
                     LogNonCriticalError = host.LogNonCriticalError,
@@ -1163,6 +1902,8 @@ namespace ImageViewerControl.Tests
 
         private sealed class RecordingSessionHost
         {
+            public WorkpieceCoordinateSystem? CoordinateSystem { get; set; }
+
             public RecordingSessionHost(
                 IImageViewerSessionService sessionService,
                 IImageViewerRecentProjectService recentProjectService,
@@ -1176,6 +1917,8 @@ namespace ImageViewerControl.Tests
             public Dispatcher Dispatcher { get; } = Dispatcher.CurrentDispatcher;
 
             public string? SaveSessionDialogPath { get; set; }
+            public MessageBoxResult UnsavedChangesDecision { get; set; } = MessageBoxResult.No;
+            public int UnsavedChangesPromptCount { get; set; }
 
             public string? OpenSessionDialogPath { get; set; }
 
@@ -1200,6 +1943,7 @@ namespace ImageViewerControl.Tests
             public IReadOnlyList<RecipeDatumPoint> CurrentRecipeDatumPoints { get; set; } = [];
 
             public object CurrentImageIdentity { get; set; } = new object();
+            public Action? BeforeApplyDocumentLoad { get; set; }
 
             // 与真实控件的默认标定一致（像素尺寸必须为有限正值，快照阶段就会校验）。
             public double PixelSize { get; set; } = 1.0;
@@ -1207,6 +1951,7 @@ namespace ImageViewerControl.Tests
             public string PhysicalUnit { get; set; } = "px";
 
             public CameraCalibration? Calibration { get; set; }
+            public ImageAnalysisQualityProfile QualityProfile { get; set; } = ImageAnalysisQualityProfile.Default;
 
             public ImageViewerViewportState CurrentViewportState { get; set; } = new(1, 0, 0);
 
@@ -1299,6 +2044,8 @@ namespace ImageViewerControl.Tests
 
             public bool ThrowOnSave { get; set; }
 
+            public Task? AllowAutoSave { get; set; }
+
             public ImageViewerSessionData LoadResult { get; set; } = new(
                 "session",
                 DateTimeOffset.UtcNow,
@@ -1328,6 +2075,15 @@ namespace ImageViewerControl.Tests
                 Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
                 File.WriteAllText(filePath, "session");
                 return Task.CompletedTask;
+            }
+
+            public async Task SaveRecoveryToFileAsync(string filePath, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry pluginRegistry, CancellationToken cancellationToken = default)
+            {
+                if (AllowAutoSave is { } pending)
+                {
+                    await pending.WaitAsync(cancellationToken);
+                }
+                await SaveToFileAsync(filePath, snapshot, pluginRegistry, cancellationToken);
             }
 
             public string SerializeSession(string? sessionName, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry pluginRegistry)

@@ -37,24 +37,15 @@ public static class AdvancedMeasurementService
     {
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(rois);
-        if (!double.IsFinite(pixelSize) || pixelSize <= 0)
-            return Failure(definition.Id, "Pixel size must be finite and greater than zero.");
-        if (string.IsNullOrWhiteSpace(unit))
-            return Failure(definition.Id, "A physical unit is required.");
-        if (calibration is not null && !calibration.IsValid)
-            return Failure(definition.Id, "Camera calibration contains invalid parameters.");
+        if (GetInputError(pixelSize, unit, calibration) is { } error)
+            return Failure(definition.Id, error);
 
         RoiBase[] roiList = rois.Where(roi => roi is not null).ToArray();
-        var byRoiId = roiList.Where(roi => roi.MeasurementId != Guid.Empty)
-            .GroupBy(roi => roi.MeasurementId).ToDictionary(group => group.Key, group => group.ToArray());
-        AdvancedMeasurementDefinition[] definitions = EnumerateDefinitions(roiList).ToArray();
-        if (definitions.Length > MaximumDefinitions)
-            return Failure(definition.Id, $"A workspace may contain at most {MaximumDefinitions} advanced measurement definitions.");
-        var byDefinitionId = definitions.GroupBy(item => item.Id).ToDictionary(group => group.Key, group => group.ToArray());
-        if (byDefinitionId.TryGetValue(definition.Id, out AdvancedMeasurementDefinition[]? matchingDefinitions) && matchingDefinitions.Length != 1)
-            return Failure(definition.Id, "A measurement definition ID is duplicated.");
-        var context = new EvaluationContext(pixelSize, unit.Trim(), calibration, bitmap, workpiece, byRoiId, byDefinitionId);
-        return context.Evaluate(definition, new HashSet<Guid>());
+        var definitions = EnumerateDefinitions(roiList);
+        if (definitions.Count > MaximumDefinitions)
+            return Failure(definition.Id, TooManyDefinitionsError);
+
+        return CreateContext(roiList, definitions, pixelSize, unit, calibration, bitmap, workpiece).Evaluate(definition);
     }
 
     /// <summary>Evaluates every saved definition using the current image and calibration.</summary>
@@ -67,11 +58,36 @@ public static class AdvancedMeasurementService
         WorkpieceCoordinateSystem? workpiece = null)
     {
         ArgumentNullException.ThrowIfNull(rois);
-        AdvancedMeasurementDefinition[] definitions = EnumerateDefinitions(rois).ToArray();
-        if (definitions.Length > MaximumDefinitions)
-            return Array.AsReadOnly(definitions.Select(definition => Failure(definition.Id,
-                $"A workspace may contain at most {MaximumDefinitions} advanced measurement definitions.")).ToArray());
-        return Array.AsReadOnly(definitions.Select(definition => Evaluate(definition, rois, pixelSize, unit, calibration, bitmap, workpiece)).ToArray());
+        RoiBase[] roiList = rois.Where(roi => roi is not null).ToArray();
+        var definitions = EnumerateDefinitions(roiList);
+        if (definitions.Count == 0)
+            return Array.Empty<AdvancedMeasurementEvaluation>();
+
+        string? error = definitions.Count > MaximumDefinitions ? TooManyDefinitionsError : GetInputError(pixelSize, unit, calibration);
+        if (error is not null)
+            return Array.AsReadOnly(definitions.Select(definition => Failure(definition.Id, error)).ToArray());
+
+        var context = CreateContext(roiList, definitions, pixelSize, unit, calibration, bitmap, workpiece);
+        return Array.AsReadOnly(definitions.Select(context.Evaluate).ToArray());
+    }
+
+    private static string TooManyDefinitionsError => $"A workspace may contain at most {MaximumDefinitions} advanced measurement definitions.";
+
+    private static string? GetInputError(double pixelSize, string unit, CameraCalibration? calibration)
+    {
+        if (!double.IsFinite(pixelSize) || pixelSize <= 0) return "Pixel size must be finite and greater than zero.";
+        if (string.IsNullOrWhiteSpace(unit)) return "A physical unit is required.";
+        if (calibration is { IsValid: false }) return "Camera calibration contains invalid parameters.";
+        return null;
+    }
+
+    private static EvaluationContext CreateContext(RoiBase[] rois, IReadOnlyList<AdvancedMeasurementDefinition> definitions,
+        double pixelSize, string unit, CameraCalibration? calibration, BitmapSource? bitmap, WorkpieceCoordinateSystem? workpiece)
+    {
+        var byRoiId = rois.Where(roi => roi.MeasurementId != Guid.Empty)
+            .GroupBy(roi => roi.MeasurementId).ToDictionary(group => group.Key, group => group.ToArray());
+        var byDefinitionId = definitions.GroupBy(item => item.Id).ToDictionary(group => group.Key, group => group.ToArray());
+        return new EvaluationContext(pixelSize, unit.Trim(), calibration, bitmap, workpiece, byRoiId, byDefinitionId);
     }
 
     private static AdvancedMeasurementEvaluation Failure(Guid id, string error) => new()
@@ -127,13 +143,29 @@ public static class AdvancedMeasurementService
         Dictionary<Guid, RoiBase[]> byRoiId,
         Dictionary<Guid, AdvancedMeasurementDefinition[]> byDefinitionId)
     {
-        public AdvancedMeasurementEvaluation Evaluate(AdvancedMeasurementDefinition definition, HashSet<Guid> stack)
+        private readonly List<double> _undistortResiduals = [];
+        private readonly HashSet<Guid> _activeDefinitions = [];
+        private readonly Dictionary<Guid, (AdvancedMeasurementEvaluation Result, int Depth)> _successfulEvaluations = [];
+
+        public AdvancedMeasurementEvaluation Evaluate(AdvancedMeasurementDefinition definition) => Evaluate(definition, out _);
+
+        private AdvancedMeasurementEvaluation Evaluate(AdvancedMeasurementDefinition definition, out int depth)
         {
+            depth = 1;
             if (definition.Id == Guid.Empty) return Failure(definition.Id, "Measurement definition ID is empty.");
-            if (stack.Count >= MaximumRecursionDepth) return Failure(definition.Id, $"Constructed measurement nesting is limited to {MaximumRecursionDepth} levels.");
-            if (!stack.Add(definition.Id)) return Failure(definition.Id, "A cycle was found in constructed measurement sources.");
+            int ancestorCount = _activeDefinitions.Count;
+            if (ancestorCount >= MaximumRecursionDepth) return Failure(definition.Id, $"Constructed measurement nesting is limited to {MaximumRecursionDepth} levels.");
+            if (!_activeDefinitions.Add(definition.Id)) return Failure(definition.Id, "A cycle was found in constructed measurement sources.");
+            int residualCountAtStart = _undistortResiduals.Count;
             try
             {
+                // A valid result can still be too deep when used as a child of another definition.
+                if (_successfulEvaluations.TryGetValue(definition.Id, out var cached) && ancestorCount + cached.Depth <= MaximumRecursionDepth)
+                {
+                    depth = cached.Depth;
+                    return cached.Result;
+                }
+
                 if (definition.Sources is null) return Failure(definition.Id, "Source ID list is missing.");
                 if (definition.Sources.Length > MaximumSourcesPerDefinition)
                     return Failure(definition.Id, $"A definition may contain at most {MaximumSourcesPerDefinition} sources.");
@@ -157,25 +189,41 @@ public static class AdvancedMeasurementService
                     else if (byDefinitionId.TryGetValue(sourceId, out AdvancedMeasurementDefinition[]? definitionMatches))
                     {
                         if (definitionMatches.Length != 1) return Failure(definition.Id, "A constructed source ID is duplicated.");
-                        AdvancedMeasurementEvaluation nested = Evaluate(definitionMatches[0], stack);
-                        if (!nested.Success) return Failure(definition.Id, $"Constructed source {sourceId} failed: {nested.Error}");
+                        AdvancedMeasurementEvaluation nested = Evaluate(definitionMatches[0], out int nestedDepth);
+                        if (!nested.Success)
+                            return Failure(definition.Id, $"Constructed source {sourceId} failed: {nested.Error}") with { Warnings = [.. nested.Warnings] };
+                        depth = Math.Max(depth, nestedDepth + 1);
                         sources.Add(ResolvedSource.FromEvaluation(definitionMatches[0].Kind, nested));
                     }
                     else return Failure(definition.Id, $"Source {sourceId} was not found.");
                 }
 
+                if (_undistortResiduals.Count > residualCountAtStart)
+                {
+                    return DistortionFailure(definition.Id, residualCountAtStart);
+                }
+
                 AdvancedMeasurementEvaluation evaluation = EvaluateKind(definition, sources);
+                if (_undistortResiduals.Count > residualCountAtStart)
+                {
+                    return DistortionFailure(definition.Id, residualCountAtStart);
+                }
                 PointD[][] contours = sources.Where(source => source.WasRasterExtracted && source.Contour is not null)
                     .SelectMany(source => new[] { Close(source.Contour!) }.Concat(source.Holes.Select(Close)))
                     .ToArray();
                 if (contours.Length > 0) evaluation = evaluation with { SourceContours = contours };
+                if (evaluation.Success) _successfulEvaluations[definition.Id] = (evaluation, depth);
                 return evaluation;
             }
             catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or ArithmeticException)
             {
                 return Failure(definition.Id, exception.Message);
             }
-            finally { stack.Remove(definition.Id); }
+            finally
+            {
+                _undistortResiduals.RemoveRange(residualCountAtStart, _undistortResiduals.Count - residualCountAtStart);
+                _activeDefinitions.Remove(definition.Id);
+            }
         }
 
         private (ResolvedSource? Source, string? Error) FromRoi(RoiBase roi, AdvancedMeasurementKind requestedKind)
@@ -574,8 +622,32 @@ public static class AdvancedMeasurementService
         }
         private PointD Convert(PointD point)
         {
-            PointD corrected = calibration?.UndistortPoint(point) ?? point;
+            PointD corrected = point;
+            if (calibration is { } activeCalibration)
+            {
+                UndistortResult result = activeCalibration.Undistort(point);
+                corrected = result.Point;
+                if (!result.Converged)
+                {
+                    _undistortResiduals.Add(double.IsFinite(result.ResidualPixels) ? result.ResidualPixels : double.MaxValue);
+                }
+            }
+
             return new PointD(corrected.X * pixelSize, corrected.Y * pixelSize);
+        }
+
+        private AdvancedMeasurementEvaluation DistortionFailure(Guid id, int residualCountAtStart)
+        {
+            int count = _undistortResiduals.Count - residualCountAtStart;
+            double maximumResidual = 0;
+            for (int index = residualCountAtStart; index < _undistortResiduals.Count; index++)
+            {
+                maximumResidual = Math.Max(maximumResidual, _undistortResiduals[index]);
+            }
+
+            string warning = FormattableString.Invariant(
+                $"Distortion inversion did not converge for {count} source point(s); max residual {maximumResidual:G4} px. The affected measurement cannot be evaluated.");
+            return Failure(id, warning) with { Warnings = [warning] };
         }
 
         private CircleData CircleFrom(PointD center, double radius)

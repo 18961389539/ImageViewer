@@ -39,6 +39,36 @@ public class PrintableReportTests
     }
 
     [Fact]
+    public void DocumentShowsUndistortionFailureFromReportAudit()
+    {
+        WpfTestRunner.Run(() =>
+        {
+            var calibration = new CameraCalibration
+            {
+                PrincipalX = 0,
+                PrincipalY = 0,
+                NormalizationRadius = 100,
+                K1 = -1,
+                MeasurementUncertaintyPixels = 0.2
+            };
+            DistortionAudit audit = CameraCalibrationAudit.Audit(calibration, [new PointD(100, 0)]);
+            Assert.True(audit.HasNonConvergedPoints);
+            MeasurementReport report = MeasurementReportBuilder.Build(
+                [new MeasurementReportItem("长度", "长度", "mm", null, 5, 0.05, 0.05, "Passed", "NotEvaluable")],
+                0.05,
+                "mm",
+                calibration,
+                distortionAudit: audit);
+
+            FlowDocument document = MeasurementReportDocumentBuilder.Build(report, []);
+            string text = new TextRange(document.ContentStart, document.ContentEnd).Text;
+
+            Assert.Contains("去畸变反解未收敛", text);
+            Assert.Contains("相关尺寸和公差判定不可评估", text);
+        });
+    }
+
+    [Fact]
     public void LongReportPaginatesAcrossMultiplePages()
     {
         WpfTestRunner.Run(() =>

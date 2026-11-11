@@ -1,4 +1,6 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using ImageViewer.Drawing;
@@ -56,6 +58,20 @@ namespace ImageViewer.Controls
 
             public bool TrySnapPointToEdge(Point seed, out Point snapped, out double score, out double confidence)
                 => _owner.TrySnapPointToEdge(seed, out snapped, out score, out confidence);
+
+            public Task<EdgeSnapResult> SnapPointToEdgeAsync(Point seed, CancellationToken cancellationToken)
+                => _owner.SnapPointToEdgeAsync(seed, cancellationToken);
+
+            public void PostToUiThread(Action action)
+            {
+                if (_owner.Dispatcher.CheckAccess())
+                {
+                    action();
+                    return;
+                }
+
+                _owner.Dispatcher.BeginInvoke(action);
+            }
 
             public void Commit(RoiBase roi) => _owner.CommitRoi(roi);
 

@@ -45,5 +45,7 @@ public sealed record AdvancedMeasurementEvaluation
     public double[] Samples { get; init; } = [];
     public double[] Stations { get; init; } = [];
     public bool? WithinLimits { get; init; }
+    /// <summary>Non-fatal defects that affect how much the reported values can be trusted.</summary>
+    public string[] Warnings { get; init; } = [];
 }
 #pragma warning restore CS1591

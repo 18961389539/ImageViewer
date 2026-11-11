@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Windows.Media.Imaging;
 using ImageViewer.Core.Measurements;
 using ImageViewer.Core.Geometry;
+using ImageViewer.Core.Persistence;
 using ImageViewer.Models;
 using ImageViewer.Plugins;
 
@@ -16,16 +17,52 @@ public static class AdvancedMeasurementExportService
 {
     private static readonly JsonSerializerOptions MetadataOptions = new() { WriteIndented = true };
     /// <summary>Writes CSV and metadata together with rollback protection.</summary>
-    public static async Task SaveAsync(string path, IReadOnlyList<RoiBase> rois, double pixelSize, string unit,
+    public static Task SaveAsync(string path, IReadOnlyList<RoiBase> rois, double pixelSize, string unit,
         CameraCalibration? calibration = null, BitmapSource? bitmap = null, string? sourceImagePath = null,
         WorkpieceCoordinateSystem? workpiece = null)
+        => SaveAsync(path, RoiPluginRegistry.CreateBuiltIn(), rois, pixelSize, unit,
+            calibration, bitmap, sourceImagePath, workpiece);
+
+    /// <summary>Captures inputs on the caller's thread, then evaluates and exports on a background thread.</summary>
+    public static async Task SaveAsync(string path, RoiPluginRegistry pluginRegistry,
+        IReadOnlyList<RoiBase> rois, double pixelSize, string unit,
+        CameraCalibration? calibration = null, BitmapSource? bitmap = null, string? sourceImagePath = null,
+        WorkpieceCoordinateSystem? workpiece = null, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        ArgumentNullException.ThrowIfNull(pluginRegistry);
         ArgumentNullException.ThrowIfNull(rois);
+        cancellationToken.ThrowIfCancellationRequested();
+        RoiDocument roiDocument = RoiPersistenceService.CreateDocument(rois, pixelSize, unit, pluginRegistry);
+        RoiBase[] capturedRois = rois.Select(roi =>
+        {
+            RoiBase copy = roi.Clone();
+            if (ReferenceEquals(copy, roi))
+            {
+                throw new InvalidOperationException("An ROI clone must be independent of its source before exporting.");
+            }
+            copy.MeasurementId = roi.MeasurementId;
+            copy.AdvancedMeasurements = roi.AdvancedMeasurements;
+            return copy;
+        }).ToArray();
+        BitmapSource? capturedBitmap = bitmap == null || bitmap.IsFrozen
+            ? bitmap : (BitmapSource)bitmap.GetCurrentValueAsFrozen();
+        CameraCalibration? capturedCalibration = calibration?.Clone();
+        string fullPath = Path.GetFullPath(path);
+        await Task.Run(() => SaveSnapshotAsync(fullPath, capturedRois, roiDocument, pixelSize, unit,
+            capturedCalibration, capturedBitmap, sourceImagePath, workpiece, cancellationToken), cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task SaveSnapshotAsync(string path, IReadOnlyList<RoiBase> rois, RoiDocument roiDocument,
+        double pixelSize, string unit, CameraCalibration? calibration, BitmapSource? bitmap,
+        string? sourceImagePath, WorkpieceCoordinateSystem? workpiece, CancellationToken cancellationToken)
+    {
         var definitions = AdvancedMeasurementService.EnumerateDefinitions(rois).ToArray();
+        cancellationToken.ThrowIfCancellationRequested();
         var results = AdvancedMeasurementService.EvaluateAll(rois, pixelSize, unit, calibration, bitmap, workpiece).ToArray();
+        cancellationToken.ThrowIfCancellationRequested();
         string csv = BuildCsv(definitions, results);
-        string roiJson = RoiPersistenceService.Serialize(rois, pixelSize, unit, RoiPluginRegistry.CreateBuiltIn());
+        string roiJson = JsonSerializer.Serialize(roiDocument, ImageViewerCoreJsonSerializationContext.Default.RoiDocument);
         string? imageHash = null;
         if (bitmap != null)
         {
@@ -34,6 +71,7 @@ public static class AdvancedMeasurementExportService
             using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
             for (int y = 0; y < bitmap.PixelHeight; y++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 bitmap.CopyPixels(new System.Windows.Int32Rect(0, y, bitmap.PixelWidth, 1), row, stride, 0);
                 hash.AppendData(row);
             }
@@ -60,7 +98,7 @@ public static class AdvancedMeasurementExportService
         {
             [path] = csv,
             [Path.ChangeExtension(path, ".metadata.json")] = json
-        }).ConfigureAwait(false);
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Generates invariant CSV including failures and every profile sample.</summary>

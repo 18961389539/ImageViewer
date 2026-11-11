@@ -57,6 +57,16 @@ namespace ImageViewer.Controls
             _analysisController.UpdateRenderedImage();
         }
 
+        internal void UpdateRenderedImageForDisplaySettings()
+        {
+            if (!IsLoaded)
+            {
+                return;
+            }
+
+            _analysisController.UpdateRenderedImageForDisplaySettings();
+        }
+
         internal BitmapSource? GetAnalysisBitmapSource() => _analysisController.GetAnalysisBitmapSource();
 
         private Task PrepareAnalysisResourcesAsync(ImageSource? source)
@@ -152,7 +162,7 @@ namespace ImageViewer.Controls
         {
             if (d is ImageViewer viewer)
             {
-                viewer.UpdateRenderedImage();
+                viewer.UpdateRenderedImageForDisplaySettings();
             }
         }
 

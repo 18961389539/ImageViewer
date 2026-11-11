@@ -1,7 +1,9 @@
 #pragma warning disable CS1591
 using System;
+using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using ImageViewer.Core.Display;
+using ImageViewer.Core.Geometry;
 using ImageViewer.Models;
 
 namespace ImageViewer.Core.Persistence
@@ -19,6 +21,9 @@ namespace ImageViewer.Core.Persistence
         public string? SessionName { get; set; }
         public DateTimeOffset SavedAtUtc { get; set; }
         public string? ImagePath { get; set; }
+        /// <summary>Optional SHA-256 of the exact bytes referenced by ImagePath.</summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? ImageSha256 { get; set; }
         [JsonConverter(typeof(RoiDocumentJsonConverter))]
         public RoiDocument? RoiDocument { get; set; }
 
@@ -43,6 +48,15 @@ namespace ImageViewer.Core.Persistence
         public double TranslateX { get; set; }
         public double TranslateY { get; set; }
         public CameraCalibration? Calibration { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public WorkpieceCoordinateSystem? CoordinateSystem { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<RecipeDatumPoint>? ReferenceDatumPoints { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<RecipeDatumPoint>? CurrentDatumPoints { get; set; }
 
         /// <summary>
         /// 显示调节（窗宽窗位/亮度/对比度/伽马/反色）。

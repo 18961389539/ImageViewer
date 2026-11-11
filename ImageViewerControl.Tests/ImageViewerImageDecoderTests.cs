@@ -2,10 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using ImageViewer.Abstractions;
 using ImageViewer.Controls;
+using ImageViewer.Models;
 using ImageViewer.Services;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace ImageViewerControl.Tests
@@ -18,6 +22,50 @@ namespace ImageViewerControl.Tests
         private const uint White = 0xFFFFFFFF;
         private const uint Black = 0xFF000000;
         private const uint Yellow = 0xFF00FFFF;
+
+        [Fact]
+        public async Task VolumePreflight_ChecksAllDimensionsAndBudgetsForDecodedFormat()
+        {
+            string first = Path.Combine(Path.GetTempPath(), $"volume-first-{Guid.NewGuid():N}.png");
+            string second = Path.Combine(Path.GetTempPath(), $"volume-second-{Guid.NewGuid():N}.png");
+            try
+            {
+                WpfTestRunner.Run(() =>
+                {
+                    SaveGray16Slice(first, 3);
+                    SaveGray16Slice(second, 3);
+                });
+                VolumeImportEstimate estimate = await VolumeImportPreflight.InspectAsync([first, second]);
+                Assert.Equal((3, 4, 64L, 96L), (estimate.Width, estimate.Height, estimate.DecodedBytes, estimate.EstimatedBytes));
+                Assert.True(estimate.ExceedsBudget(95));
+                Assert.False(estimate.ExceedsBudget(96));
+
+                WpfTestRunner.Run(() => SaveGray16Slice(second, 5));
+                InvalidDataException error = await Assert.ThrowsAsync<InvalidDataException>(
+                    () => VolumeImportPreflight.InspectAsync([first, second]));
+                Assert.Contains(Path.GetFileName(second), error.Message);
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                    () => VolumeImportPreflight.InspectAsync([first, second], new CancellationToken(true)));
+            }
+            finally
+            {
+                File.Delete(first);
+                File.Delete(second);
+            }
+        }
+
+        private static void SaveGray16Slice(string path, int width, ushort intensity = 0)
+        {
+            const int height = 4;
+            int stride = width * 2;
+            var pixels = new ushort[height * width];
+            Array.Fill(pixels, intensity);
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(
+                BitmapSource.Create(width, height, 96, 96, PixelFormats.Gray16, null, pixels, stride)));
+            using FileStream stream = File.Create(path);
+            encoder.Save(stream);
+        }
 
         public static IEnumerable<object[]> OrientationCases()
         {
@@ -43,6 +91,115 @@ namespace ImageViewerControl.Tests
                 Assert.Equal(expectedWidth, result.PixelWidth);
                 Assert.Equal(expectedHeight, result.PixelHeight);
                 Assert.Equal(expectedPixels, ReadPixels(result));
+            });
+        }
+
+        [Fact]
+        public async Task VerifiedVolumeImport_RejectsChangedBytesEvenWhenLengthAndTimestampMatch()
+        {
+            string first = Path.Combine(Path.GetTempPath(), $"volume-first-{Guid.NewGuid():N}.png");
+            string second = Path.Combine(Path.GetTempPath(), $"volume-second-{Guid.NewGuid():N}.png");
+            try
+            {
+                WpfTestRunner.Run(() =>
+                {
+                    SaveGray16Slice(first, 3, 1000);
+                    SaveGray16Slice(second, 3, 40000);
+                });
+                byte[] original = await File.ReadAllBytesAsync(second);
+                byte[] padded = [.. original, 0];
+                await File.WriteAllBytesAsync(second, padded);
+                DateTime originalWriteTime = File.GetLastWriteTimeUtc(second);
+
+                VolumeImportPlan plan = await VolumeImportPreflight.PrepareAsync([first, second]);
+                var progress = new SliceLoadProgress();
+                BitmapSource[] loaded = await plan.LoadAllSlicesAsync(progress);
+                Assert.Collection(progress.CompletedCounts, count => Assert.Equal(1, count), count => Assert.Equal(2, count));
+                Assert.Collection(loaded, slice => AssertSlice(slice, 1000), slice => AssertSlice(slice, 40000));
+
+                padded[^1] = 1;
+                await File.WriteAllBytesAsync(second, padded);
+                File.SetLastWriteTimeUtc(second, originalWriteTime);
+                Assert.Equal(originalWriteTime, File.GetLastWriteTimeUtc(second));
+                Assert.Equal(padded.Length, new FileInfo(second).Length);
+
+                InvalidDataException changed = await Assert.ThrowsAsync<InvalidDataException>(() => plan.LoadAllSlicesAsync());
+                Assert.IsType<ImageViewerSessionImageMismatchException>(changed.InnerException);
+                Assert.Contains(Path.GetFileName(second), changed.Message, StringComparison.Ordinal);
+
+                File.Delete(second);
+                InvalidDataException missing = await Assert.ThrowsAsync<InvalidDataException>(() => plan.LoadSliceAsync(1));
+                Assert.IsType<FileNotFoundException>(missing.InnerException);
+                Assert.Contains(Path.GetFileName(second), missing.Message, StringComparison.Ordinal);
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => plan.LoadSliceAsync(0, new CancellationToken(true)));
+            }
+            finally
+            {
+                File.Delete(first);
+                File.Delete(second);
+            }
+
+            static void AssertSlice(BitmapSource slice, ushort expected)
+            {
+                Assert.True(slice.IsFrozen);
+                Assert.Equal(PixelFormats.Gray16, slice.Format);
+                Assert.Equal((3, 4), (slice.PixelWidth, slice.PixelHeight));
+                var pixels = new ushort[12];
+                slice.CopyPixels(pixels, 6, 0);
+                Assert.All(pixels, intensity => Assert.Equal(expected, intensity));
+            }
+        }
+
+        private sealed class SliceLoadProgress : IProgress<int>
+        {
+            public List<int> CompletedCounts { get; } = [];
+
+            public void Report(int value)
+            {
+                lock (CompletedCounts)
+                {
+                    CompletedCounts.Add(value);
+                }
+            }
+        }
+
+        [Fact]
+        public void VerifiedVolumeImport_SessionKeepsStoredGridForExifRotatedSlice()
+        {
+            WpfTestRunner.RunAsync(async () =>
+            {
+                string root = Path.Combine(Path.GetTempPath(), $"imageviewer-volume-exif-{Guid.NewGuid():N}");
+                Directory.CreateDirectory(root);
+                try
+                {
+                    string first = Path.Combine(root, "first.jpg");
+                    string second = Path.Combine(root, "second.jpg");
+                    string sessionPath = Path.Combine(root, "slice.ivsession");
+                    WriteJpegWithOrientation(first, 6);
+                    File.Copy(first, second);
+                    VolumeImportPlan plan = await VolumeImportPreflight.PrepareAsync([first, second]);
+                    BitmapSource slice = await plan.LoadSliceAsync(0);
+                    var image = ImageViewerSnapshotImage.Capture(
+                        ImageViewerImageSourceRegistry.TryGetPath(slice, out string sourcePath) ? sourcePath : null,
+                        () => slice);
+                    var registry = ImageViewer.Plugins.RoiPluginRegistry.CreateBuiltIn();
+                    var snapshot = new ImageViewerPersistenceSnapshot(image.Path,
+                        RoiPersistenceService.CreateDocument([], 1, "px", registry), 1, 0, 0, null)
+                    {
+                        InMemoryImage = image.Bitmap,
+                        ImageSha256 = image.Sha256
+                    };
+                    var service = new ImageViewerSessionService();
+                    await service.SaveToFileAsync(sessionPath, snapshot, registry);
+                    string savedImagePath = (await service.LoadFromFileAsync(sessionPath, registry)).ImagePath!;
+                    BitmapSource reopened = await ImageViewerImageDecoder.LoadFromFileAsync(savedImagePath);
+
+                    Assert.Equal((2, 3), (reopened.PixelWidth, reopened.PixelHeight));
+                }
+                finally
+                {
+                    Directory.Delete(root, recursive: true);
+                }
             });
         }
 
@@ -98,6 +255,81 @@ namespace ImageViewerControl.Tests
                     File.Delete(filePath);
                 }
             });
+        }
+
+        [Fact]
+        public void ProjectAndBatchUseTheSameExifCoordinates()
+        {
+            WpfTestRunner.RunAsync(async () =>
+            {
+                string root = Path.Combine(Path.GetTempPath(), $"imageviewer-exif-workflows-{Guid.NewGuid():N}");
+                Directory.CreateDirectory(root);
+                try
+                {
+                    string imagePath = Path.Combine(root, "rotated.jpg");
+                    string sessionPath = Path.Combine(root, "project.ivsession");
+                    string csvPath = Path.Combine(root, "batch.csv");
+                    WriteJpegWithOrientation(imagePath, 6);
+                    File.WriteAllText(sessionPath, """{"Version":2,"ImagePath":"rotated.jpg","Scale":1}""");
+
+                    using ServiceProvider provider = new ServiceCollection()
+                        .AddSingleton<IImageViewerSessionStoragePolicy>(new LocalAppDataImageViewerSessionStoragePolicy(root, TimeSpan.FromSeconds(30)))
+                        .AddImageViewerHost()
+                        .BuildServiceProvider();
+                    using IServiceScope scope = provider.CreateScope();
+                    var viewer = scope.ServiceProvider.GetRequiredService<ImageViewer.Controls.ImageViewer>();
+                    Assert.True(await viewer.OpenProjectFromFileAsync(sessionPath));
+                    var bitmap = Assert.IsAssignableFrom<BitmapSource>(viewer.ImageSource);
+                    Assert.Equal((3, 2), (bitmap.PixelWidth, bitmap.PixelHeight));
+
+                    var roi = new CircleRoi { Center = new PointD(2.5, 0.5), Radius = 0.5 };
+                    Assert.True(ImageAnalysisService.TryCalculateStatistics(bitmap, roi, out RoiStatistics statistics));
+                    await BatchRoiAnalysisExportService.ExportAsync(csvPath, [imagePath], [roi], 1, "px");
+                    string[] cells = (await File.ReadAllLinesAsync(csvPath))[1].Split(',');
+                    Assert.Equal(statistics.Mean, double.Parse(cells[8], System.Globalization.CultureInfo.InvariantCulture), 2);
+                    Assert.Equal("1", cells[12]);
+
+                    BitmapSource rawSlice = await ImageViewerImageDecoder.LoadFromFileAsync(imagePath, applyExifOrientation: false);
+                    Assert.Equal((2, 3), (rawSlice.PixelWidth, rawSlice.PixelHeight));
+                }
+                finally
+                {
+                    Directory.Delete(root, recursive: true);
+                }
+            });
+        }
+
+        [Fact]
+        public async Task BatchExport_PreservesGray16Statistics()
+        {
+            string root = Path.Combine(Path.GetTempPath(), $"imageviewer-gray16-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(root);
+            try
+            {
+                string imagePath = Path.Combine(root, "gray16.tiff");
+                string csvPath = Path.Combine(root, "batch.csv");
+                const ushort intensity = 4096;
+                ushort[] pixels = [intensity, intensity, intensity, intensity];
+                BitmapSource source = BitmapSource.Create(2, 2, 96, 96, PixelFormats.Gray16, null, pixels, 4);
+                var encoder = new TiffBitmapEncoder();
+                encoder.Frames.Add(BitmapFrame.Create(source));
+                using (FileStream stream = File.Create(imagePath))
+                {
+                    encoder.Save(stream);
+                }
+
+                BitmapSource bitmap = await ImageViewerImageDecoder.LoadFromFileAsync(imagePath);
+                Assert.Equal(PixelFormats.Gray16, bitmap.Format);
+                Assert.True(bitmap.IsFrozen);
+
+                var roi = new CircleRoi { Center = new PointD(1, 1), Radius = 1 };
+                await BatchRoiAnalysisExportService.ExportAsync(csvPath, [imagePath], [roi], 1, "px");
+                Assert.Contains(",4096.00,4096,4096,0.00,4,", (await File.ReadAllLinesAsync(csvPath))[1]);
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
         }
 
         private static BitmapSource CreateSource()

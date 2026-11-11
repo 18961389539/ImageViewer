@@ -142,7 +142,12 @@ internal static class MeasurementReportDocumentBuilder
             ? calibration.MeasurementUncertaintyPixels
             : null;
         double? reprojectionRms = calibration is { } c && c.ReprojectionErrorRms > 0 ? c.ReprojectionErrorRms : null;
-        if (!uncertaintyPixels.HasValue && !reprojectionRms.HasValue)
+        DistortionAudit? audit = report.DistortionAudit;
+        double? pointUncertaintyPixels = audit is { HasPoints: true } && audit.MaximumUncertaintyPixels > 0
+            ? audit.MaximumUncertaintyPixels
+            : null;
+        if (!uncertaintyPixels.HasValue && !reprojectionRms.HasValue && !pointUncertaintyPixels.HasValue &&
+            audit is not { HasNonConvergedPoints: true })
         {
             return;
         }
@@ -167,8 +172,33 @@ internal static class MeasurementReportDocumentBuilder
             list.ListItems.Add(new ListItem(new Paragraph(CreateRun(text))));
         }
 
+        if (audit is { HasPoints: true })
+        {
+            if (pointUncertaintyPixels.HasValue &&
+                (!uncertaintyPixels.HasValue || pointUncertaintyPixels.Value > uncertaintyPixels.Value))
+            {
+                string text = "逐点去畸变不确定度（最大）: "
+                    + pointUncertaintyPixels.Value.ToString("G4", CultureInfo.InvariantCulture) + " px";
+                if (report.Scale.IsCalibrated)
+                {
+                    text += "（≈ " + (pointUncertaintyPixels.Value * report.Scale.PixelSize).ToString("G4", CultureInfo.InvariantCulture)
+                        + " " + report.Scale.Unit + ", 1σ）";
+                }
+
+                list.ListItems.Add(new ListItem(new Paragraph(CreateRun(text))));
+            }
+
+            if (audit.HasNonConvergedPoints)
+            {
+                list.ListItems.Add(new ListItem(new Paragraph(CreateRun(
+                    "去畸变反解未收敛: " + audit.NonConvergedPointCount + "/" + audit.PointCount + " 个测量点，最大残差 "
+                    + audit.MaximumResidualPixels.ToString("G4", CultureInfo.InvariantCulture)
+                    + " px；相关尺寸和公差判定不可评估。"))));
+            }
+        }
+
         list.ListItems.Add(new ListItem(new Paragraph(CreateRun(
-            "单次测量的综合不确定度 = 重复性(未评估) ⊕ 标定不确定度；未做重复测量时以上述标定不确定度为准。"))));
+            "单次测量的综合不确定度 = 重复性(未评估) ⊕ 标定不确定度；未做重复测量时取标定不确定度与逐点去畸变不确定度中的较大者。"))));
         document.Blocks.Add(list);
     }
 

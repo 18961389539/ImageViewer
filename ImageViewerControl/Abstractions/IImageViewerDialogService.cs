@@ -1,4 +1,5 @@
 using System.Windows;
+using ImageViewer.Localization;
 using ImageViewer.Models;
 
 namespace ImageViewer.Abstractions
@@ -20,5 +21,11 @@ namespace ImageViewer.Abstractions
         void ShowReadOnlyTextDialog(Window? owner, string title, string text);
 
         void ShowWarning(Window? owner, string title, string message);
+
+        /// <summary>Asks whether to save, discard, or cancel before replacing a dirty document.</summary>
+        MessageBoxResult ConfirmUnsavedDocumentChanges(Window? owner) => owner == null
+            ? MessageBoxResult.Cancel
+            : MessageBox.Show(owner, UiText.Get("UnsavedDocumentReplaceMessage"), UiText.Get("UnsavedDocumentTitle"),
+                MessageBoxButton.YesNoCancel, MessageBoxImage.Warning, MessageBoxResult.Yes);
     }
 }

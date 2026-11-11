@@ -69,10 +69,16 @@ namespace ImageViewer.Services
                 Description = description,
                 SavedAtUtc = DateTimeOffset.UtcNow,
                 CoordinateSystem = coordinateSystem,
-                DatumPoints = datumPoints?.ToList() ?? new List<RecipeDatumPoint>(),
+                DatumPoints = datumPoints?.Select(point => new RecipeDatumPoint
+                {
+                    Name = point.Name,
+                    X = point.X,
+                    Y = point.Y
+                }).ToList() ?? new List<RecipeDatumPoint>(),
                 PixelSize = pixelSize,
                 PhysicalUnit = physicalUnit,
-                Calibration = calibration,
+                Calibration = calibration?.Clone(),
+                QualityProfile = templateDocument.QualityProfile,
                 Items = roiList.Select((roi, index) => new MeasurementRecipeItem
                 {
                     Key = $"{roi.RoiTypeName}#{index}",
@@ -81,7 +87,7 @@ namespace ImageViewer.Services
                     Tolerance = roi.Tolerance?.Clone(),
                     IsEnabled = roi.IsVisible,
                     // 公差只在 Tolerance 一处存放，这里把模板里的副本清掉，避免"改一处、另一处还是旧值"。
-                    Template = StripTolerance(templateDocument.Items[index])
+                    Template = PrepareTemplateForSave(templateDocument.Items[index])
                 }).ToList()
             };
         }
@@ -92,16 +98,43 @@ namespace ImageViewer.Services
         /// <see cref="MeasurementRecipeItem.Tolerance"/> 是同一份数据的两个出口；两者都在时无法判断谁生效，
         /// 因此配方统一以项上的 Tolerance 为准。
         /// </summary>
-        private static RoiPersistenceData StripTolerance(RoiPersistenceData template)
+        private static RoiPersistenceData PrepareTemplateForSave(RoiPersistenceData template)
         {
             template.Common.Tolerance = null;
+            ClearReferenceImageEvidence(template);
             return template;
+        }
+
+        private static void ClearReferenceImageEvidence(RoiPersistenceData template)
+        {
+            // Geometry is reusable; scores and residuals describe only the image used to create it.
+            if (string.Equals(template.Type, "point-coordinate-measure", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(template.Type, nameof(PointCoordinateMeasureRoi), StringComparison.OrdinalIgnoreCase))
+            {
+                template.IsEdgeSnapped = false;
+                template.EdgeScore = 0;
+                template.EdgeConfidence = 0;
+            }
+            else if (string.Equals(template.Type, "fitted-ellipse", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(template.Type, nameof(FittedEllipseRoi), StringComparison.OrdinalIgnoreCase))
+            {
+                template.Width = 0; // The fitted-ellipse payload stores its source point count here.
+                template.FitInlierCount = 0;
+                template.FitOutlierCount = 0;
+                template.FitResidualRms = 0;
+                template.FitResidualMedian = 0;
+                template.FitResidualMax = 0;
+                template.FitNoiseScale = 0;
+                template.FitAspectRatio = 0;
+                template.FitAlgorithm = null;
+            }
         }
 
         /// <summary>序列化配方（source-generated context，保证 AOT/裁剪友好）。</summary>
         public static string Serialize(MeasurementRecipeDocument recipe)
         {
             ArgumentNullException.ThrowIfNull(recipe);
+            recipe.QualityProfile?.Validate();
             return JsonSerializer.Serialize(recipe, ImageViewerCoreJsonSerializationContext.Default.MeasurementRecipeDocument);
         }
 
@@ -115,6 +148,20 @@ namespace ImageViewer.Services
             if (recipe is null)
             {
                 throw new JsonException("配方文件内容为空或不是有效的配方 JSON。");
+            }
+
+            if (recipe.Version > MeasurementRecipeDocument.CurrentVersion)
+            {
+                throw new NotSupportedException($"不支持配方版本 {recipe.Version}；当前支持到版本 {MeasurementRecipeDocument.CurrentVersion}。");
+            }
+
+            try
+            {
+                recipe.QualityProfile?.Validate();
+            }
+            catch (ArgumentException ex)
+            {
+                throw new JsonException($"配方中的检测质量门限无效：{ex.Message}", ex);
             }
 
             return recipe;
@@ -148,34 +195,55 @@ namespace ImageViewer.Services
             return Deserialize(File.ReadAllText(filePath));
         }
 
+        internal static Task<MeasurementRecipeDocument> LoadFromFileAsync(string filePath, CancellationToken cancellationToken)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+            return Task.Run(async () =>
+            {
+                string json = await File.ReadAllTextAsync(filePath, cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                return Deserialize(json);
+            }, cancellationToken);
+        }
+
         /// <summary>
         /// 把配方还原成 ROI 文档对象，交给统一的 ROI 反序列化路径。
         /// Chinese: 刻意复用 <see cref="RoiPersistenceService"/> 的文档管线而不是自己 new ROI：
         /// 版本校验、未知类型 → unresolved、公差应用这些语义只有一份，走同一条路才不会出现
         /// "加载会话能工作、加载配方不行"的分叉。
         /// </summary>
-        internal static RoiDocument BuildRoiDocument(MeasurementRecipeDocument recipe)
+        internal static RoiDocument BuildRoiDocument(MeasurementRecipeDocument recipe, Action<RoiPersistenceData>? transformTemplate = null)
         {
             ArgumentNullException.ThrowIfNull(recipe);
+            recipe.QualityProfile?.Validate();
 
             var document = new RoiDocument
             {
                 Version = 1,
                 PixelSize = recipe.HasValidScale ? recipe.PixelSize : null,
-                PhysicalUnit = string.IsNullOrWhiteSpace(recipe.PhysicalUnit) ? "px" : recipe.PhysicalUnit
+                PhysicalUnit = string.IsNullOrWhiteSpace(recipe.PhysicalUnit) ? "px" : recipe.PhysicalUnit,
+                QualityProfile = recipe.QualityProfile
             };
 
             foreach (MeasurementRecipeItem item in recipe.Items)
             {
                 if (item.Template is null)
                 {
-                    // 没有几何的项无法还原成 ROI——宁可跳过也不要造一个空壳 ROI 出来。
+                    if (item.IsEnabled)
+                    {
+                        throw new InvalidOperationException($"配方项“{item.DisplayName ?? item.Key}”缺少 ROI 几何。");
+                    }
+
                     continue;
                 }
 
-                // 公差以项上的为准回填进载荷（保存时被刻意清掉，避免两处出口）。
-                item.Template.Common.Tolerance = item.Tolerance?.Clone();
-                document.Items.Add(item.Template);
+                var typeInfo = ImageViewerCoreJsonSerializationContext.Default.RoiPersistenceData;
+                RoiPersistenceData template = JsonSerializer.SerializeToElement(item.Template, typeInfo).Deserialize(typeInfo)
+                    ?? throw new JsonException("无法复制配方 ROI 模板。");
+                ClearReferenceImageEvidence(template);
+                template.Common.Tolerance = item.Tolerance?.Clone();
+                transformTemplate?.Invoke(template);
+                document.Items.Add(template);
             }
 
             return document;

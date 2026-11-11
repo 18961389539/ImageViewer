@@ -120,8 +120,6 @@ namespace ImageViewer.Controls
             await RunShutdownOperationAsync(
                 "Drain autosave during unload",
                 () => _controlComposition.SessionController.DrainAutoSaveAsync());
-            // 关闭是"正常结束"：本实例留下的快照不该在下次启动时被当成待恢复文档。
-            _controlComposition.SessionController.ReleaseRecoveryOwnership();
         }
 
         private static IEnumerable<MenuItem> EnumerateMenuItems(ItemsControl itemsControl)

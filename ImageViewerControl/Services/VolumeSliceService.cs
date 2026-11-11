@@ -22,6 +22,14 @@ namespace ImageViewer.Services
     /// </summary>
     public sealed class VolumeSliceService
     {
+        /// <summary>
+        /// 每个体数据同时执行的重建上限。
+        /// Chinese: 64 MB LRU 只约束已完成结果，不约束在途任务；快速切层时若不限制并发，会同时复制并着色多个完整平面。
+        /// English: The 64 MB LRU bounds completed slices, not work in flight; cap parallel reconstructions so a fast slice
+        /// sweep cannot keep many full planes alive at once.
+        /// </summary>
+        internal const int MaxConcurrentSliceBuilds = 2;
+
         private static readonly ConditionalWeakTable<VolumeData, CachedIntensityVolume> IntensityCaches = new();
 
         public static BitmapSource GetSlice(VolumeData volume, VolumeSliceOrientation orientation, int sliceIndex, CancellationToken cancellationToken = default)
@@ -69,6 +77,13 @@ namespace ImageViewer.Services
             return IntensityCaches.TryGetValue(volume, out CachedIntensityVolume? cache) ? cache.EntryCount : 0;
         }
 
+        /// <summary>测试观测点：实际重建期间达到过的最大并发数。</summary>
+        internal static int GetMaxObservedSliceBuilds(VolumeData volume)
+        {
+            ArgumentNullException.ThrowIfNull(volume);
+            return IntensityCaches.TryGetValue(volume, out CachedIntensityVolume? cache) ? cache.MaxObservedSliceBuilds : 0;
+        }
+
         private static BitmapSource GetOrCreateSlice(VolumeData volume, VolumeSliceOrientation orientation, int sliceIndex, CancellationToken cancellationToken)
         {
             // 先做边界校验（保持原有异常语义），避免用一个非法索引去污染 single-flight 字典。
@@ -82,15 +97,18 @@ namespace ImageViewer.Services
             return cache.GetSlice(volume, orientation, sliceIndex, cancellationToken);
         }
 
-        private sealed class CachedIntensityVolume
+        private sealed class CachedIntensityVolume : IDisposable
         {
             private const long MaxSliceCacheBytes = 64L * 1024 * 1024;
 
             private readonly object _sliceCacheLock = new();
             private readonly ConcurrentDictionary<(VolumeSliceOrientation Orientation, int Index), SliceEntry> _slices = new();
             private readonly LinkedList<(VolumeSliceOrientation Orientation, int Index)> _sliceCacheOrder = new();
+            private readonly SemaphoreSlim _sliceBuildGate = new(MaxConcurrentSliceBuilds, MaxConcurrentSliceBuilds);
             private long _sliceCacheBytes;
             private int _sliceBuildCount;
+            private int _activeSliceBuildCount;
+            private int _maxObservedSliceBuilds;
 
             public CachedIntensityVolume(VolumeData volume)
             {
@@ -109,6 +127,8 @@ namespace ImageViewer.Services
 
             /// <summary>已入账的切片字节数。</summary>
             public long SliceCacheBytes => Volatile.Read(ref _sliceCacheBytes);
+
+            public int MaxObservedSliceBuilds => Volatile.Read(ref _maxObservedSliceBuilds);
 
             public BitmapSource GetSlice(VolumeData volume, VolumeSliceOrientation orientation, int sliceIndex, CancellationToken cancellationToken)
             {
@@ -245,23 +265,54 @@ namespace ImageViewer.Services
             /// single abandoned drag poison the shared result for every later caller; instead the build completes and is
             /// cached, so returning to that plane is an instant hit.
             /// </summary>
-            private Task<BitmapSource> BuildSliceAsync(VolumeData volume, (VolumeSliceOrientation Orientation, int Index) key)
+            private async Task<BitmapSource> BuildSliceAsync(VolumeData volume, (VolumeSliceOrientation Orientation, int Index) key)
             {
-                return Task.Run(() =>
+                // 排队任务只持有轻量条目；真正重建进入有界闸门，避免一次快速扫层同时复制多个完整平面。
+                await _sliceBuildGate.WaitAsync().ConfigureAwait(false);
+                try
                 {
                     Interlocked.Increment(ref _sliceBuildCount);
-
-                    Exception? fault = SliceBuildFaultForTest?.Invoke(volume, key);
-                    if (fault is not null)
+                    TrackBuildStarted();
+                    try
                     {
-                        throw fault;
+                        return await Task.Run(() =>
+                        {
+                            Exception? fault = SliceBuildFaultForTest?.Invoke(volume, key);
+                            if (fault is not null)
+                            {
+                                throw fault;
+                            }
+
+                            return key.Orientation == VolumeSliceOrientation.Coronal
+                                ? BuildCoronalSlice(volume, key.Index, CancellationToken.None)
+                                : BuildSagittalSlice(volume, key.Index, CancellationToken.None);
+                        }).ConfigureAwait(false);
+                    }
+                    finally
+                    {
+                        Interlocked.Decrement(ref _activeSliceBuildCount);
+                    }
+                }
+                finally
+                {
+                    _sliceBuildGate.Release();
+                }
+            }
+
+            private void TrackBuildStarted()
+            {
+                int active = Interlocked.Increment(ref _activeSliceBuildCount);
+                int observed = Volatile.Read(ref _maxObservedSliceBuilds);
+                while (active > observed)
+                {
+                    int previous = Interlocked.CompareExchange(ref _maxObservedSliceBuilds, active, observed);
+                    if (previous == observed)
+                    {
+                        return;
                     }
 
-                    BitmapSource slice = key.Orientation == VolumeSliceOrientation.Coronal
-                        ? BuildCoronalSlice(volume, key.Index, CancellationToken.None)
-                        : BuildSagittalSlice(volume, key.Index, CancellationToken.None);
-                    return slice;
-                });
+                    observed = previous;
+                }
             }
 
             private void RegisterCompletedSlice((VolumeSliceOrientation Orientation, int Index) key, SliceEntry entry, BitmapSource slice)
@@ -398,6 +449,12 @@ namespace ImageViewer.Services
                 result.Freeze();
                 return result;
             }
+
+            /// <summary>
+            /// 当前没有显式释放入口；未使用 <see cref="SemaphoreSlim.AvailableWaitHandle"/> 的闸门不持有内核句柄，
+            /// 条目随 <see cref="VolumeData"/> 的弱表一起回收。实现 IDisposable 是为了让所有权边界显式可分析。
+            /// </summary>
+            public void Dispose() => _sliceBuildGate.Dispose();
         }
     }
 }

@@ -26,6 +26,11 @@ namespace ImageViewer.Rendering
 
         public static string BuildFittedEllipseText(FittedEllipseRoi ellipse, RoiRenderContext context)
         {
+            if (!ellipse.HasFitEvidence)
+            {
+                return BuildEllipseText(ellipse, context);
+            }
+
             return BuildMultiline(ellipse.Label, $"Fit RX:{context.FormatLength(ellipse.RadiusX)} RY:{context.FormatLength(ellipse.RadiusY)} Pts:{ellipse.SourcePointCount}");
         }
 

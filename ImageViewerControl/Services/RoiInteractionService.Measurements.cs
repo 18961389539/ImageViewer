@@ -125,6 +125,103 @@ namespace ImageViewer.Services
             }
         }
 
+        /// <summary>
+        /// 线卡尺（单边缘拟合直线）交互。
+        /// Chinese: 拖动两个端点改变测量线；拖动黄框两侧长边中点改变搜索范围（CaliperSearchRange），
+        /// 范围按当前点到中心线的法向距离设定，两侧对称。
+        /// English: Single-edge line caliper. Endpoints move the reference line; the middle of either long
+        /// side sets the caliper search range from the normal distance to the center line, symmetrically.
+        /// </summary>
+        private sealed class LineCaliperMeasureBehavior : IRoiBehavior
+        {
+            public bool CanHandle(RoiBase roi) => roi is LineCaliperMeasureRoi;
+
+            public bool HitTest(RoiBase roi, Point point, double scale, double hitTestTolerance)
+            {
+                var line = (LineCaliperMeasureRoi)roi;
+                Point p1 = line.P1.ToWpfPoint();
+                Point p2 = line.P2.ToWpfPoint();
+                if (GeometryUtils.IsPointNearSegment(point, p1, p2, hitTestTolerance / scale))
+                {
+                    return true;
+                }
+
+                Point center = MidPoint(line);
+                var matrix = new Matrix();
+                matrix.RotateAt(-GetAngleDegrees(line), center.X, center.Y);
+                Point local = matrix.Transform(point);
+                double halfLength = GeometryUtils.Distance(p1, p2) / 2;
+                return Math.Abs(local.X - center.X) <= halfLength &&
+                       Math.Abs(local.Y - center.Y) <= line.CaliperSearchRange;
+            }
+
+            public ResizeHandle GetHandleAt(RoiBase roi, Point point, double scale, double handleSize, double handleHitPadding, double infoTextOffset, double polygonVertexHitPadding)
+            {
+                var line = (LineCaliperMeasureRoi)roi;
+                double hSize = (handleSize + handleHitPadding) / scale;
+                if (IsNear(point, line.P1.ToWpfPoint(), hSize)) return ResizeHandle.P1;
+                if (IsNear(point, line.P2.ToWpfPoint(), hSize)) return ResizeHandle.P2;
+
+                GetSearchHandlePositions(line, out Point positive, out Point negative);
+                if (IsNear(point, positive, hSize)) return ResizeHandle.BottomCenter;
+                if (IsNear(point, negative, hSize)) return ResizeHandle.TopCenter;
+                return ResizeHandle.None;
+            }
+
+            public void Move(RoiBase roi, double dx, double dy)
+            {
+                var line = (LineCaliperMeasureRoi)roi;
+                line.P1 = new Point(line.P1.X + dx, line.P1.Y + dy).ToPointD();
+                line.P2 = new Point(line.P2.X + dx, line.P2.Y + dy).ToPointD();
+            }
+
+            public void Resize(RoiBase roi, ResizeHandle handle, double dx, double dy, Point currentPos, double minimumRoiDimension)
+            {
+                var line = (LineCaliperMeasureRoi)roi;
+                if (handle == ResizeHandle.P1)
+                {
+                    line.P1 = currentPos.ToPointD();
+                    return;
+                }
+
+                if (handle == ResizeHandle.P2)
+                {
+                    line.P2 = currentPos.ToPointD();
+                    return;
+                }
+
+                if (handle is not (ResizeHandle.BottomCenter or ResizeHandle.TopCenter))
+                {
+                    return;
+                }
+
+                // Symmetric range: either side sets |normal distance| from the center line.
+                Point center = MidPoint(line);
+                double projected = Math.Abs(Vector.Multiply(currentPos - center, GetNormal(line)));
+                line.CaliperSearchRange = Math.Max(1, (int)Math.Round(projected));
+            }
+
+            private static Point MidPoint(LineCaliperMeasureRoi line) =>
+                new((line.P1.X + line.P2.X) / 2, (line.P1.Y + line.P2.Y) / 2);
+
+            private static double GetAngleDegrees(LineCaliperMeasureRoi line) =>
+                Math.Atan2(line.P2.Y - line.P1.Y, line.P2.X - line.P1.X) * 180 / Math.PI;
+
+            private static Vector GetNormal(LineCaliperMeasureRoi line)
+            {
+                double radians = GetAngleDegrees(line) * Math.PI / 180;
+                return new Vector(-Math.Sin(radians), Math.Cos(radians));
+            }
+
+            private static void GetSearchHandlePositions(LineCaliperMeasureRoi line, out Point positive, out Point negative)
+            {
+                Point center = MidPoint(line);
+                Vector normal = GetNormal(line);
+                positive = center + (normal * line.CaliperSearchRange);
+                negative = center - (normal * line.CaliperSearchRange);
+            }
+        }
+
         private sealed class AngleMeasureBehavior : IRoiBehavior
         {
             public bool CanHandle(RoiBase roi) => roi is AngleMeasureRoi;

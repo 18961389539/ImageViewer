@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
+using ImageViewer.Services;
 
 namespace ImageViewer.Controls
 {
@@ -37,12 +38,14 @@ namespace ImageViewer.Controls
         };
 
         private readonly string _filePath;
+        private readonly string _directory;
         private readonly string _lockName;
 
         public ImageViewerRecoveryIndex(string autoSaveDirectory)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(autoSaveDirectory);
-            _filePath = Path.Combine(autoSaveDirectory, FileName);
+            _directory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(autoSaveDirectory));
+            _filePath = Path.Combine(_directory, FileName);
 
             // 互斥量名按目录哈希区分：同一台机器上不同存储根目录的索引互不阻塞，同一目录的所有
             // 进程/线程竞争同一把锁。"Global\" 前缀使其跨会话（服务/终端）可见。
@@ -76,7 +79,8 @@ namespace ImageViewer.Controls
         public void Register(string autoSaveFilePath, ImageViewerRecoveryIndexEntry entry)
         {
             ArgumentNullException.ThrowIfNull(entry);
-            Register(autoSaveFilePath, entry.TimestampUtc, entry.OwnerInstanceId, entry.LastHeartbeatUtc);
+            Register(autoSaveFilePath, entry.TimestampUtc, entry.OwnerInstanceId, entry.LastHeartbeatUtc,
+                entry.ProjectName, entry.ImageName, entry.HasOwnerLease);
         }
 
         /// <summary>登记一个自动保存文件；同路径已存在则更新其修改时间。</summary>
@@ -94,7 +98,10 @@ namespace ImageViewer.Controls
             string autoSaveFilePath,
             DateTimeOffset timestamp,
             string? ownerInstanceId = null,
-            DateTimeOffset? lastHeartbeatUtc = null)
+            DateTimeOffset? lastHeartbeatUtc = null,
+            string? projectName = null,
+            string? imageName = null,
+            bool hasOwnerLease = false)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(autoSaveFilePath);
             string fullPath = Path.GetFullPath(autoSaveFilePath);
@@ -106,7 +113,10 @@ namespace ImageViewer.Controls
                 var updated = new ImageViewerRecoveryIndexEntry(fullPath, timestamp)
                 {
                     OwnerInstanceId = ownerInstanceId,
-                    LastHeartbeatUtc = lastHeartbeatUtc
+                    LastHeartbeatUtc = lastHeartbeatUtc,
+                    ProjectName = projectName,
+                    ImageName = imageName,
+                    HasOwnerLease = hasOwnerLease
                 };
 
                 if (existing >= 0)
@@ -168,7 +178,7 @@ namespace ImageViewer.Controls
         /// English: Drops entries owned by a session that shut down cleanly. A crashed process never reaches
         /// this call, so its stale heartbeat is what eventually makes the snapshot recoverable.
         /// </summary>
-        public void ReleaseOwnership(string ownerInstanceId)
+        public void DeleteOwnedSnapshots(string ownerInstanceId)
         {
             if (string.IsNullOrWhiteSpace(ownerInstanceId))
             {
@@ -179,7 +189,8 @@ namespace ImageViewer.Controls
             {
                 List<ImageViewerRecoveryIndexEntry> entries = [.. ReadCore()];
                 int removed = entries.RemoveAll(entry =>
-                    string.Equals(entry.OwnerInstanceId, ownerInstanceId, StringComparison.Ordinal));
+                    string.Equals(entry.OwnerInstanceId, ownerInstanceId, StringComparison.Ordinal) &&
+                    TryDeleteOwnedFile(entry.Path));
                 if (removed > 0)
                 {
                     WriteCore(entries);
@@ -187,6 +198,67 @@ namespace ImageViewer.Controls
 
                 return true;
             });
+        }
+
+        public FileStream? TryAcquireOwnerLease(string ownerInstanceId)
+        {
+            try
+            {
+                return new FileStream(GetOwnerLeasePath(ownerInstanceId), FileMode.CreateNew, FileAccess.ReadWrite,
+                    FileShare.None, bufferSize: 1, FileOptions.DeleteOnClose);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                return null; // A storage provider that cannot hold the lease still uses the heartbeat.
+            }
+        }
+
+        public bool IsOwnerActive(string? ownerInstanceId)
+        {
+            if (!Guid.TryParseExact(ownerInstanceId, "N", out _))
+            {
+                return false;
+            }
+
+            try
+            {
+                using var stream = new FileStream(GetOwnerLeasePath(ownerInstanceId!), FileMode.Open, FileAccess.Read,
+                    FileShare.ReadWrite | FileShare.Delete);
+                return false;
+            }
+            catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
+            {
+                return false;
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                return true;
+            }
+        }
+
+        private string GetOwnerLeasePath(string ownerInstanceId) => Path.Combine(_directory, $".owner-{ownerInstanceId}");
+
+        private bool TryDeleteOwnedFile(string path)
+        {
+            try
+            {
+                string fullPath = Path.GetFullPath(path);
+                string name = Path.GetFileName(fullPath);
+                if (!PathsEqual(Path.GetDirectoryName(fullPath) ?? string.Empty, _directory) ||
+                    !name.StartsWith("autosave-", StringComparison.OrdinalIgnoreCase) ||
+                    !name.EndsWith(".ivsession", StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+
+                File.Delete(fullPath);
+                ImageViewerSnapshotImage.PruneRecoveryImages(fullPath);
+                return true;
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+            {
+                return false;
+            }
         }
 
         private IReadOnlyList<ImageViewerRecoveryIndexEntry> ReadCore()
@@ -332,5 +404,12 @@ namespace ImageViewer.Controls
         /// （崩溃/被强杀，走不到正常关闭的清理路径），这份快照即可恢复。
         /// </summary>
         public DateTimeOffset? LastHeartbeatUtc { get; set; }
+
+        public string? ProjectName { get; set; }
+
+        public string? ImageName { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public bool HasOwnerLease { get; set; }
     }
 }

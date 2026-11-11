@@ -88,6 +88,14 @@ namespace ImageViewer.Dialogs
             dialog.ShowDialog();
         }
 
+        /// <summary>Shows scrollable, selectable text and returns true only after explicit confirmation.</summary>
+        public static bool ConfirmReadOnlyTextDialog(Window? owner, string title, string text, string confirmLabel)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(confirmLabel);
+            var dialog = new ReadOnlyTextDialog(title, text, confirmLabel) { Owner = owner };
+            return dialog.ShowDialog() == true;
+        }
+
         public void ShowWarning(Window? owner, string title, string message)
         {
             MessageBox.Show(owner, message, title, MessageBoxButton.OK, MessageBoxImage.Warning);

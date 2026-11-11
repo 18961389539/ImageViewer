@@ -10,18 +10,70 @@ namespace ImageViewer.Controls
 {
     public partial class VolumeViewer : UserControl, IDisposable, IAsyncDisposable
     {
+        /// <summary>控件主题（默认深色）。</summary>
+        public static readonly DependencyProperty ThemeProperty =
+            DependencyProperty.Register(
+                nameof(Theme),
+                typeof(ViewerThemes.Theme),
+                typeof(VolumeViewer),
+                new PropertyMetadata(ViewerThemes.Theme.Dark, OnThemeChanged));
+
+        /// <summary>自定义主题字典；非 null 时优先于 <see cref="Theme"/>。</summary>
+        public static readonly DependencyProperty ThemeDictionaryProperty =
+            DependencyProperty.Register(
+                nameof(ThemeDictionary),
+                typeof(ResourceDictionary),
+                typeof(VolumeViewer),
+                new PropertyMetadata(null, OnThemeChanged));
+
         private VolumeData? _volume;
         private bool _isDisposed;
+        private readonly ImageViewer sliceViewer;
 
-        public VolumeViewer()
+        public VolumeViewer() : this(static () => new ImageViewer()) { }
+
+        internal VolumeViewer(Func<ImageViewer> createImageViewer)
         {
             InitializeComponent();
-            sliceViewer = new ImageViewer();
+            sliceViewer = createImageViewer();
             sliceViewerHost.Content = sliceViewer;
+            ApplyTheme();
             UpdateSliceState();
         }
 
-        private readonly ImageViewer sliceViewer;
+        /// <summary>控件主题（默认深色）。</summary>
+        public ViewerThemes.Theme Theme
+        {
+            get => (ViewerThemes.Theme)GetValue(ThemeProperty);
+            set => SetValue(ThemeProperty, value);
+        }
+
+        /// <summary>自定义主题字典；非 null 时优先于 <see cref="Theme"/>。</summary>
+        public ResourceDictionary? ThemeDictionary
+        {
+            get => (ResourceDictionary?)GetValue(ThemeDictionaryProperty);
+            set => SetValue(ThemeDictionaryProperty, value);
+        }
+
+        private static void OnThemeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is VolumeViewer viewer)
+            {
+                viewer.ApplyTheme();
+            }
+        }
+
+        private void ApplyTheme()
+        {
+            if (!IsInitialized)
+            {
+                return;
+            }
+
+            ViewerThemeSwitcher.Apply(this, ThemeDictionary ?? ViewerThemes.CreateDictionary(Theme));
+            sliceViewer.Theme = Theme;
+            sliceViewer.ThemeDictionary = ThemeDictionary;
+        }
 
         public VolumeData? Volume
         {
@@ -75,7 +127,7 @@ namespace ImageViewer.Controls
         {
             Dispose();
             GC.SuppressFinalize(this);
-            return ValueTask.CompletedTask;
+            return new ValueTask(sliceViewer.AutoSaveCloseCompletion);
         }
 
         private void OnSliceValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -116,14 +168,15 @@ namespace ImageViewer.Controls
         {
             if (_volume == null)
             {
-                sliceViewer.ImageSource = null;
+                sliceViewer.SetVolumeSliceImage(null);
                 sliceStatusText.Text = UiText.Get("StatusNoVolume");
                 return;
             }
 
             int sliceIndex = CurrentSliceIndex;
-            sliceViewer.SetImage(VolumeSliceService.GetSlice(_volume, VolumeSliceOrientation.Axial, sliceIndex));
-            sliceStatusText.Text = UiText.Format("StatusAxialSlice", sliceIndex + 1, _volume.Depth);
+            sliceViewer.SetVolumeSliceImage(VolumeSliceService.GetSlice(_volume, VolumeSliceOrientation.Axial, sliceIndex));
+            string sliceStatus = UiText.Format("StatusAxialSlice", sliceIndex + 1, _volume.Depth);
+            sliceStatusText.Text = UiText.Format("StatusVolumePlaneSpacing", sliceStatus, "X", _volume.SpacingX, "Y", _volume.SpacingY);
         }
     }
 }

@@ -51,6 +51,9 @@ namespace ImageViewer.Core.Analysis
         string? Unit,
         DateTimeOffset GeneratedAtUtc)
     {
+        /// <summary>参与报告的测量点的逐点去畸变审计；未审计或未启用畸变校正时为 null。</summary>
+        public DistortionAudit? DistortionAudit { get; init; }
+
         /// <summary>总测量项数。</summary>
         public int ItemCount => Items.Count;
 
@@ -63,10 +66,11 @@ namespace ImageViewer.Core.Analysis
         /// <summary>无法评估的项数（缺测得值 / 缺公差 / 检测失败 / 标定非法）。</summary>
         public int NotEvaluableCount => Items.Count(item => !item.HasVerdict);
 
-        /// <summary>整体结论：三项以上的判定才谈得上"整体"，否则只报计数。</summary>
+        /// <summary>整体结论。畸变反解失败时仍保留已知不合格项，但不给出整体通过。</summary>
         public string OverallVerdict =>
             Readiness.IsBlocked ? "Blocked"
             : FailedCount > 0 ? "Failed"
+            : DistortionAudit is { HasNonConvergedPoints: true } ? "NoVerdict"
             : PassedCount > 0 ? "Passed"
             : "NoVerdict";
 
@@ -182,7 +186,12 @@ namespace ImageViewer.Core.Analysis
                 ? calibration.MeasurementUncertaintyPixels
                 : null;
             double? reprojectionRms = calibration is { } c && c.ReprojectionErrorRms > 0 ? c.ReprojectionErrorRms : null;
-            if (!uncertaintyPixels.HasValue && !reprojectionRms.HasValue)
+            DistortionAudit? audit = report.DistortionAudit;
+            double? pointUncertaintyPixels = audit is { HasPoints: true } && audit.MaximumUncertaintyPixels > 0
+                ? audit.MaximumUncertaintyPixels
+                : null;
+            if (!uncertaintyPixels.HasValue && !reprojectionRms.HasValue && !pointUncertaintyPixels.HasValue &&
+                audit is not { HasNonConvergedPoints: true })
             {
                 return;
             }
@@ -206,7 +215,37 @@ namespace ImageViewer.Core.Analysis
                 builder.AppendLine();
             }
 
-            builder.AppendLine("- 单次测量的综合不确定度 = 重复性(未评估) ⊕ 标定不确定度；未做重复测量时以上述标定不确定度为准。");
+            if (audit is { HasPoints: true })
+            {
+                // 逐点不确定度只在必要时单列：它大于标定记录值就意味着某点的反解残差
+                // 已经超过了标定本身的精度声明，读者必须看到这个差异。
+                if (pointUncertaintyPixels.HasValue &&
+                    (!uncertaintyPixels.HasValue || pointUncertaintyPixels.Value > uncertaintyPixels.Value))
+                {
+                    builder.Append("- 逐点去畸变不确定度（最大）: ")
+                        .Append(pointUncertaintyPixels.Value.ToString("G4", CultureInfo.InvariantCulture))
+                        .Append(" px");
+                    if (report.Scale.IsCalibrated)
+                    {
+                        builder.Append("（≈ ")
+                            .Append((pointUncertaintyPixels.Value * report.Scale.PixelSize).ToString("G4", CultureInfo.InvariantCulture))
+                            .Append(' ').Append(report.Scale.Unit).Append(", 1σ）");
+                    }
+
+                    builder.AppendLine();
+                }
+
+                if (audit.HasNonConvergedPoints)
+                {
+                    builder.Append("- 去畸变反解未收敛: ")
+                        .Append(audit.NonConvergedPointCount).Append('/').Append(audit.PointCount)
+                        .Append(" 个测量点，最大残差 ")
+                        .Append(audit.MaximumResidualPixels.ToString("G4", CultureInfo.InvariantCulture))
+                        .AppendLine(" px；相关尺寸和公差判定不可评估。");
+                }
+            }
+
+            builder.AppendLine("- 单次测量的综合不确定度 = 重复性(未评估) ⊕ 标定不确定度；未做重复测量时取标定不确定度与逐点去畸变不确定度中的较大者。");
         }
 
         private static string Escape(string? value) =>
@@ -220,17 +259,20 @@ namespace ImageViewer.Core.Analysis
     /// </summary>
     public static class MeasurementReportBuilder
     {
+        /// <summary>构造未包含逐点去畸变审计的报告。</summary>
+        public static MeasurementReport Build(
+            IEnumerable<MeasurementReportItem> items, double pixelSize, string? physicalUnit,
+            CameraCalibration? calibration, string? sourceName, string? sourceSha256,
+            bool hasKnownReference, string? title, DateTimeOffset? generatedAtUtc)
+            => Build(items, pixelSize, physicalUnit, calibration, sourceName, sourceSha256,
+                hasKnownReference, title, generatedAtUtc, null);
+
         /// <summary>构造报告。</summary>
         public static MeasurementReport Build(
-            IEnumerable<MeasurementReportItem> items,
-            double pixelSize,
-            string? physicalUnit,
-            CameraCalibration? calibration,
-            string? sourceName = null,
-            string? sourceSha256 = null,
-            bool hasKnownReference = false,
-            string? title = null,
-            DateTimeOffset? generatedAtUtc = null)
+            IEnumerable<MeasurementReportItem> items, double pixelSize, string? physicalUnit,
+            CameraCalibration? calibration, string? sourceName = null, string? sourceSha256 = null,
+            bool hasKnownReference = false, string? title = null, DateTimeOffset? generatedAtUtc = null,
+            DistortionAudit? distortionAudit = null)
         {
             ArgumentNullException.ThrowIfNull(items);
 
@@ -247,6 +289,7 @@ namespace ImageViewer.Core.Analysis
                 calibration,
                 itemList.Count,
                 toleranced,
+                distortionAudit,
                 unmeasuredToleranced,
                 hasKnownReference);
 
@@ -259,7 +302,10 @@ namespace ImageViewer.Core.Analysis
                 readiness,
                 itemList,
                 unit,
-                generatedAtUtc ?? DateTimeOffset.UtcNow);
+                generatedAtUtc ?? DateTimeOffset.UtcNow)
+            {
+                DistortionAudit = distortionAudit is { HasPoints: true } ? distortionAudit : null
+            };
         }
 
         /// <summary>

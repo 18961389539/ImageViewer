@@ -217,6 +217,32 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
+        public void VolumeViewer_ThemePropagatesToNestedSliceViewer()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                using var viewer = new VolumeViewer();
+                viewer.Theme = ViewerThemes.Theme.Light;
+
+                Assert.Equal(ViewerThemes.Theme.Light, viewer.Theme);
+                Assert.Equal(ViewerThemes.Theme.Light, viewer.SliceViewer.Theme);
+            });
+        }
+
+        [Fact]
+        public void AdaptiveViewer_ThemePropagatesToAxialViewerAndItsSliceViewer()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                using var viewer = new AdaptiveImageViewer();
+                viewer.Theme = ViewerThemes.Theme.Light;
+
+                Assert.Equal(ViewerThemes.Theme.Light, viewer.VolumeViewer.Theme);
+                Assert.Equal(ViewerThemes.Theme.Light, viewer.VolumeViewer.SliceViewer.Theme);
+            });
+        }
+
+        [Fact]
         public void ThemeDictionary_ContainsEveryKeyUsedByControls()
         {
             // pack URI 只在运行时解析：静态编译不会发现键名/路径写错。这里逐个加载三个内置字典并核对键集。

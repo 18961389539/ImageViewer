@@ -19,14 +19,15 @@ namespace ImageViewerControl.Tests
 
         public static ImageViewerRuntimeServices CreateRuntimeServices(
             IImageViewerLogger? logger = null,
-            IImageViewerSessionStoragePolicy? sessionStoragePolicy = null)
+            IImageViewerSessionStoragePolicy? sessionStoragePolicy = null,
+            IImageViewerFileDialogService? fileDialogService = null)
         {
             sessionStoragePolicy ??= CreateSessionStoragePolicy();
 
             var sessionService = new ImageViewerSessionService();
             return new ImageViewerRuntimeServices(
                 new ImageViewerDialogService(),
-                new ImageViewerFileDialogService(),
+                fileDialogService ?? new ImageViewerFileDialogService(),
                 logger ?? new TraceImageViewerLogger(),
                 new ImageViewerViewportService(),
                 sessionService,

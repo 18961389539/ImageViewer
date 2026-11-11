@@ -285,16 +285,27 @@ namespace ImageViewer.Controls
         public void CheckCalibrationReadiness()
         {
             IReadOnlyList<RoiBase> rois = _data.AllRois;
-            var toleranced = rois.Where(roi => roi.Tolerance is { IsEnabled: true }).ToList();
-            int unmeasured = toleranced.Count(roi =>
-                !RoiInspectionEvaluator.Evaluate(roi, _data.PixelSize, _data.Calibration).MeasuredValue.HasValue);
+            int toleranced = 0;
+            int unmeasured = 0;
+            DistortionAudit audit = DistortionAudit.Empty;
+            foreach (RoiBase roi in rois)
+            {
+                RoiInspectionResult result = RoiInspectionEvaluator.Evaluate(roi, _data.PixelSize, _data.Calibration);
+                audit = audit.Combine(result.DistortionAudit);
+                if (roi.Tolerance is { IsEnabled: true })
+                {
+                    toleranced++;
+                    if (!result.HasMeasuredValue) unmeasured++;
+                }
+            }
 
             MeasurementWorkflowReadiness readiness = MeasurementWorkflowReadinessEvaluator.Evaluate(
                 _data.PixelSize,
                 _data.PhysicalUnit,
                 _data.Calibration,
                 rois.Count,
-                toleranced.Count,
+                toleranced,
+                audit,
                 unmeasured);
 
             _dialogs.ShowReadOnlyText(

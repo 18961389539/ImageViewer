@@ -1,5 +1,8 @@
 using System;
+using System.Windows;
+using System.Windows.Media.Imaging;
 using ImageViewer.Models;
+using ImageViewer.Services;
 
 namespace ImageViewer.Controls
 {
@@ -27,7 +30,10 @@ namespace ImageViewer.Controls
                         Persistence = new ImageViewerSessionPersistenceWorkflow
                         {
                             ShowSaveSessionDialog = dialogWorkflowService.ShowSaveSessionDialog,
+                            ConfirmUnsavedChanges = () => _owner.DialogService.ConfirmUnsavedDocumentChanges(Window.GetWindow(_owner)),
                             ShowOpenSessionDialog = dialogWorkflowService.ShowOpenSessionDialog,
+                            LocateSessionImage = (imagePath, sessionPath) =>
+                                _owner.RuntimeServices.FileDialogService.ShowLocateSessionImageDialog(Window.GetWindow(_owner), imagePath, sessionPath),
                             ShowSaveProjectPackageDialog = dialogWorkflowService.ShowSaveProjectPackageDialog,
                             ShowSaveRecipeDialog = dialogWorkflowService.ShowSaveRecipeDialog,
                             ShowOpenRecipeDialog = dialogWorkflowService.ShowOpenRecipeDialog,
@@ -37,13 +43,13 @@ namespace ImageViewer.Controls
                             GetPluginRegistry = () => _owner.PluginRegistry,
                             GetAllRois = () => _owner.ViewerState.AllRois,
                             GetPixelSize = () => _owner.PixelSize,
-                            SetPixelSize = value => _owner.PixelSize = value,
+                            SetPixelSize = value => _owner.SetCurrentValue(PixelSizeProperty, value),
                             GetPhysicalUnit = () => _owner.PhysicalUnit,
-                            SetPhysicalUnit = value => _owner.PhysicalUnit = value,
+                            SetPhysicalUnit = value => _owner.SetCurrentValue(PhysicalUnitProperty, value),
                             GetCalibration = () => _owner.Calibration,
-                            SetCalibration = value => _owner.Calibration = value,
+                            SetCalibration = value => _owner.SetCurrentValue(CalibrationProperty, value),
                             GetDisplay = () => _owner.DisplayAdjustment,
-                            SetDisplay = value => _owner.DisplayAdjustment = value,
+                            SetDisplay = value => _owner.SetCurrentValue(DisplayAdjustmentProperty, value),
                             GetWorkpieceCoordinateSystem = () => _owner.WorkpieceCoordinateSystem,
                             SetWorkpieceCoordinateSystem = value => _owner.WorkpieceCoordinateSystem = value,
                             GetRecipeDatumPoints = _owner.GetRecipeReferenceDatums,
@@ -54,17 +60,39 @@ namespace ImageViewer.Controls
                                 : null,
                             SetRecipeDatumPoint = _owner.SetRecipeReferenceDatum,
                             SetRecipeDatumPoints = _owner.SetRecipeReferenceDatums,
+                            SetCurrentRecipeDatumPoints = _owner.SetRecipeCurrentDatums,
                             SetCurrentRecipeDatumPoint = _owner.SetRecipeCurrentDatum,
                             GetQualityProfile = () => _owner.QualityProfile,
                             SetQualityProfile = value => _owner.QualityProfile = value,
                             GetCurrentViewportState = () => viewportController.CurrentState,
                             TryGetCurrentImagePath = viewportController.TryGetCurrentImagePath,
-                            LoadImageFromFile = viewportController.LoadImageFromFile,
+                            GetCurrentBitmap = () => _owner.ImageSource as BitmapSource,
+                            RunDocumentLoadAsync = dialogWorkflowService.RunDocumentLoadAsync,
+                            PrepareImageAsync = async (filePath, expectedSha256, token, progress) =>
+                            {
+                                var bitmap = await ImageViewerImageDecoder.LoadDocumentImageAsync(filePath, progress, expectedSha256, token);
+                                return () => _owner.SetCurrentValue(ImageSourceProperty, bitmap);
+                            },
+                            ClearImage = () => _owner.SetCurrentValue(ImageSourceProperty, null),
+                            EndDocumentInteraction = () =>
+                            {
+                                _owner.ExitCurrentMode();
+                                _owner.ResetImageOrientation();
+                                _owner.ClearAllRecipeDatums();
+                            },
+                            FitImageToView = viewportController.FitToView,
                             ReplaceAllRois = _owner.ViewerState.ReplaceAllRois,
                             ApplyViewportState = state => viewportController.ApplyViewportState(state),
                             DrawRois = () => _owner.DrawRois(),
                             ShowNonCriticalError = _owner.ShowNonCriticalError,
-                            ShowWarning = dialogWorkflowService.ShowWarning,
+                            ShowWarning = (title, message) =>
+                            {
+                                _owner.ShowStatusHint(message, StatusHintKind.Error);
+                                if (Window.GetWindow(_owner) != null)
+                                {
+                                    dialogWorkflowService.ShowWarning(title, message);
+                                }
+                            },
                             ShowStatusHint = (message, kind) => _owner.ShowStatusHint(message, kind),
                             ClearUndoHistory = () => _owner.ViewerState.UndoRedo.Clear(),
                             UpdateContextMenuState = _owner.UpdateContextMenuState
@@ -75,11 +103,15 @@ namespace ImageViewer.Controls
                             HasContent = () => _owner.ImageSource != null || _owner.ViewerState.AllRois.Count > 0,
                             GetCurrentViewportState = () => viewportController.CurrentState,
                             TryGetCurrentImagePath = viewportController.TryGetCurrentImagePath,
+                            GetCurrentBitmap = () => _owner.ImageSource as BitmapSource,
                             GetAllRois = () => _owner.ViewerState.AllRois,
                             GetPixelSize = () => _owner.PixelSize,
                             GetPhysicalUnit = () => _owner.PhysicalUnit,
                             GetCalibration = () => _owner.Calibration,
                             GetDisplay = () => _owner.DisplayAdjustment,
+                            GetWorkpieceCoordinateSystem = () => _owner.WorkpieceCoordinateSystem,
+                            GetRecipeDatumPoints = _owner.GetRecipeReferenceDatums,
+                            GetCurrentRecipeDatumPoints = _owner.GetRecipeCurrentDatums,
                             GetQualityProfile = () => _owner.QualityProfile,
                             SessionService = _owner.RuntimeServices.SessionService,
                             GetPluginRegistry = () => _owner.PluginRegistry,

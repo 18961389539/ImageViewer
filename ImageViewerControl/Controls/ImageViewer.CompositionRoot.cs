@@ -45,7 +45,7 @@ namespace ImageViewer.Controls
             ImageSourceController imageSourceController = coreAssembler.CreateImageSourceController(dialogWorkflowService, imageViewStateController);
             RoiEditController roiEditController = coreAssembler.CreateRoiEditController(dialogWorkflowService);
             CalibrationController calibrationController = coreAssembler.CreateCalibrationController(dialogWorkflowService);
-            DroppedContentController droppedContentController = coreAssembler.CreateDroppedContentController(viewportController, sessionComposition.SessionController);
+            DroppedContentController droppedContentController = coreAssembler.CreateDroppedContentController(dialogWorkflowService, sessionComposition.SessionController);
             ImageViewerInteractionComposition interactionComposition = interactionAssembler.CreateInteractionComposition(viewportController, roiEditController, sessionComposition.SessionController, analysisComposition.AnalysisController);
             ImageViewerFeatureMenuCommandController featureMenuCommandController = commandAssembler.CreateFeatureMenuCommandController(dialogWorkflowService);
             ExternalImageSourceBindingController externalImageSourceBindingController = coreAssembler.CreateExternalImageSourceBindingController();

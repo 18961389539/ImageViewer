@@ -23,21 +23,30 @@ namespace ImageViewer.Services
                 lines.Add(roi.Label);
             }
 
-            var pluginLines = roiPlugins.FindByRoi(roi)?.BuildInfoLines(roi, bitmap, pixelSize, physicalUnit);
-            if (pluginLines is { Count: > 0 })
+            RoiInspectionResult inspection = RoiInspectionEvaluator.Evaluate(roi, pixelSize, calibration);
+            if (inspection.DistortionAudit is { HasNonConvergedPoints: true } audit)
             {
-                lines.AddRange(pluginLines);
+                lines.Add(UiText.FormatInvariant("InfoLineCalibrationUndistortionWarning",
+                    audit.NonConvergedPointCount, audit.PointCount, audit.MaximumResidualPixels, audit.MaximumUncertaintyPixels));
             }
             else
             {
-                AppendBuiltInInfoLines(lines, roi, pixelSize, physicalUnit, calibration);
+                var pluginLines = roiPlugins.FindByRoi(roi)?.BuildInfoLines(roi, bitmap, pixelSize, physicalUnit);
+                if (pluginLines is { Count: > 0 })
+                {
+                    lines.AddRange(pluginLines);
+                }
+                else
+                {
+                    AppendBuiltInInfoLines(lines, roi, pixelSize, physicalUnit, calibration);
+                }
             }
 
             // Tolerance judgement is a cross-cutting inspection result.  It must
             // be shown even when a custom ROI plugin supplies its own geometry
             // lines; otherwise the information panel can omit the specification
             // decision for plugin-backed ROIs.
-            AppendToleranceJudgementLine(lines, roi, pixelSize, calibration);
+            AppendToleranceJudgementLine(lines, inspection);
 
             if (includeStatistics && bitmap != null && ImageAnalysisService.TryCalculateStatistics(bitmap, roi, out RoiStatistics statistics))
             {
@@ -113,7 +122,7 @@ namespace ImageViewer.Services
                     lines.Add(UiText.FormatInvariant("InfoLineRectDimensions", FormatLength(rect.Width * correction, pixelSize, physicalUnit), FormatLength(rect.Height * correction, pixelSize, physicalUnit)));
                     lines.Add(UiText.FormatInvariant("InfoLineArea", FormatArea(rect.Width * rect.Height * areaCorrection, pixelSize, physicalUnit)));
                     break;
-                case FittedEllipseRoi fittedEllipse:
+                case FittedEllipseRoi fittedEllipse when fittedEllipse.HasFitEvidence:
                     lines.Add(UiText.FormatInvariant("InfoLineFittedEllipse", FormatLength(fittedEllipse.RadiusX * correction, pixelSize, physicalUnit), FormatLength(fittedEllipse.RadiusY * correction, pixelSize, physicalUnit)));
                     lines.Add(UiText.FormatInvariant("InfoLineAnglePoints", fittedEllipse.Angle, fittedEllipse.SourcePointCount));
                     if (fittedEllipse.FitInlierCount > 0)
@@ -252,14 +261,8 @@ namespace ImageViewer.Services
         /// Chinese: 主测量值仅对距离/半径类测量 ROI 有效；无主测量或未配置公差时不做判定。
         /// English: Appends a pass/fail judgement line when a tolerance is configured for the ROI.
         /// </summary>
-        private static void AppendToleranceJudgementLine(List<string> lines, RoiBase roi, double pixelSize, CameraCalibration? calibration)
+        private static void AppendToleranceJudgementLine(List<string> lines, RoiInspectionResult inspection)
         {
-            if (roi.Tolerance is not { IsEnabled: true } tolerance)
-            {
-                return;
-            }
-
-            RoiInspectionResult inspection = RoiInspectionEvaluator.Evaluate(roi, pixelSize, calibration);
             if (inspection.SpecificationStatus is not (RoiSpecificationStatus.Passed or RoiSpecificationStatus.Failed) ||
                 inspection.MeasuredValue is not { } measured)
             {
@@ -269,7 +272,7 @@ namespace ImageViewer.Services
             string key = inspection.SpecificationStatus == RoiSpecificationStatus.Passed
                 ? "InfoTolerancePass"
                 : "InfoToleranceFail";
-            lines.Add(UiText.FormatInvariant(key, measured, tolerance.Nominal ?? 0));
+            lines.Add(UiText.FormatInvariant(key, measured, inspection.NominalValue ?? 0));
         }
 
         private static void AppendBlobAnalysisInfoLines(List<string> lines, BlobAnalysisRoi blob, double pixelSize, string? physicalUnit, double correction, double areaCorrection)
@@ -312,6 +315,15 @@ namespace ImageViewer.Services
             AppendCaliperParameterLine(lines, caliper);
             if (!caliper.HasDetectedEdges)
             {
+                // 未检出时必须给出可操作的说明：否则面板只显示手画线长，用户会以为检测根本没跑。
+                int invalidCalipers = caliper.InvalidCaliperMarkers.Length;
+                lines.Add(invalidCalipers > 0
+                    ? UiText.FormatInvariant(
+                        "InfoLineCaliperValidCalipers",
+                        caliper.CaliperCount - invalidCalipers,
+                        caliper.CaliperCount,
+                        caliper.MinimumValidCalipers)
+                    : UiText.Get("InfoLineCaliperNotDetected"));
                 return;
             }
 
@@ -448,6 +460,7 @@ namespace ImageViewer.Services
             {
                 lines.Add(UiText.FormatInvariant("InfoLineCalibrationIdentity", calibration.CalibrationId));
             }
+
         }
 
         private static string FormatLength(double pixelLength, double pixelSize, string? physicalUnit)

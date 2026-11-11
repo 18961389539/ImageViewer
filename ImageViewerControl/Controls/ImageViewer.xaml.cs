@@ -1,6 +1,8 @@
 using System;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using ImageViewer.Localization;
@@ -35,6 +37,7 @@ namespace ImageViewer.Controls
         private readonly IImageViewerLatestTaskScheduler _infoPanelStatisticsScheduler;
         private readonly ImageViewerLifetime _lifetime;
         private int _imageRotation;
+        private bool _isChangingVolumeSlice;
         private bool _flipImageHorizontally;
         private bool _flipImageVertically;
         private ImageAnalysisQualityProfile _qualityProfile = ImageAnalysisQualityProfile.Default;
@@ -155,6 +158,20 @@ namespace ImageViewer.Controls
             ImageSource = source;
         }
 
+        internal void SetVolumeSliceImage(ImageSource? source)
+        {
+            bool wasChangingSlice = _isChangingVolumeSlice;
+            _isChangingVolumeSlice = true;
+            try
+            {
+                SetCurrentValue(ImageSourceProperty, source);
+            }
+            finally
+            {
+                _isChangingVolumeSlice = wasChangingSlice;
+            }
+        }
+
         /// <summary>
         /// 添加一个 ROI，并把操作纳入撤销栈。
         /// Chinese: 供宿主或分析流程提交程序生成的 ROI；与鼠标绘制使用同一撤销语义。
@@ -211,6 +228,55 @@ namespace ImageViewer.Controls
         /// </summary>
         public Task SaveSessionAsync() => _fileMenuCommandController.ExecuteAsync(ImageViewerFileMenuCommand.SaveSession);
 
+        internal Task SaveSessionForViewAsync(string sessionLabel, ImageViewer otherViewer, Window? owner) =>
+            _sessionController.SaveSessionAsync(() =>
+            {
+                string? path = RuntimeServices.FileDialogService.ShowSaveSessionDialog(owner, sessionLabel);
+                if (!string.IsNullOrWhiteSpace(path) &&
+                    string.Equals(Path.GetFullPath(path), otherViewer._sessionController.CurrentProjectPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    string message = UiText.Get("ErrorSaveSessionOtherViewPath");
+                    ShowStatusHint(message, StatusHintKind.Error);
+                    if (owner != null)
+                    {
+                        DialogService.ShowWarning(owner, UiText.Get("ErrorSaveSessionTitle"), message);
+                    }
+                    return null;
+                }
+                return path;
+            });
+
+        /// <summary>Lets hosts protect the current document before replacing it with host-provided content.</summary>
+        public Task<bool> ConfirmDocumentReplacementAsync() => _sessionController.ConfirmDocumentReplacementAsync();
+
+        /// <summary>Starts a new document with a host-provided image after protecting unsaved edits.</summary>
+        public Task<bool> ReplaceImageDocumentAsync(ImageSource image, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(image);
+            return ReplaceDocumentContentAsync(
+                _ => Task.FromResult<Action?>(() => SetCurrentValue(ImageSourceProperty, image)), cancellationToken);
+        }
+
+        internal Task<bool> ReplaceDocumentContentAsync(
+            Func<CancellationToken, Task<Action?>> prepareContent, CancellationToken cancellationToken) =>
+            _sessionController.ReplaceImageDocumentAsync(prepareContent, cancellationToken);
+
+        internal Task<Action?> PrepareDocumentContentAsync(Action applyContent, CancellationToken cancellationToken) =>
+            _sessionController.PrepareImageDocumentAsync(applyContent, markDirty: false, cancellationToken);
+
+        internal IDisposable SuspendAutoSaveWrites() => _sessionController.SuspendAutoSaveWrites();
+
+        /// <summary>Opens a session or project package. Returns false on failure, cancellation or supersession.</summary>
+        public Task<bool> OpenProjectFromFileAsync(string filePath)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+            return _controlComposition.SessionController.OpenProjectAsync(filePath);
+        }
+
+        internal Task<bool> OpenProjectFromFileAsync(
+            string filePath, Func<CancellationToken, Task<Action?>> prepareRelatedContent) =>
+            _sessionController.OpenProjectAsync(filePath, prepareRelatedContent);
+
         public void Dispose()
         {
             CancelImageLoad();
@@ -231,8 +297,10 @@ namespace ImageViewer.Controls
         {
             Dispose();
             GC.SuppressFinalize(this);
-            return default;
+            return new ValueTask(AutoSaveCloseCompletion);
         }
+
+        internal Task AutoSaveCloseCompletion => _controlComposition.SessionController.CloseCompletion;
 
         /// <summary>
         /// 归还宿主租约，且只归还一次。

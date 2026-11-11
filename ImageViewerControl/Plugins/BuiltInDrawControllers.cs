@@ -65,18 +65,22 @@ namespace ImageViewer.Plugins
                 shouldCommit: static (host, roi) => roi.Radius > host.MinimumDrawableSize));
 
         /// <summary>
-        /// 圆环：两段式拖拽。
-        /// Chinese: 第一段拖出外径，抬起后进入第二段并把内径固定为外径一半（与既有行为一致）；
-        /// 第二段抬起才提交。
-        /// English: Ring, drawn in two drag stages. The first stage drags the outer radius; releasing it
-        /// advances to the second stage and fixes the inner radius at half the outer radius (matching the
-        /// existing behavior). Only the second release commits.
+        /// 圆环：单段拖拽 + 确认点击。
+        /// Chinese: 按下圆心拖出外径，拖动过程中内径始终为外径的一半（预览即最终形状）；
+        /// 第一次抬起不提交，只进入确认等待，再点一次左键才提交，右键随时取消。
+        /// English: Ring, drawn in a single drag plus a confirmation click. Dragging fixes the outer
+        /// radius and keeps the inner radius at half of it, so the preview already shows the final
+        /// proportions. The first release only enters a confirmation wait; the next left click commits.
         /// </summary>
         public static IRoiDrawController Ring { get; } = new RoiDrawController(
             Cursors.Cross,
             static () => new DragDrawSession<RingRoi>(
                 createInitial: static (_, start) => new RingRoi { Center = start.ToPointD(), InnerRadius = 0, OuterRadius = 0 },
-                applyDrag: static (_, roi, origin, current) => roi.OuterRadius = GeometryUtils.Distance(origin, current),
+                applyDrag: static (_, roi, origin, current) =>
+                {
+                    roi.OuterRadius = GeometryUtils.Distance(origin, current);
+                    roi.InnerRadius = roi.OuterRadius / 2;
+                },
                 shouldCommit: static (host, roi) => RoiGeometryService.IsRingDrawable(roi.OuterRadius, host.MinimumDrawableSize),
                 beforeCommit: static (host, roi) => roi.InnerRadius = RoiGeometryService.ClampRingInnerRadius(
                     roi.InnerRadius,
@@ -84,7 +88,6 @@ namespace ImageViewer.Plugins
                     host.MinimumDrawableSize),
                 finalStage: 1,
                 shouldAdvanceStage: static (host, roi) => RoiGeometryService.IsRingDrawable(roi.OuterRadius, host.MinimumDrawableSize),
-                onStageAdvanced: static (_, roi, stage) => roi.InnerRadius = roi.OuterRadius / 2,
                 cancelOnRightButton: true));
 
         public static IRoiDrawController CircularCaliper { get; } = new RoiDrawController(

@@ -30,13 +30,9 @@ namespace ImageViewer.Controls
 
         public required Func<int> GetRetryDelayMilliseconds { get; init; }
 
-        public required Action<ImageSource> SetImage { get; init; }
+        public required Func<ImageSource, CancellationToken, Task<Action?>> PrepareReplacementAsync { get; init; }
 
         public required Action<bool, string, double, bool> SetImageLoadState { get; init; }
-
-        public required Action FitToView { get; init; }
-
-        public required Action ClearUndoHistory { get; init; }
 
         public required Action<string, string, Exception> ShowNonCriticalError { get; init; }
     }
@@ -135,7 +131,7 @@ namespace ImageViewer.Controls
                 false);
         }
 
-        private async Task OpenImageFromPathAsync(string filePath)
+        public async Task OpenImageFromPathAsync(string filePath)
         {
             (CancellationTokenSource cancellation, long generation) = BeginImageLoad();
             ImageViewerDialogImageLoadWorkflow imageLoading = _dependencies.ImageLoading;
@@ -176,21 +172,29 @@ namespace ImageViewer.Controls
                         {
                             if (IsCurrentImageLoad(cancellation, generation))
                             {
-                                imageLoading.SetImageLoadState(true, UiText.Get("ImageLoadStatusDecoding"), progress, false);
+                                imageLoading.SetImageLoadState(true, UiText.Get("ImageLoadStatusDecoding"), Math.Min(progress, 80), false);
                             }
                         });
-                        BitmapSource bitmap = await Task.Run(
-                            () => CreateBitmapFromFile(filePath, cancellation.Token, decodeProgress),
-                            cancellation.Token);
+                        BitmapSource bitmap = await ImageViewerImageDecoder.LoadDocumentImageAsync(
+                            filePath, decodeProgress, expectedSha256: null, cancellation.Token);
                         if (!IsCurrentImageLoad(cancellation, generation))
                         {
                             return;
                         }
 
+                        Action? replace = await imageLoading.PrepareReplacementAsync(bitmap, cancellation.Token);
+                        if (!IsCurrentImageLoad(cancellation, generation))
+                        {
+                            return;
+                        }
+                        if (replace == null)
+                        {
+                            imageLoading.SetImageLoadState(false, UiText.Get("ImageLoadStatusCanceled"), 0, false);
+                            return;
+                        }
+
                         imageLoading.SetImageLoadState(true, UiText.Get("ImageLoadStatusApplying"), 85, false);
-                        imageLoading.SetImage(bitmap);
-                        imageLoading.FitToView();
-                        imageLoading.ClearUndoHistory();
+                        replace();
                         imageLoading.SetImageLoadState(false, UiText.Get("ImageLoadStatusReady"), 100, false);
                         _lastFailedImagePath = null;
                         return;
@@ -232,6 +236,57 @@ namespace ImageViewer.Controls
                 {
                     imageLoading.ShowNonCriticalError(UiText.Get("ErrorOpenImageTitle"), UiText.Get("ErrorOpenImageMessage"), lastException ?? new InvalidOperationException("Image load failed."));
                 }
+            }
+            finally
+            {
+                EndImageLoad(cancellation);
+            }
+        }
+
+        public async Task<bool> RunDocumentLoadAsync(Func<CancellationToken, IProgress<double>, Task<Action?>> prepare)
+        {
+            (CancellationTokenSource cancellation, long generation) = BeginImageLoad();
+            ImageViewerDialogImageLoadWorkflow imageLoading = _dependencies.ImageLoading;
+            _lastFailedImagePath = null;
+            try
+            {
+                imageLoading.SetImageLoadState(true, UiText.Get("DocumentLoadStatusStarting"), 5, false);
+                var progress = new Progress<double>(value =>
+                {
+                    if (IsCurrentImageLoad(cancellation, generation))
+                    {
+                        imageLoading.SetImageLoadState(true, UiText.Get("ImageLoadStatusDecoding"), Math.Min(value, 80), false);
+                    }
+                });
+                Action? apply = await prepare(cancellation.Token, progress);
+                if (!IsCurrentImageLoad(cancellation, generation))
+                {
+                    return false;
+                }
+
+                if (apply == null)
+                {
+                    imageLoading.SetImageLoadState(false, string.Empty, 0, false);
+                    return false;
+                }
+
+                imageLoading.SetImageLoadState(true, UiText.Get("DocumentLoadStatusApplying"), 85, false);
+                apply();
+                if (IsCurrentImageLoad(cancellation, generation))
+                {
+                    imageLoading.SetImageLoadState(false, UiText.Get("DocumentLoadStatusReady"), 100, false);
+                }
+
+                return true;
+            }
+            catch (Exception) when (!IsCurrentImageLoad(cancellation, generation))
+            {
+                return false;
+            }
+            catch
+            {
+                imageLoading.SetImageLoadState(false, UiText.Get("DocumentLoadStatusFailed"), 0, false);
+                throw;
             }
             finally
             {
@@ -519,9 +574,5 @@ namespace ImageViewer.Controls
             target.Radius = source.Radius;
         }
 
-        private static BitmapSource CreateBitmapFromFile(string filePath, CancellationToken cancellationToken, IProgress<double> progress)
-        {
-            return ImageViewerImageDecoder.LoadFromFile(filePath, cancellationToken, progress);
-        }
     }
 }

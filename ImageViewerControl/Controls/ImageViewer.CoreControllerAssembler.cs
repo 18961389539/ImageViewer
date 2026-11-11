@@ -108,10 +108,9 @@ namespace ImageViewer.Controls
                         {
                             GetRetryCount = () => _owner.RuntimeOptions.ImageLoadRetryCount,
                             GetRetryDelayMilliseconds = () => _owner.RuntimeOptions.ImageLoadRetryDelayMilliseconds,
-                            SetImage = _owner.SetImage,
+                            PrepareReplacementAsync = (source, token) => _owner._sessionController.PrepareImageDocumentAsync(
+                                () => _owner.SetCurrentValue(ImageSourceProperty, source), markDirty: true, token),
                             SetImageLoadState = _owner.SetImageLoadState,
-                            FitToView = viewportController.FitToView,
-                            ClearUndoHistory = () => _owner.ViewerState.UndoRedo.Clear(),
                             ShowNonCriticalError = _owner.ShowNonCriticalError
                         },
                         RoiEditing = new ImageViewerDialogRoiWorkflow
@@ -213,17 +212,16 @@ namespace ImageViewer.Controls
             }
 
             public DroppedContentController CreateDroppedContentController(
-                ViewportController viewportController,
+                ImageViewerDialogWorkflowService dialogWorkflowService,
                 ImageViewerSessionController sessionController)
             {
-                ArgumentNullException.ThrowIfNull(viewportController);
+                ArgumentNullException.ThrowIfNull(dialogWorkflowService);
                 ArgumentNullException.ThrowIfNull(sessionController);
 
                 return new DroppedContentController(
-                    viewportController,
+                    dialogWorkflowService,
                     sessionController,
                     () => _owner._roiSelectionStateController.RefreshPropertyPanel(),
-                    () => _owner.ViewerState.UndoRedo.Clear(),
                     (message, kind) => _owner.ShowStatusHint(message, kind));
             }
 

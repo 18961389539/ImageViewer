@@ -8,23 +8,20 @@ namespace ImageViewer.Controls
 {
     internal sealed class DroppedContentController
     {
-        private readonly ViewportController _viewportController;
+        private readonly ImageViewerDialogWorkflowService _dialogWorkflowService;
         private readonly ImageViewerSessionController _sessionController;
         private readonly Action _refreshSelectedRoiPropertyPanel;
-        private readonly Action _clearUndoHistory;
         private readonly Action<string, StatusHintKind> _showStatusHint;
 
         public DroppedContentController(
-            ViewportController viewportController,
+            ImageViewerDialogWorkflowService dialogWorkflowService,
             ImageViewerSessionController sessionController,
             Action refreshSelectedRoiPropertyPanel,
-            Action clearUndoHistory,
             Action<string, StatusHintKind> showStatusHint)
         {
-            _viewportController = viewportController ?? throw new ArgumentNullException(nameof(viewportController));
+            _dialogWorkflowService = dialogWorkflowService ?? throw new ArgumentNullException(nameof(dialogWorkflowService));
             _sessionController = sessionController ?? throw new ArgumentNullException(nameof(sessionController));
             _refreshSelectedRoiPropertyPanel = refreshSelectedRoiPropertyPanel ?? throw new ArgumentNullException(nameof(refreshSelectedRoiPropertyPanel));
-            _clearUndoHistory = clearUndoHistory ?? throw new ArgumentNullException(nameof(clearUndoHistory));
             _showStatusHint = showStatusHint ?? throw new ArgumentNullException(nameof(showStatusHint));
         }
 
@@ -63,9 +60,7 @@ namespace ImageViewer.Controls
             switch (kind)
             {
                 case DroppedFileKind.Image:
-                    _viewportController.LoadImageFromFile(path, fitToView: true);
-                    // 与对话框打开一致：换图后清空撤销历史，避免上一张图的命令污染新图状态
-                    _clearUndoHistory();
+                    await _dialogWorkflowService.OpenImageFromPathAsync(path);
                     break;
                 case DroppedFileKind.Session:
                 case DroppedFileKind.ProjectPackage:

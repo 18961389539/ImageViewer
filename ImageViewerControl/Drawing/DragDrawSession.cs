@@ -1,5 +1,7 @@
 using System;
 using System.Windows;
+using System.Windows.Media;
+using ImageViewer.Localization;
 using ImageViewer.Models;
 using ImageViewer.Rendering;
 
@@ -12,11 +14,12 @@ namespace ImageViewer.Drawing
     /// commit. Covers rectangle/ellipse/circle/ring/caliper/line-measure style tools.
     /// </summary>
     /// <remarks>
-    /// 多段拖拽（<paramref name="finalStage"/> &gt; 0）用于圆环：第一段抬起不提交，只推进阶段。
-    /// Chinese: 阶段推进时按既有行为释放鼠标捕获，因此后续阶段的移动不再改变几何。
-    /// English: Multi-stage drag is used by the ring: releasing a non-final stage advances the stage
-    /// instead of committing. Stage advancement releases mouse capture, matching the existing behavior,
-    /// so later stages no longer follow the pointer.
+    /// 确认点击（<paramref name="finalStage"/> &gt; 0）用于圆环：第一次抬起只进入确认等待，不提交。
+    /// Chinese: 进入确认等待时冻结几何但保持鼠标捕获，再抬起一次（点击确认）才提交；右键可取消。
+    /// 注意：这里不能主动释放捕获 —— 宿主会把它当成 LostMouseCapture 并取消整次绘制。
+    /// English: A non-final stage is a confirmation wait: it freezes the geometry while keeping mouse
+    /// capture, and the next release commits. Capture must not be released here, because the host
+    /// treats a released capture as LostMouseCapture and cancels the whole draw operation.
     /// </remarks>
     public sealed class DragDrawSession<T> : IRoiDrawSession
         where T : RoiBase
@@ -27,13 +30,15 @@ namespace ImageViewer.Drawing
         private readonly Action<IRoiDrawHost, T>? _beforeCommit;
         private readonly int _finalStage;
         private readonly Func<IRoiDrawHost, T, bool>? _shouldAdvanceStage;
+        // Kept for constructor compatibility: the ring now maintains its inner radius while dragging,
+        // so no built-in tool supplies this callback any more.
         private readonly Action<IRoiDrawHost, T, int>? _onStageAdvanced;
         private readonly bool _cancelOnRightButton;
 
         private T? _roi;
         private Point _origin;
         private int _stage;
-        private bool _captureReleased;
+        private bool _geometryFrozen;
 
         public DragDrawSession(
             Func<IRoiDrawHost, Point, T> createInitial,
@@ -84,12 +89,12 @@ namespace ImageViewer.Drawing
             _origin = host.SnapPoint(e.RawPosition);
             _roi = _createInitial(host, _origin);
             _stage = 0;
-            _captureReleased = false;
+            _geometryFrozen = false;
         }
 
         public void OnPointerMove(IRoiDrawHost host, DrawPointerEvent e)
         {
-            if (_roi is not T roi || _captureReleased)
+            if (_roi is not T roi || _geometryFrozen)
             {
                 return;
             }
@@ -138,12 +143,19 @@ namespace ImageViewer.Drawing
         public void OnModeExiting(IRoiDrawHost host)
         {
             _roi = null;
-            _captureReleased = false;
+            _geometryFrozen = false;
         }
 
         public void DrawOverlay(IRoiDrawHost host, RoiRenderContext context)
         {
-            // 进行中的 ROI 由宿主经 IRoiRenderer 渲染，拖拽类无需额外预览。
+            // 确认等待（几何已冻结）：提示再点一次落地，右键取消。
+            if (_roi is null || !_geometryFrozen)
+            {
+                return;
+            }
+
+            var anchor = new Point(_origin.X, _origin.Y - (context.HandleSize / context.Scale));
+            context.DrawInfoText(UiText.Get("RoiDrawClickToConfirm"), anchor, Brushes.White, centerAlign: true);
         }
 
         private void AdvanceStage(IRoiDrawHost host, T roi)
@@ -158,9 +170,10 @@ namespace ImageViewer.Drawing
             _stage++;
             _onStageAdvanced?.Invoke(host, roi, _stage);
 
-            // 阶段推进即释放捕获，与既有行为一致。
-            _captureReleased = true;
-            host.ReleaseMouseCapture();
+            // 保持鼠标捕获：主动 ReleaseMouseCapture 会同步触发宿主的 LostMouseCapture，
+            // 进而调用 OnCaptureLost 把正在等待确认的几何清掉（表现为松手即消失）。
+            // 这里只冻结几何，捕获留给确认点击或 EndDraw 统一释放。
+            _geometryFrozen = true;
             host.InvalidateOverlay();
         }
     }

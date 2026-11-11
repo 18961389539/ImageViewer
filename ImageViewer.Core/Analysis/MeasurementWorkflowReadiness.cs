@@ -91,6 +91,9 @@ namespace ImageViewer.Core.Analysis
         /// <summary>没有已标定身份（CalibrationId/时间）时的稳定代码。</summary>
         public const string CodeCalibrationIdentityMissing = "calibration.identity-missing";
 
+        /// <summary>测量点畸变反解未收敛时的稳定代码。</summary>
+        public const string CodeCalibrationUndistortionNotConverged = "calibration.undistortion-not-converged";
+
         /// <summary>没有任何 ROI 时的稳定代码。</summary>
         public const string CodeNoRois = "workflow.no-rois";
 
@@ -99,6 +102,13 @@ namespace ImageViewer.Core.Analysis
 
         /// <summary>存在配公差但未测到值的 ROI 时的稳定代码。</summary>
         public const string CodeRoiNotMeasured = "workflow.roi-not-measured";
+
+        /// <summary>评估测量工作流能否继续。</summary>
+        public static MeasurementWorkflowReadiness Evaluate(
+            double pixelSize, string? physicalUnit, CameraCalibration? calibration,
+            int roiCount, int tolerancedRoiCount, int unmeasuredTolerancedRoiCount = 0, bool hasKnownReference = false)
+            => Evaluate(pixelSize, physicalUnit, calibration, roiCount, tolerancedRoiCount, null,
+                unmeasuredTolerancedRoiCount, hasKnownReference);
 
         /// <summary>
         /// 评估测量工作流能否继续。
@@ -110,12 +120,14 @@ namespace ImageViewer.Core.Analysis
         /// <param name="tolerancedRoiCount">其中配置了公差的数量。</param>
         /// <param name="unmeasuredTolerancedRoiCount">其中配了公差但当前没有测得值的数量。</param>
         /// <param name="hasKnownReference">是否已知标准样件值（有才谈得上精度/偏差结论）。</param>
+        /// <param name="distortionAudit">参与测量的点的逐点去畸变审计；为 null 表示未审计。</param>
         public static MeasurementWorkflowReadiness Evaluate(
             double pixelSize,
             string? physicalUnit,
             CameraCalibration? calibration,
             int roiCount,
             int tolerancedRoiCount,
+            DistortionAudit? distortionAudit,
             int unmeasuredTolerancedRoiCount = 0,
             bool hasKnownReference = false)
         {
@@ -165,6 +177,15 @@ namespace ImageViewer.Core.Analysis
                     CodeCalibrationIdentityMissing,
                     MeasurementReadinessLevel.Warning,
                     "标定没有标识（CalibrationId），结果无法追溯到具体的那次标定。"));
+            }
+
+            if (distortionAudit is { HasNonConvergedPoints: true })
+            {
+                checks.Add(new MeasurementReadinessCheck(
+                    CodeCalibrationUndistortionNotConverged,
+                    MeasurementReadinessLevel.Warning,
+                    FormattableString.Invariant(
+                        $"有 {distortionAudit.NonConvergedPointCount}/{distortionAudit.PointCount} 个测量点的畸变反解未收敛（最大残差 {distortionAudit.MaximumResidualPixels:G4} px），相关尺寸和公差判定不可评估。")));
             }
 
             if (roiCount <= 0)

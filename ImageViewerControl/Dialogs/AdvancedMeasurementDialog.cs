@@ -12,6 +12,7 @@ using ImageViewer.Core.Geometry;
 using ImageViewer.Core.Measurements;
 using ImageViewer.Localization;
 using ImageViewer.Models;
+using ImageViewer.Plugins;
 using ImageViewer.Services;
 using Microsoft.Win32;
 
@@ -28,6 +29,9 @@ internal sealed partial class AdvancedMeasurementDialog : Window
     private readonly Func<System.Windows.Media.Imaging.BitmapSource?>? _getBitmap;
     private readonly Func<string?>? _getImagePath;
     private readonly Func<WorkpieceCoordinateSystem?>? _getWorkpiece;
+    private readonly Func<RoiPluginRegistry>? _getPluginRegistry;
+    private Button _exportButton = null!;
+    private CancellationTokenSource? _exportCancellation;
     private readonly ObservableCollection<SourceOption> _sourceOptions = [];
     private readonly ObservableCollection<SourceOption> _selectedSources = [];
     private readonly ObservableCollection<AdvancedMeasurementDefinition> _savedDefinitions = [];
@@ -66,7 +70,8 @@ internal sealed partial class AdvancedMeasurementDialog : Window
         Action<RoiBase, AdvancedMeasurementDefinition[]> setDefinitions,
         Func<System.Windows.Media.Imaging.BitmapSource?>? getBitmap = null,
         Func<string?>? getImagePath = null,
-        Func<WorkpieceCoordinateSystem?>? getWorkpiece = null)
+        Func<WorkpieceCoordinateSystem?>? getWorkpiece = null,
+        Func<RoiPluginRegistry>? getPluginRegistry = null)
     {
         _getRois = getRois ?? throw new ArgumentNullException(nameof(getRois));
         _getPixelSize = getPixelSize ?? throw new ArgumentNullException(nameof(getPixelSize));
@@ -76,6 +81,7 @@ internal sealed partial class AdvancedMeasurementDialog : Window
         _getBitmap = getBitmap;
         _getImagePath = getImagePath;
         _getWorkpiece = getWorkpiece;
+        _getPluginRegistry = getPluginRegistry;
 
         InitializeWindowContent();
 
@@ -135,7 +141,10 @@ internal sealed partial class AdvancedMeasurementDialog : Window
         string primary = evaluation.Metrics.FirstOrDefault() is AdvancedMeasurementMetric metric
             ? FormatMetric(metric)
             : UiText.Get("AdvancedMeasurementNoSamples");
-        return UiText.Format("AdvancedMeasurementResultRow", definition.Name, status, primary);
+        string summary = UiText.Format("AdvancedMeasurementResultRow", definition.Name, status, primary);
+        return evaluation.Warnings.Length > 0
+            ? summary + UiText.Get("AdvancedMeasurementWarningSuffix")
+            : summary;
     }
 
     private string FormatMetric(AdvancedMeasurementMetric metric)
@@ -181,6 +190,11 @@ internal sealed partial class AdvancedMeasurementDialog : Window
             lines.Add(UiText.Get(withinLimits ? "AdvancedMeasurementStatusWithinLimits" : "AdvancedMeasurementStatusOutOfLimits"));
         }
 
+        foreach (string warning in result.Warnings)
+        {
+            lines.Add(UiText.Format("AdvancedMeasurementWarningRow", warning));
+        }
+
         for (int i = 0; i < result.Samples.Length; i++)
         {
             double station = i < result.Stations.Length ? result.Stations[i] : i;
@@ -199,33 +213,62 @@ internal sealed partial class AdvancedMeasurementDialog : Window
 
     private async void ExportCsvAsync()
     {
-        var dialog = new SaveFileDialog
-        {
-            Title = UiText.Get("FileDialogSaveAnalysisCsvTitle"),
-            Filter = UiText.Get("FileDialogCsvFilter"),
-            DefaultExt = ".csv",
-            AddExtension = true
-        };
-        if (dialog.ShowDialog(this) != true)
+        if (_exportCancellation != null || _disposed)
         {
             return;
         }
 
+        using var cancellation = new CancellationTokenSource();
+        _exportCancellation = cancellation;
+        _exportButton.IsEnabled = false;
         try
         {
+            var dialog = new SaveFileDialog
+            {
+                Title = UiText.Get("FileDialogSaveAnalysisCsvTitle"),
+                Filter = UiText.Get("FileDialogCsvFilter"),
+                DefaultExt = ".csv",
+                AddExtension = true
+            };
+            if (dialog.ShowDialog(this) != true)
+            {
+                return;
+            }
+
+            _detailsText.Text = UiText.Get("AdvancedMeasurementExportInProgress");
             await AdvancedMeasurementExportService.SaveAsync(
                 dialog.FileName,
+                _getPluginRegistry?.Invoke() ?? RoiPluginRegistry.CreateBuiltIn(),
                 _getRois(),
                 _getPixelSize(),
                 _getUnit(),
                 _getCalibration(),
                 _getBitmap?.Invoke(),
                 _getImagePath?.Invoke(),
-                _getWorkpiece?.Invoke());
+                _getWorkpiece?.Invoke(),
+                cancellation.Token);
+            if (!_disposed)
+            {
+                _detailsText.Text = UiText.Get("AdvancedMeasurementExportComplete");
+            }
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
         }
         catch (Exception exception)
         {
-            MessageBox.Show(this, $"{UiText.Get("AdvancedMeasurementSaveFailed")}: {exception.Message}", Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+            if (!_disposed)
+            {
+                MessageBox.Show(this, $"{UiText.Get("AdvancedMeasurementSaveFailed")}: {exception.Message}", Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+        finally
+        {
+            _exportCancellation = null;
+            if (!_disposed)
+            {
+                _exportButton.IsEnabled = true;
+            }
         }
     }
 
@@ -287,6 +330,7 @@ internal sealed partial class AdvancedMeasurementDialog : Window
     private void OnClosed(object? sender, EventArgs args)
     {
         _disposed = true;
+        _exportCancellation?.Cancel();
         DetachRoiNotifications();
     }
 

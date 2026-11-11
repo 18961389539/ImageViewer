@@ -36,14 +36,16 @@ namespace ImageViewer.Controls
         private CancellationTokenSource? _operationCancellation;
 
 
-        public AdaptiveImageViewer()
+        public AdaptiveImageViewer() : this(static () => new ImageViewer()) { }
+
+        internal AdaptiveImageViewer(Func<ImageViewer> createImageViewer)
         {
             InitializeComponent();
             Loaded += OnLoaded;
-            _imageViewer = new ImageViewer();
+            _imageViewer = createImageViewer();
             // 自适应宿主默认收起工具栏，把画布留给图像；点击左上角“工具栏”入口即可打开完整命令面板。
             _imageViewer.ShowToolbar = false;
-            _volumeViewer = new VolumeViewer();
+            _volumeViewer = new VolumeViewer(createImageViewer);
             _volume3DViewer = new Volume3DViewer();
             _volume3DViewer.SwitchToAxialSliceRequested += OnSwitchToAxialSliceRequested;
             _volumeViewer.CurrentSliceChanged += OnCurrentSliceChanged;
@@ -60,7 +62,10 @@ namespace ImageViewer.Controls
             {
                 ObjectDisposedException.ThrowIf(_isDisposed, this);
                 _imageSource = value;
-                _imageViewer.ImageSource = value;
+                if (!IsMprMode(_displayMode))
+                {
+                    _imageViewer.ImageSource = value;
+                }
                 UpdateDisplayedView();
                 UpdateStatus();
                 UpdateButtonStates();
@@ -74,7 +79,12 @@ namespace ImageViewer.Controls
             set
             {
                 ObjectDisposedException.ThrowIf(_isDisposed, this);
-                _mprCancellation?.Cancel();
+                AbandonMprRequest();
+                _readyMprMode = null;
+                if (IsMprMode(_displayMode))
+                {
+                    _imageViewer.SetVolumeSliceImage(null);
+                }
                 _operationCancellation?.Cancel();
                 _volume = value;
                 _volumeViewer.Volume = value;
@@ -91,6 +101,12 @@ namespace ImageViewer.Controls
                 UpdateDisplayedView();
                 UpdateStatus();
                 UpdateButtonStates();
+
+                // 允许宿主先设置 DisplayMode 再赋 Volume：模式已是 MPR 时，新体数据必须重新加载目标平面。
+                if (_volume != null && (_displayMode is AdaptiveDisplayMode.Coronal or AdaptiveDisplayMode.Sagittal))
+                {
+                    _ = SetDisplayModeAsync(_displayMode);
+                }
             }
         }
 
@@ -100,21 +116,124 @@ namespace ImageViewer.Controls
             set
             {
                 ObjectDisposedException.ThrowIf(_isDisposed, this);
-                _displayMode = value;
-                UpdateDisplayedView();
-                UpdateStatus();
-                UpdateButtonStates();
+
+                // MPR 模式不只是切换容器：必须同时重建目标方向的首个切片。
+                // 属性 setter 不能 await，因此统一交给异步入口；它会先把模式切过去，再用重建状态遮罩阻止误操作。
+                if (value is AdaptiveDisplayMode.Coronal or AdaptiveDisplayMode.Sagittal)
+                {
+                    _ = SetDisplayModeAsync(value);
+                    return;
+                }
+
+                ApplyDisplayMode(value);
             }
+        }
+
+        /// <summary>
+        /// 切换显示模式；MPR 模式会等待目标切片重建完成后再返回。
+        /// Chinese: 属性 setter、按钮和快捷键都走这里，避免“模式已切换但图像还是旧平面”的分叉路径。
+        /// English: Single transition path for the property, buttons and shortcuts; MPR waits for the requested plane.
+        /// </summary>
+        public Task<bool> SetDisplayModeAsync(AdaptiveDisplayMode mode, CancellationToken cancellationToken = default)
+        {
+            ObjectDisposedException.ThrowIf(_isDisposed, this);
+            if (mode is AdaptiveDisplayMode.Coronal or AdaptiveDisplayMode.Sagittal)
+            {
+                return SetMprDisplayModeAsync(mode, cancellationToken);
+            }
+
+            ApplyDisplayMode(mode);
+            return Task.FromResult(true);
         }
 
         public ImageViewer ImageViewer => _imageViewer;
 
-        public bool IsDirty => _imageViewer.IsDirty;
+        public bool IsDirty => _imageViewer.IsDirty || _volumeViewer.SliceViewer.IsDirty;
 
         public Task SaveSessionAsync() => _imageViewer.SaveSessionAsync();
 
+        /// <summary>Saves every dirty view as its own session. Returns false if any edits remain unsaved.</summary>
+        public async Task<bool> SaveUnsavedSessionsAsync()
+        {
+            ImageViewer axial = _volumeViewer.SliceViewer;
+            Window? owner = Window.GetWindow(this);
+            if (_imageViewer.IsDirty)
+            {
+                await _imageViewer.SaveSessionForViewAsync(UiText.Get("SessionPrimaryView"), axial, owner);
+                if (_imageViewer.IsDirty)
+                {
+                    return false;
+                }
+            }
+            if (axial.IsDirty)
+            {
+                await axial.SaveSessionForViewAsync(UiText.Get("SessionAxialView"), _imageViewer, owner);
+            }
+            return !IsDirty;
+        }
+
+        /// <summary>Opens a new image document after protecting unsaved edits.</summary>
+        public Task<bool> ReplaceImageDocumentAsync(ImageSource image, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(image);
+            return ReplaceDocumentContentAsync(image, null, cancellationToken);
+        }
+
+        /// <summary>Opens a new volume document after protecting unsaved edits.</summary>
+        public Task<bool> ReplaceVolumeDocumentAsync(VolumeData volume, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(volume);
+            return ReplaceDocumentContentAsync(volume.GetAxialSlice(0), volume, cancellationToken);
+        }
+
+        /// <summary>Opens a 2D project after protecting edits in the current viewers.</summary>
+        public async Task<bool> OpenProjectFromFileAsync(string filePath)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+            void ShowProject()
+            {
+                ImageSource = _imageViewer.ImageSource;
+                DisplayMode = AdaptiveDisplayMode.Auto;
+                Volume = null;
+            }
+
+            using IDisposable primaryPause = _imageViewer.SuspendAutoSaveWrites();
+            using IDisposable axialPause = _volumeViewer.SliceViewer.SuspendAutoSaveWrites();
+            return await _imageViewer.OpenProjectFromFileAsync(filePath,
+                token => _volume != null
+                    ? _volumeViewer.SliceViewer.PrepareDocumentContentAsync(ShowProject, token)
+                    : Task.FromResult<Action?>(ShowProject));
+        }
+
+        private async Task<bool> ReplaceDocumentContentAsync(ImageSource image, VolumeData? volume, CancellationToken cancellationToken)
+        {
+            void ApplyContent()
+            {
+                DisplayMode = AdaptiveDisplayMode.Auto;
+                Volume = volume;
+                ImageSource = image;
+            }
+
+            // Both viewers can prompt before the shared volume changes. While preparing the
+            // replacement, drain existing writes and keep their next timers from racing it.
+            using IDisposable primaryPause = _imageViewer.SuspendAutoSaveWrites();
+            using IDisposable axialPause = _volumeViewer.SliceViewer.SuspendAutoSaveWrites();
+            return await _imageViewer.ReplaceDocumentContentAsync(token =>
+            {
+                if (_volume != null || volume != null)
+                {
+                    return _volumeViewer.SliceViewer.PrepareDocumentContentAsync(ApplyContent, token);
+                }
+                return Task.FromResult<Action?>(ApplyContent);
+            }, cancellationToken);
+        }
+
         /// <summary>Marks host-provided initial content as the saved baseline.</summary>
-        public void MarkDocumentClean() => _imageViewer.MarkDocumentClean();
+        public void MarkDocumentClean()
+        {
+            _imageViewer.MarkDocumentClean();
+            _volumeViewer.SliceViewer.MarkDocumentClean();
+        }
 
         public VolumeViewer VolumeViewer => _volumeViewer;
 
@@ -130,13 +249,13 @@ namespace ImageViewer.Controls
             }
 
             _isDisposed = true;
+            AbandonMprRequest();
             _imageViewer.Dispose();
             _volumeViewer.Dispose();
             _volume3DViewer.SwitchToAxialSliceRequested -= OnSwitchToAxialSliceRequested;
             _volumeViewer.CurrentSliceChanged -= OnCurrentSliceChanged;
             Loaded -= OnLoaded;
             _volume3DViewer.Dispose();
-            _mprCancellation?.Cancel();
             _operationCancellation?.Cancel();
             contentHost.Content = null;
             _imageSource = null;
@@ -148,7 +267,36 @@ namespace ImageViewer.Controls
         {
             Dispose();
             GC.SuppressFinalize(this);
-            return ValueTask.CompletedTask;
+            return new ValueTask(Task.WhenAll(_imageViewer.AutoSaveCloseCompletion, _volumeViewer.SliceViewer.AutoSaveCloseCompletion));
+        }
+
+        private void ApplyDisplayMode(AdaptiveDisplayMode mode)
+        {
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            bool wasMpr = IsMprMode(_displayMode);
+            _displayMode = mode;
+            if (!IsMprMode(mode))
+            {
+                AbandonMprRequest();
+                _readyMprMode = null;
+                _lastNonMprMode = mode;
+                if (wasMpr)
+                {
+                    _imageViewer.SetVolumeSliceImage(_imageSource);
+                }
+            }
+            else if (!wasMpr)
+            {
+                _imageSource = _imageViewer.ImageSource;
+            }
+
+            UpdateDisplayedView();
+            UpdateStatus();
+            UpdateButtonStates();
         }
 
         private void UpdateDisplayedView()
@@ -187,10 +335,16 @@ namespace ImageViewer.Controls
         private void OnCurrentSliceChanged(object? sender, EventArgs e)
         {
             _volume3DViewer.SetCurrentSlice(_volumeViewer.CurrentSliceIndex);
-            if (_volume != null)
+            if (_volume != null && _displayMode == AdaptiveDisplayMode.AxialSlice)
             {
-                statusText.Text = UiText.Format("StatusAxialSlice", _volumeViewer.CurrentSliceIndex + 1, _volume.Depth);
+                UpdateAxialStatus(_volume);
             }
+        }
+
+        private void UpdateAxialStatus(VolumeData volume)
+        {
+            string sliceStatus = UiText.Format("StatusAxialSlice", _volumeViewer.CurrentSliceIndex + 1, volume.Depth);
+            statusText.Text = UiText.Format("StatusVolumePlaneSpacing", sliceStatus, "X", volume.SpacingX, "Y", volume.SpacingY);
         }
 
         private void OnLoaded(object sender, RoutedEventArgs e)
@@ -202,15 +356,26 @@ namespace ImageViewer.Controls
         private void OnTwoDimensionalClick(object sender, RoutedEventArgs e) => DisplayMode = AdaptiveDisplayMode.TwoDimensional;
         private void OnThreeDimensionalClick(object sender, RoutedEventArgs e) => DisplayMode = AdaptiveDisplayMode.ThreeDimensional;
         private void OnAxialClick(object sender, RoutedEventArgs e) => DisplayMode = AdaptiveDisplayMode.AxialSlice;
-        private async void OnCoronalClick(object sender, RoutedEventArgs e) => await SetMprModeAsync(AdaptiveDisplayMode.Coronal);
-        private async void OnSagittalClick(object sender, RoutedEventArgs e) => await SetMprModeAsync(AdaptiveDisplayMode.Sagittal);
-
+        private void OnCoronalClick(object sender, RoutedEventArgs e) => _ = SetDisplayModeAsync(AdaptiveDisplayMode.Coronal);
+        private void OnSagittalClick(object sender, RoutedEventArgs e) => _ = SetDisplayModeAsync(AdaptiveDisplayMode.Sagittal);
 
         private async void OnKeyDown(object sender, KeyEventArgs e)
         {
+            try
+            {
+                await HandleKeyDownAsync(e);
+            }
+            catch (Exception)
+            {
+                statusText.Text = UiText.Get("StatusViewerOperationFailed");
+            }
+        }
+
+        private async Task HandleKeyDownAsync(KeyEventArgs e)
+        {
             // 让嵌套 ImageViewer 先处理 ROI 的方向键和 Esc；文本框、下拉框、列表和滑块
             // 也必须保留自己的键盘行为，避免外层查看器抢走输入。
-            if (e.Handled || IsKeyboardInputControlFocused())
+            if (e.Handled || (e.Key != Key.Escape && IsKeyboardInputControlFocused()))
             {
                 return;
             }
@@ -221,10 +386,12 @@ namespace ImageViewer.Controls
                     DisplayMode = AdaptiveDisplayMode.AxialSlice;
                     break;
                 case Key.D2 when _volume != null:
-                    await SetMprModeAsync(AdaptiveDisplayMode.Coronal);
+                    e.Handled = true;
+                    await SetDisplayModeAsync(AdaptiveDisplayMode.Coronal);
                     break;
                 case Key.D3 when _volume != null:
-                    await SetMprModeAsync(AdaptiveDisplayMode.Sagittal);
+                    e.Handled = true;
+                    await SetDisplayModeAsync(AdaptiveDisplayMode.Sagittal);
                     break;
                 case Key.D4 when _volume != null:
                     DisplayMode = AdaptiveDisplayMode.ThreeDimensional;
@@ -235,9 +402,11 @@ namespace ImageViewer.Controls
                     statusText.Text = UiText.Get("StatusVolumeFitted");
                     break;
                 case Key.Up when IsMprModeActive:
+                    e.Handled = true;
                     await StepMprSliceAsync(1);
                     break;
                 case Key.Down when IsMprModeActive:
+                    e.Handled = true;
                     await StepMprSliceAsync(-1);
                     break;
                 case Key.Escape:
@@ -248,11 +417,7 @@ namespace ImageViewer.Controls
                         cancelled = true;
                     }
 
-                    if (_mprCancellation is not null)
-                    {
-                        _mprCancellation.Cancel();
-                        cancelled = true;
-                    }
+                    cancelled |= CancelMprNavigation();
 
                     if (!cancelled)
                     {
@@ -297,8 +462,10 @@ namespace ImageViewer.Controls
         private void OnCancelClick(object sender, RoutedEventArgs e)
         {
             _operationCancellation?.Cancel();
-            _mprCancellation?.Cancel();
-            statusText.Text = UiText.Get("StatusCancelRequested");
+            if (!CancelMprNavigation() || _operationCancellation != null)
+            {
+                statusText.Text = UiText.Get("StatusCancelRequested");
+            }
             operationProgress.Visibility = Visibility.Collapsed;
             UpdateButtonStates();
         }

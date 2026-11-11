@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.IO.Compression;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -59,6 +60,8 @@ namespace ImageViewerControl.Tests
                 using ZipArchive archive = ZipFile.OpenRead(packagePath);
                 ZipArchiveEntry imageEntry = Assert.Single(archive.Entries, entry => entry.FullName == "assets/source.png");
                 Assert.Equal("image", await ReadEntryAsync(imageEntry));
+                ImageViewerSessionData session = await service.LoadAsync(packagePath, RoiPluginRegistry.CreateBuiltIn());
+                Assert.Equal(Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(imagePath))), session.ImageSha256);
             }
             finally
             {
@@ -333,6 +336,134 @@ namespace ImageViewerControl.Tests
             {
                 DeleteTempRoot(rootPath);
             }
+        }
+
+        [Fact]
+        public async Task LoadAsync_IdenticalPackageAtAnotherPathReusesExtractedAssets()
+        {
+            string root = CreateTempRoot();
+            try
+            {
+                var registry = RoiPluginRegistry.CreateBuiltIn();
+                var service = CreateService(root);
+                string image = Path.Combine(root, "image.png");
+                string package = Path.Combine(root, "original.ivpkg");
+                string copy = Path.Combine(root, "copy.ivpkg");
+                await File.WriteAllTextAsync(image, "image");
+                await service.ExportAsync(package, CreateSnapshot(image, []), registry);
+                File.Copy(package, copy);
+                ImageViewerSessionData first = await service.LoadAsync(package, registry);
+                var oldTimestamp = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                File.SetLastWriteTimeUtc(first.ImagePath!, oldTimestamp);
+                ImageViewerSessionData second = await service.LoadAsync(copy, registry);
+                Assert.Equal(first.ImagePath, second.ImagePath);
+                Assert.Equal(oldTimestamp, File.GetLastWriteTimeUtc(second.ImagePath!));
+            }
+            finally
+            {
+                DeleteTempRoot(root);
+            }
+        }
+
+        [Fact]
+        public async Task SaveStandaloneSession_CopiesCachedImageAndSurvivesEvictionAndMoving()
+        {
+            string root = CreateTempRoot();
+            try
+            {
+                string cache = Path.Combine(root, "cache");
+                string entry = MakeCacheEntry(cache, 1);
+                string image = Path.Combine(entry, "assets", "image.png");
+                string savedFolder = Path.Combine(root, "saved");
+                string session = Path.Combine(savedFolder, "first.ivsession");
+                string another = Path.Combine(savedFolder, "second.ivsession");
+                var registry = RoiPluginRegistry.CreateBuiltIn();
+                var service = new ImageViewerSessionService();
+
+                await service.SaveToFileAsync(session, CreateSnapshot(image, []), registry);
+                service.SaveToFile(another, CreateSnapshot(image, []), registry);
+
+                string asset = Assert.Single(Directory.GetFiles(Path.Combine(savedFolder, "ImageViewer.assets")));
+                Assert.Equal(asset, (await service.LoadFromFileAsync(session, registry)).ImagePath);
+                Assert.Equal(asset, (await service.LoadFromFileAsync(another, registry)).ImagePath);
+                Assert.Contains("ImageViewer.assets", await File.ReadAllTextAsync(session));
+                using (FileStream guard = await ImageViewerProjectPackageCache.LockAsync(cache, default))
+                {
+                    ImageViewerProjectPackageCache.Trim(cache, string.Empty, Path.Combine(root, "recovery"), 1);
+                }
+                Assert.False(Directory.Exists(entry));
+
+                string movedFolder = Path.Combine(root, "moved");
+                Directory.Move(savedFolder, movedFolder);
+                ImageViewerSessionData moved = await service.LoadFromFileAsync(Path.Combine(movedFolder, "first.ivsession"), registry);
+                Assert.Equal("0123456789", await File.ReadAllTextAsync(moved.ImagePath!));
+
+                string saveAs = Path.Combine(root, "other", "copy.ivsession");
+                await service.SaveToFileAsync(saveAs, CreateSnapshot(moved.ImagePath, []), registry);
+                ImageViewerSessionData copied = await service.LoadFromFileAsync(saveAs, registry);
+                Assert.StartsWith(Path.GetDirectoryName(saveAs)!, copied.ImagePath!, StringComparison.OrdinalIgnoreCase);
+                Assert.Equal("0123456789", await File.ReadAllTextAsync(copied.ImagePath!));
+            }
+            finally
+            {
+                DeleteTempRoot(root);
+            }
+        }
+
+        [Fact]
+        public async Task Trim_EvictsLeastRecentlyUsedAndKeepsLiveAndRecoveryAssets()
+        {
+            string root = CreateTempRoot();
+            try
+            {
+                string cache = Path.Combine(root, "cache");
+                string recovery = Path.Combine(root, "recovery");
+                Directory.CreateDirectory(recovery);
+                using FileStream guard = await ImageViewerProjectPackageCache.LockAsync(cache, default);
+                string current = MakeCacheEntry(cache, 1);
+                string live = MakeCacheEntry(cache, 2);
+                string recovered = MakeCacheEntry(cache, 3);
+                string older = MakeCacheEntry(cache, 4);
+                string newer = MakeCacheEntry(cache, 5);
+                File.SetLastWriteTimeUtc(ImageViewerProjectPackageCache.MarkerPath(older), DateTime.UtcNow.AddDays(-3));
+                File.SetLastWriteTimeUtc(ImageViewerProjectPackageCache.MarkerPath(newer), DateTime.UtcNow.AddDays(-2));
+                using FileStream liveLease = ImageViewerProjectPackageCache.LeaseEntry(live);
+                string recoveryFile = Path.Combine(recovery, "autosave.ivsession");
+                string recoveryAsset = Path.Combine(recovered, "assets", "image.png");
+                File.WriteAllText(recoveryFile, System.Text.Json.JsonSerializer.Serialize(new { ImagePath = recoveryAsset }));
+
+                ImageViewerProjectPackageCache.Trim(cache, current, recovery, 40);
+                Assert.False(Directory.Exists(older));
+                Assert.True(Directory.Exists(newer));
+
+                ImageViewerProjectPackageCache.Trim(cache, current, recovery, 10);
+                Assert.False(Directory.Exists(newer));
+                Assert.True(Directory.Exists(current));
+                Assert.True(Directory.Exists(live));
+                Assert.True(File.Exists(recoveryAsset));
+
+                liveLease.Dispose();
+                File.Delete(recoveryFile);
+                ImageViewerProjectPackageCache.Trim(cache, current, recovery, 10);
+                Assert.False(Directory.Exists(live));
+                Assert.False(Directory.Exists(recovered));
+            }
+            finally
+            {
+                DeleteTempRoot(root);
+            }
+        }
+
+        private static string MakeCacheEntry(string cache, byte id)
+        {
+            byte[] hash = new byte[32];
+            hash[0] = id;
+            string entry = ImageViewerProjectPackageCache.GetDirectory(cache, hash);
+            string assets = Path.Combine(entry, "assets");
+            Directory.CreateDirectory(assets);
+            File.WriteAllText(Path.Combine(assets, "image.png"), "0123456789");
+            ImageViewerProjectPackageCache.Complete(entry, 10);
+            return entry;
         }
 
         private static void WriteSessionEntry(ZipArchive archive, string sessionJson)

@@ -430,6 +430,48 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
+        public void RenderTileCache_TileProcessingDoesNotBlockExistingEntries()
+        {
+            WpfTestRunner.RunAsync(async () =>
+            {
+                using var cache = new ImageViewerRenderTileCache();
+                BitmapSource source = CreateFrozenLargeBitmap();
+                Int32Rect firstRect = new(0, 0, 512, 512);
+                Int32Rect secondRect = new(512, 0, 512, 512);
+                cache.GetOrCreate(source, firstRect);
+
+                var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                Task<BitmapSource> processing = Task.Run(() => cache.GetOrCreateTileView(
+                    source,
+                    secondRect,
+                    HotSettings,
+                    new Int32Rect(0, 0, secondRect.Width, secondRect.Height),
+                    tile =>
+                    {
+                        entered.TrySetResult();
+                        release.Task.WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult();
+                        return ImageViewerDisplaySourceService.ApplyDisplayLut(tile, HotSettings);
+                    }));
+
+                try
+                {
+                    await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+                    // 另一个线程处理新 tile 时，已有的缓存命中不能排在它的像素变换后面。
+                    Task<bool> existingHit = Task.Run(() => cache.TryGet(source, firstRect, out _));
+                    Assert.True(await existingHit.WaitAsync(TimeSpan.FromSeconds(2)), "tile 处理持锁阻塞了已有缓存命中。");
+                }
+                finally
+                {
+                    release.TrySetResult();
+                }
+
+                await processing.WaitAsync(TimeSpan.FromSeconds(10));
+            });
+        }
+
+        [Fact]
         public void RenderTileCache_EvictingTheTileAlsoReleasesItsDerivedViews()
         {
             WpfTestRunner.Run(() =>

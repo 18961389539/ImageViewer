@@ -288,13 +288,33 @@ internal static class VisionAlgorithmEntryPoint
             edgeSelection,
             out sample);
 
+    /// <summary>全图斑点分割与连通域分析。</summary>
     public static IReadOnlyList<BlobFeature> ExtractBlobs(
         IntensityImage image,
         bool useOtsu,
         int threshold,
         bool detectDark,
-        int minArea) =>
-        BlobAlgorithm.ExtractRegions(image, useOtsu, threshold, detectDark, minArea);
+        int minArea,
+        bool includeContours = false,
+        int maximumContourVertices = 512) =>
+        BlobAlgorithm.ExtractRegions(
+            image, inside: null, useOtsu, threshold, detectDark, minArea, includeContours, maximumContourVertices);
+
+    /// <summary>
+    /// 限定搜索掩码的斑点分割。<paramref name="inside"/> 之外的像素既不进入 Otsu 直方图，
+    /// 也不会形成连通域；传 null 等价于全图搜索。
+    /// </summary>
+    public static IReadOnlyList<BlobFeature> ExtractBlobs(
+        IntensityImage image,
+        bool[]? inside,
+        bool useOtsu,
+        int threshold,
+        bool detectDark,
+        int minArea,
+        bool includeContours = false,
+        int maximumContourVertices = 512) =>
+        BlobAlgorithm.ExtractRegions(
+            image, inside, useOtsu, threshold, detectDark, minArea, includeContours, maximumContourVertices);
 
     private static PointD[] ToPointD(Point[] points)
     {

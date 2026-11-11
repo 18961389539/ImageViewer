@@ -34,18 +34,21 @@
                     <TextBlock
                         Foreground="#F5F8FC"
                         FontSize="14"
+                        TextWrapping="Wrap"
                         Text="{localization:DemoText ToolbarHint}" />
                     <StackPanel x:Name="openProgressPanel" Margin="0,6,0,0" Visibility="Collapsed">
                         <TextBlock x:Name="openStatusText" Foreground="#AAB5C3" FontSize="12" />
                         <ProgressBar x:Name="openProgressBar" Height="5" Margin="0,4,0,0" Minimum="0" Maximum="100" />
                     </StackPanel>
-                    <TextBlock
-                        x:Name="openSummaryText"
-                        Margin="0,6,0,0"
-                        Foreground="#AAB5C3"
-                        FontSize="12"
-                        TextWrapping="Wrap"
-                        Visibility="Collapsed" />
+                    <ScrollViewer x:Name="openSummaryScroll" MaxHeight="96"
+                                  VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
+                        <TextBlock
+                            x:Name="openSummaryText"
+                            Margin="0,6,0,0"
+                            Foreground="#AAB5C3"
+                            FontSize="12"
+                            TextWrapping="Wrap" />
+                    </ScrollViewer>
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
@@ -65,6 +68,15 @@
                         Background="#243B57"
                         BorderBrush="#69AFFF"
                         Content="{localization:DemoText OpenVolumeButton}"
+                        Foreground="#F5F8FC" />
+                    <Button
+                        x:Name="measurementSampleButton"
+                        Margin="8,0,0,0"
+                        Padding="12,6"
+                        Click="OnMeasurementSampleClick"
+                        Background="#243B57"
+                        BorderBrush="#69AFFF"
+                        Content="{localization:DemoText MeasurementSampleButton}"
                         Foreground="#F5F8FC" />
                     <Button
                         x:Name="cancelOpenButton"

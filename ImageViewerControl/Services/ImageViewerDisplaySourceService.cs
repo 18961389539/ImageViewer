@@ -144,18 +144,29 @@ namespace ImageViewer.Services
 
         /// <summary>
         /// 归一化到"可以按像素直接读强度"的格式。
-        /// Chinese: 直通与 Shader 能看到相同数值的格式；其它格式转成 Bgra32（而不是 Gray8，那会丢掉 alpha）。
-        /// English: Passes through formats whose samples match what the shader sees; other formats are converted to Bgra32
-        /// rather than Gray8, which would drop alpha.
+        /// Chinese: `Pbgra32` 的 RGB 是预乘值，不能直接当强度查表；先由 WPF 转成直通的 `Bgra32`，
+        /// 与 Shader 的反预乘路径保持同一语义。其它格式也统一转 Bgra32，而不是 Gray8，避免丢 alpha。
+        /// English: `Pbgra32` stores premultiplied RGB and must be converted to straight `Bgra32` before the LUT;
+        /// other formats also go through `Bgra32` so alpha survives the conversion.
         /// </summary>
         private static BitmapSource NormalizeForColorRead(BitmapSource source)
         {
+            if (source.Format == PixelFormats.Pbgra32)
+            {
+                var converted = new FormatConvertedBitmap(source, PixelFormats.Bgra32, null, 0);
+                if (converted.CanFreeze)
+                {
+                    converted.Freeze();
+                }
+
+                return converted;
+            }
+
             return source.Format == PixelFormats.Gray8 ||
                    source.Format == PixelFormats.Gray16 ||
                    source.Format == PixelFormats.Bgr24 ||
                    source.Format == PixelFormats.Bgr32 ||
-                   source.Format == PixelFormats.Bgra32 ||
-                   source.Format == PixelFormats.Pbgra32
+                   source.Format == PixelFormats.Bgra32
                 ? source
                 : new FormatConvertedBitmap(source, PixelFormats.Bgra32, null, 0);
         }

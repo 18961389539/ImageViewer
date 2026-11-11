@@ -95,7 +95,7 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
-        public void Register_ThenReleaseOwnership_DropsOnlyThatInstancesEntries()
+        public void DeleteOwnedSnapshots_RemovesOnlyThatInstancesFilesInsideAutosave()
         {
             string rootPath = CreateTempRoot();
             try
@@ -104,22 +104,23 @@ namespace ImageViewerControl.Tests
                 Directory.CreateDirectory(autoSaveDirectory);
                 string firstPath = Path.Combine(autoSaveDirectory, "autosave-first.ivsession");
                 string secondPath = Path.Combine(autoSaveDirectory, "autosave-second.ivsession");
+                string outside = Path.Combine(rootPath, "autosave-outside.ivsession");
                 File.WriteAllText(firstPath, "session");
                 File.WriteAllText(secondPath, "session");
+                File.WriteAllText(outside, "user file");
 
                 var index = new ImageViewerRecoveryIndex(autoSaveDirectory);
                 index.Register(firstPath, DateTimeOffset.UtcNow, "instance-a", DateTimeOffset.UtcNow);
                 index.Register(secondPath, DateTimeOffset.UtcNow, "instance-b", DateTimeOffset.UtcNow);
+                index.Register(outside, DateTimeOffset.UtcNow, "instance-a", DateTimeOffset.UtcNow);
 
-                index.ReleaseOwnership("instance-a");
+                index.DeleteOwnedSnapshots("instance-a");
 
-                ImageViewerRecoveryIndexEntry survivor = Assert.Single(index.Read());
-                Assert.Equal(secondPath, survivor.Path);
-                Assert.Equal("instance-b", survivor.OwnerInstanceId);
-
-                // 文件本身不动——所有权只是索引层的概念。
-                Assert.True(File.Exists(firstPath));
+                Assert.DoesNotContain(index.Read(), entry => entry.Path == firstPath);
+                Assert.Contains(index.Read(), entry => entry.Path == secondPath && entry.OwnerInstanceId == "instance-b");
+                Assert.False(File.Exists(firstPath));
                 Assert.True(File.Exists(secondPath));
+                Assert.Equal("user file", File.ReadAllText(outside));
             }
             finally
             {

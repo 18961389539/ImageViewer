@@ -87,6 +87,10 @@ namespace ImageViewer.Core.Persistence
 
         public CameraCalibration? Calibration { get; set; }
 
+        /// <summary>检测质量门限；旧配方缺少此项时沿用查看器当前设置。</summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public ImageAnalysisQualityProfile? QualityProfile { get; set; }
+
         /// <summary>测量项。</summary>
         public List<MeasurementRecipeItem> Items { get; set; } = new();
 

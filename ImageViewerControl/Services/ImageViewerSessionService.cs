@@ -6,6 +6,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using ImageViewer.Abstractions;
 using ImageViewer.Core.Display;
+using ImageViewer.Core.Geometry;
+using ImageViewer.Core.Persistence;
 using ImageViewer.Models;
 using ImageViewer.Plugins;
 
@@ -18,15 +20,7 @@ namespace ImageViewer.Services
         private const int CurrentSessionVersion = 2;
 
         public void SaveToFile(string filePath, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry pluginRegistry)
-        {
-            ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
-            ArgumentNullException.ThrowIfNull(snapshot);
-            ArgumentNullException.ThrowIfNull(pluginRegistry);
-
-            ImageViewerAtomicFile.WriteAllText(
-                filePath,
-                SerializeSession(Path.GetFileNameWithoutExtension(filePath), snapshot, pluginRegistry));
-        }
+            => SaveToFileCoreAsync(filePath, snapshot, pluginRegistry, standalone: true, default).GetAwaiter().GetResult();
 
         /// <summary>
         /// 异步保存会话。
@@ -35,22 +29,104 @@ namespace ImageViewer.Services
         /// English: Serialization runs off the UI thread too. The snapshot already carries a detached ROI payload
         /// built on the UI thread, so offloading here cannot race the editor.
         /// </summary>
-        public async Task SaveToFileAsync(string filePath, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry pluginRegistry, CancellationToken cancellationToken = default)
+        public Task SaveToFileAsync(string filePath, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry pluginRegistry, CancellationToken cancellationToken = default)
+            => SaveToFileCoreAsync(filePath, snapshot, pluginRegistry, standalone: true, cancellationToken);
+
+        Task IImageViewerSessionService.SaveRecoveryToFileAsync(
+            string filePath, ImageViewerPersistenceSnapshot snapshot, RoiPluginRegistry pluginRegistry, CancellationToken cancellationToken)
+            => SaveToFileCoreAsync(filePath, snapshot, pluginRegistry, standalone: false, cancellationToken);
+
+        private async Task SaveToFileCoreAsync(string filePath, ImageViewerPersistenceSnapshot snapshot,
+            RoiPluginRegistry pluginRegistry, bool standalone, CancellationToken cancellationToken)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
             ArgumentNullException.ThrowIfNull(snapshot);
             ArgumentNullException.ThrowIfNull(pluginRegistry);
 
-            string sessionName = Path.GetFileNameWithoutExtension(filePath);
-            string sessionJson = await Task.Run(
-                () => SerializeSession(sessionName, snapshot, pluginRegistry),
+            using FileStream? assetLease = await Task.Run(
+                () => ImageViewerProjectPackageCache.TryLeaseAsset(snapshot.ImagePath, cancellationToken),
                 cancellationToken).ConfigureAwait(false);
+            string? recoveryImage = null;
+            bool createdRecoveryImage = false;
+            try
+            {
+                if (standalone)
+                {
+                    snapshot = await PrepareStandaloneSnapshotAsync(filePath, snapshot, assetLease != null, cancellationToken).ConfigureAwait(false);
+                }
+                else if (snapshot.InMemoryImage is { } bitmap)
+                {
+                    string sha256;
+                    (recoveryImage, createdRecoveryImage, sha256) = await Task.Run(
+                        () => ImageViewerSnapshotImage.SaveRecoveryImageAsync(filePath, bitmap, cancellationToken), cancellationToken).ConfigureAwait(false);
+                    snapshot = snapshot with { ImagePath = recoveryImage, InMemoryImage = null, ImageSha256 = sha256 };
+                }
+                else if (snapshot.ImageSha256 == null)
+                {
+                    snapshot = snapshot with { ImageSha256 = await ReadSourceSha256Async(filePath, snapshot.ImagePath, cancellationToken).ConfigureAwait(false) };
+                }
 
-            await ImageViewerAtomicFile.WriteAllTextAsync(
-                filePath,
-                sessionJson,
-                cancellationToken: cancellationToken).ConfigureAwait(false);
+                string sessionName = Path.GetFileNameWithoutExtension(filePath);
+                string sessionJson = await Task.Run(
+                    () => SerializeSession(sessionName, snapshot, pluginRegistry),
+                    cancellationToken).ConfigureAwait(false);
+                await ImageViewerAtomicFile.WriteAllTextAsync(filePath, sessionJson, cancellationToken: cancellationToken).ConfigureAwait(false);
+                createdRecoveryImage = false; // The committed session owns its sidecar from here on.
+                if (!standalone)
+                {
+                    ImageViewerSnapshotImage.PruneRecoveryImages(filePath, snapshot.ImagePath);
+                }
+            }
+            finally
+            {
+                if (createdRecoveryImage && recoveryImage != null)
+                {
+                    string directory = Path.GetDirectoryName(Path.GetFullPath(filePath))!;
+                    ImageViewerAtomicFile.TryDelete(Path.Combine(directory, recoveryImage));
+                }
+            }
         }
+
+        private static async Task<ImageViewerPersistenceSnapshot> PrepareStandaloneSnapshotAsync(
+            string sessionPath, ImageViewerPersistenceSnapshot snapshot, bool isCachedAsset, CancellationToken cancellationToken)
+        {
+            if (snapshot.InMemoryImage is { } bitmap)
+            {
+                string temporary = ImageViewerAtomicFile.CreateTemporaryPath(sessionPath) + ".png";
+                try
+                {
+                    await Task.Run(() => ImageViewerSnapshotImage.WritePng(temporary, bitmap, cancellationToken), cancellationToken).ConfigureAwait(false);
+                    string relative = await ImageViewerSessionAssets.SaveAsync(sessionPath, temporary, expectedSha256: null, cancellationToken).ConfigureAwait(false);
+                    return snapshot with { ImagePath = relative, InMemoryImage = null, ImageSha256 = Path.GetFileNameWithoutExtension(relative) };
+                }
+                finally
+                {
+                    ImageViewerAtomicFile.TryDelete(temporary);
+                }
+            }
+
+            if (snapshot.ImagePath is not { } source ||
+                (!isCachedAsset && !ImageViewerSessionAssets.IsManagedAsset(source) && !ImageViewerSnapshotImage.IsRecoveryAsset(source)))
+            {
+                string? sha256 = await ReadSourceSha256Async(sessionPath, snapshot.ImagePath, cancellationToken).ConfigureAwait(false);
+                if (snapshot.ImageSha256 != null)
+                {
+                    if (sha256 == null)
+                    {
+                        throw new FileNotFoundException("The original image is missing.", snapshot.ImagePath);
+                    }
+                    ImageViewerSessionImageIdentity.Verify(snapshot.ImageSha256, sha256, snapshot.ImagePath!);
+                }
+                return snapshot with { ImageSha256 = sha256 };
+            }
+
+            string relativePath = await ImageViewerSessionAssets.SaveAsync(sessionPath, source, snapshot.ImageSha256, cancellationToken).ConfigureAwait(false);
+            return snapshot with { ImagePath = relativePath, ImageSha256 = Path.GetFileNameWithoutExtension(relativePath) };
+        }
+
+        private static Task<string?> ReadSourceSha256Async(string sessionPath, string? imagePath, CancellationToken cancellationToken)
+            => ImageViewerSessionImageIdentity.TryReadAsync(
+                ResolveImagePath(imagePath, Path.GetDirectoryName(Path.GetFullPath(sessionPath))), cancellationToken);
 
         /// <summary>
         /// 把快照映射成会话文档并序列化。
@@ -63,6 +139,10 @@ namespace ImageViewer.Services
         {
             ArgumentNullException.ThrowIfNull(snapshot);
             ArgumentNullException.ThrowIfNull(pluginRegistry);
+            if (snapshot.InMemoryImage != null)
+            {
+                throw new ArgumentException("Save the snapshot to a session or project package before serializing an in-memory image.", nameof(snapshot));
+            }
 
             var session = new ImageViewerSessionDocument
             {
@@ -70,11 +150,15 @@ namespace ImageViewer.Services
                 SessionName = sessionName,
                 SavedAtUtc = DateTimeOffset.UtcNow,
                 ImagePath = snapshot.ImagePath,
+                ImageSha256 = ImageViewerSessionImageIdentity.Normalize(snapshot.ImageSha256, snapshot.ImagePath),
                 RoiDocument = snapshot.RoiDocument,
                 Scale = snapshot.Scale,
                 TranslateX = snapshot.TranslateX,
                 TranslateY = snapshot.TranslateY,
                 Calibration = snapshot.Calibration,
+                CoordinateSystem = snapshot.CoordinateSystem,
+                ReferenceDatumPoints = CloneDatumPoints(snapshot.ReferenceDatumPoints),
+                CurrentDatumPoints = CloneDatumPoints(snapshot.CurrentDatumPoints),
                 Display = snapshot.Display
             };
 
@@ -110,6 +194,10 @@ namespace ImageViewer.Services
             {
                 UnresolvedRois = roiData.UnresolvedItems,
                 QualityProfile = qualityProfile,
+                CoordinateSystem = session.CoordinateSystem,
+                ReferenceDatumPoints = CloneDatumPoints(session.ReferenceDatumPoints),
+                CurrentDatumPoints = CloneDatumPoints(session.CurrentDatumPoints),
+                ImageSha256 = ImageViewerSessionImageIdentity.Normalize(session.ImageSha256, session.ImagePath),
                 Display = session.Display is { } display && display.TryValidate(out _)
                     ? display
                     : DisplayAdjustment.Identity
@@ -129,6 +217,29 @@ namespace ImageViewer.Services
                 throw new NotSupportedException(
                     $"The session document version {version} is newer than the supported version {CurrentSessionVersion}.");
             }
+        }
+
+        internal static List<RecipeDatumPoint> CloneDatumPoints(IReadOnlyList<RecipeDatumPoint>? points)
+        {
+            if (points == null)
+            {
+                return [];
+            }
+            if (points.Count > 2)
+            {
+                throw new InvalidDataException("A session can contain at most two datum points in each set.");
+            }
+
+            var copy = new List<RecipeDatumPoint>(points.Count);
+            foreach (RecipeDatumPoint point in points)
+            {
+                if (point == null || !double.IsFinite(point.X) || !double.IsFinite(point.Y))
+                {
+                    throw new InvalidDataException("Session datum points must contain finite image coordinates.");
+                }
+                copy.Add(new RecipeDatumPoint { Name = point.Name, X = point.X, Y = point.Y });
+            }
+            return copy;
         }
 
         private static string? ResolveImagePath(string? imagePath, string? sessionBaseDirectory)
@@ -155,6 +266,15 @@ namespace ImageViewer.Services
         double TranslateY,
         CameraCalibration? Calibration)
     {
+        /// <summary>Optional SHA-256 to verify before applying this session's measurements to an image.</summary>
+        public string? ImageSha256 { get; init; }
+
+        public WorkpieceCoordinateSystem? CoordinateSystem { get; init; }
+
+        public IReadOnlyList<RecipeDatumPoint> ReferenceDatumPoints { get; init; } = [];
+
+        public IReadOnlyList<RecipeDatumPoint> CurrentDatumPoints { get; init; } = [];
+
         /// <summary>
         /// 加载时未能解析的 ROI 载荷。
         /// Chinese: 缺插件 / 类型键变更时不为空；随快照流回保存路径，避免数据丢失。

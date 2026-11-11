@@ -1,6 +1,8 @@
 using System;
 using System.IO;
+using System.Security.Cryptography;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Media.Imaging;
 using ImageViewer.Controls;
 
@@ -10,26 +12,108 @@ namespace ImageViewer.Services
     /// Chinese: 统一的文件图像解码入口：先读头部校验像素预算，再解码并应用 EXIF 方向。
     /// English: Single file-decoding entry point: validate the pixel budget from the header, decode, then apply EXIF orientation.
     /// </summary>
-    internal static class ImageViewerImageDecoder
+    public static class ImageViewerImageDecoder
     {
         internal const long DefaultMaxPixelCount = 100_000_000;
+
+        /// <summary>
+        /// Decodes a file off the UI thread and preserves its pixel format. The returned bitmap is frozen.
+        /// Progress is reported on a 0–100 scale. Disable EXIF orientation for volume slices whose
+        /// spatial metadata describes the stored pixel grid.
+        /// </summary>
+        public static Task<BitmapSource> LoadFromFileAsync(
+            string filePath,
+            IProgress<double>? progress = null,
+            bool applyExifOrientation = true,
+            CancellationToken cancellationToken = default)
+            => Task.Run(() =>
+            {
+                BitmapSource bitmap = LoadFromFile(filePath, cancellationToken, progress, applyExifOrientation: applyExifOrientation);
+                cancellationToken.ThrowIfCancellationRequested();
+                progress?.Report(100);
+                return bitmap;
+            }, cancellationToken);
 
         internal static BitmapSource LoadFromFile(
             string filePath,
             CancellationToken cancellationToken,
             IProgress<double>? progress = null,
-            long maxPixelCount = DefaultMaxPixelCount)
+            long maxPixelCount = DefaultMaxPixelCount,
+            bool applyExifOrientation = true)
+            => LoadFromFileCore(filePath, progress, maxPixelCount, applyExifOrientation, false, null, null, cancellationToken);
+
+        internal static BitmapSource LoadVerifiedVolumeSlice(
+            string filePath, string sha256, ImageHeader verifiedHeader, CancellationToken cancellationToken)
+            => LoadFromFileCore(filePath, null, DefaultMaxPixelCount,
+                applyExifOrientation: false, trackIdentity: true, expectedSha256: sha256, verifiedHeader, cancellationToken);
+
+        internal static Task<BitmapSource> LoadDocumentImageAsync(
+            string filePath, IProgress<double>? progress, string? expectedSha256, CancellationToken cancellationToken)
+            => Task.Run(() =>
+            {
+                BitmapSource bitmap = LoadFromFileCore(filePath, progress, DefaultMaxPixelCount,
+                    applyExifOrientation: true, trackIdentity: true, expectedSha256, null, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+                progress?.Report(100);
+                return bitmap;
+            }, cancellationToken);
+
+        private static BitmapSource LoadFromFileCore(
+            string filePath, IProgress<double>? progress,
+            long maxPixelCount, bool applyExifOrientation, bool trackIdentity, string? expectedSha256,
+            ImageHeader? verifiedHeader, CancellationToken cancellationToken)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
             cancellationToken.ThrowIfCancellationRequested();
 
-            ImageHeader header = ReadHeader(filePath, cancellationToken);
-            EnsureWithinLimits(header.PixelWidth, header.PixelHeight, maxPixelCount);
+            FileStream? cacheLease = ImageViewerProjectPackageCache.TryLeaseAsset(filePath, cancellationToken);
+            try
+            {
+                using FileStream stream = File.OpenRead(filePath);
+                string? sha256 = null;
+                if (trackIdentity)
+                {
+                    sha256 = ReadSha256(stream, cancellationToken);
+                    ImageViewerSessionImageIdentity.Verify(expectedSha256, sha256, filePath);
+                    stream.Position = 0;
+                }
+                // Preflight read this header from the file whose bytes we have just verified.
+                ImageHeader header = verifiedHeader ?? ReadHeader(stream, cancellationToken);
+                EnsureWithinLimits(header.PixelWidth, header.PixelHeight, maxPixelCount);
 
-            BitmapSource decoded = DecodePixels(filePath, cancellationToken, progress);
-            BitmapSource oriented = ExifOrientationTransform.Apply(decoded, header.Orientation);
-            ImageViewerImageSourceRegistry.Register(oriented, filePath);
-            return oriented;
+                stream.Position = 0;
+                BitmapSource decoded = DecodePixels(stream, cancellationToken, progress);
+                BitmapSource oriented = applyExifOrientation ? ExifOrientationTransform.Apply(decoded, header.Orientation) : decoded;
+                // A verified volume slice uses the stored grid. With an EXIF transform, a session
+                // must save those pixels as an asset because opening the file would orient it.
+                if (applyExifOrientation || !trackIdentity || header.Orientation == ExifOrientationTransform.NormalOrientation)
+                {
+                    ImageViewerImageSourceRegistry.Register(oriented, filePath, cacheLease, sha256);
+                    cacheLease = null;
+                }
+                return oriented;
+            }
+            finally
+            {
+                cacheLease?.Dispose();
+            }
+        }
+
+        internal static (ImageHeader Header, string? Sha256) InspectFile(
+            string filePath, bool readIdentity, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            using FileStream stream = File.OpenRead(filePath);
+            ImageHeader header = ReadHeader(stream, cancellationToken);
+            EnsureWithinLimits(header.PixelWidth, header.PixelHeight, DefaultMaxPixelCount);
+            stream.Position = 0;
+            return (header, readIdentity ? ReadSha256(stream, cancellationToken) : null);
+        }
+
+        private static string ReadSha256(Stream stream, CancellationToken cancellationToken)
+        {
+            using var hashStream = new DecodeProgressStream(stream, cancellationToken, null);
+            return Convert.ToHexString(SHA256.HashData(hashStream));
         }
 
         internal static void EnsureWithinLimits(int pixelWidth, int pixelHeight, long maxPixelCount)
@@ -48,10 +132,9 @@ namespace ImageViewer.Services
             }
         }
 
-        private static ImageHeader ReadHeader(string filePath, CancellationToken cancellationToken)
+        private static ImageHeader ReadHeader(Stream stream, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            using FileStream stream = File.OpenRead(filePath);
             BitmapDecoder decoder = BitmapDecoder.Create(
                 stream,
                 BitmapCreateOptions.PreservePixelFormat | BitmapCreateOptions.DelayCreation,
@@ -66,19 +149,20 @@ namespace ImageViewer.Services
             return new ImageHeader(
                 frame.PixelWidth,
                 frame.PixelHeight,
+                frame.Format.BitsPerPixel,
                 ExifOrientationTransform.ReadOrientation(frame.Metadata));
         }
 
         private static BitmapSource DecodePixels(
-            string filePath,
+            Stream stream,
             CancellationToken cancellationToken,
             IProgress<double>? progress)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            using var fileStream = File.OpenRead(filePath);
-            using var progressStream = new DecodeProgressStream(fileStream, cancellationToken, progress);
+            using var progressStream = new DecodeProgressStream(stream, cancellationToken, progress);
             var bitmap = new BitmapImage();
             bitmap.BeginInit();
+            bitmap.CreateOptions = BitmapCreateOptions.PreservePixelFormat;
             bitmap.CacheOption = BitmapCacheOption.OnLoad;
             bitmap.StreamSource = progressStream;
             bitmap.EndInit();
@@ -88,7 +172,7 @@ namespace ImageViewer.Services
             return bitmap;
         }
 
-        private readonly record struct ImageHeader(int PixelWidth, int PixelHeight, int Orientation);
+        internal readonly record struct ImageHeader(int PixelWidth, int PixelHeight, int BitsPerPixel, int Orientation);
 
         private sealed class DecodeProgressStream : Stream
         {
@@ -133,16 +217,6 @@ namespace ImageViewer.Services
             public override void SetLength(long value) => throw new NotSupportedException();
 
             public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
-
-            protected override void Dispose(bool disposing)
-            {
-                if (disposing)
-                {
-                    _inner.Dispose();
-                }
-
-                base.Dispose(disposing);
-            }
 
             private void ReportProgress()
             {

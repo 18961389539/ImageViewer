@@ -39,6 +39,8 @@ namespace ImageViewer.Models
         double? TolerancePlus,
         double? ToleranceMinus)
     {
+        public DistortionAudit? DistortionAudit { get; init; }
+
         public bool HasMeasuredValue => MeasuredValue is { } value && double.IsFinite(value);
     }
 }

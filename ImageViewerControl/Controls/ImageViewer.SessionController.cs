@@ -1,7 +1,10 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Media.Imaging;
 using ImageViewer.Abstractions;
 using ImageViewer.Core.Analysis;
 using ImageViewer.Core.Display;
@@ -26,7 +29,11 @@ namespace ImageViewer.Controls
     {
         public required Func<string?> ShowSaveSessionDialog { get; init; }
 
+        public Func<MessageBoxResult> ConfirmUnsavedChanges { get; init; } = static () => MessageBoxResult.Cancel;
+
         public required Func<string?> ShowOpenSessionDialog { get; init; }
+
+        public Func<string, string, string?> LocateSessionImage { get; init; } = static (_, _) => null;
 
         public required Func<string?> ShowSaveProjectPackageDialog { get; init; }
 
@@ -92,13 +99,25 @@ namespace ImageViewer.Controls
 
         public Action<IReadOnlyList<RecipeDatumPoint>> SetRecipeDatumPoints { get; init; } = static _ => { };
 
+        public Action<IReadOnlyList<RecipeDatumPoint>> SetCurrentRecipeDatumPoints { get; init; } = static _ => { };
+
         public Action<int, RecipeDatumPoint> SetCurrentRecipeDatumPoint { get; init; } = static (_, _) => { };
 
         public required Func<ImageViewerViewportState> GetCurrentViewportState { get; init; }
 
         public required Func<string?> TryGetCurrentImagePath { get; init; }
 
-        public required Action<string, bool> LoadImageFromFile { get; init; }
+        public Func<BitmapSource?> GetCurrentBitmap { get; init; } = static () => null;
+
+        public required Func<Func<CancellationToken, IProgress<double>, Task<Action?>>, Task<bool>> RunDocumentLoadAsync { get; init; }
+
+        public required Func<string, string?, CancellationToken, IProgress<double>, Task<Action>> PrepareImageAsync { get; init; }
+
+        public required Action ClearImage { get; init; }
+
+        public Action EndDocumentInteraction { get; init; } = static () => { };
+
+        public Action FitImageToView { get; init; } = static () => { };
 
         public required Action<IReadOnlyList<RoiBase>> ReplaceAllRois { get; init; }
 
@@ -133,8 +152,9 @@ namespace ImageViewer.Controls
         public ImageViewerPersistenceSnapshot CaptureSnapshot()
         {
             ImageViewerViewportState viewportState = GetCurrentViewportState();
+            var image = ImageViewerSnapshotImage.Capture(TryGetCurrentImagePath(), GetCurrentBitmap);
             return new ImageViewerPersistenceSnapshot(
-                TryGetCurrentImagePath(),
+                image.Path,
                 RoiPersistenceService.CreateDocument(
                     GetAllRois(),
                     GetPixelSize(),
@@ -145,9 +165,14 @@ namespace ImageViewer.Controls
                 viewportState.Scale,
                 viewportState.TranslateX,
                 viewportState.TranslateY,
-                GetCalibration())
+                GetCalibration()?.Clone())
             {
-                Display = GetDisplay()
+                Display = GetDisplay(),
+                CoordinateSystem = GetWorkpieceCoordinateSystem(),
+                ReferenceDatumPoints = ImageViewerSessionService.CloneDatumPoints(GetRecipeDatumPoints()),
+                CurrentDatumPoints = ImageViewerSessionService.CloneDatumPoints(GetCurrentRecipeDatumPoints()),
+                InMemoryImage = image.Bitmap,
+                ImageSha256 = image.Sha256
             };
         }
     }
@@ -162,6 +187,8 @@ namespace ImageViewer.Controls
 
         public required Func<string?> TryGetCurrentImagePath { get; init; }
 
+        public Func<BitmapSource?> GetCurrentBitmap { get; init; } = static () => null;
+
         public required Func<IReadOnlyList<RoiBase>> GetAllRois { get; init; }
 
         public required Func<double> GetPixelSize { get; init; }
@@ -171,6 +198,12 @@ namespace ImageViewer.Controls
         public required Func<CameraCalibration?> GetCalibration { get; init; }
 
         public Func<DisplayAdjustment> GetDisplay { get; init; } = static () => DisplayAdjustment.Identity;
+
+        public Func<WorkpieceCoordinateSystem?> GetWorkpieceCoordinateSystem { get; init; } = static () => null;
+
+        public Func<IReadOnlyList<RecipeDatumPoint>> GetRecipeDatumPoints { get; init; } = static () => [];
+
+        public Func<IReadOnlyList<RecipeDatumPoint>> GetCurrentRecipeDatumPoints { get; init; } = static () => [];
 
         public Func<ImageAnalysisQualityProfile> GetQualityProfile { get; init; } = static () => ImageAnalysisQualityProfile.Default;
 
@@ -195,8 +228,9 @@ namespace ImageViewer.Controls
         public ImageViewerPersistenceSnapshot CaptureSnapshot()
         {
             ImageViewerViewportState viewportState = GetCurrentViewportState();
+            var image = ImageViewerSnapshotImage.Capture(TryGetCurrentImagePath(), GetCurrentBitmap);
             return new ImageViewerPersistenceSnapshot(
-                TryGetCurrentImagePath(),
+                image.Path,
                 RoiPersistenceService.CreateDocument(
                     GetAllRois(),
                     GetPixelSize(),
@@ -207,9 +241,14 @@ namespace ImageViewer.Controls
                 viewportState.Scale,
                 viewportState.TranslateX,
                 viewportState.TranslateY,
-                GetCalibration())
+                GetCalibration()?.Clone())
             {
-                Display = GetDisplay()
+                Display = GetDisplay(),
+                CoordinateSystem = GetWorkpieceCoordinateSystem(),
+                ReferenceDatumPoints = ImageViewerSessionService.CloneDatumPoints(GetRecipeDatumPoints()),
+                CurrentDatumPoints = ImageViewerSessionService.CloneDatumPoints(GetCurrentRecipeDatumPoints()),
+                InMemoryImage = image.Bitmap,
+                ImageSha256 = image.Sha256
             };
         }
     }
@@ -224,12 +263,14 @@ namespace ImageViewer.Controls
         private readonly ImageViewerAutoSaveController _autoSaveController;
         private readonly ImageViewerRecoveryIndex _recoveryIndex;
         private readonly string _autoSaveDirectory;
-        private readonly string _documentId;
         private readonly string _sessionInstanceId;
         private string? _currentProjectPath;
         private string? _recoveryFilePath;
+        private (string Path, DateTime LastWriteUtc)? _adoptedRecovery;
         private bool _recoveryPromptDismissed;
         private bool _isDirty;
+        private long _editRevision;
+        private bool _isConfirmingReplacement;
 
         /// <summary>
         /// 判定"某份快照是否仍被活动实例持有"的心跳窗口。
@@ -262,7 +303,6 @@ namespace ImageViewer.Controls
             _persistence = dependencies.Persistence ?? throw new ArgumentNullException(nameof(dependencies));
             _autoSave = dependencies.AutoSave;
             _autoSaveDirectory = sessionStoragePolicy.AutoSaveDirectory;
-            _documentId = documentId;
             _recoveryIndex = new ImageViewerRecoveryIndex(_autoSaveDirectory);
             _recentProjectCatalog = new ImageViewerRecentProjectCatalog(_persistence.RecentProjectService, sessionStoragePolicy.RecentProjectsFilePath);
             _autoSaveController = new ImageViewerAutoSaveController(dependencies.AutoSave, periodicTaskSchedulerFactory, sessionStoragePolicy, documentId, _recoveryIndex);
@@ -273,12 +313,19 @@ namespace ImageViewer.Controls
 
         public bool IsAutoSaveEnabled => _autoSaveController.IsEnabled;
 
+        internal IDisposable SuspendAutoSaveWrites() => _autoSaveController.SuspendWrites();
+
         public bool IsDirty => _isDirty;
+
+        internal string? CurrentProjectPath => _currentProjectPath;
+
+        internal void RecordVolumeSliceNavigation() => _editRevision++;
 
         public bool HasRecoverySnapshot => !_recoveryPromptDismissed && _recoveryFilePath != null;
 
         public void MarkDirty()
         {
+            _editRevision++;
             if (_isDirty)
             {
                 return;
@@ -310,28 +357,144 @@ namespace ImageViewer.Controls
             StateChanged?.Invoke(this, EventArgs.Empty);
         }
 
-        public async Task SaveSessionAsync()
-        {
-            string? filePath = _persistence.ShowSaveSessionDialog();
-            if (string.IsNullOrWhiteSpace(filePath))
-            {
-                return;
-            }
+        public Task SaveSessionAsync() => SaveSessionAsync(_persistence.ShowSaveSessionDialog);
 
+        internal async Task SaveSessionAsync(Func<string?> choosePath)
+        {
             try
             {
+                string? filePath = choosePath();
+                if (string.IsNullOrWhiteSpace(filePath))
+                {
+                    return;
+                }
+
+                long savedRevision = _editRevision;
                 await _persistence.SessionService.SaveToFileAsync(
                     filePath,
                     _persistence.CaptureSnapshot(),
                     _persistence.GetPluginRegistry());
-                SetCurrentProject(filePath, SessionProjectKind);
-                CompleteSuccessfulSave();
+                await _autoSaveController.DrainPendingWriteAsync();
+                if (_editRevision == savedRevision)
+                {
+                    string previousAutoSave = _autoSaveController.GetAutoSaveFilePath();
+                    SetCurrentProject(filePath, SessionProjectKind);
+                    CompleteSuccessfulSave(previousAutoSave);
+                }
                 _persistence.ShowStatusHint(UiText.Get("StatusSaveSessionSuccess"), StatusHintKind.Success);
             }
             catch (Exception ex)
             {
-                _persistence.ShowNonCriticalError(UiText.Get("ErrorSaveSessionTitle"), UiText.Get("ErrorSaveSessionMessage"), ex);
+                _persistence.ShowNonCriticalError(UiText.Get("ErrorSaveSessionTitle"),
+                    UiText.Get(ex is ImageViewerSessionImageMismatchException ? "ErrorSaveChangedSessionImage" : "ErrorSaveSessionMessage"), ex);
             }
+        }
+
+        public async Task<bool> ConfirmDocumentReplacementAsync()
+        {
+            if (_isConfirmingReplacement)
+            {
+                return false;
+            }
+            if (!IsDirty)
+            {
+                return true;
+            }
+
+            _isConfirmingReplacement = true;
+            try
+            {
+                switch (_persistence.ConfirmUnsavedChanges())
+                {
+                    case MessageBoxResult.No:
+                        return true;
+                    case MessageBoxResult.Yes:
+                        await SaveSessionAsync();
+                        return !IsDirty;
+                    default:
+                        return false;
+                }
+            }
+            finally
+            {
+                _isConfirmingReplacement = false;
+            }
+        }
+
+        internal Task<bool> ReplaceImageDocumentAsync(
+            Func<CancellationToken, Task<Action?>> prepareContent, CancellationToken cancellationToken)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return Task.FromResult(false);
+            }
+
+            return _persistence.RunDocumentLoadAsync(async (loadToken, _) =>
+            {
+                using var linked = CancellationTokenSource.CreateLinkedTokenSource(loadToken, cancellationToken);
+                try
+                {
+                    Action? apply = await PrepareImageDocumentAsync(prepareContent, markDirty: true, linked.Token);
+                    return linked.IsCancellationRequested ? null : apply;
+                }
+                catch (OperationCanceledException) when (linked.IsCancellationRequested)
+                {
+                    return null;
+                }
+            });
+        }
+
+        internal Task<Action?> PrepareImageDocumentAsync(Action applyImage, bool markDirty, CancellationToken cancellationToken) =>
+            PrepareImageDocumentAsync(_ => Task.FromResult<Action?>(applyImage), markDirty, cancellationToken);
+
+        private async Task<Action?> PrepareImageDocumentAsync(
+            Func<CancellationToken, Task<Action?>> prepareContent, bool markDirty, CancellationToken cancellationToken)
+        {
+            if (!await ConfirmSessionReplacementAsync(cancellationToken))
+            {
+                return null;
+            }
+
+            long revision = _editRevision;
+            Action? applyImage = await prepareContent(cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (applyImage == null || revision != _editRevision)
+            {
+                return null;
+            }
+
+            return () =>
+            {
+                string replacedAutoSave = _autoSaveController.GetAutoSaveFilePath();
+                _persistence.EndDocumentInteraction();
+                _persistence.ReplaceAllRois([]);
+                _persistence.SetPixelSize(1);
+                _persistence.SetPhysicalUnit("px");
+                _persistence.SetCalibration(null);
+                _persistence.SetDisplay(DisplayAdjustment.Identity);
+                _persistence.SetQualityProfile(ImageAnalysisQualityProfile.Default);
+                _persistence.SetWorkpieceCoordinateSystem(null);
+                ReportUnresolvedRois([]);
+                applyImage();
+                _persistence.ApplyViewportState(ImageViewerViewportState.Default);
+                _persistence.FitImageToView();
+                _persistence.ClearUndoHistory();
+
+                DeleteRecoverySnapshotSafely(replacedAutoSave);
+                _currentProjectPath = null;
+                _autoSaveController.SetCurrentProject(null);
+                _adoptedRecovery = null;
+                _persistence.DrawRois();
+                _persistence.UpdateContextMenuState();
+                if (markDirty)
+                {
+                    MarkDirty();
+                }
+                else
+                {
+                    MarkClean();
+                }
+            };
         }
 
         public async Task LoadProjectAsync()
@@ -355,17 +518,24 @@ namespace ImageViewer.Controls
 
             try
             {
+                long savedRevision = _editRevision;
                 await _persistence.ProjectPackageService.ExportAsync(
                     filePath,
                     _persistence.CaptureSnapshot(),
                     _persistence.GetPluginRegistry());
-                SetCurrentProject(filePath, PackageProjectKind);
-                CompleteSuccessfulSave();
+                await _autoSaveController.DrainPendingWriteAsync();
+                if (_editRevision == savedRevision)
+                {
+                    string previousAutoSave = _autoSaveController.GetAutoSaveFilePath();
+                    SetCurrentProject(filePath, PackageProjectKind);
+                    CompleteSuccessfulSave(previousAutoSave);
+                }
                 _persistence.ShowStatusHint(UiText.Get("StatusExportPackageSuccess"), StatusHintKind.Success);
             }
             catch (Exception ex)
             {
-                _persistence.ShowNonCriticalError(UiText.Get("ErrorExportProjectPackageTitle"), UiText.Get("ErrorExportProjectPackageMessage"), ex);
+                _persistence.ShowNonCriticalError(UiText.Get("ErrorExportProjectPackageTitle"),
+                    UiText.Get(ex is ImageViewerSessionImageMismatchException ? "ErrorSaveChangedSessionImage" : "ErrorExportProjectPackageMessage"), ex);
             }
         }
 
@@ -463,6 +633,7 @@ namespace ImageViewer.Controls
                     UiText.Format("StatusRecipeReferenceDatumCaptured", index + 1, position.X, position.Y),
                     StatusHintKind.Success);
             }
+            MarkDirty();
         }
 
         /// <summary>
@@ -490,84 +661,7 @@ namespace ImageViewer.Controls
 
             try
             {
-                object? sourceIdentity = _persistence.GetCurrentImageIdentity();
-                IReadOnlyList<RecipeDatumPoint> currentDatumPoints = applyAlignment
-                    ? _persistence.GetCurrentRecipeDatumPoints()
-                        .Select(point => new RecipeDatumPoint { Name = point.Name, X = point.X, Y = point.Y })
-                        .ToArray()
-                    : Array.Empty<RecipeDatumPoint>();
-
-                MeasurementRecipeDocument recipe = await Task.Run(
-                    () => MeasurementRecipeService.LoadFromFile(filePath)).ConfigureAwait(true);
-
-                if (applyAlignment)
-                {
-                    if (!ReferenceEquals(sourceIdentity, _persistence.GetCurrentImageIdentity()))
-                    {
-                        _persistence.ShowStatusHint(UiText.Get("StatusRecipeImageChangedDuringAlignment"), StatusHintKind.Error);
-                        return;
-                    }
-
-                    if (!recipe.CanLocalize || !HasDistinctPair(recipe.DatumPoints)
-                        || currentDatumPoints.Count < 2 || !HasDistinctPair(currentDatumPoints))
-                    {
-                        _persistence.ShowStatusHint(UiText.Get("StatusRecipeAlignmentDatumsRequired"), StatusHintKind.Error);
-                        return;
-                    }
-                }
-
-                RoiDocument roiDocument = applyAlignment
-                    ? MeasurementRecipeService.BuildAlignedRoiDocument(
-                        recipe,
-                        new PointD(currentDatumPoints[0].X, currentDatumPoints[0].Y),
-                        new PointD(currentDatumPoints[1].X, currentDatumPoints[1].Y))
-                    : MeasurementRecipeService.BuildRoiDocument(recipe);
-
-                RoiDocumentLoadResult restored = RoiPersistenceService.CreateRois(
-                    roiDocument,
-                    _persistence.GetPluginRegistry());
-
-                if (applyAlignment && restored.UnresolvedItems.Count > 0)
-                {
-                    throw new InvalidOperationException(
-                        UiText.Format("StatusRecipeUnsupportedRoiCount", restored.UnresolvedItems.Count));
-                }
-
-                WorkpieceCoordinateSystem? coordinateSystem = recipe.CoordinateSystem;
-                if (applyAlignment)
-                {
-                    coordinateSystem = WorkpieceCoordinateSystem.Localize(
-                        new PointD(currentDatumPoints[0].X, currentDatumPoints[0].Y),
-                        new PointD(currentDatumPoints[1].X, currentDatumPoints[1].Y),
-                        new PointD(recipe.DatumPoints[0].X, recipe.DatumPoints[0].Y),
-                        new PointD(recipe.DatumPoints[1].X, recipe.DatumPoints[1].Y),
-                        recipe.CoordinateSystem?.Name);
-                }
-
-                _persistence.ReplaceAllRois(restored.Rois);
-                _persistence.SetPixelSize(recipe.PixelSize);
-                if (!string.IsNullOrWhiteSpace(recipe.PhysicalUnit))
-                {
-                    _persistence.SetPhysicalUnit(recipe.PhysicalUnit);
-                }
-
-                _persistence.SetCalibration(recipe.Calibration);
-                _persistence.SetWorkpieceCoordinateSystem(coordinateSystem);
-                _persistence.SetRecipeDatumPoints(applyAlignment ? currentDatumPoints : recipe.DatumPoints);
-                _persistence.DrawRois();
-                _persistence.UpdateContextMenuState();
-
-                MeasurementWorkflowReadiness readiness = MeasurementRecipeService.EvaluateReadiness(recipe);
-                StatusHintKind kind = readiness.IsBlocked
-                    ? StatusHintKind.Error
-                    : readiness.HasWarnings ? StatusHintKind.Info : StatusHintKind.Success;
-                _persistence.ShowStatusHint(
-                    UiText.Format(
-                        "StatusRecipeLoadSuccess",
-                        restored.Rois.Count,
-                        MeasurementWorkflowReadinessFormatter.FormatSingleLine(readiness))
-                        + (applyAlignment ? " " + UiText.Get("StatusRecipeManualAlignmentApplied") : string.Empty),
-                    kind);
+                await _persistence.RunDocumentLoadAsync((token, _) => PrepareRecipeAsync(filePath, applyAlignment, token));
             }
             catch (Exception ex)
             {
@@ -584,6 +678,111 @@ namespace ImageViewer.Controls
             }
         }
 
+        private async Task<Action?> PrepareRecipeAsync(string filePath, bool applyAlignment, CancellationToken cancellationToken)
+        {
+            long revision = _editRevision;
+            object? sourceIdentity = _persistence.GetCurrentImageIdentity();
+            IReadOnlyList<RecipeDatumPoint> currentDatumPoints = applyAlignment
+                ? _persistence.GetCurrentRecipeDatumPoints()
+                    .Select(point => new RecipeDatumPoint { Name = point.Name, X = point.X, Y = point.Y })
+                    .ToArray()
+                : [];
+
+            MeasurementRecipeDocument recipe = await MeasurementRecipeService.LoadFromFileAsync(filePath, cancellationToken);
+            if (!CanApply())
+            {
+                return null;
+            }
+
+            if (applyAlignment && (!recipe.CanLocalize || !HasDistinctPair(recipe.DatumPoints) || !HasDistinctPair(currentDatumPoints)))
+            {
+                _persistence.ShowStatusHint(UiText.Get("StatusRecipeAlignmentDatumsRequired"), StatusHintKind.Error);
+                return null;
+            }
+
+            RoiDocument roiDocument;
+            WorkpieceCoordinateSystem? coordinateSystem = recipe.CoordinateSystem;
+            IReadOnlyList<RecipeDatumPoint> referenceDatumPoints;
+            if (applyAlignment)
+            {
+                PointD current1 = new(currentDatumPoints[0].X, currentDatumPoints[0].Y);
+                PointD current2 = new(currentDatumPoints[1].X, currentDatumPoints[1].Y);
+                roiDocument = MeasurementRecipeService.BuildAlignedRoiDocument(recipe, current1, current2);
+                coordinateSystem = WorkpieceCoordinateSystem.Localize(current1, current2,
+                    new PointD(recipe.DatumPoints[0].X, recipe.DatumPoints[0].Y),
+                    new PointD(recipe.DatumPoints[1].X, recipe.DatumPoints[1].Y), recipe.CoordinateSystem?.Name);
+                referenceDatumPoints = currentDatumPoints;
+            }
+            else
+            {
+                roiDocument = MeasurementRecipeService.BuildRoiDocument(recipe);
+                referenceDatumPoints = ImageViewerSessionService.CloneDatumPoints(recipe.DatumPoints);
+            }
+
+            RoiDocumentLoadResult restored = RoiPersistenceService.CreateRois(roiDocument, _persistence.GetPluginRegistry());
+            if (restored.UnresolvedItems.Count > 0)
+            {
+                string types = string.Join(", ", restored.UnresolvedItems.Select(item => item.Type).Distinct(StringComparer.OrdinalIgnoreCase));
+                _persistence.ShowStatusHint(UiText.Format("StatusRecipeUnsupportedRoiCount", restored.UnresolvedItems.Count, types), StatusHintKind.Error);
+                return null;
+            }
+
+            MeasurementWorkflowReadiness readiness = MeasurementRecipeService.EvaluateReadiness(recipe);
+            if (!CanApply() || !await ConfirmDocumentReplacementAsync() || !CanApply())
+            {
+                return null;
+            }
+
+            return () =>
+            {
+                if (!CanApply())
+                {
+                    return;
+                }
+
+                if (restored.QualityProfile is { } qualityProfile)
+                {
+                    _persistence.SetQualityProfile(qualityProfile);
+                }
+
+                _persistence.ReplaceAllRois(restored.Rois);
+                _persistence.SetPixelSize(recipe.PixelSize);
+                if (!string.IsNullOrWhiteSpace(recipe.PhysicalUnit))
+                {
+                    _persistence.SetPhysicalUnit(restored.PhysicalUnit);
+                }
+
+                _persistence.SetCalibration(recipe.Calibration);
+                _persistence.SetWorkpieceCoordinateSystem(coordinateSystem);
+                _persistence.SetRecipeDatumPoints(referenceDatumPoints);
+                ReportUnresolvedRois([]);
+                _persistence.ClearUndoHistory();
+                MarkDirty();
+                _persistence.DrawRois();
+                _persistence.UpdateContextMenuState();
+
+                StatusHintKind kind = readiness.IsBlocked
+                    ? StatusHintKind.Error
+                    : readiness.HasWarnings ? StatusHintKind.Info : StatusHintKind.Success;
+                _persistence.ShowStatusHint(
+                    UiText.Format("StatusRecipeLoadSuccess", restored.Rois.Count, MeasurementWorkflowReadinessFormatter.FormatSingleLine(readiness))
+                        + (applyAlignment ? " " + UiText.Get("StatusRecipeManualAlignmentApplied") : string.Empty),
+                    kind);
+            };
+
+            bool CanApply()
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (revision == _editRevision && ReferenceEquals(sourceIdentity, _persistence.GetCurrentImageIdentity()))
+                {
+                    return true;
+                }
+
+                _persistence.ShowStatusHint(UiText.Get("StatusRecipeTargetChanged"), StatusHintKind.Error);
+                return false;
+            }
+        }
+
         private static bool HasDistinctPair(IReadOnlyList<RecipeDatumPoint> points)
         {
             return points.Count == 2
@@ -593,55 +792,123 @@ namespace ImageViewer.Controls
                     || Math.Abs(points[1].Y - points[0].Y) > 1e-12);
         }
 
-        public async Task RecoverLatestAutoSaveAsync()
+        public Task RecoverLatestAutoSaveAsync() => RecoverAutoSaveAsync(chooseSnapshot: null);
+
+        public async Task RecoverAutoSaveAsync(Func<IReadOnlyList<RecoverySnapshotOption>, RecoverySnapshotOption?>? chooseSnapshot)
         {
-            RefreshRecoverySnapshot();
-            IReadOnlyList<string> recoveryCandidates = GetRecoveryCandidates();
-            if (recoveryCandidates.Count == 0)
+            IReadOnlyList<RecoverySnapshotOption> candidates = GetRecoveryCandidates();
+            _recoveryFilePath = candidates.Count == 0 ? null : candidates[0].Path;
+            if (candidates.Count == 0)
             {
+                StateChanged?.Invoke(this, EventArgs.Empty);
                 _persistence.ShowStatusHint(UiText.Get("StatusNoRecoverySnapshot"), StatusHintKind.Info);
                 return;
             }
 
-            Exception? lastLoadException = null;
-            string? missingImagePath = null;
-            foreach (string recoveryFilePath in recoveryCandidates)
+            bool explicitlySelected = chooseSnapshot != null;
+            if (chooseSnapshot != null)
             {
-                try
+                RecoverySnapshotOption? selected = chooseSnapshot(candidates);
+                if (selected == null || !candidates.Contains(selected))
                 {
-                    ImageViewerSessionData session = await _persistence.SessionService.LoadFromFileAsync(
-                        recoveryFilePath,
-                        _persistence.GetPluginRegistry());
-
-                    // Skip stale entries whose image was removed, then try an older candidate.
-                    if (!string.IsNullOrWhiteSpace(session.ImagePath) && !File.Exists(session.ImagePath))
-                    {
-                        missingImagePath = session.ImagePath;
-                        continue;
-                    }
-
-                    if (!ApplySession(session))
-                    {
-                        continue;
-                    }
-
-                    _recoveryFilePath = recoveryFilePath;
-                    _persistence.ClearUndoHistory();
-                    ReportUnresolvedRois(session.UnresolvedRois);
-                    _recoveryPromptDismissed = true;
-                    StateChanged?.Invoke(this, EventArgs.Empty);
-                    MarkDirty();
-                    _persistence.ShowStatusHint(UiText.Get("StatusRecoveryLoaded"), StatusHintKind.Success);
                     return;
                 }
-                catch (Exception ex)
+
+                // The snapshot may have changed while the picker was open.
+                if (!GetRecoveryCandidates().Contains(selected))
+                {
+                    RefreshRecoverySnapshot();
+                    StateChanged?.Invoke(this, EventArgs.Empty);
+                    _persistence.ShowStatusHint(UiText.Get("StatusRecoverySnapshotChanged"), StatusHintKind.Info);
+                    return;
+                }
+                candidates = [selected];
+            }
+
+            await _persistence.RunDocumentLoadAsync((token, progress) => PrepareRecoveryAsync(candidates, explicitlySelected, token, progress));
+        }
+
+        private async Task<Action?> PrepareRecoveryAsync(
+            IReadOnlyList<RecoverySnapshotOption> recoveryCandidates,
+            bool explicitlySelected,
+            CancellationToken cancellationToken,
+            IProgress<double> progress)
+        {
+            Exception? lastLoadException = null;
+            string? imageProblem = null;
+            foreach (RecoverySnapshotOption candidate in recoveryCandidates)
+            {
+                string recoveryFilePath = candidate.Path;
+                try
+                {
+                    DateTime snapshotWriteTime = File.GetLastWriteTimeUtc(recoveryFilePath);
+                    if (explicitlySelected && snapshotWriteTime != candidate.LastWriteUtc)
+                    {
+                        RefreshRecoverySnapshot();
+                        StateChanged?.Invoke(this, EventArgs.Empty);
+                        _persistence.ShowStatusHint(UiText.Get("StatusRecoverySnapshotChanged"), StatusHintKind.Info);
+                        return null;
+                    }
+                    ImageViewerSessionData session = await _persistence.SessionService.LoadFromFileAsync(
+                        recoveryFilePath,
+                        _persistence.GetPluginRegistry(), cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    var (applyImage, _, problem) = await PrepareSessionImageAsync(
+                        session, recoveryFilePath, explicitlySelected, cancellationToken, progress);
+                    if (applyImage == null)
+                    {
+                        if (explicitlySelected)
+                        {
+                            _persistence.ShowStatusHint(problem!, StatusHintKind.Error);
+                            return null;
+                        }
+                        imageProblem ??= problem;
+                        continue;
+                    }
+
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!await ConfirmSessionReplacementAsync(cancellationToken))
+                    {
+                        return null;
+                    }
+                    if (explicitlySelected && File.GetLastWriteTimeUtc(recoveryFilePath) != snapshotWriteTime)
+                    {
+                        RefreshRecoverySnapshot();
+                        StateChanged?.Invoke(this, EventArgs.Empty);
+                        _persistence.ShowStatusHint(UiText.Get("StatusRecoverySnapshotChanged"), StatusHintKind.Info);
+                        return null;
+                    }
+                    return () =>
+                    {
+                        string replacedAutoSave = _autoSaveController.GetAutoSaveFilePath();
+                        ApplySession(session, applyImage);
+                        DeleteRecoverySnapshotSafely(replacedAutoSave);
+                        _currentProjectPath = null;
+                        _autoSaveController.SetCurrentProject(null);
+                        _adoptedRecovery = (recoveryFilePath, snapshotWriteTime);
+                        _persistence.ClearUndoHistory();
+                        ReportUnresolvedRois(session.UnresolvedRois);
+                        _recoveryPromptDismissed = false;
+                        RefreshRecoverySnapshot();
+                        StateChanged?.Invoke(this, EventArgs.Empty);
+                        MarkDirty();
+                        _persistence.ShowStatusHint(UiText.Get("StatusRecoveryLoaded"), StatusHintKind.Success);
+                    };
+                }
+                catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
                 {
                     lastLoadException = ex;
                     _autoSave.LogNonCriticalError("Load autosave candidate", ex);
                 }
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             _recoveryFilePath = null;
+            if (explicitlySelected)
+            {
+                RefreshRecoverySnapshot();
+            }
             _recoveryPromptDismissed = false;
             StateChanged?.Invoke(this, EventArgs.Empty);
             if (lastLoadException != null)
@@ -651,16 +918,16 @@ namespace ImageViewer.Controls
                     UiText.Get("ErrorRecoveryMessage"),
                     lastLoadException);
             }
-            else if (missingImagePath != null)
+            else if (imageProblem != null)
             {
-                _persistence.ShowStatusHint(
-                    UiText.Format("StatusSessionImageMissing", missingImagePath),
-                    StatusHintKind.Error);
+                _persistence.ShowStatusHint(imageProblem, StatusHintKind.Error);
             }
             else
             {
                 _persistence.ShowStatusHint(UiText.Get("StatusNoRecoverySnapshot"), StatusHintKind.Info);
             }
+
+            return null;
         }
 
         public void ToggleAutoSave()
@@ -683,67 +950,160 @@ namespace ImageViewer.Controls
             return _autoSaveController.DrainAsync(cancellationToken);
         }
 
-        /// <summary>
-        /// 正常关闭时释放本实例在恢复索引里的所有权。
-        /// Chinese: 用户主动关掉的窗口不该在下次启动时弹出"恢复未保存文档"——那份快照只是它退出前的
-        /// 最后状态。异常退出（崩溃/强杀）不会走到这里，条目保留并在心跳过期后可恢复。
-        /// </summary>
-        public void ReleaseRecoveryOwnership()
-        {
-            _autoSaveController.ReleaseRecoveryOwnership();
-        }
+        public void Dispose() => _autoSaveController.Dispose();
 
-        public void Dispose()
-        {
-            _autoSaveController.ReleaseRecoveryOwnership();
-            _autoSaveController.Dispose();
-        }
+        public Task CloseCompletion => _autoSaveController.CloseCompletion;
 
-        public async Task OpenProjectAsync(string filePath)
-        {
-            if (!File.Exists(filePath))
-            {
-                _recentProjectCatalog.RemoveMissing(filePath);
-                _persistence.ShowWarning(UiText.Get("WarningFileMissingTitle"), UiText.Get("WarningRecentProjectRemoved"));
-                _persistence.UpdateContextMenuState();
-                return;
-            }
+        public Task<bool> OpenProjectAsync(string filePath) => OpenProjectAsync(filePath, null);
 
+        internal async Task<bool> OpenProjectAsync(
+            string filePath, Func<CancellationToken, Task<Action?>>? prepareRelatedContent)
+        {
             try
             {
-                ImageViewerSessionData session = string.Equals(Path.GetExtension(filePath), ".ivpkg", StringComparison.OrdinalIgnoreCase)
-                    ? await _persistence.ProjectPackageService.LoadAsync(filePath, _persistence.GetPluginRegistry())
-                    : await _persistence.SessionService.LoadFromFileAsync(filePath, _persistence.GetPluginRegistry());
-
-                if (!ApplySession(session))
+                if (!File.Exists(filePath))
                 {
-                    return;
+                    _recentProjectCatalog.RemoveMissing(filePath);
+                    _persistence.ShowWarning(UiText.Get("WarningFileMissingTitle"), UiText.Get("WarningRecentProjectRemoved"));
+                    _persistence.UpdateContextMenuState();
+                    return false;
                 }
-                SetCurrentProject(filePath, string.Equals(Path.GetExtension(filePath), ".ivpkg", StringComparison.OrdinalIgnoreCase) ? PackageProjectKind : SessionProjectKind);
-                _persistence.ClearUndoHistory();
-                MarkClean();
-                _persistence.ShowStatusHint(UiText.Get("StatusLoadSessionSuccess"), StatusHintKind.Success);
-                ReportUnresolvedRois(session.UnresolvedRois);
+
+                return await _persistence.RunDocumentLoadAsync(async (token, progress) =>
+                {
+                    bool isPackage = string.Equals(Path.GetExtension(filePath), ".ivpkg", StringComparison.OrdinalIgnoreCase);
+                    ImageViewerSessionData session = isPackage
+                        ? await _persistence.ProjectPackageService.LoadAsync(filePath, _persistence.GetPluginRegistry(), token)
+                        : await _persistence.SessionService.LoadFromFileAsync(filePath, _persistence.GetPluginRegistry(), token);
+                    token.ThrowIfCancellationRequested();
+                    var (applyImage, relinked, problem) = await PrepareSessionImageAsync(session, filePath, !isPackage, token, progress);
+                    if (applyImage == null)
+                    {
+                        _persistence.ShowStatusHint(problem!, StatusHintKind.Error);
+                        return null;
+                    }
+
+                    token.ThrowIfCancellationRequested();
+                    if (!await ConfirmSessionReplacementAsync(token))
+                    {
+                        return null;
+                    }
+                    Action? applyRelatedContent = null;
+                    if (prepareRelatedContent != null)
+                    {
+                        long revision = _editRevision;
+                        applyRelatedContent = await prepareRelatedContent(token);
+                        token.ThrowIfCancellationRequested();
+                        if (applyRelatedContent == null || revision != _editRevision)
+                        {
+                            return null;
+                        }
+                    }
+                    return () =>
+                    {
+                        string replacedAutoSave = _autoSaveController.GetAutoSaveFilePath();
+                        ApplySession(session, applyImage);
+                        applyRelatedContent?.Invoke();
+                        DeleteRecoverySnapshotSafely(replacedAutoSave);
+                        _adoptedRecovery = null;
+                        SetCurrentProject(filePath, isPackage ? PackageProjectKind : SessionProjectKind);
+                        _persistence.ClearUndoHistory();
+                        if (relinked)
+                        {
+                            MarkDirty();
+                        }
+                        else
+                        {
+                            MarkClean();
+                        }
+                        _persistence.ShowStatusHint(UiText.Get(relinked ? "StatusSessionImageRelinked" : "StatusLoadSessionSuccess"), StatusHintKind.Success);
+                        ReportUnresolvedRois(session.UnresolvedRois);
+                    };
+                });
             }
             catch (Exception ex)
             {
                 _persistence.ShowNonCriticalError(UiText.Get("ErrorLoadProjectTitle"), UiText.Get("ErrorLoadProjectMessage"), ex);
+                return false;
             }
         }
 
-        private bool ApplySession(ImageViewerSessionData session)
+        private async Task<(Action? Apply, bool Relinked, string? Problem)> PrepareSessionImageAsync(
+            ImageViewerSessionData session, string sessionPath, bool allowRelink,
+            CancellationToken cancellationToken, IProgress<double> progress)
         {
-            if (!string.IsNullOrWhiteSpace(session.ImagePath))
+            if (string.IsNullOrWhiteSpace(session.ImagePath))
             {
-                if (!File.Exists(session.ImagePath))
-                {
-                    _persistence.ShowStatusHint(UiText.Format("StatusSessionImageMissing", session.ImagePath), StatusHintKind.Error);
-                    return false;
-                }
-
-                _persistence.LoadImageFromFile(session.ImagePath, false);
+                return (_persistence.ClearImage, false, null);
             }
 
+            string path = session.ImagePath;
+            string problem = UiText.Format("StatusSessionImageMissing", path);
+            if (File.Exists(path))
+            {
+                try
+                {
+                    return (await _persistence.PrepareImageAsync(path, session.ImageSha256, cancellationToken, progress), false, null);
+                }
+                catch (ImageViewerSessionImageMismatchException)
+                {
+                    problem = UiText.Format("StatusSessionImageMismatch", path);
+                }
+                catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+                {
+                    // The file may have been moved between the existence check and the open.
+                }
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!allowRelink)
+            {
+                return (null, false, problem);
+            }
+
+            string? selected = _persistence.LocateSessionImage(path, Path.GetFullPath(sessionPath));
+            cancellationToken.ThrowIfCancellationRequested();
+            if (string.IsNullOrWhiteSpace(selected))
+            {
+                return (null, false, problem);
+            }
+
+            selected = Path.GetFullPath(selected);
+            try
+            {
+                return (await _persistence.PrepareImageAsync(selected, session.ImageSha256, cancellationToken, progress), true, null);
+            }
+            catch (ImageViewerSessionImageMismatchException)
+            {
+                return (null, false, UiText.Format("StatusSessionImageMismatch", selected));
+            }
+            catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+            {
+                return (null, false, UiText.Format("StatusSessionImageMissing", selected));
+            }
+        }
+
+        private async Task<bool> ConfirmSessionReplacementAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!await ConfirmDocumentReplacementAsync())
+            {
+                return false;
+            }
+
+            long revision = _editRevision;
+            await _autoSaveController.DrainPendingWriteAsync().WaitAsync(cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            return revision == _editRevision;
+        }
+
+        private void ApplySession(ImageViewerSessionData session, Action applyImage)
+        {
+            _persistence.EndDocumentInteraction();
+            applyImage();
+            _persistence.SetWorkpieceCoordinateSystem(session.CoordinateSystem);
+            _persistence.SetRecipeDatumPoints(session.ReferenceDatumPoints);
+            _persistence.SetCurrentRecipeDatumPoints(session.CurrentDatumPoints);
             _persistence.ReplaceAllRois(session.Rois);
             _persistence.SetPixelSize(session.PixelSize);
             _persistence.SetPhysicalUnit(session.PhysicalUnit);
@@ -753,108 +1113,85 @@ namespace ImageViewer.Controls
             _persistence.ApplyViewportState(new ImageViewerViewportState(session.Scale, session.TranslateX, session.TranslateY));
             _persistence.DrawRois();
             _persistence.UpdateContextMenuState();
-            return true;
         }
 
         private void SetCurrentProject(string filePath, string projectKind)
         {
             _currentProjectPath = Path.GetFullPath(filePath);
             _autoSaveController.SetCurrentProject(_currentProjectPath);
-            _recentProjectCatalog.Remember(_currentProjectPath, projectKind);
+            try
+            {
+                _recentProjectCatalog.Remember(_currentProjectPath, projectKind);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                _autoSave.LogNonCriticalError("Update recent projects", ex);
+            }
+
             _persistence.UpdateContextMenuState();
         }
 
-        /// <summary>
-        /// 成功保存/导出后需要清理与摘除索引的候选路径。
-        /// Chinese: 保存会改变自动保存的文件名（未保存 → autosave-{id}，保存后 → autosave-{名}-{哈希}），
-        /// 所以只按"当前"文件名找会漏掉保存前那份。这里用 <see cref="ImageViewerAutoSaveController.LastWrittenAutoSavePath"/>
-        /// 记住的"本文档真正写过的路径"来补齐——**绝不枚举整个目录**：同目录下还躺着其它窗口/文档的
-        /// 自动保存，按 <c>autosave-*.ivsession</c> 通配清理会把别人的恢复文件一并删掉（保存一个文档
-        /// 却毁掉另一个文档的恢复数据）。
-        /// English: Cleanup covers only files this document produced. Earlier versions swept every
-        /// <c>autosave-*.ivsession</c> in the directory, so saving one document deleted another window's recovery file.
-        /// </summary>
-        private string[] GetRecoveryCleanupPaths()
-        {
-            var paths = new List<string>
-            {
-                _autoSaveController.GetAutoSaveFilePath(),
-                _autoSaveController.GetLegacyAutoSaveFilePath(),
-                Path.Combine(_autoSaveDirectory, "autosave.ivsession")
-            };
-
-            // 保存改名前的实际写盘路径（本文档自己的文件，与通配枚举无关）。
-            if (!string.IsNullOrWhiteSpace(_autoSaveController.LastWrittenAutoSavePath))
-            {
-                paths.Add(_autoSaveController.LastWrittenAutoSavePath!);
-            }
-
-            if (!string.IsNullOrWhiteSpace(_recoveryFilePath))
-            {
-                paths.Add(_recoveryFilePath);
-            }
-
-            return paths
-                .Where(path => !string.IsNullOrWhiteSpace(path))
-                .Select(path => path!)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-        }
-
-        private void CompleteSuccessfulSave()
+        private void CompleteSuccessfulSave(string previousAutoSave)
         {
             MarkClean();
-            string[] recoveryPaths = GetRecoveryCleanupPaths();
-            if (recoveryPaths.Length == 0)
-            {
-                return;
-            }
+            var adopted = _adoptedRecovery;
+            _adoptedRecovery = null;
 
             try
             {
-                foreach (string recoveryPath in recoveryPaths)
+                DeleteRecoverySnapshot(previousAutoSave);
+                // The offered recovery is only a suggestion. Clean it up only if the user
+                // actually opened that snapshot and it has not changed since it was read.
+                if (adopted is { } snapshot &&
+                    !string.Equals(previousAutoSave, snapshot.Path, StringComparison.OrdinalIgnoreCase) &&
+                    File.GetLastWriteTimeUtc(snapshot.Path) == snapshot.LastWriteUtc)
                 {
-                    if (File.Exists(recoveryPath))
-                    {
-                        File.Delete(recoveryPath);
-                    }
+                    DeleteRecoverySnapshot(snapshot.Path);
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 _persistence.ShowStatusHint(UiText.Get("StatusRecoveryCleanupFailed"), StatusHintKind.Info);
                 _autoSave.LogNonCriticalError("Clean up recovered autosave", ex);
-                return;
             }
 
-            // 文件已删 + 已经从"未保存"变成"已保存"：索引里的登记要一并摘掉，
-            // 否则下次启动索引会指向不存在的路径，或把已保存的文档又列成待恢复文档。
-            ForgetRecoveryIndexEntries(recoveryPaths);
-            _recoveryFilePath = null;
-            _recoveryPromptDismissed = false;
+            if (adopted != null)
+            {
+                _recoveryPromptDismissed = false;
+            }
+            RefreshRecoverySnapshot();
             StateChanged?.Invoke(this, EventArgs.Empty);
         }
 
-        /// <summary>
-        /// 从恢复索引里摘除已不再需要恢复的自动保存文件。
-        /// Chinese: 成功保存/导出后，这份文档已经落到了用户指定的路径，重启时不该再提示"恢复未保存文档"。
-        /// English: Drops auto-save files from the recovery index once the document has been saved for real.
-        /// </summary>
-        private void ForgetRecoveryIndexEntries(IEnumerable<string> recoveryPaths)
+        private void DeleteRecoverySnapshot(string path)
         {
-            foreach (string recoveryPath in recoveryPaths)
+            if (File.Exists(path))
             {
-                _recoveryIndex.Unregister(recoveryPath);
+                File.Delete(path);
+            }
+            ImageViewerSnapshotImage.PruneRecoveryImages(path);
+            _recoveryIndex.Unregister(path);
+        }
+
+        private void DeleteRecoverySnapshotSafely(string path)
+        {
+            try
+            {
+                DeleteRecoverySnapshot(path);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                _autoSave.LogNonCriticalError("Clean up replaced autosave", ex);
             }
         }
 
         private void RefreshRecoverySnapshot()
         {
-            IReadOnlyList<string> candidates = GetRecoveryCandidates();
-            _recoveryFilePath = candidates.Count == 0 ? null : candidates[0];
+            IReadOnlyList<RecoverySnapshotOption> candidates = GetRecoveryCandidates();
+            _recoveryFilePath = candidates.Count == 0 ? null : candidates[0].Path;
         }
 
-        private IReadOnlyList<string> GetRecoveryCandidates()
+        private IReadOnlyList<RecoverySnapshotOption> GetRecoveryCandidates()
         {
             if (!Directory.Exists(_autoSaveDirectory))
             {
@@ -863,13 +1200,6 @@ namespace ImageViewer.Controls
 
             try
             {
-                // 只认"本文档"的自动保存文件：未保存项目时是 autosave-<DocumentId>.ivsession，
-                // 已保存项目时是 autosave-<名>-<路径哈希>.ivsession。此前扫描目录下全部
-                // *.ivsession，多个窗口会互相把对方的自动保存当成自己的恢复候选（先到先得），
-                // 结果既可能恢复成别人的文档，也会把对方的候选从列表里顶掉。
-                // 旧版遗留的无身份文件（autosave.ivsession / 旧命名）仅在"尚未有任何本文档
-                // 候选"时作为兜底接受，保证升级用户的存量恢复记录不丢。
-                string ownFileName = Path.GetFileName(_autoSaveController.GetAutoSaveFilePath());
                 string[] candidates = Directory
                     .EnumerateFiles(_autoSaveDirectory, "*.ivsession", SearchOption.TopDirectoryOnly)
                     .Where(path =>
@@ -882,26 +1212,8 @@ namespace ImageViewer.Controls
                     .OrderByDescending(GetLastWriteTimeUtc)
                     .ToArray();
 
-                string[] ownCandidates = candidates
-                    .Where(path => string.Equals(Path.GetFileName(path), ownFileName, StringComparison.OrdinalIgnoreCase))
-                    .ToArray();
-                if (ownCandidates.Length > 0)
-                {
-                    return ownCandidates;
-                }
-
-                // 重启后 DocumentId 是新的，自己的文件名根本不存在；靠持久化索引认出"上一次运行遗留的
-                // 待恢复文档"。只接受索引里明确登记过、且当前磁盘上确实存在的文件——不退回"扫目录全收"，
-                // 否则同目录下别的窗口的自动保存又会被误当成自己的候选。
-                string[] indexedCandidates = GetIndexedRecoveryCandidates(candidates);
-                if (indexedCandidates.Length > 0)
-                {
-                    return indexedCandidates;
-                }
-
-                return candidates
-                    .Where(path => IsLegacyUnidentifiedAutoSave(Path.GetFileName(path)))
-                    .ToArray();
+                // The index distinguishes abandoned snapshots from snapshots of open windows, including this one.
+                return GetIndexedRecoveryCandidates(candidates);
             }
             catch
             {
@@ -917,24 +1229,41 @@ namespace ImageViewer.Controls
         /// 后者靠 <see cref="ImageViewerRecoveryIndexEntry.OwnerInstanceId"/> + 新鲜心跳识别，
         /// 因此崩溃/强杀的实例（心跳过期）仍然可恢复。
         /// </summary>
-        private string[] GetIndexedRecoveryCandidates(string[] onDiskCandidates)
+        private RecoverySnapshotOption[] GetIndexedRecoveryCandidates(string[] onDiskCandidates)
         {
-            IReadOnlyList<ImageViewerRecoveryIndexEntry> indexedEntries = _recoveryIndex.Prune();
-            if (indexedEntries.Count == 0)
+            IReadOnlyList<ImageViewerRecoveryIndexEntry> indexedEntries = _recoveryIndex.Prune() ?? [];
+            DateTimeOffset heartbeatThreshold = DateTimeOffset.UtcNow - _liveHeartbeatWindow;
+            var byPath = new Dictionary<string, ImageViewerRecoveryIndexEntry>(StringComparer.OrdinalIgnoreCase);
+            foreach (ImageViewerRecoveryIndexEntry entry in indexedEntries)
             {
-                return [];
+                byPath.TryAdd(entry.Path, entry);
             }
 
-            DateTimeOffset heartbeatThreshold = DateTimeOffset.UtcNow - _liveHeartbeatWindow;
-            var recoverablePaths = new HashSet<string>(
-                indexedEntries
-                    .Where(entry => IsRecoverable(entry, heartbeatThreshold))
-                    .Select(entry => entry.Path),
-                StringComparer.OrdinalIgnoreCase);
+            var choices = new List<RecoverySnapshotOption>();
+            foreach (string path in onDiskCandidates)
+            {
+                string fullPath = Path.GetFullPath(path);
+                DateTime savedAt = GetLastWriteTimeUtc(fullPath);
+                if (_adoptedRecovery is { } adopted &&
+                    string.Equals(adopted.Path, fullPath, StringComparison.OrdinalIgnoreCase) &&
+                    adopted.LastWriteUtc == savedAt)
+                {
+                    continue;
+                }
 
-            return onDiskCandidates
-                .Where(path => recoverablePaths.Contains(Path.GetFullPath(path)))
-                .ToArray();
+                if (byPath.TryGetValue(fullPath, out ImageViewerRecoveryIndexEntry? entry))
+                {
+                    if (IsRecoverable(entry, heartbeatThreshold))
+                    {
+                        choices.Add(new(fullPath, savedAt, entry.ProjectName, entry.ImageName));
+                    }
+                }
+                else if (IsLegacyUnidentifiedAutoSave(Path.GetFileName(fullPath)))
+                {
+                    choices.Add(new(fullPath, savedAt, null, null));
+                }
+            }
+            return [.. choices];
         }
 
         /// <summary>
@@ -946,13 +1275,15 @@ namespace ImageViewer.Controls
         /// </summary>
         private bool IsRecoverable(ImageViewerRecoveryIndexEntry entry, DateTimeOffset heartbeatThreshold)
         {
-            if (string.Equals(entry.OwnerInstanceId, _sessionInstanceId, StringComparison.Ordinal))
+            if (string.Equals(entry.OwnerInstanceId, _sessionInstanceId, StringComparison.Ordinal) ||
+                _recoveryIndex.IsOwnerActive(entry.OwnerInstanceId))
             {
                 return false;
             }
 
-            if (entry.LastHeartbeatUtc is not DateTimeOffset heartbeat)
+            if (entry.HasOwnerLease || entry.LastHeartbeatUtc is not DateTimeOffset heartbeat)
             {
+                // A lease that was recorded and is now gone proves its owner is no longer running.
                 return true;
             }
 

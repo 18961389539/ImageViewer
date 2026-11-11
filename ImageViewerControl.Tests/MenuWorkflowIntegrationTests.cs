@@ -30,7 +30,9 @@ public class MenuWorkflowIntegrationTests
             Assert.False(result.IsEnabled);
             Assert.Contains(UiText.Get("MenuNeedClosedContour"), result.ToolTip!.ToString(), StringComparison.Ordinal);
             viewer.menuSearchBox.Clear();
-            Assert.Equal(5, viewer.measureMenuItem.Items.OfType<MenuItem>().Count());
+            // Five generated task groups; the fixed entries (advanced measurements, recipe) sit outside them.
+            Assert.Equal(5, viewer.measureMenuItem.Items.OfType<MenuItem>()
+                .Count(item => item.Tag is "measurement-task-group"));
         });
     }
 

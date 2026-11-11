@@ -50,21 +50,38 @@ namespace ImageViewer.Rendering
                 }
 
                 Brush blobBrush = Brushes.Magenta;
+                double blobThickness = 1.0 / context.Scale;
                 foreach (var blob in blobRoi.DetectedBlobs)
                 {
-                    context.DrawRectangleOutline(
-                        new Point(blob.BoundingBox.X + blob.BoundingBox.Width / 2, blob.BoundingBox.Y + blob.BoundingBox.Height / 2),
-                        blob.BoundingBox.Width,
-                        blob.BoundingBox.Height,
-                        0,
-                        blobBrush,
-                        1.0 / context.Scale);
+                    if (blob.Contour is { Length: >= 3 } contour)
+                    {
+                        // Traced pixel boundary, so a slanted blob reads as its real shape rather
+                        // than an axis-aligned box that misleadingly looks like the search region.
+                        var points = new Point[contour.Length];
+                        for (int i = 0; i < contour.Length; i++)
+                        {
+                            points[i] = contour[i].ToWpfPoint();
+                        }
+
+                        context.DrawPolyline(points, blobBrush, blobThickness, closed: true);
+                    }
+                    else
+                    {
+                        context.DrawRectangleOutline(
+                            new Point(blob.BoundingBox.X + blob.BoundingBox.Width / 2, blob.BoundingBox.Y + blob.BoundingBox.Height / 2),
+                            blob.BoundingBox.Width,
+                            blob.BoundingBox.Height,
+                            0,
+                            blobBrush,
+                            blobThickness);
+                    }
+
                     context.DrawHandle(blob.Centroid.ToWpfPoint(), ResizeHandle.None, 2 / context.Scale, false, blobBrush);
 
                     if (isSelected)
                     {
                         context.DrawInfoText(
-                            $"#{blob.Label} A:{blob.Area} W:{blob.BoundingBox.Width:F0} H:{blob.BoundingBox.Height:F0}",
+                            $"#{blob.Label} A:{blob.Area} V:{blob.Contour?.Length ?? 0}",
                             new Point(blob.BoundingBox.X, blob.BoundingBox.Y),
                             blobBrush);
                     }

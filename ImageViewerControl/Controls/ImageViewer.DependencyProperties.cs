@@ -151,7 +151,21 @@ namespace ImageViewer.Controls
         /// Chinese: 刻意不做成依赖属性——它不是给 XAML 绑定的视觉状态，而是"当前测量方案"的一部分，
         /// 只由配方加载/自动定位设置。放在普通属性上可以避免触发无谓的布局与重绘。
         /// </summary>
-        public WorkpieceCoordinateSystem? WorkpieceCoordinateSystem { get; set; }
+        private WorkpieceCoordinateSystem? _workpieceCoordinateSystem;
+
+        public WorkpieceCoordinateSystem? WorkpieceCoordinateSystem
+        {
+            get => _workpieceCoordinateSystem;
+            set
+            {
+                if (_workpieceCoordinateSystem == value)
+                {
+                    return;
+                }
+                _workpieceCoordinateSystem = value;
+                _controlComposition?.SessionController.MarkDirty();
+            }
+        }
 
         public static readonly DependencyProperty MenuStateProperty =
             DependencyProperty.Register(nameof(MenuState), typeof(object), typeof(ImageViewer),
@@ -418,7 +432,11 @@ namespace ImageViewer.Controls
                 // Without this refresh, commands such as Save, Undo and Export can remain disabled
                 // until the user opens the context menu or invokes another command first.
                 viewer.UpdateContextMenuState();
-                if (viewer.IsLoaded)
+                if (viewer._isChangingVolumeSlice)
+                {
+                    viewer._sessionController.RecordVolumeSliceNavigation();
+                }
+                else if (viewer.IsLoaded)
                 {
                     viewer.MarkDocumentDirty();
                 }

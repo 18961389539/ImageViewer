@@ -1,6 +1,5 @@
 using System;
 using System.Linq;
-using System.Text.Json;
 using ImageViewer.Core.Geometry;
 using ImageViewer.Core.Measurements;
 using ImageViewer.Core.Persistence;
@@ -46,33 +45,7 @@ namespace ImageViewer.Services
                 ValidateTemplateForAlignment(item.Template);
             }
 
-            // Clone the complete schema first. A failure while transforming any item leaves the
-            // recipe object and the caller's current ROI collection untouched.
-            string json = JsonSerializer.Serialize(
-                recipe,
-                ImageViewerCoreJsonSerializationContext.Default.MeasurementRecipeDocument);
-            MeasurementRecipeDocument detached = JsonSerializer.Deserialize(
-                json,
-                ImageViewerCoreJsonSerializationContext.Default.MeasurementRecipeDocument)
-                ?? throw new JsonException("Could not clone measurement recipe.");
-
-            foreach (MeasurementRecipeItem item in detached.Items)
-            {
-                if (item.Template is null)
-                {
-                    if (item.IsEnabled)
-                    {
-                        throw new InvalidOperationException(
-                            $"Enabled recipe item '{item.DisplayName ?? item.Key}' has no ROI geometry.");
-                    }
-
-                    continue;
-                }
-
-                TransformTemplate(item.Template, referenceToCurrent);
-            }
-
-            return MeasurementRecipeService.BuildRoiDocument(detached);
+            return MeasurementRecipeService.BuildRoiDocument(recipe, template => TransformTemplate(template, referenceToCurrent));
         }
 
         private static void ValidateTemplateForAlignment(RoiPersistenceData data)
@@ -111,6 +84,12 @@ namespace ImageViewer.Services
                     (!double.IsFinite(definition.NominalX) || !double.IsFinite(definition.NominalY)))
                 {
                     throw new InvalidOperationException($"Recipe ROI '{data.Type}' contains a non-finite position nominal.");
+                }
+
+                if (definition is { Kind: AdvancedMeasurementKind.ProjectedDistance, Sources.Length: 2 } &&
+                    !double.IsFinite(definition.Parameter))
+                {
+                    throw new InvalidOperationException($"Recipe ROI '{data.Type}' contains a non-finite projection angle.");
                 }
             }
         }
@@ -235,10 +214,10 @@ namespace ImageViewer.Services
                 throw new InvalidOperationException($"Recipe ROI '{key}' has a non-finite angle.");
             }
 
-            TransformPositionNominals(data, transform, key);
+            TransformAdvancedMeasurementParameters(data, transform, key);
         }
 
-        private static void TransformPositionNominals(RoiPersistenceData data, RigidTransform2D transform, string type)
+        private static void TransformAdvancedMeasurementParameters(RoiPersistenceData data, RigidTransform2D transform, string type)
         {
             if (data.AdvancedMeasurements is null)
             {
@@ -248,6 +227,14 @@ namespace ImageViewer.Services
             for (int index = 0; index < data.AdvancedMeasurements.Length; index++)
             {
                 AdvancedMeasurementDefinition? definition = data.AdvancedMeasurements[index];
+                if (definition is { Kind: AdvancedMeasurementKind.ProjectedDistance, Sources.Length: 2 })
+                {
+                    // The optional third source already rotates with its ROI. Only rotate the explicit angle.
+                    double rotatedAngle = transform.TransformAngleDegrees(definition.Parameter % 360) % 360;
+                    data.AdvancedMeasurements[index] = definition with { Parameter = rotatedAngle };
+                    continue;
+                }
+
                 if (definition is not { Kind: AdvancedMeasurementKind.Position, NominalInWorkpieceCoordinates: false })
                 {
                     continue;

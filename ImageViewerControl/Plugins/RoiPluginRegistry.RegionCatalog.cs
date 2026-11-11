@@ -40,7 +40,7 @@ namespace ImageViewer.Plugins
                     hitTestOrder: 55,
                     drawingTools:
                     [
-                        new RoiToolDescriptor(UiText.Get("ToolBlobAnalysis"), BuiltInDrawControllers.BlobAnalysis, 15, CreateBlobIcon)
+                        new RoiToolDescriptor(UiText.Get("ToolBlobAnalysis"), BuiltInDrawControllers.BlobAnalysis, 15, CreateBlobIcon, isMeasurement: true)
                     ],
                     persistence: CreateCenterWidthHeightAnglePersistence(
                         data => new BlobAnalysisRoi

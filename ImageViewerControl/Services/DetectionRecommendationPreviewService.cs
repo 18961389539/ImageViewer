@@ -231,7 +231,7 @@ internal static class DetectionRecommendationPreviewService
                 cancellationToken.ThrowIfCancellationRequested();
                 List<BlobFeature> blobs = BlobAnalysisService.DetectBlobs(
                     bitmap,
-                    GetBlobAnalysisBounds(blob),
+                    blob,
                     blob.UseOtsu,
                     blob.ManualThreshold,
                     blob.DetectDark,
@@ -292,22 +292,4 @@ internal static class DetectionRecommendationPreviewService
 
     private static DetectionTrial FailedTrial(string statusKey, RoiBase? detectedRoi = null) =>
         new(false, string.IsNullOrWhiteSpace(statusKey) ? "RecommendationTrialFailed" : statusKey, null, null, 0, 0, [], detectedRoi);
-
-    private static Rect GetBlobAnalysisBounds(BlobAnalysisRoi roi)
-    {
-        Rect rectangle = new(roi.Center.X - roi.Width / 2, roi.Center.Y - roi.Height / 2, roi.Width, roi.Height);
-        if (roi.Angle == 0)
-        {
-            return rectangle;
-        }
-
-        Point center = roi.Center.ToWpfPoint();
-        return Utils.GeometryUtils.GetBoundingBox(
-        [
-            Utils.GeometryUtils.RotatePoint(new Point(rectangle.Left, rectangle.Top), center, roi.Angle),
-            Utils.GeometryUtils.RotatePoint(new Point(rectangle.Right, rectangle.Top), center, roi.Angle),
-            Utils.GeometryUtils.RotatePoint(new Point(rectangle.Right, rectangle.Bottom), center, roi.Angle),
-            Utils.GeometryUtils.RotatePoint(new Point(rectangle.Left, rectangle.Bottom), center, roi.Angle)
-        ]);
-    }
 }

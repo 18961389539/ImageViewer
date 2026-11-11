@@ -112,7 +112,12 @@ namespace ImageViewerControl.Tests
                 {
                     GetRetryCount = () => state.ImageLoadRetryCount,
                     GetRetryDelayMilliseconds = () => state.ImageLoadRetryDelayMilliseconds,
-                    SetImage = source => state.LastImage = source,
+                    PrepareReplacementAsync = (source, _) => Task.FromResult<Action?>(() =>
+                    {
+                        state.LastImage = source;
+                        state.FitToViewCount++;
+                        state.ClearUndoHistoryCount++;
+                    }),
                     SetImageLoadState = (isLoading, statusText, progress, canRetry) =>
                     {
                         state.LastLoadState = (isLoading, statusText, progress, canRetry);
@@ -121,8 +126,6 @@ namespace ImageViewerControl.Tests
                             state.RetryStarted?.TrySetResult(true);
                         }
                     },
-                    FitToView = () => state.FitToViewCount++,
-                    ClearUndoHistory = () => state.ClearUndoHistoryCount++,
                     ShowNonCriticalError = (title, message, ex) => state.Errors.Add((title, message, ex))
                 },
                 RoiEditing = new ImageViewerDialogRoiWorkflow

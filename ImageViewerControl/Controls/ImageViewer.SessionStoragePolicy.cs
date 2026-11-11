@@ -11,6 +11,8 @@ namespace ImageViewer.Controls
 
         string ProjectPackageCacheDirectory { get; }
 
+        long ProjectPackageCacheBudgetBytes => 2L * 1024 * 1024 * 1024;
+
         TimeSpan AutoSaveInterval { get; }
     }
 
@@ -24,12 +26,19 @@ namespace ImageViewer.Controls
         }
 
         public LocalAppDataImageViewerSessionStoragePolicy(string storageRoot, TimeSpan autoSaveInterval)
+            : this(storageRoot, autoSaveInterval, 2L * 1024 * 1024 * 1024)
+        {
+        }
+
+        public LocalAppDataImageViewerSessionStoragePolicy(string storageRoot, TimeSpan autoSaveInterval, long projectPackageCacheBudgetBytes)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(storageRoot);
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(projectPackageCacheBudgetBytes);
 
             RecentProjectsFilePath = Path.Combine(storageRoot, "recent-projects.json");
             AutoSaveDirectory = Path.Combine(storageRoot, "Autosave");
             ProjectPackageCacheDirectory = Path.Combine(storageRoot, "PackageCache");
+            ProjectPackageCacheBudgetBytes = projectPackageCacheBudgetBytes;
             AutoSaveInterval = autoSaveInterval <= TimeSpan.Zero
                 ? throw new ArgumentOutOfRangeException(nameof(autoSaveInterval))
                 : autoSaveInterval;
@@ -40,6 +49,8 @@ namespace ImageViewer.Controls
         public string AutoSaveDirectory { get; }
 
         public string ProjectPackageCacheDirectory { get; }
+
+        public long ProjectPackageCacheBudgetBytes { get; }
 
         public TimeSpan AutoSaveInterval { get; }
     }

@@ -1,6 +1,9 @@
 using ImageViewer.Core.Display;
+using ImageViewer.Core.Geometry;
+using ImageViewer.Core.Persistence;
 using ImageViewer.Models;
 using ImageViewer.Services;
+using System.Windows.Media.Imaging;
 
 namespace ImageViewer.Abstractions
 {
@@ -31,5 +34,20 @@ namespace ImageViewer.Abstractions
         /// 加位置参数会把每一处都变成编译错误，而这里新增的是一项可选状态。
         /// </summary>
         public DisplayAdjustment Display { get; init; } = DisplayAdjustment.Identity;
+
+        /// <summary>A frozen bitmap to persist when the image does not have a durable source file.</summary>
+        public BitmapSource? InMemoryImage { get; init; }
+
+        /// <summary>SHA-256 of the source file that produced the displayed image, when known.</summary>
+        public string? ImageSha256 { get; init; }
+
+        /// <summary>The image-to-workpiece placement in effect when the snapshot was captured.</summary>
+        public WorkpieceCoordinateSystem? CoordinateSystem { get; init; }
+
+        /// <summary>Detached reference-image datum points, in selection order.</summary>
+        public IReadOnlyList<RecipeDatumPoint> ReferenceDatumPoints { get; init; } = [];
+
+        /// <summary>Detached datum points selected on the current image, in selection order.</summary>
+        public IReadOnlyList<RecipeDatumPoint> CurrentDatumPoints { get; init; } = [];
     }
 }

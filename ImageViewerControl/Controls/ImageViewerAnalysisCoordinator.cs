@@ -107,6 +107,9 @@ namespace ImageViewer.Controls
         internal readonly IImageViewerAnalysisErrorSink _errorSink;
         private ImageViewerBackgroundOperationObserver? _backgroundOperationObserver;
         private readonly TimeSpan _asyncAnalysisDebounce;
+        private long _displayRenderVersion;
+        private DisplayRenderRequest? _pendingDisplayRender;
+        private bool _displayRenderLoopRunning;
 
         public ImageViewerAnalysisCoordinator(
             IImageViewerAnalysisHost host,
@@ -126,10 +129,188 @@ namespace ImageViewer.Controls
 
         public void UpdateRenderedImage()
         {
+            // 同步更新意味着当前视口/源图状态已经变化，任何在途的显示设置结果都不能再覆盖它。
+            InvalidateDisplayRenderRequests();
             ImageViewerRenderedImagePlan renderPlan = BuildRenderedImagePlan();
+            ApplyRenderedImagePlan(renderPlan);
+        }
+
+        /// <summary>
+        /// 显示设置变化（调色板、亮度、窗宽窗位等）的渲染入口。
+        /// Chinese: CPU LUT 是最重的一步；在 UI 上下文可用且确实需要 CPU 回退时放到后台，只提交最新一版。
+        /// 没有同步上下文（例如现有同步测试或启动早期）时保持原有同步语义。
+        /// English: CPU LUT is the expensive step; run it off the UI thread when a synchronization context exists and
+        /// only commit the newest request. Falls back to the synchronous path when no UI context is available.
+        /// </summary>
+        public void UpdateRenderedImageForDisplaySettings()
+        {
+            if (SynchronizationContext.Current is null)
+            {
+                UpdateRenderedImage();
+                return;
+            }
+
+            DisplayRenderRequest? request = CaptureDisplayRenderRequest();
+            if (request == null || request.CpuDisplaySettings.IsPassThrough)
+            {
+                UpdateRenderedImage();
+                return;
+            }
+
+            _displayRenderVersion++;
+            _pendingDisplayRender = request with { Version = _displayRenderVersion };
+            if (_displayRenderLoopRunning)
+            {
+                return;
+            }
+
+            _displayRenderLoopRunning = true;
+            _ = RunDisplayRenderLoopAsync();
+        }
+
+        private void ApplyRenderedImagePlan(ImageViewerRenderedImagePlan renderPlan)
+        {
             _uiFacade.ApplyRenderedImagePlan(renderPlan);
             _host.AnalysisState.IsShaderPseudoColorActive = renderPlan.IsShaderPseudoColorActive;
             _host.AnalysisState.LastRenderFrame = renderPlan.RenderFrame;
+        }
+
+        private void InvalidateDisplayRenderRequests()
+        {
+            _displayRenderVersion++;
+            _pendingDisplayRender = null;
+        }
+
+        /// <summary>
+        /// 控件销毁时调用：让在途显示结果失效，避免后台 LUT 完成后写回已卸载的视觉树。
+        /// </summary>
+        public void CancelPendingWork()
+        {
+            InvalidateDisplayRenderRequests();
+        }
+
+        private DisplayRenderRequest? CaptureDisplayRenderRequest()
+        {
+            ImageViewerAnalysisState state = _host.AnalysisState;
+            BitmapSource? analysisBitmap = state.AnalysisBitmapSource;
+            if (analysisBitmap == null)
+            {
+                return null;
+            }
+
+            ImageViewerDisplaySettings displaySettings = _host.DisplaySettings;
+            Effect? displayEffect = ResolveDisplayEffect(displaySettings);
+            ImageViewerDisplaySettings cpuDisplaySettings = ResolveCpuDisplaySettings(displaySettings, displayEffect);
+            IReadOnlyList<ImagePyramidLevel> pyramidLevels = _host.EnableImagePyramid
+                ? state.PyramidLevels
+                : [new ImagePyramidLevel(analysisBitmap, 1.0)];
+
+            return new DisplayRenderRequest(
+                analysisBitmap,
+                pyramidLevels,
+                _host.ViewportSize,
+                _host.Scale,
+                _host.Translation,
+                cpuDisplaySettings,
+                displayEffect,
+                _host.EnableGpuRendering,
+                _host.EnableTiledRendering,
+                _host.AutoSelectPyramidLevel,
+                _host.PrefetchAdjacentTiles,
+                _host.TileCacheMaximumMegabytes,
+                _host.TilePrefetchRadius,
+                state.SourceGeneration);
+        }
+
+        private Effect? ResolveDisplayEffect(ImageViewerDisplaySettings displaySettings)
+        {
+            return _host.PreferShaderPseudoColor
+                ? _host.RenderService.CreateDisplayEffect(displaySettings)
+                : null;
+        }
+
+        private ImageViewerDisplaySettings ResolveCpuDisplaySettings(
+            ImageViewerDisplaySettings displaySettings,
+            Effect? displayEffect)
+        {
+            return displayEffect == null && _host.AllowCpuPseudoColorFallback
+                ? displaySettings
+                : ImageViewerDisplaySettings.PassThrough;
+        }
+
+        private async Task RunDisplayRenderLoopAsync()
+        {
+            try
+            {
+                while (true)
+                {
+                    DisplayRenderRequest? request = _pendingDisplayRender;
+                    if (request is null)
+                    {
+                        return;
+                    }
+
+                    _pendingDisplayRender = null;
+                    ImageViewerRenderedImagePlan renderPlan;
+                    try
+                    {
+                        // BuildRenderFrame reads only captured immutable inputs; the tile cache is already thread-safe.
+                        renderPlan = await Task.Run(() => BuildRenderedImagePlan(request)).ConfigureAwait(true);
+                    }
+                    catch (Exception exception)
+                    {
+                        _errorSink.LogNonCriticalError("Build background display render plan", exception);
+                        continue;
+                    }
+
+                    if (request.Version != _displayRenderVersion ||
+                        request.SourceGeneration != _host.AnalysisState.SourceGeneration)
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        ApplyRenderedImagePlan(renderPlan);
+                    }
+                    catch (Exception exception)
+                    {
+                        _errorSink.LogNonCriticalError("Apply background display render plan", exception);
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                // 渲染循环是 fire-and-forget；任何意外异常都必须在这里观察，避免成为未处理任务异常。
+                _errorSink.LogNonCriticalError("Run background display render loop", exception);
+            }
+            finally
+            {
+                _displayRenderLoopRunning = false;
+                if (_pendingDisplayRender != null)
+                {
+                    _displayRenderLoopRunning = true;
+                    _ = RunDisplayRenderLoopAsync();
+                }
+            }
+        }
+
+        private ImageViewerRenderedImagePlan BuildRenderedImagePlan(DisplayRenderRequest request)
+        {
+            ImageViewerRenderFrame frame = _host.RenderService.BuildRenderFrame(
+                request.AnalysisBitmap,
+                request.PyramidLevels,
+                request.ViewportSize,
+                request.Scale,
+                request.Translation,
+                request.CpuDisplaySettings,
+                request.EnableTiledRendering,
+                request.AutoSelectPyramidLevel,
+                request.PrefetchAdjacentTiles,
+                request.TileCacheMaximumMegabytes,
+                request.TilePrefetchRadius);
+
+            return new ImageViewerRenderedImagePlan(frame, request.DisplayEffect, request.EnableGpuRendering);
         }
 
         public void ClearRenderCache()
@@ -192,7 +373,7 @@ namespace ImageViewer.Controls
             BitmapSource? analysisBitmap = _host.RenderService.GetAnalysisBitmap(source);
             _host.AnalysisState.ResetForSource(analysisBitmap);
             ClearAnalysisDisplays();
-            UpdateRenderedImage();
+            UpdateRenderedImageForDisplaySettings();
 
             if (analysisBitmap == null || !_host.EnableImagePyramid)
             {
@@ -217,7 +398,7 @@ namespace ImageViewer.Controls
                     return;
                 }
 
-                UpdateRenderedImage();
+                UpdateRenderedImageForDisplaySettings();
                 await RefreshAnalysisDisplaysAsync();
             }
             catch (OperationCanceledException)
@@ -277,12 +458,12 @@ namespace ImageViewer.Controls
         /// </summary>
         public void HandlePseudoColorPaletteChanged()
         {
-            UpdateRenderedImage();
+            UpdateRenderedImageForDisplaySettings();
         }
 
         public void HandleRenderingOptionChanged()
         {
-            UpdateRenderedImage();
+            UpdateRenderedImageForDisplaySettings();
         }
 
         public void HandleHistogramVisibilityChanged(bool isVisible)
@@ -613,5 +794,23 @@ namespace ImageViewer.Controls
                 _host.DisplaySettings.Palette == PseudoColorPalette.Viridis);
         }
 
+        private sealed record DisplayRenderRequest(
+            BitmapSource AnalysisBitmap,
+            IReadOnlyList<ImagePyramidLevel> PyramidLevels,
+            Size ViewportSize,
+            double Scale,
+            Point Translation,
+            ImageViewerDisplaySettings CpuDisplaySettings,
+            Effect? DisplayEffect,
+            bool EnableGpuRendering,
+            bool EnableTiledRendering,
+            bool AutoSelectPyramidLevel,
+            bool PrefetchAdjacentTiles,
+            int TileCacheMaximumMegabytes,
+            int TilePrefetchRadius,
+            long SourceGeneration)
+        {
+            public long Version { get; init; }
+        }
     }
 }

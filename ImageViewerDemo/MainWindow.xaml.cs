@@ -10,6 +10,7 @@ using System.Windows;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using ImageViewer.Controls;
+using ImageViewer.Dialogs;
 using ImageViewer.Services;
 using ImageViewerDemo.Localization;
 using ImageViewer.Models;
@@ -37,19 +38,16 @@ public partial class MainWindow : Window, IDisposable
     private async void OnMainWindowLoaded(object sender, RoutedEventArgs e)
     {
         string path = Path.Combine(AppContext.BaseDirectory, "Resources", "TestImage.png");
-        if (!File.Exists(path))
+        if (!File.Exists(path) || !TryBeginOpen(DemoText.Get("ImageLoadingStatus"), isIndeterminate: false))
         {
             return;
         }
 
         try
         {
-            if (!TryBeginOpen(DemoText.Get("ImageLoadingStatus"), isIndeterminate: true))
-            {
-                return;
-            }
-
-            BitmapSource bitmap = await LoadBitmapAsync(path, _openCancellation!.Token);
+            CancellationToken token = _openCancellation!.Token;
+            BitmapSource bitmap = await LoadImageWithProgressAsync(path, token);
+            token.ThrowIfCancellationRequested();
             Viewer.ImageSource = bitmap;
             Viewer.MarkDocumentClean();
         }
@@ -68,7 +66,7 @@ public partial class MainWindow : Window, IDisposable
     }
 
 
-    private async void OnOpenImageClick(object sender, RoutedEventArgs e)
+    private void OnOpenImageClick(object sender, RoutedEventArgs e)
     {
         var dialog = new OpenFileDialog
         {
@@ -81,23 +79,26 @@ public partial class MainWindow : Window, IDisposable
             return;
         }
 
-        await OpenImageAsync(dialog.FileName);
+        _ = OpenImageAsync(dialog.FileName);
     }
 
     private async Task OpenImageAsync(string path)
     {
-        if (!TryBeginOpen(DemoText.Get("ImageLoadingStatus"), isIndeterminate: true))
+        if (!TryBeginOpen(DemoText.Get("ImageLoadingStatus"), isIndeterminate: false))
         {
             return;
         }
 
         try
         {
-            BitmapSource bitmap = await LoadBitmapAsync(path, _openCancellation!.Token);
-            _openCancellation.Token.ThrowIfCancellationRequested();
-            Viewer.Volume = null;
-            Viewer.ImageSource = bitmap;
-            Viewer.DisplayMode = AdaptiveDisplayMode.Auto;
+            CancellationToken token = _openCancellation!.Token;
+            BitmapSource bitmap = await LoadImageWithProgressAsync(path, token);
+            token.ThrowIfCancellationRequested();
+            if (!await Viewer.ReplaceImageDocumentAsync(bitmap, token))
+            {
+                token.ThrowIfCancellationRequested();
+                return;
+            }
             ClearOpenSummary();
         }
         catch (OperationCanceledException)
@@ -107,6 +108,39 @@ public partial class MainWindow : Window, IDisposable
         catch (Exception ex)
         {
             MessageBox.Show(this, ex.Message, DemoText.Get("OpenImageErrorTitle"), MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            EndOpen();
+        }
+    }
+
+    private async void OnMeasurementSampleClick(object sender, RoutedEventArgs e)
+    {
+        if (!TryBeginOpen(DemoText.Get("MeasurementSampleLoading"), isIndeterminate: true))
+        {
+            return;
+        }
+
+        try
+        {
+            CancellationToken token = _openCancellation!.Token;
+            token.ThrowIfCancellationRequested();
+            using CancellationTokenRegistration registration = token.Register(Viewer.ImageViewer.CancelImageLoad);
+            string path = Path.Combine(AppContext.BaseDirectory, "Resources", "MeasurementSample.ivsession");
+            if (await Viewer.OpenProjectFromFileAsync(path))
+            {
+                Viewer.ImageViewer.ShowToolbar = true;
+                SetOpenSummary(DemoText.Get("MeasurementSampleGuide"));
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            SetOpenStatus(DemoText.Get("OpenCancelledStatus"));
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.GetBaseException().Message, DemoText.Get("OpenMeasurementSampleErrorTitle"), MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {
@@ -149,15 +183,16 @@ public partial class MainWindow : Window, IDisposable
             List<string> importWarnings = ordering.Warnings.ToList();
             (double Value, string Source) spacingX = ResolveSpacing(ordering.Slices.Select(slice => slice.SpacingX).ToArray(), 1.0, "X", importWarnings);
             (double Value, string Source) spacingY = ResolveSpacing(ordering.Slices.Select(slice => slice.SpacingY).ToArray(), 1.0, "Y", importWarnings);
-            (double Value, string Source) spacingZ = ResolveSpacing(ordering.Slices.Select(slice => slice.SpacingZ).ToArray(), 1.0, "Z", importWarnings);
+            (double Value, string Source) spacingZ = ResolveVolumeDepthSpacing(ordering, importWarnings);
             string orderSource = GetOrderSource(ordering.Source);
             bool orderNeedsConfirmation = !ordering.IsAuthoritative ||
                 importWarnings.Count > 0 ||
                 VolumeSliceOrderingService.HasOrderChanged(selectedPaths, orderedPaths);
             if (orderNeedsConfirmation)
             {
-                MessageBoxResult orderConfirmation = MessageBox.Show(
+                bool orderConfirmed = ImageViewerDialogService.ConfirmReadOnlyTextDialog(
                     this,
+                    DemoText.Get("OpenVolumeOrderChangedTitle"),
                     DemoText.Format(
                         "OpenVolumeOrderChangedMessage",
                         orderedPaths.Count,
@@ -166,49 +201,33 @@ public partial class MainWindow : Window, IDisposable
                         Path.GetFileName(orderedPaths[Math.Min(1, orderedPaths.Count - 1)]),
                         Path.GetFileName(orderedPaths[Math.Max(0, orderedPaths.Count - 2)]),
                         Path.GetFileName(orderedPaths[^1]),
-                        importWarnings.Count == 0 ? string.Empty : $"\n{string.Join(Environment.NewLine, importWarnings)}"),
-                    DemoText.Get("OpenVolumeOrderChangedTitle"),
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Warning);
+                        importWarnings.Count == 0 ? string.Empty : $"\n{string.Join(Environment.NewLine, importWarnings)}",
+                        spacingX.Value, spacingY.Value, spacingZ.Value),
+                    DemoText.Get("OpenVolumeConfirmImport"));
 
-                if (orderConfirmation != MessageBoxResult.Yes)
+                if (!orderConfirmed)
                 {
                     return;
                 }
             }
 
-            cancellationToken.ThrowIfCancellationRequested();
+            SetOpenStatus(DemoText.Get("VolumeVerifyingStatus"));
             openProgressBar.IsIndeterminate = false;
             openProgressBar.Value = 0;
-            BitmapSource[] slices = new BitmapSource[orderedPaths.Count];
-            int? expectedWidth = null;
-            int? expectedHeight = null;
-            for (int index = 0; index < orderedPaths.Count; index++)
+            var inspectionProgress = new Progress<double>(value =>
             {
-                int sliceNumber = index + 1;
-                SetOpenStatus(DemoText.Format("VolumeLoadingProgress", sliceNumber, orderedPaths.Count));
-                slices[index] = await LoadBitmapAsync(orderedPaths[index], cancellationToken);
-                expectedWidth ??= slices[index].PixelWidth;
-                expectedHeight ??= slices[index].PixelHeight;
-                if (slices[index].PixelWidth != expectedWidth || slices[index].PixelHeight != expectedHeight)
+                if (_openCancellation?.Token == cancellationToken && !cancellationToken.IsCancellationRequested)
                 {
-                    throw new InvalidOperationException(DemoText.Format(
-                        "OpenVolumeDimensionMismatch",
-                        sliceNumber,
-                        slices[index].PixelWidth,
-                        slices[index].PixelHeight,
-                        expectedWidth,
-                        expectedHeight));
+                    openProgressBar.Value = value;
                 }
-                openProgressBar.Value = sliceNumber * 100d / orderedPaths.Count;
-            }
-
-            long estimatedBytes = EstimateVolumeBytes(slices, bytesPerPixel: 4);
-            if (estimatedBytes > 768L * 1024 * 1024)
+            });
+            VolumeImportPlan importPlan = await VolumeImportPreflight.PrepareAsync(orderedPaths, inspectionProgress, cancellationToken);
+            VolumeImportEstimate estimate = importPlan.Estimate;
+            if (estimate.ExceedsBudget(768L * 1024 * 1024))
             {
                 MessageBoxResult memoryConfirmation = MessageBox.Show(
                     this,
-                    DemoText.Format("OpenVolumeMemoryWarning", estimatedBytes / (1024d * 1024d)),
+                    DemoText.Format("OpenVolumeMemoryWarning", estimate.EstimatedBytes / (1024d * 1024d)),
                     DemoText.Get("OpenVolumeErrorTitle"),
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Warning,
@@ -218,6 +237,20 @@ public partial class MainWindow : Window, IDisposable
                     return;
                 }
             }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            openProgressBar.IsIndeterminate = false;
+            openProgressBar.Value = 0;
+            SetOpenStatus(DemoText.Format("VolumeLoadingProgress", 0, importPlan.SliceCount));
+            var decodeProgress = new Progress<int>(completed =>
+            {
+                if (_openCancellation?.Token == cancellationToken && !cancellationToken.IsCancellationRequested)
+                {
+                    SetOpenStatus(DemoText.Format("VolumeLoadingProgress", completed, importPlan.SliceCount));
+                    openProgressBar.Value = completed * 100d / importPlan.SliceCount;
+                }
+            });
+            BitmapSource[] slices = await importPlan.LoadAllSlicesAsync(decodeProgress, cancellationToken);
 
             var orderMetadata = new VolumeSliceOrderMetadata(
                 ordering.Source.ToString(),
@@ -233,14 +266,16 @@ public partial class MainWindow : Window, IDisposable
                 () => new VolumeData(slices, spacingX.Value, spacingY.Value, spacingZ.Value, orderMetadata),
                 cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
-            Viewer.Volume = volume;
-            Viewer.ImageSource = volume.GetAxialSlice(0);
-            Viewer.DisplayMode = AdaptiveDisplayMode.Auto;
+            if (!await Viewer.ReplaceVolumeDocumentAsync(volume, cancellationToken))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return;
+            }
             string summary = DemoText.Format(
                 "OpenVolumeLoaded",
                 slices.Length,
-                expectedWidth ?? 0,
-                expectedHeight ?? 0,
+                estimate.Width,
+                estimate.Height,
                 spacingX.Value,
                 spacingY.Value,
                 spacingZ.Value);
@@ -275,7 +310,7 @@ public partial class MainWindow : Window, IDisposable
 
     private async void OnMainWindowClosing(object? sender, CancelEventArgs e)
     {
-        if (_allowClose || !Viewer.IsDirty)
+        if (_allowClose)
         {
             return;
         }
@@ -289,9 +324,11 @@ public partial class MainWindow : Window, IDisposable
         _closePromptActive = true;
         try
         {
-            MessageBoxResult result = MessageBox.Show(
+            MessageBoxResult result = !Viewer.IsDirty ? MessageBoxResult.No : MessageBox.Show(
                 this,
-                DemoText.Get("UnsavedCloseMessage"),
+                DemoText.Get(Viewer.VolumeViewer.SliceViewer.IsDirty
+                    ? Viewer.ImageViewer.IsDirty ? "UnsavedCloseBothViews" : "UnsavedCloseAxialView"
+                    : "UnsavedCloseMessage"),
                 DemoText.Get("UnsavedCloseTitle"),
                 MessageBoxButton.YesNoCancel,
                 MessageBoxImage.Warning,
@@ -302,22 +339,31 @@ public partial class MainWindow : Window, IDisposable
                 return;
             }
 
-            if (result == MessageBoxResult.Yes)
+            if (result == MessageBoxResult.Yes && !await Viewer.SaveUnsavedSessionsAsync())
             {
-                await Viewer.SaveSessionAsync();
-                if (Viewer.IsDirty)
-                {
-                    MessageBox.Show(this, DemoText.Get("UnsavedCloseSaveFailed"), DemoText.Get("UnsavedCloseTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
+                MessageBox.Show(this, DemoText.Get("UnsavedCloseSaveFailed"), DemoText.Get("UnsavedCloseTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
             }
 
+            _openCancellation?.Cancel();
+            try
+            {
+                await Viewer.DisposeAsync();
+            }
+            catch (Exception exception)
+            {
+                System.Diagnostics.Trace.TraceError("ImageViewer shutdown: {0}", exception);
+            }
             _allowClose = true;
             // Closing is a synchronous, cancelable WPF event. Save may yield
             // back to the dispatcher, so calling Close() here re-enters the
             // window while its original Closing event is still active.
             // Queue the final close until that event has returned.
             _ = Dispatcher.BeginInvoke(new Action(Close), DispatcherPriority.ApplicationIdle);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.GetBaseException().Message, DemoText.Get("UnsavedCloseTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         finally
         {
@@ -342,6 +388,7 @@ public partial class MainWindow : Window, IDisposable
         _openCancellation = new CancellationTokenSource();
         openImageButton.IsEnabled = false;
         openVolumeButton.IsEnabled = false;
+        measurementSampleButton.IsEnabled = false;
         cancelOpenButton.IsEnabled = true;
         cancelOpenButton.Visibility = Visibility.Visible;
         openProgressPanel.Visibility = Visibility.Visible;
@@ -359,13 +406,14 @@ public partial class MainWindow : Window, IDisposable
     private void SetOpenSummary(string summary)
     {
         openSummaryText.Text = summary;
-        openSummaryText.Visibility = Visibility.Visible;
+        openSummaryScroll.ScrollToTop();
+        openSummaryScroll.Visibility = Visibility.Visible;
     }
 
     private void ClearOpenSummary()
     {
         openSummaryText.Text = string.Empty;
-        openSummaryText.Visibility = Visibility.Collapsed;
+        openSummaryScroll.Visibility = Visibility.Collapsed;
     }
 
     private void EndOpen()
@@ -375,20 +423,46 @@ public partial class MainWindow : Window, IDisposable
         _isOpeningData = false;
         openImageButton.IsEnabled = true;
         openVolumeButton.IsEnabled = true;
+        measurementSampleButton.IsEnabled = true;
         cancelOpenButton.IsEnabled = true;
         cancelOpenButton.Visibility = Visibility.Collapsed;
         openProgressPanel.Visibility = Visibility.Collapsed;
     }
 
-    private static async Task<BitmapSource> LoadBitmapAsync(string filePath, CancellationToken cancellationToken)
+    private Task<BitmapSource> LoadImageWithProgressAsync(string filePath, CancellationToken cancellationToken)
     {
-        return await Task.Run(() =>
+        var progress = new Progress<double>(value =>
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            BitmapSource bitmap = LoadBitmap(filePath);
-            cancellationToken.ThrowIfCancellationRequested();
-            return bitmap;
-        }, cancellationToken);
+            if (_isOpeningData && !cancellationToken.IsCancellationRequested && _openCancellation?.Token == cancellationToken)
+            {
+                openProgressBar.Value = value;
+            }
+        });
+        return ImageViewerImageDecoder.LoadFromFileAsync(filePath, progress, cancellationToken: cancellationToken);
+    }
+
+    private static (double Value, string Source) ResolveVolumeDepthSpacing(
+        VolumeSliceOrderingResult ordering, ICollection<string> warnings)
+    {
+        VolumeSlicePositionSpacing positions = VolumeSliceOrderingService.AnalyzePositionSpacing(ordering);
+        if (positions.HasIrregularIntervals)
+        {
+            warnings.Add(DemoText.Get("OpenVolumeIrregularPositions"));
+        }
+        else if (positions.ConflictsWithDeclaredSpacing)
+        {
+            warnings.Add(DemoText.Get("OpenVolumeDepthSpacingConflict"));
+        }
+
+        if (positions.Interval is { } interval)
+        {
+            string source = positions.HasIrregularIntervals
+                ? DemoText.Get("OpenVolumeDepthSpacingApproximation")
+                : DemoText.Get("OpenVolumeDepthSpacingFromPosition");
+            return (interval, source);
+        }
+
+        return ResolveSpacing(ordering.Slices.Select(slice => slice.SpacingZ).ToArray(), 1.0, "Z", warnings);
     }
 
     private static (double Value, string Source) ResolveSpacing(
@@ -403,8 +477,8 @@ public partial class MainWindow : Window, IDisposable
             .ToArray();
         if (valid.Length == 0)
         {
-            warnings.Add(DemoText.Format("OpenVolumeSpacingWarning", axis));
-            return (fallback, "默认回退值 1.0 mm");
+            warnings.Add(DemoText.Format("OpenVolumeSpacingMissing", axis, fallback));
+            return (fallback, DemoText.Get("OpenVolumeSpacingDefaultSource"));
         }
 
         double selected = valid[0];
@@ -438,17 +512,6 @@ public partial class MainWindow : Window, IDisposable
         return checked((long)slices[0].PixelWidth * slices[0].PixelHeight * slices.Count * bytesPerPixel);
     }
 
-    private static BitmapSource LoadBitmap(string filePath)
-    {
-        var bitmap = new BitmapImage();
-        bitmap.BeginInit();
-        bitmap.CacheOption = BitmapCacheOption.OnLoad;
-        bitmap.UriSource = new Uri(filePath, UriKind.Absolute);
-        bitmap.EndInit();
-        bitmap.Freeze();
-        return bitmap;
-    }
-
     protected override void OnClosed(EventArgs e)
     {
         Dispose();
@@ -460,6 +523,7 @@ public partial class MainWindow : Window, IDisposable
         _openCancellation?.Cancel();
         _openCancellation?.Dispose();
         _openCancellation = null;
+        Viewer.Dispose();
         GC.SuppressFinalize(this);
     }
 }

@@ -1,5 +1,8 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using ImageViewer.Drawing;
@@ -58,6 +61,39 @@ namespace ImageViewerControl.Tests
 
         public List<RoiBase> AnalyzedRois { get; } = new();
 
+        /// <summary>预设同步吸附是否成功。</summary>
+        public bool EdgeSnapFound { get; set; }
+
+        public Point EdgeSnapPoint { get; set; }
+
+        public double EdgeSnapScore { get; set; } = 1.0;
+
+        public double EdgeSnapConfidence { get; set; } = 1.0;
+
+        /// <summary>异步吸附处理器；为 null 时按预设结果立即返回。</summary>
+        public Func<Point, CancellationToken, Task<EdgeSnapResult>>? SnapPointToEdgeAsyncHandler { get; set; }
+
+        /// <summary>true 时 <see cref="PostToUiThread"/> 立即执行；false 时排队等待测试线程刷新。</summary>
+        public bool PostToUiThreadInline { get; set; } = true;
+
+        public List<Point> SnapRequestPositions { get; } = new();
+
+        public List<CancellationToken> SnapRequestTokens { get; } = new();
+
+        public int SnapRequestCount => SnapRequestPositions.Count;
+
+        public int PendingPostedActionCount => _postedActions.Count;
+
+        private readonly Queue<Action> _postedActions = new();
+
+        public void FlushPostedActions()
+        {
+            while (_postedActions.Count > 0)
+            {
+                _postedActions.Dequeue()();
+            }
+        }
+
         public int CaptureCount { get; private set; }
 
         public int ReleaseCaptureCount { get; private set; }
@@ -87,10 +123,17 @@ namespace ImageViewerControl.Tests
             return CaptureResult;
         }
 
+        /// <summary>
+        /// Optional hook fired when capture is released, so a test can replay the real host behaviour
+        /// (rootGrid.LostMouseCapture → OnCaptureLost) that silently cancels a draw session.
+        /// </summary>
+        public Action? ReleaseCaptureCallback { get; set; }
+
         public void ReleaseMouseCapture()
         {
             _calls.Add(nameof(ReleaseMouseCapture));
             ReleaseCaptureCount++;
+            ReleaseCaptureCallback?.Invoke();
         }
 
         public void SetCursor(Cursor cursor)
@@ -116,6 +159,51 @@ namespace ImageViewerControl.Tests
             _calls.Add(nameof(TryApplyAnalysis));
             AnalyzedRois.Add(roi);
             return AnalysisResult;
+        }
+
+        public bool TrySnapPointToEdge(Point seed, out Point snapped, out double score, out double confidence)
+        {
+            _calls.Add(nameof(TrySnapPointToEdge));
+            if (EdgeSnapFound)
+            {
+                snapped = EdgeSnapPoint;
+                score = EdgeSnapScore;
+                confidence = EdgeSnapConfidence;
+                return true;
+            }
+
+            snapped = default;
+            score = 0;
+            confidence = 0;
+            return false;
+        }
+
+        public Task<EdgeSnapResult> SnapPointToEdgeAsync(Point seed, CancellationToken cancellationToken)
+        {
+            _calls.Add(nameof(SnapPointToEdgeAsync));
+            SnapRequestPositions.Add(seed);
+            SnapRequestTokens.Add(cancellationToken);
+            if (SnapPointToEdgeAsyncHandler is not null)
+            {
+                return SnapPointToEdgeAsyncHandler(seed, cancellationToken);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(EdgeSnapFound
+                ? new EdgeSnapResult(true, EdgeSnapPoint, EdgeSnapScore, EdgeSnapConfidence)
+                : EdgeSnapResult.NotFound);
+        }
+
+        public void PostToUiThread(Action action)
+        {
+            _calls.Add(nameof(PostToUiThread));
+            if (PostToUiThreadInline)
+            {
+                action();
+                return;
+            }
+
+            _postedActions.Enqueue(action);
         }
 
         public void Commit(RoiBase roi)

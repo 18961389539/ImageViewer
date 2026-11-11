@@ -71,6 +71,8 @@ namespace ImageViewer.Controls
             // 内部承载的查看器与自适应面板共享同一套配色，一并切换。
             _imageViewer.Theme = Theme;
             _imageViewer.ThemeDictionary = ThemeDictionary;
+            _volumeViewer.Theme = Theme;
+            _volumeViewer.ThemeDictionary = ThemeDictionary;
             _volume3DViewer.Theme = Theme;
             _volume3DViewer.ThemeDictionary = ThemeDictionary;
         }
@@ -80,7 +82,22 @@ namespace ImageViewer.Controls
             string data = _volume == null
                 ? (_imageSource == null ? UiText.Get("StatusNoDataLoaded") : UiText.Get("StatusSingleImage"))
                 : UiText.Format("StatusVolumeSummary", _volume.Width, _volume.Height, _volume.Depth, _volume.SpacingX, _volume.SpacingY, _volume.SpacingZ);
-            statusText.Text = data;
+            if (_isMprRebuilding)
+            {
+                statusText.Text = UiText.Get("AdaptiveMprRebuilding");
+            }
+            else if (_volume != null && _readyMprMode == _displayMode)
+            {
+                UpdateMprStatus(_displayMode, GetMprSliceIndex(_displayMode), _volume);
+            }
+            else if (_volume != null && _displayMode == AdaptiveDisplayMode.AxialSlice)
+            {
+                UpdateAxialStatus(_volume);
+            }
+            else
+            {
+                statusText.Text = data;
+            }
             stateBarText.Text = UiText.Format("StatusModeFormat", LocalizeMode(ResolveMode()), data);
             UpdateMprSliceControl(ResolveMode());
         }
@@ -108,7 +125,7 @@ namespace ImageViewer.Controls
             sagittalButton.IsEnabled = hasVolume && !operationActive;
             qualityButton.IsEnabled = hasVolume && !operationActive;
             segmentButton.IsEnabled = hasVolume && !operationActive;
-            cancelButton.IsEnabled = operationActive;
+            cancelButton.IsEnabled = operationActive || _isMprRebuilding;
             bool isMpr = hasVolume && (_displayMode == AdaptiveDisplayMode.Coronal || _displayMode == AdaptiveDisplayMode.Sagittal);
             mprSliceSlider.IsEnabled = isMpr && !operationActive;
             mprPreviousButton.IsEnabled = isMpr && !operationActive && mprSliceSlider.Value > mprSliceSlider.Minimum;

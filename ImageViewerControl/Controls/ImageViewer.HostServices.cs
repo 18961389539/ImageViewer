@@ -498,9 +498,9 @@ namespace ImageViewer.Controls
                 _timer.Tick -= OnTick;
             }
 
-            private async void OnTick(object? sender, EventArgs e)
+            private void OnTick(object? sender, EventArgs e)
             {
-                await OnTickAsync();
+                _ = OnTickAsync();
             }
 
             private async Task OnTickAsync()

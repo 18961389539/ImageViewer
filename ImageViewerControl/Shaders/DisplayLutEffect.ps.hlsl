@@ -26,24 +26,33 @@ float4 main(float2 uv : TEXCOORD) : COLOR
         return inputColor;
     }
 
+    // WPF 的 ShaderEffect 输入是预乘 alpha；先恢复直通颜色再计算强度，
+    // 输出也必须重新预乘，否则半透明边缘会变亮或发灰。
+    float alpha = inputColor.a;
+    if (alpha <= 0.0001)
+    {
+        return float4(0.0, 0.0, 0.0, 0.0);
+    }
+
+    float3 straightInput = inputColor.rgb / alpha;
     float3 color;
     if (LutMode < 1.5)
     {
         // 与 ImageViewerPixelAccess.ReadIntensity 同一组权重。
-        float intensity = saturate(dot(inputColor.rgb, float3(0.299, 0.587, 0.114)));
+        float intensity = saturate(dot(straightInput, float3(0.299, 0.587, 0.114)));
         color = tex2D(DisplayLut, float2(lutU(intensity), 0.5)).rgb;
     }
     else
     {
         float2 lutRow = float2(0.0, 0.5);
-        lutRow.x = lutU(inputColor.r);
+        lutRow.x = lutU(straightInput.r);
         float4 red = tex2D(DisplayLut, lutRow);
-        lutRow.x = lutU(inputColor.g);
+        lutRow.x = lutU(straightInput.g);
         float4 green = tex2D(DisplayLut, lutRow);
-        lutRow.x = lutU(inputColor.b);
+        lutRow.x = lutU(straightInput.b);
         float4 blue = tex2D(DisplayLut, lutRow);
         color = float3(red.r, green.g, blue.b);
     }
 
-    return float4(color, inputColor.a);
+    return float4(color * alpha, alpha);
 }

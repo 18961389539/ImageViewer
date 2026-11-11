@@ -16,6 +16,8 @@ namespace ImageViewer.Models
 
         public override string RoiTypeName => nameof(FittedEllipseRoi);
 
+        internal bool HasFitEvidence => SourcePointCount > 0 || FitInlierCount > 0;
+
         public int SourcePointCount
         {
             get => _sourcePointCount;

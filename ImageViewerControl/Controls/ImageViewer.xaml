@@ -288,12 +288,11 @@
                     </Style>
                 </ContextMenu.Resources>
                 <MenuItem Header="{Binding DataContext.ImageLoadStatusText, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                          IsEnabled="False"
+                          Click="OnRetryImageLoadClick"
+                          IsEnabled="{Binding DataContext.CanRetryImageLoad, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                          ToolTip="{localization:UiText ImageLoadRetry}"
                           Foreground="{DynamicResource ViewerErrorBrush}"
                           Visibility="{Binding DataContext.ImageLoadHasError, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                <MenuItem Header="{localization:UiText ImageLoadRetry}"
-                          Click="OnRetryImageLoadClick"
-                          Visibility="{Binding DataContext.CanRetryImageLoad, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 <Separator Visibility="{Binding DataContext.ImageLoadHasError, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 <MenuItem x:Name="openImageMenuItem" x:FieldModifier="internal" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.OpenImage}" Header="{localization:UiText MenuOpenImageFile}" InputGestureText="Ctrl+O" />
                 <MenuItem x:Name="saveSessionMenuItem" x:FieldModifier="internal" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.SaveSession}" Header="{localization:UiText MenuSaveSession}" InputGestureText="Ctrl+S" IsEnabled="{Binding MenuState.File.SaveSessionEnabled}" />
@@ -302,6 +301,7 @@
                 <MenuItem x:Name="redoMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.Redo}" Header="{localization:UiText MenuRedo}" InputGestureText="Ctrl+Y" IsEnabled="{Binding MenuState.Context.RedoEnabled}" />
                 <Separator />
                 <MenuItem x:Name="fitToViewMenuItem" x:FieldModifier="internal" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.FitToView}" Header="{localization:UiText MenuFitToView}" InputGestureText="Ctrl+F" IsEnabled="{Binding MenuState.View.FitToViewEnabled}" />
+                <MenuItem x:Name="fillToViewMenuItem" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.FillToView}" Header="{localization:UiText MenuFillToView}" IsEnabled="{Binding MenuState.View.FitToViewEnabled}" />
                 <MenuItem x:Name="actualSizeMenuItem" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ActualSize}" Header="{localization:UiText MenuActualSize}" IsEnabled="{Binding MenuState.View.ActualSizeEnabled}" />
                 <MenuItem x:Name="resetViewMenuItem" x:FieldModifier="internal" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ResetView}" Header="{localization:UiText MenuResetView}" InputGestureText="Ctrl+0" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
                 <MenuItem x:Name="editPropertiesMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.EditProperties}" Header="{localization:UiText MenuEditProperties}" IsEnabled="{Binding MenuState.Context.EditPropertiesEnabled}" Visibility="{Binding MenuState.Context.EditPropertiesEnabled, Converter={StaticResource BooleanToVisibilityConverter}}" />
@@ -319,18 +319,31 @@
                 </MenuItem>
                 <MenuItem x:Name="drawRoiMenuItem" x:FieldModifier="internal" Header="{localization:UiText MenuDraw}" ToolTip="{localization:UiText MenuDrawTooltip}" IsEnabled="{Binding MenuState.Context.DrawRoiEnabled}" />
                 <MenuItem x:Name="measureMenuItem" Header="{localization:UiText MenuMeasure}">
+                    <MenuItem x:Name="advancedMeasurementsMenuItem" Click="OnAdvancedMeasurementsClick" Header="{localization:UiText AdvancedMeasurementDialogTitle}" />
+                    <MenuItem Header="{localization:UiText MenuRecipe}">
+                        <MenuItem x:Name="saveRecipeMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.SaveRecipe}" Header="{localization:UiText MenuSaveRecipe}" IsEnabled="{Binding MenuState.File.SaveRoisEnabled}" ToolTip="{localization:UiText TooltipSaveRecipe}" />
+                        <MenuItem x:Name="loadRecipeMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.LoadRecipe}" Header="{localization:UiText MenuLoadRecipe}" ToolTip="{localization:UiText TooltipLoadRecipe}" />
+                        <Separator />
+                        <MenuItem Header="{localization:UiText MenuRecipeReferenceDatums}">
+                            <MenuItem Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.CaptureRecipeReferenceDatum1}" Header="{localization:UiText MenuRecipeReferenceDatum1}" />
+                            <MenuItem Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.CaptureRecipeReferenceDatum2}" Header="{localization:UiText MenuRecipeReferenceDatum2}" />
+                        </MenuItem>
+                        <MenuItem Header="{localization:UiText MenuRecipeCurrentDatums}">
+                            <MenuItem Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.CaptureCurrentAlignmentDatum1}" Header="{localization:UiText MenuRecipeCurrentDatum1}" />
+                            <MenuItem Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.CaptureCurrentAlignmentDatum2}" Header="{localization:UiText MenuRecipeCurrentDatum2}" />
+                        </MenuItem>
+                        <MenuItem Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.LoadAlignedRecipe}" Header="{localization:UiText MenuLoadAlignedRecipe}" ToolTip="{localization:UiText TooltipLoadAlignedRecipe}" />
+                    </MenuItem>
+                    <Separator />
                     <MenuItem x:Name="gradientDetectMenuItem" Click="OnFeatureMenuCommandClick" Tag="{x:Static controls:ImageViewerFeatureMenuTags.GradientDetect}" Header="{localization:UiText MenuGradientAlignCaliper}" IsEnabled="{Binding MenuState.Context.GradientDetectEnabled}" />
                 </MenuItem>
                 <MenuItem x:Name="roiOperationsMenuItem" Header="{localization:UiText MenuRoiOperations}">
                     <MenuItem x:Name="deleteRoiMenuItem" x:FieldModifier="internal" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.DeleteSelected}" Header="{localization:UiText MenuDeleteSelectedRoi}" ToolTip="{localization:UiText RoiDestructiveActionUndoHint}" IsEnabled="{Binding MenuState.Context.DeleteSelectedEnabled}" Visibility="{Binding MenuState.Context.DeleteSelectedEnabled, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     <MenuItem x:Name="clearAllMenuItem" x:FieldModifier="internal" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.ClearAll}" Header="{localization:UiText MenuClearAllRois}" ToolTip="{localization:UiText RoiClearAllUndoHint}" IsEnabled="{Binding MenuState.Context.ClearAllEnabled}" />
-                    <Separator />
-                    <MenuItem x:Name="calibratePixelsMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.CalibratePixels}" Header="{localization:UiText MenuCalibratePixels}" IsEnabled="{Binding MenuState.Context.CalibratePixelsEnabled}" Visibility="{Binding MenuState.Context.CalibratePixelsEnabled, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                    <Separator />
-                    <MenuItem x:Name="showRoiListMenuItem" Header="{localization:UiText MenuShowRoiList}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleRoiList}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowRoiListChecked}" />
                 </MenuItem>
                 <MenuItem Header="{localization:UiText MenuFileAndProjects}">
                     <MenuItem x:Name="loadSessionMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.LoadSession}" Header="{localization:UiText MenuOpenProjectOrSession}" />
+                    <MenuItem Click="OnRecoverAutoSaveClick" Header="{localization:UiText RecoveryPickerTitle}" />
                     <MenuItem x:Name="recentProjectsMenuItem" Header="{localization:UiText MenuRecentProjects}" ItemsSource="{Binding MenuState.File.RecentProjects}" IsEnabled="{Binding MenuState.File.RecentProjectsEnabled}">
                         <MenuItem.ItemContainerStyle>
                             <Style TargetType="{x:Type MenuItem}">
@@ -346,71 +359,63 @@
                     <MenuItem x:Name="saveRoisMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.SaveRois}" Header="{localization:UiText MenuSaveRois}" IsEnabled="{Binding MenuState.File.SaveRoisEnabled}" />
                     <MenuItem x:Name="loadRoisMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.LoadRois}" Header="{localization:UiText MenuLoadRois}" />
                     <Separator />
-                    <MenuItem x:Name="saveRecipeMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.SaveRecipe}" Header="{localization:UiText MenuSaveRecipe}" IsEnabled="{Binding MenuState.File.SaveRoisEnabled}" ToolTip="{localization:UiText TooltipSaveRecipe}" />
-                    <MenuItem x:Name="loadRecipeMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.LoadRecipe}" Header="{localization:UiText MenuLoadRecipe}" ToolTip="{localization:UiText TooltipLoadRecipe}" />
-                    <MenuItem Header="{localization:UiText MenuRecipeReferenceDatums}">
-                        <MenuItem Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.CaptureRecipeReferenceDatum1}" Header="{localization:UiText MenuRecipeReferenceDatum1}" />
-                        <MenuItem Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.CaptureRecipeReferenceDatum2}" Header="{localization:UiText MenuRecipeReferenceDatum2}" />
+                    <MenuItem Header="{localization:UiText MenuCalibration}">
+                        <MenuItem x:Name="calibratePixelsMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.CalibratePixels}" Header="{localization:UiText MenuCalibratePixels}" IsEnabled="{Binding MenuState.Context.CalibratePixelsEnabled}" Visibility="{Binding MenuState.Context.CalibratePixelsEnabled, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        <MenuItem x:Name="checkCalibrationReadinessMenuItem" Click="OnFeatureMenuCommandClick" Tag="{x:Static controls:ImageViewerFeatureMenuTags.CheckCalibrationReadiness}" Header="{localization:UiText MenuCheckCalibrationReadiness}" ToolTip="{localization:UiText ToolbarCalibrationCheckTooltip}" />
                     </MenuItem>
-                    <MenuItem Header="{localization:UiText MenuRecipeCurrentDatums}">
-                        <MenuItem Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.CaptureCurrentAlignmentDatum1}" Header="{localization:UiText MenuRecipeCurrentDatum1}" />
-                        <MenuItem Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.CaptureCurrentAlignmentDatum2}" Header="{localization:UiText MenuRecipeCurrentDatum2}" />
-                    </MenuItem>
-                    <MenuItem Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.LoadAlignedRecipe}" Header="{localization:UiText MenuLoadAlignedRecipe}" ToolTip="{localization:UiText TooltipLoadAlignedRecipe}" />
                     <Separator />
                     <MenuItem x:Name="exportProjectPackageMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.ExportProjectPackage}" Header="{localization:UiText MenuExportProjectPackage}" IsEnabled="{Binding MenuState.File.ExportProjectPackageEnabled}" />
                     <MenuItem x:Name="autoSaveMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.ToggleAutoSave}" Header="{localization:UiText MenuAutoSave}" IsCheckable="True" IsChecked="{Binding MenuState.File.AutoSaveChecked}" />
                 </MenuItem>
                 <MenuItem Header="{localization:UiText MenuViewControl}">
-                    <MenuItem Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.FillToView}" Header="{localization:UiText MenuFillToView}" IsEnabled="{Binding MenuState.View.FitToViewEnabled}" />
-                    <Separator />
                     <MenuItem Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.RotateLeft}" Header="{localization:UiText MenuRotateLeft}" InputGestureText="Ctrl+Shift+R" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
                     <MenuItem Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.RotateRight}" Header="{localization:UiText MenuRotateRight}" InputGestureText="Ctrl+R" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
                     <MenuItem Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.FlipHorizontal}" Header="{localization:UiText MenuFlipHorizontal}" InputGestureText="Ctrl+H" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
                     <MenuItem Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.FlipVertical}" Header="{localization:UiText MenuFlipVertical}" InputGestureText="Ctrl+Shift+H" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
                 </MenuItem>
                 <MenuItem Header="{localization:UiText MenuImageDisplay}">
-                    <MenuItem x:Name="smartDisplaySuggestionMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ShowSmartDisplaySuggestion}" Header="{localization:UiText MenuSmartDisplaySuggestion}" IsEnabled="{Binding MenuState.Analysis.EnableRefreshAnalysis}" />
-                    <MenuItem x:Name="displayAdjustmentMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ShowDisplayAdjustment}" Header="{localization:UiText MenuDisplayAdjustment}" ToolTip="{localization:UiText TooltipDisplayAdjustment}" IsEnabled="{Binding MenuState.Analysis.EnableRefreshAnalysis}" />
-                    <MenuItem x:Name="resetDisplayAdjustmentMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ResetDisplayAdjustment}" Header="{localization:UiText MenuResetDisplayAdjustment}" IsEnabled="{Binding MenuState.Analysis.EnableRefreshAnalysis}" />
-                    <MenuItem Header="{localization:UiText MenuPseudoColorStrategy}">
-                        <MenuItem x:Name="preferShaderPseudoColorMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.TogglePreferShaderPseudoColor}" Header="{localization:UiText MenuPreferShaderPseudoColor}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PreferShaderPseudoColorChecked}" />
-                        <MenuItem x:Name="allowCpuPseudoColorFallbackMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ToggleAllowCpuPseudoColorFallback}" Header="{localization:UiText MenuAllowCpuFallback}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.AllowCpuPseudoColorFallbackChecked}" />
+                    <MenuItem Header="{localization:UiText MenuImageAdjustment}">
+                        <MenuItem x:Name="smartDisplaySuggestionMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ShowSmartDisplaySuggestion}" Header="{localization:UiText MenuSmartDisplaySuggestion}" IsEnabled="{Binding MenuState.Analysis.EnableRefreshAnalysis}" />
+                        <MenuItem x:Name="displayAdjustmentMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ShowDisplayAdjustment}" Header="{localization:UiText MenuDisplayAdjustment}" ToolTip="{localization:UiText TooltipDisplayAdjustment}" IsEnabled="{Binding MenuState.Analysis.EnableRefreshAnalysis}" />
+                        <MenuItem x:Name="resetDisplayAdjustmentMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ResetDisplayAdjustment}" Header="{localization:UiText MenuResetDisplayAdjustment}" IsEnabled="{Binding MenuState.Analysis.EnableRefreshAnalysis}" />
+                        <Separator />
+                        <MenuItem x:Name="pseudoColorMenuItem" x:FieldModifier="internal" Header="{localization:UiText MenuPseudoColor}">
+                            <MenuItem Header="{localization:UiText MenuPseudoColorOriginal}" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.SetPseudoColorPaletteNone}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PseudoColorNoneChecked}" />
+                            <MenuItem Header="{localization:UiText MenuPseudoColorHot}" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.SetPseudoColorPaletteHot}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PseudoColorHotChecked}" />
+                            <MenuItem Header="{localization:UiText MenuPseudoColorJet}" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.SetPseudoColorPaletteJet}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PseudoColorJetChecked}" />
+                            <MenuItem Header="{localization:UiText MenuPseudoColorViridis}" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.SetPseudoColorPaletteViridis}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PseudoColorViridisChecked}" />
+                        </MenuItem>
                     </MenuItem>
-                    <MenuItem x:Name="pseudoColorMenuItem" x:FieldModifier="internal" Header="{localization:UiText MenuPseudoColor}">
-                        <MenuItem Header="{localization:UiText MenuPseudoColorOriginal}" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.SetPseudoColorPaletteNone}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PseudoColorNoneChecked}" />
-                        <MenuItem Header="{localization:UiText MenuPseudoColorHot}" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.SetPseudoColorPaletteHot}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PseudoColorHotChecked}" />
-                        <MenuItem Header="{localization:UiText MenuPseudoColorJet}" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.SetPseudoColorPaletteJet}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PseudoColorJetChecked}" />
-                        <MenuItem Header="{localization:UiText MenuPseudoColorViridis}" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.SetPseudoColorPaletteViridis}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PseudoColorViridisChecked}" />
+                    <MenuItem Header="{localization:UiText MenuDisplayOverlays}">
+                        <MenuItem x:Name="showToolbarMenuItem" x:FieldModifier="internal" Header="{localization:UiText MenuShowToolbar}" ToolTip="{localization:UiText MenuShowToolbarTooltip}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleToolbar}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowToolbarChecked}" />
+                        <MenuItem x:Name="showInfoPanelMenuItem" x:FieldModifier="internal" Header="{localization:UiText MenuShowInfoPanel}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleInfoPanel}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowInfoPanelChecked}" />
+                        <MenuItem x:Name="showRoiListMenuItem" Header="{localization:UiText MenuShowRoiList}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleRoiList}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowRoiListChecked}" />
+                        <Separator />
+                        <MenuItem x:Name="showPixelGridMenuItem" Header="{localization:UiText MenuShowPixelGrid}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.TogglePixelGrid}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowPixelGridChecked}" />
+                        <MenuItem x:Name="showSnapGridMenuItem" Header="{localization:UiText MenuShowSnapGrid}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleSnapGrid}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowSnapGridChecked}" />
+                        <MenuItem x:Name="enableSnapToGridMenuItem" Header="{localization:UiText MenuEnableSnapToGrid}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleSnapToGrid}" IsCheckable="True" IsChecked="{Binding MenuState.View.EnableSnapToGridChecked}" />
+                        <Separator />
+                        <MenuItem x:Name="showCrosshairMenuItem" Header="{localization:UiText MenuShowCrosshair}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleCrosshair}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowCrosshairChecked}" />
+                        <MenuItem x:Name="showCaliperScoresMenuItem" Header="{localization:UiText MenuShowCaliperScores}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleCaliperScores}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowCaliperScoresChecked}" />
+                        <Separator />
+                        <MenuItem x:Name="showHistogramMenuItem" Header="{localization:UiText MenuShowHistogram}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleHistogram}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowHistogramChecked}" />
+                        <MenuItem x:Name="pauseRealtimeHistogramMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.TogglePauseRealtimeHistogram}" Header="{localization:UiText MenuPauseRealtimeHistogram}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PauseRealtimeHistogramChecked}" IsEnabled="{Binding MenuState.Analysis.PauseRealtimeHistogramEnabled}" />
+                        <MenuItem x:Name="showProfileMenuItem" Header="{localization:UiText MenuShowProfile}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleProfile}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowProfileChecked}" />
+                        <MenuItem x:Name="pauseRealtimeProfileMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.TogglePauseRealtimeProfile}" Header="{localization:UiText MenuPauseRealtimeProfile}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PauseRealtimeProfileChecked}" IsEnabled="{Binding MenuState.Analysis.PauseRealtimeProfileEnabled}" />
+                        <MenuItem x:Name="showScaleBarMenuItem" Header="{localization:UiText MenuShowScaleBar}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleScaleBar}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowScaleBarChecked}" />
                     </MenuItem>
-                    <Separator />
-                    <MenuItem x:Name="showToolbarMenuItem" x:FieldModifier="internal" Header="{localization:UiText MenuShowToolbar}" ToolTip="{localization:UiText MenuShowToolbarTooltip}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleToolbar}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowToolbarChecked}" />
-                    <MenuItem x:Name="showPixelGridMenuItem" Header="{localization:UiText MenuShowPixelGrid}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.TogglePixelGrid}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowPixelGridChecked}" />
-                    <MenuItem x:Name="showSnapGridMenuItem" Header="{localization:UiText MenuShowSnapGrid}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleSnapGrid}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowSnapGridChecked}" />
-                    <MenuItem x:Name="enableSnapToGridMenuItem" Header="{localization:UiText MenuEnableSnapToGrid}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleSnapToGrid}" IsCheckable="True" IsChecked="{Binding MenuState.View.EnableSnapToGridChecked}" />
-                    <Separator />
-                    <MenuItem x:Name="showCrosshairMenuItem" Header="{localization:UiText MenuShowCrosshair}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleCrosshair}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowCrosshairChecked}" />
-                    <MenuItem x:Name="showCaliperScoresMenuItem" Header="{localization:UiText MenuShowCaliperScores}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleCaliperScores}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowCaliperScoresChecked}" />
-                    <Separator />
-                    <MenuItem x:Name="showInfoPanelMenuItem" x:FieldModifier="internal" Header="{localization:UiText MenuShowInfoPanel}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleInfoPanel}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowInfoPanelChecked}" />
-                    <MenuItem x:Name="showHistogramMenuItem" Header="{localization:UiText MenuShowHistogram}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleHistogram}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowHistogramChecked}" />
-                    <MenuItem x:Name="showProfileMenuItem" Header="{localization:UiText MenuShowProfile}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleProfile}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowProfileChecked}" />
-                    <MenuItem x:Name="showScaleBarMenuItem" Header="{localization:UiText MenuShowScaleBar}" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ToggleScaleBar}" IsCheckable="True" IsChecked="{Binding MenuState.View.ShowScaleBarChecked}" />
                 </MenuItem>
                 <MenuItem Header="{localization:UiText MenuAnalysisAndExport}">
-                    <MenuItem x:Name="advancedMeasurementsMenuItem" Click="OnAdvancedMeasurementsClick" Header="{localization:UiText AdvancedMeasurementDialogTitle}" />
                     <MenuItem x:Name="exportSnapshotMenuItem" x:FieldModifier="internal" Click="OnFeatureMenuCommandClick" Tag="{x:Static controls:ImageViewerFeatureMenuTags.ExportSnapshot}" Header="{localization:UiText MenuExportCurrentViewPng}" IsEnabled="{Binding MenuState.Context.ExportSnapshotEnabled}" />
                     <MenuItem x:Name="exportAnalysisCsvMenuItem" Click="OnFeatureMenuCommandClick" Tag="{x:Static controls:ImageViewerFeatureMenuTags.ExportAnalysisCsv}" Header="{localization:UiText MenuExportAnalysisCsv}" IsEnabled="{Binding MenuState.Context.ExportAnalysisCsvEnabled}" />
                     <MenuItem x:Name="exportBatchAnalysisCsvMenuItem" Click="OnFeatureMenuCommandClick" Tag="{x:Static controls:ImageViewerFeatureMenuTags.ExportBatchAnalysisCsv}" Header="{localization:UiText MenuExportBatchAnalysisCsv}" IsEnabled="{Binding MenuState.Context.ExportAnalysisCsvEnabled}" />
+                    <Separator />
                     <MenuItem x:Name="showAnalysisSummaryMenuItem" Click="OnFeatureMenuCommandClick" Tag="{x:Static controls:ImageViewerFeatureMenuTags.ShowAnalysisSummary}" Header="{localization:UiText MenuShowAnalysisSummary}" IsEnabled="{Binding MenuState.Context.ShowAnalysisSummaryEnabled}" />
                     <MenuItem x:Name="showProcessCapabilityMenuItem" Click="OnFeatureMenuCommandClick" Tag="{x:Static controls:ImageViewerFeatureMenuTags.ShowProcessCapability}" Header="{localization:UiText MenuShowProcessCapability}" ToolTip="{localization:UiText TooltipShowProcessCapability}" IsEnabled="{Binding MenuState.Context.ShowAnalysisSummaryEnabled}" />
                     <MenuItem x:Name="printReportMenuItem" Click="OnFeatureMenuCommandClick" Tag="{x:Static controls:ImageViewerFeatureMenuTags.PrintReport}" Header="{localization:UiText MenuPrintReport}" ToolTip="{localization:UiText TooltipPrintReport}" IsEnabled="{Binding MenuState.Context.ShowAnalysisSummaryEnabled}" />
-                    <MenuItem x:Name="checkCalibrationReadinessMenuItem" Click="OnFeatureMenuCommandClick" Tag="{x:Static controls:ImageViewerFeatureMenuTags.CheckCalibrationReadiness}" Header="{localization:UiText MenuCheckCalibrationReadiness}" ToolTip="{localization:UiText ToolbarCalibrationCheckTooltip}" />
                     <Separator />
                     <MenuItem Header="{localization:UiText MenuAnalysisRun}">
                         <MenuItem x:Name="enableAsyncAnalysisMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ToggleAsyncAnalysis}" Header="{localization:UiText MenuEnableAsyncAnalysis}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.EnableAsyncAnalysisChecked}" />
-                        <MenuItem x:Name="pauseRealtimeHistogramMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.TogglePauseRealtimeHistogram}" Header="{localization:UiText MenuPauseRealtimeHistogram}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PauseRealtimeHistogramChecked}" IsEnabled="{Binding MenuState.Analysis.PauseRealtimeHistogramEnabled}" />
-                        <MenuItem x:Name="pauseRealtimeProfileMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.TogglePauseRealtimeProfile}" Header="{localization:UiText MenuPauseRealtimeProfile}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PauseRealtimeProfileChecked}" IsEnabled="{Binding MenuState.Analysis.PauseRealtimeProfileEnabled}" />
                         <MenuItem x:Name="refreshAnalysisMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.RefreshAnalysis}" Header="{localization:UiText MenuRefreshAnalysis}" IsEnabled="{Binding MenuState.Analysis.EnableRefreshAnalysis}" />
                     </MenuItem>
                 </MenuItem>
@@ -421,7 +426,12 @@
                         <MenuItem x:Name="enableTiledRenderingMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ToggleTiledRendering}" Header="{localization:UiText MenuEnableTiledRendering}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.EnableTiledRenderingChecked}" />
                         <MenuItem x:Name="prefetchAdjacentTilesMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.TogglePrefetchAdjacentTiles}" Header="{localization:UiText MenuPrefetchAdjacentTiles}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PrefetchAdjacentTilesChecked}" IsEnabled="{Binding MenuState.Analysis.PrefetchAdjacentTilesEnabled}" />
                         <MenuItem x:Name="gpuRenderingMenuItem" Header="{localization:UiText MenuEnableGpuViewportCache}" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ToggleGpuRendering}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.GpuRenderingChecked}" />
-                        <Separator />
+                        <MenuItem Header="{localization:UiText MenuPseudoColorStrategy}">
+                            <MenuItem x:Name="preferShaderPseudoColorMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.TogglePreferShaderPseudoColor}" Header="{localization:UiText MenuPreferShaderPseudoColor}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.PreferShaderPseudoColorChecked}" />
+                            <MenuItem x:Name="allowCpuPseudoColorFallbackMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ToggleAllowCpuPseudoColorFallback}" Header="{localization:UiText MenuAllowCpuFallback}" IsCheckable="True" IsChecked="{Binding MenuState.Analysis.AllowCpuPseudoColorFallbackChecked}" />
+                        </MenuItem>
+                    </MenuItem>
+                    <MenuItem Header="{localization:UiText MenuCacheMaintenance}">
                         <MenuItem x:Name="clearPyramidCacheMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ClearPyramidCache}" Header="{localization:UiText MenuClearPyramidCache}" IsEnabled="{Binding MenuState.Analysis.EnableClearPyramidCache}" />
                         <MenuItem x:Name="clearAnalysisCacheMenuItem" Click="OnAnalysisCommandMenuClick" Tag="{x:Static controls:ImageViewerAnalysisMenuTags.ClearAnalysisCache}" Header="{localization:UiText MenuClearAnalysisCache}" IsEnabled="{Binding MenuState.Analysis.EnableClearAnalysisCache}" />
                     </MenuItem>

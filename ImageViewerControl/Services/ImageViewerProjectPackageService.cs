@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -49,40 +50,39 @@ namespace ImageViewer.Services
                 directory ?? Directory.GetCurrentDirectory(),
                 $".{Path.GetFileName(fullPackagePath)}.{Guid.NewGuid():N}.tmp");
 
-            string? imagePath = snapshot.ImagePath;
-            string? packagedImagePath = null;
-            if (!string.IsNullOrWhiteSpace(imagePath) && File.Exists(imagePath))
-            {
-                packagedImagePath = $"{AssetFolderName}/{Path.GetFileName(imagePath)}";
-            }
-
-            string sessionJson = _sessionService.SerializeSession(
-                Path.GetFileNameWithoutExtension(fullPackagePath),
-                // A package may only refer to assets that it actually contains. Missing
-                // source images are represented as an empty image reference instead of
-                // carrying an external path into a portable package.
-                snapshot with { ImagePath = packagedImagePath },
-                pluginRegistry);
-            if (Encoding.UTF8.GetByteCount(sessionJson) > MaximumSessionEntryUncompressedBytes)
-            {
-                throw new InvalidDataException($"The session entry exceeds the maximum uncompressed size of {MaximumSessionEntryUncompressedBytes} bytes.");
-            }
-
-            if (!string.IsNullOrWhiteSpace(imagePath) && !string.IsNullOrWhiteSpace(packagedImagePath))
-            {
-                long imageLength = new FileInfo(imagePath).Length;
-                if (imageLength > MaximumArchiveEntryUncompressedBytes)
-                {
-                    throw new InvalidDataException($"The image asset exceeds the maximum uncompressed size of {MaximumArchiveEntryUncompressedBytes} bytes.");
-                }
-            }
-
+            string? temporaryImagePath = null;
             try
             {
+                string? imagePath = snapshot.ImagePath;
+                string? packagedImagePath = null;
+                using FileStream? cacheLease = snapshot.InMemoryImage == null
+                    ? await Task.Run(() => ImageViewerProjectPackageCache.TryLeaseAsset(imagePath, cancellationToken),
+                        cancellationToken).ConfigureAwait(false)
+                    : null;
+                if (snapshot.InMemoryImage is { } bitmap)
+                {
+                    string encodedPath = temporaryPackagePath + ".png";
+                    temporaryImagePath = encodedPath;
+                    await Task.Run(() => ImageViewerSnapshotImage.WritePng(encodedPath, bitmap, cancellationToken),
+                        cancellationToken).ConfigureAwait(false);
+                    imagePath = encodedPath;
+                    packagedImagePath = $"{AssetFolderName}/image.png";
+                }
+                else if (!string.IsNullOrWhiteSpace(imagePath) && File.Exists(imagePath))
+                {
+                    packagedImagePath = $"{AssetFolderName}/{Path.GetFileName(imagePath)}";
+                }
+
+                if (packagedImagePath == null && snapshot.ImageSha256 != null)
+                {
+                    throw new FileNotFoundException("The original image is missing.", imagePath);
+                }
+
                 // Packaging compresses the whole image, so it runs on a background thread:
                 // doing it inline would freeze the UI for as long as Optimal compression takes.
                 await Task.Run(
-                    () => WritePackageAsync(temporaryPackagePath, sessionJson, imagePath, packagedImagePath, cancellationToken),
+                    () => WritePackageAsync(temporaryPackagePath, Path.GetFileNameWithoutExtension(fullPackagePath),
+                        snapshot, pluginRegistry, imagePath, packagedImagePath, cancellationToken),
                     cancellationToken).ConfigureAwait(false);
 
                 cancellationToken.ThrowIfCancellationRequested();
@@ -90,10 +90,8 @@ namespace ImageViewer.Services
             }
             finally
             {
-                if (File.Exists(temporaryPackagePath))
-                {
-                    File.Delete(temporaryPackagePath);
-                }
+                ImageViewerAtomicFile.TryDelete(temporaryImagePath);
+                ImageViewerAtomicFile.TryDelete(temporaryPackagePath);
             }
         }
 
@@ -102,14 +100,34 @@ namespace ImageViewer.Services
         /// Chinese: 由 <see cref="ExportAsync"/> 在后台线程调用；图片用异步流拷贝，因此超大图导出也能响应取消。
         /// English: Runs on a background thread; the image asset is copied with an async stream so large exports stay cancellable.
         /// </summary>
-        private static async Task WritePackageAsync(
+        private async Task WritePackageAsync(
             string temporaryPackagePath,
-            string sessionJson,
+            string sessionName,
+            ImageViewerPersistenceSnapshot snapshot,
+            RoiPluginRegistry pluginRegistry,
             string? imagePath,
             string? packagedImagePath,
             CancellationToken cancellationToken)
         {
             using var archive = ZipFile.Open(temporaryPackagePath, ZipArchiveMode.Create);
+
+            string? sha256 = null;
+            if (imagePath != null && packagedImagePath != null)
+            {
+                sha256 = await AddFileEntryAsync(archive, packagedImagePath, imagePath, cancellationToken).ConfigureAwait(false);
+                if (snapshot.InMemoryImage == null)
+                {
+                    ImageViewerSessionImageIdentity.Verify(snapshot.ImageSha256, sha256, imagePath);
+                }
+            }
+
+            // The digest covers exactly the bytes copied into the archive.
+            string sessionJson = _sessionService.SerializeSession(sessionName,
+                snapshot with { ImagePath = packagedImagePath, InMemoryImage = null, ImageSha256 = sha256 }, pluginRegistry);
+            if (Encoding.UTF8.GetByteCount(sessionJson) > MaximumSessionEntryUncompressedBytes)
+            {
+                throw new InvalidDataException($"The session entry exceeds the maximum uncompressed size of {MaximumSessionEntryUncompressedBytes} bytes.");
+            }
 
             ZipArchiveEntry sessionEntry = archive.CreateEntry(SessionEntryName, CompressionLevel.Optimal);
             await using (Stream sessionStream = sessionEntry.Open())
@@ -117,14 +135,9 @@ namespace ImageViewer.Services
                 await using var writer = new StreamWriter(sessionStream);
                 await writer.WriteAsync(sessionJson.AsMemory(), cancellationToken).ConfigureAwait(false);
             }
-
-            if (!string.IsNullOrWhiteSpace(packagedImagePath) && !string.IsNullOrWhiteSpace(imagePath))
-            {
-                await AddFileEntryAsync(archive, packagedImagePath, imagePath, cancellationToken).ConfigureAwait(false);
-            }
         }
 
-        private static async Task AddFileEntryAsync(
+        private static async Task<string> AddFileEntryAsync(
             ZipArchive archive,
             string entryName,
             string sourcePath,
@@ -139,7 +152,6 @@ namespace ImageViewer.Services
                 entry.LastWriteTime = lastWriteUtc;
             }
 
-            await using Stream target = entry.Open();
             await using var source = new FileStream(
                 sourcePath,
                 FileMode.Open,
@@ -147,7 +159,17 @@ namespace ImageViewer.Services
                 FileShare.Read,
                 bufferSize: 81920,
                 options: FileOptions.Asynchronous | FileOptions.SequentialScan);
-            await source.CopyToAsync(target, 81920, cancellationToken).ConfigureAwait(false);
+            if (source.Length > MaximumArchiveEntryUncompressedBytes)
+            {
+                throw new InvalidDataException($"The image asset exceeds the maximum uncompressed size of {MaximumArchiveEntryUncompressedBytes} bytes.");
+            }
+
+            await using Stream target = entry.Open();
+            using var hash = SHA256.Create();
+            await using var hashingTarget = new CryptoStream(target, hash, CryptoStreamMode.Write, leaveOpen: true);
+            await source.CopyToAsync(hashingTarget, 81920, cancellationToken).ConfigureAwait(false);
+            await hashingTarget.FlushFinalBlockAsync(cancellationToken).ConfigureAwait(false);
+            return Convert.ToHexString(hash.Hash!);
         }
 
         public async Task<ImageViewerSessionData> LoadAsync(string packagePath, RoiPluginRegistry pluginRegistry, CancellationToken cancellationToken = default)
@@ -157,7 +179,10 @@ namespace ImageViewer.Services
             cancellationToken.ThrowIfCancellationRequested();
 
             string fullPackagePath = Path.GetFullPath(packagePath);
-            using var archive = ZipFile.OpenRead(fullPackagePath);
+            await using FileStream packageStream = File.OpenRead(fullPackagePath);
+            byte[] hash = await System.Security.Cryptography.SHA256.HashDataAsync(packageStream, cancellationToken).ConfigureAwait(false);
+            packageStream.Position = 0;
+            using var archive = new ZipArchive(packageStream, ZipArchiveMode.Read, leaveOpen: true);
             (ZipArchiveEntry sessionEntry, IReadOnlySet<string> assetFileNames) = ValidateArchive(archive);
 
             using var sessionStream = sessionEntry.Open();
@@ -165,10 +190,54 @@ namespace ImageViewer.Services
             string sessionJson = await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
             ValidateSessionImageReference(sessionJson, assetFileNames);
 
-            string cacheRoot = await GetPackageCacheDirectoryAsync(fullPackagePath, cancellationToken).ConfigureAwait(false);
-            Directory.CreateDirectory(cacheRoot);
-            ExtractArchiveEntries(archive, cacheRoot, cancellationToken);
-            return _sessionService.LoadFromJson(sessionJson, pluginRegistry, cacheRoot);
+            string cacheRoot = Path.GetFullPath(_sessionStoragePolicy.ProjectPackageCacheDirectory);
+            string entryDirectory = ImageViewerProjectPackageCache.GetDirectory(cacheRoot, hash);
+            FileStream lease = await PrepareCachedPackageAsync(archive, cacheRoot, entryDirectory, cancellationToken).ConfigureAwait(false);
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                ImageViewerSessionData session = _sessionService.LoadFromJson(sessionJson, pluginRegistry, entryDirectory);
+                ImageViewerProjectPackageCache.AttachSessionLease(session, lease);
+                return session;
+            }
+            catch
+            {
+                lease.Dispose();
+                throw;
+            }
+        }
+
+        private async Task<FileStream> PrepareCachedPackageAsync(
+            ZipArchive archive, string cacheRoot, string entryDirectory, CancellationToken cancellationToken)
+        {
+            using FileStream cacheLock = await ImageViewerProjectPackageCache.LockAsync(cacheRoot, cancellationToken).ConfigureAwait(false);
+            if (!IsCompleteExtraction(archive, entryDirectory))
+            {
+                string staging = Path.Combine(cacheRoot, $"staging-{Guid.NewGuid():N}");
+                Directory.CreateDirectory(staging);
+                try
+                {
+                    long bytes = await ExtractArchiveEntriesAsync(archive, staging, cancellationToken).ConfigureAwait(false);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    ImageViewerProjectPackageCache.Complete(staging, bytes);
+                    if (Directory.Exists(entryDirectory))
+                    {
+                        ImageViewerProjectPackageCache.RemoveEntry(entryDirectory);
+                    }
+                    Directory.Move(staging, entryDirectory);
+                }
+                finally
+                {
+                    if (Directory.Exists(staging))
+                    {
+                        ImageViewerProjectPackageCache.RemoveEntry(staging);
+                    }
+                }
+            }
+
+            ImageViewerProjectPackageCache.Trim(cacheRoot, entryDirectory, _sessionStoragePolicy.AutoSaveDirectory,
+                _sessionStoragePolicy.ProjectPackageCacheBudgetBytes);
+            return ImageViewerProjectPackageCache.LeaseEntry(entryDirectory);
         }
 
         private static (ZipArchiveEntry SessionEntry, IReadOnlySet<string> AssetFileNames) ValidateArchive(ZipArchive archive)
@@ -256,7 +325,32 @@ namespace ImageViewer.Services
             return (sessionEntry ?? throw new InvalidDataException("The project package does not contain a session file."), fileNames);
         }
 
-        private static void ExtractArchiveEntries(ZipArchive archive, string destinationDirectory, CancellationToken cancellationToken)
+        private static bool IsCompleteExtraction(ZipArchive archive, string directory)
+        {
+            if (!File.Exists(ImageViewerProjectPackageCache.MarkerPath(directory)) ||
+                (File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0)
+            {
+                return false;
+            }
+            foreach (ZipArchiveEntry entry in GetAssetEntries(archive))
+            {
+                if (entry.FullName.EndsWith('/'))
+                {
+                    continue;
+                }
+                var file = new FileInfo(Path.Combine(directory, entry.FullName.Replace('/', Path.DirectorySeparatorChar)));
+                if (!file.Exists || file.Length != entry.Length || (file.Attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static IEnumerable<ZipArchiveEntry> GetAssetEntries(ZipArchive archive) =>
+            archive.Entries.Where(entry => !string.Equals(entry.FullName, SessionEntryName, StringComparison.OrdinalIgnoreCase));
+
+        private static async Task<long> ExtractArchiveEntriesAsync(ZipArchive archive, string destinationDirectory, CancellationToken cancellationToken)
         {
             string rootPath = Path.GetFullPath(destinationDirectory);
             if (!rootPath.EndsWith(Path.DirectorySeparatorChar))
@@ -264,7 +358,8 @@ namespace ImageViewer.Services
                 rootPath += Path.DirectorySeparatorChar;
             }
 
-            foreach (ZipArchiveEntry entry in archive.Entries.Where(entry => !string.Equals(entry.FullName, SessionEntryName, StringComparison.OrdinalIgnoreCase)))
+            long totalBytes = 0;
+            foreach (ZipArchiveEntry entry in GetAssetEntries(archive))
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -286,8 +381,17 @@ namespace ImageViewer.Services
                     continue;
                 }
 
-                entry.ExtractToFile(destinationPath, true);
+                await using Stream input = entry.Open();
+                await using var output = new FileStream(destinationPath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                    81920, FileOptions.Asynchronous);
+                await input.CopyToAsync(output, cancellationToken).ConfigureAwait(false);
+                if (output.Length != entry.Length)
+                {
+                    throw new InvalidDataException($"Unexpected size for archive entry '{entry.FullName}'.");
+                }
+                totalBytes += output.Length;
             }
+            return totalBytes;
         }
 
         private static string NormalizeArchiveEntryName(string entryName)
@@ -411,25 +515,5 @@ namespace ImageViewer.Services
             }
         }
 
-        /// <summary>
-        /// 计算解包缓存目录。
-        /// Chinese: 缓存键必须来自**包内容**（对整个包文件流式哈希）而不是路径——同一路径写入不同内容的包
-        /// 不能复用旧的解包结果，否则被移除/改名的旧资产会残留并被会话引用。
-        /// English: The cache key is derived from the package content (streamed hash), not its path, so a different
-        /// package written to the same path can never reuse a previous extraction.
-        /// </summary>
-        private async Task<string> GetPackageCacheDirectoryAsync(string packagePath, CancellationToken cancellationToken)
-        {
-            byte[] hash;
-            await using (FileStream stream = File.OpenRead(packagePath))
-            {
-                hash = await System.Security.Cryptography.SHA256.HashDataAsync(stream, cancellationToken).ConfigureAwait(false);
-            }
-
-            string stamp = Convert.ToHexString(hash)[..12];
-            return Path.Combine(
-                _sessionStoragePolicy.ProjectPackageCacheDirectory,
-                $"{Path.GetFileNameWithoutExtension(packagePath)}-{stamp}");
-        }
     }
 }

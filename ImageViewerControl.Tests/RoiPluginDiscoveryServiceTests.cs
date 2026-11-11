@@ -43,6 +43,25 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
+        public void RegisterFromAssemblies_RejectsUnsupportedContractVersionBeforeRegister()
+        {
+            ContractMismatchRoiPluginModule.Reset();
+            HealthyRoiPluginModule.Reset();
+
+            RoiPluginDiscoveryResult result = RoiPluginDiscoveryService.RegisterFromAssemblies(
+                [Assembly.GetExecutingAssembly()],
+                new RoiPluginRegistry());
+
+            Assert.False(ContractMismatchRoiPluginModule.WasCalled);
+            Assert.True(HealthyRoiPluginModule.WasCalled);
+            Assert.Contains(
+                result.Failures,
+                failure => failure.Exception is RoiPluginContractMismatchException mismatch &&
+                           mismatch.ModuleTypeName.Contains(nameof(ContractMismatchRoiPluginModule), StringComparison.Ordinal) &&
+                           mismatch.ActualVersion == RoiPluginContract.CurrentVersion + 1);
+        }
+
+        [Fact]
         public void RegisterFromAssemblies_StrictMode_ThrowsAfterCollectingFailures()
         {
             RoiPluginDiscoveryOptions options = new() { FailOnModuleRegistrationError = true };
@@ -202,6 +221,16 @@ namespace ImageViewerControl.Tests
             public void LogWarning(string message) => Warnings.Add(message);
 
             public void LogError(string message, Exception? exception = null) => Warnings.Add(message);
+        }
+
+        [RoiPluginContract(RoiPluginContract.CurrentVersion + 1)]
+        public sealed class ContractMismatchRoiPluginModule : IRoiPluginModule
+        {
+            public static bool WasCalled { get; private set; }
+
+            public static void Reset() => WasCalled = false;
+
+            public void Register(RoiPluginRegistry registry) => WasCalled = true;
         }
 
         public sealed class FailingRoiPluginModule : IRoiPluginModule

@@ -107,6 +107,7 @@ namespace ImageViewer.Controls
             }
 
             _isDisposed = true;
+            AnalysisController.CancelPendingWork();
             Detach();
             SessionController.Dispose();
         }

@@ -250,7 +250,8 @@ internal sealed partial class AdvancedMeasurementDialog
         var footer = new DockPanel { Margin = new Thickness(0, 12, 0, 0) };
         var leftButtons = new WrapPanel();
         leftButtons.Children.Add(CreateButton("AdvancedMeasurementRefresh", EvaluateAll));
-        leftButtons.Children.Add(CreateButton("AdvancedMeasurementExport", ExportCsvAsync));
+        _exportButton = CreateButton("AdvancedMeasurementExport", ExportCsvAsync);
+        leftButtons.Children.Add(_exportButton);
         DockPanel.SetDock(leftButtons, Dock.Left);
         footer.Children.Add(leftButtons);
         var closeButton = CreateButton("AdvancedMeasurementClose", Close);

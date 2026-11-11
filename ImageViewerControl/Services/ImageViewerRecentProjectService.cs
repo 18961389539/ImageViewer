@@ -52,7 +52,7 @@ namespace ImageViewer.Services
 
             ImageViewerAtomicFile.WriteAllText(
                 filePath,
-                JsonSerializer.Serialize(items, ImageViewerJsonSerializationContext.Default.ListRecentImageViewerProject));
+                JsonSerializer.Serialize(items.ToList(), ImageViewerJsonSerializationContext.Default.ListRecentImageViewerProject));
         }
 
         public IReadOnlyList<RecentImageViewerProject> Touch(IEnumerable<RecentImageViewerProject> items, string filePath, string projectKind, int maxCount = 10)

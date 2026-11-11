@@ -65,6 +65,9 @@ namespace ImageViewer.Models
         /// <summary>标定完成时间。</summary>
         public DateTimeOffset? CalibratedAtUtc { get; set; }
 
+        /// <summary>Copies all calibration values for a detached measurement or persistence snapshot.</summary>
+        public CameraCalibration Clone() => (CameraCalibration)MemberwiseClone();
+
         /// <summary>
         /// 是否配置了畸变系数。
         /// English: Whether any distortion coefficient is configured.

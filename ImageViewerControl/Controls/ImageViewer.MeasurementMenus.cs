@@ -8,6 +8,9 @@ namespace ImageViewer.Controls;
 
 public partial class ImageViewer
 {
+    /// <summary>Marks the generated task groups so a rebuild can keep the fixed XAML entries.</summary>
+    private const string MeasurementGroupTag = "measurement-task-group";
+
     private static readonly string[] MeasurementGroupKeys =
     [
         "MenuMeasurementBasic",
@@ -29,10 +32,18 @@ public partial class ImageViewer
             existingGroup.Items.Remove(gradientDetectMenuItem);
         }
 
-        measureMenuItem.Items.Clear();
+        // Only the generated task groups are rebuilt; fixed entries declared in XAML
+        // (advanced measurements, recipe commands) survive every rebuild.
+        foreach (MenuItem stale in measureMenuItem.Items.OfType<MenuItem>()
+                     .Where(item => Equals(item.Tag, MeasurementGroupTag))
+                     .ToArray())
+        {
+            measureMenuItem.Items.Remove(stale);
+        }
+
         Dictionary<string, MenuItem> groups = MeasurementGroupKeys.ToDictionary(
             key => key,
-            key => new MenuItem { Header = UiText.Get(key) },
+            key => new MenuItem { Header = UiText.Get(key), Tag = MeasurementGroupTag },
             StringComparer.Ordinal);
 
         foreach (RoiToolDescriptor tool in tools)
@@ -91,7 +102,8 @@ public partial class ImageViewer
         string name = tool.Header;
 
         if (Matches(name, "ToolAutomaticEdgePoint") || Matches(name, "ToolAutomaticCircle") ||
-            Matches(name, "ToolCircularCaliper") || Matches(name, "ToolArcCaliper") || Matches(name, "ToolLineCaliper"))
+            Matches(name, "ToolCircularCaliper") || Matches(name, "ToolArcCaliper") || Matches(name, "ToolLineCaliper") ||
+            Matches(name, "ToolBlobAnalysis"))
         {
             return "MenuMeasurementEdge";
         }

@@ -34,6 +34,31 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
+        public void ApplyDisplayLut_UnpremultipliesPbgra32BeforeIndexingTheLut()
+        {
+            // 半透明纯红：Pbgra32 存储的是 R=128（预乘），直通输入是 R=255。
+            // 两条路径进入 LUT 之前必须得到同一个直通颜色，否则半透明图像会变暗/偏色。
+            var settings = new ImageViewerDisplaySettings(PseudoColorPalette.None, DisplayAdjustment.Identity with { Invert = true });
+            byte[] premultiplied = ReadOutputPixel(
+                CreateBitmap(1, 1, PixelFormats.Pbgra32, [0, 0, 128, 128]), settings);
+            byte[] straight = ReadOutputPixel(
+                CreateBitmap(1, 1, PixelFormats.Bgra32, [0, 0, 255, 128]), settings);
+
+            Assert.Equal(straight, premultiplied);
+            Assert.Equal(128, premultiplied[3]);
+        }
+
+        [Fact]
+        public void Shader_UnpremultipliesInputAndPremultipliesOutput()
+        {
+            string source = ReadEmbeddedShaderSource();
+
+            // WPF ShaderEffect 的输入/输出都按预乘 alpha 处理；缺了这两步，半透明边缘会被重复乘 alpha。
+            Assert.Contains("inputColor.rgb / alpha", source, StringComparison.Ordinal);
+            Assert.Contains("float4(color * alpha, alpha)", source, StringComparison.Ordinal);
+        }
+
+        [Fact]
         public void ApplyDisplayLut_WithoutAlphaChannel_TreatsInputAsOpaque()
         {
             byte[] color = ReadOutputPixel(CreateBitmap(1, 1, PixelFormats.Bgr24, [255, 0, 0]));

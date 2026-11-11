@@ -37,7 +37,7 @@ namespace ImageViewer.Plugins
 
             var moduleTypes = assemblies
                 .Distinct()
-                .SelectMany(GetLoadableTypes)
+                .SelectMany(assembly => GetLoadableTypes(assembly, failures, logger))
                 .Where(type =>
                     type is { IsAbstract: false, IsInterface: false } &&
                     typeof(IRoiPluginModule).IsAssignableFrom(type) &&
@@ -84,6 +84,12 @@ namespace ImageViewer.Plugins
             RoiPluginDiscoveryOptions options,
             IImageViewerLogger? logger)
         {
+            RoiPluginDiscoveryFailure? contractFailure = ValidateContract(moduleType, logger);
+            if (contractFailure != null)
+            {
+                return contractFailure;
+            }
+
             var beforeKeys = new HashSet<string>(registry.RegisteredTypeKeys, StringComparer.OrdinalIgnoreCase);
             try
             {
@@ -106,6 +112,27 @@ namespace ImageViewer.Plugins
                 logger?.LogError(CreateLogMessage(moduleType, "Register", "Failed"), ex);
                 return new RoiPluginDiscoveryFailure(moduleType.FullName ?? moduleType.Name, ex);
             }
+        }
+
+        private static RoiPluginDiscoveryFailure? ValidateContract(Type moduleType, IImageViewerLogger? logger)
+        {
+            var contract = moduleType.GetCustomAttribute<RoiPluginContractAttribute>(inherit: false)
+                ?? moduleType.Assembly
+                    .GetCustomAttributes(typeof(RoiPluginContractAttribute), inherit: false)
+                    .OfType<RoiPluginContractAttribute>()
+                    .FirstOrDefault();
+            int actualVersion = contract?.Version ?? RoiPluginContract.CurrentVersion;
+            if (actualVersion == RoiPluginContract.CurrentVersion)
+            {
+                return null;
+            }
+
+            var exception = new RoiPluginContractMismatchException(
+                moduleType.FullName ?? moduleType.Name,
+                RoiPluginContract.CurrentVersion,
+                actualVersion);
+            logger?.LogError(CreateLogMessage(moduleType, "Contract", "Failed"), exception);
+            return new RoiPluginDiscoveryFailure(moduleType.FullName ?? moduleType.Name, exception);
         }
 
         private static void RemoveNewRegistrations(RoiPluginRegistry registry, HashSet<string> registeredBeforeModule)
@@ -274,15 +301,43 @@ namespace ImageViewer.Plugins
             return false;
         }
 
-        private static Type[] GetLoadableTypes(Assembly assembly)
+        private static Type[] GetLoadableTypes(
+            Assembly assembly,
+            List<RoiPluginDiscoveryFailure> failures,
+            IImageViewerLogger? logger)
         {
+            string assemblyName = assembly.GetName().Name ?? assembly.FullName ?? "unknown";
             try
             {
                 return assembly.GetTypes();
             }
             catch (ReflectionTypeLoadException ex)
             {
+                Exception[] loaderExceptions = (ex.LoaderExceptions ?? []).OfType<Exception>().ToArray();
+                if (loaderExceptions.Length == 0)
+                {
+                    failures.Add(new RoiPluginDiscoveryFailure($"assembly:{assemblyName}", ex));
+                    logger?.LogError($"Failed to inspect plugin types in '{assemblyName}'.", ex);
+                }
+                else
+                {
+                    int index = 0;
+                    foreach (Exception loaderException in loaderExceptions)
+                    {
+                        index++;
+                        failures.Add(new RoiPluginDiscoveryFailure($"assembly:{assemblyName}:loader{index}", loaderException));
+                        logger?.LogWarning(
+                            $"Failed to load a type from plugin assembly '{assemblyName}': {loaderException.Message}");
+                    }
+                }
+
                 return ex.Types.OfType<Type>().ToArray();
+            }
+            catch (Exception ex)
+            {
+                failures.Add(new RoiPluginDiscoveryFailure($"assembly:{assemblyName}", ex));
+                logger?.LogError($"Failed to inspect plugin assembly '{assemblyName}'.", ex);
+                return [];
             }
         }
     }

@@ -234,13 +234,18 @@ namespace ImageViewer.Services
                     Touch(entry);
                     return GetOrCreateViewCore(entry, viewRect);
                 }
+            }
 
-                BitmapSource created = CreateCroppedBitmap(source, tileRect);
-                if (tileValueFactory != null)
-                {
-                    created = tileValueFactory(created);
-                }
+            // 像素处理不能放在锁内：非 tiled 路径的整幅 LUT 可能持续几十毫秒，
+            // 持锁会让其它线程的缓存命中、预取登记全部排队。
+            BitmapSource created = CreateCroppedBitmap(source, tileRect);
+            if (tileValueFactory != null)
+            {
+                created = tileValueFactory(created);
+            }
 
+            lock (_gate)
+            {
                 if (_entries.TryGetValue(key, out CacheEntry? existing))
                 {
                     Touch(existing);

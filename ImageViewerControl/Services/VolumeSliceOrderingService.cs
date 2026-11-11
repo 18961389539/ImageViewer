@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using ImageViewer.Localization;
 
 namespace ImageViewer.Services
 {
@@ -38,6 +39,12 @@ namespace ImageViewer.Services
         public IReadOnlyList<string> OrderedPaths => Slices.Select(slice => slice.Path).ToArray();
     }
 
+    /// <summary>Spacing derived from adjacent positions in the ordered stack.</summary>
+    public sealed record VolumeSlicePositionSpacing(
+        double? Interval,
+        bool HasIrregularIntervals,
+        bool ConflictsWithDeclaredSpacing);
+
     /// <summary>
     /// 为多文件体数据提供元数据优先的确定性排序。
     /// Chinese: 优先使用空间位置、实例号或采集时间；只有元数据不完整时才回退到文件名，
@@ -47,6 +54,53 @@ namespace ImageViewer.Services
     /// </summary>
     public static class VolumeSliceOrderingService
     {
+        private const double RelativeSpacingTolerance = 0.001;
+        private const int MaxConcurrentSidecarReads = 8;
+
+        /// <summary>
+        /// Estimates the nominal Z spacing from the median positive gap. Irregular or duplicate
+        /// positions cannot be represented exactly by a uniformly spaced volume.
+        /// </summary>
+        public static VolumeSlicePositionSpacing AnalyzePositionSpacing(VolumeSliceOrderingResult ordering)
+        {
+            ArgumentNullException.ThrowIfNull(ordering);
+            IReadOnlyList<VolumeSliceDescriptor> slices = ordering.Slices;
+            if (ordering.Source != VolumeSliceOrderSource.ExplicitPosition || slices.Count < 2)
+            {
+                return new VolumeSlicePositionSpacing(null, false, false);
+            }
+
+            var gaps = new List<double>(slices.Count - 1);
+            for (int index = 1; index < slices.Count; index++)
+            {
+                double gap = (slices[index].Position ?? double.NaN) - (slices[index - 1].Position ?? double.NaN);
+                if (double.IsFinite(gap) && gap > 0)
+                {
+                    gaps.Add(gap);
+                }
+            }
+
+            if (gaps.Count == 0)
+            {
+                return new VolumeSlicePositionSpacing(null, true, false);
+            }
+
+            gaps.Sort();
+            int middle = gaps.Count / 2;
+            double median = gaps[middle];
+            if (gaps.Count % 2 == 0)
+            {
+                median = gaps[middle - 1] + (median - gaps[middle - 1]) / 2;
+            }
+            bool irregular = gaps.Count != slices.Count - 1 || gaps.Any(gap => !SpacingAgrees(gap, median));
+            bool conflicts = slices.Any(slice => slice.SpacingZ is { } declared && double.IsFinite(declared) &&
+                declared > 0 && !SpacingAgrees(declared, median));
+            return new VolumeSlicePositionSpacing(median, irregular, conflicts);
+        }
+
+        private static bool SpacingAgrees(double value, double reference) =>
+            Math.Abs(value / reference - 1) <= RelativeSpacingTolerance;
+
         public static VolumeSliceOrderingResult OrderDescriptors(IEnumerable<VolumeSliceDescriptor> descriptors)
         {
             ArgumentNullException.ThrowIfNull(descriptors);
@@ -129,9 +183,45 @@ namespace ImageViewer.Services
                 throw new ArgumentException("At least one slice path is required.", nameof(paths));
             }
 
-            VolumeSliceDescriptor[] descriptors = await Task.WhenAll(
-                materialized.Select(path => ReadDescriptorAsync(path, cancellationToken))).ConfigureAwait(false);
-            return OrderDescriptors(descriptors);
+            var metadata = new SliceMetadata[materialized.Length];
+            await Parallel.ForEachAsync(Enumerable.Range(0, materialized.Length), new ParallelOptions
+            {
+                MaxDegreeOfParallelism = MaxConcurrentSidecarReads,
+                CancellationToken = cancellationToken
+            }, async (index, token) =>
+            {
+                metadata[index] = await ReadDescriptorAsync(materialized[index], token).ConfigureAwait(false);
+            }).ConfigureAwait(false);
+
+            VolumeSliceOrderingResult result = OrderDescriptors(metadata.Select(item => item.Descriptor));
+            var warnings = new List<string>(result.Warnings);
+            if (result.Source != VolumeSliceOrderSource.ExplicitPosition)
+            {
+                AddPartialFieldWarning(result.Slices, slice => slice.Position.HasValue, "VolumeMetadataPosition", warnings);
+            }
+            if (result.Source is VolumeSliceOrderSource.AcquisitionTime or VolumeSliceOrderSource.NaturalFileName)
+            {
+                AddPartialFieldWarning(result.Slices, slice => slice.InstanceNumber.HasValue, "VolumeMetadataInstance", warnings);
+            }
+            if (result.Source == VolumeSliceOrderSource.NaturalFileName)
+            {
+                AddPartialFieldWarning(result.Slices, slice => slice.AcquisitionTime.HasValue, "VolumeMetadataAcquisitionTime", warnings);
+            }
+            warnings.AddRange(metadata.SelectMany(item => item.Warnings));
+            return result with { Warnings = warnings.AsReadOnly() };
+        }
+
+        private static void AddPartialFieldWarning(IReadOnlyList<VolumeSliceDescriptor> slices,
+            Func<VolumeSliceDescriptor, bool> hasValue, string fieldKey, List<string> warnings)
+        {
+            string[] missing = slices.Where(slice => !hasValue(slice)).Select(slice => slice.Path).ToArray();
+            if (missing.Length == 0 || missing.Length == slices.Count)
+            {
+                return;
+            }
+
+            warnings.AddRange(missing.Select(path =>
+                UiText.Format("VolumeMetadataFieldMissing", Path.GetFileName(path), UiText.Get(fieldKey))));
         }
 
         public static bool HasOrderChanged(IReadOnlyList<string> original, IReadOnlyList<string> ordered)
@@ -181,82 +271,119 @@ namespace ImageViewer.Services
             }
         }
 
-        private static async Task<VolumeSliceDescriptor> ReadDescriptorAsync(string path, CancellationToken cancellationToken)
+        private static async Task<SliceMetadata> ReadDescriptorAsync(string path, CancellationToken cancellationToken)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            var warnings = new List<string>();
             foreach (string sidecarPath in GetSidecarPaths(path))
             {
-                if (!File.Exists(sidecarPath))
-                {
-                    continue;
-                }
-
+                cancellationToken.ThrowIfCancellationRequested();
+                bool earlierSidecarWasRejected = warnings.Count > 0;
                 try
                 {
-                    await using FileStream stream = File.OpenRead(sidecarPath);
+                    await using var stream = new FileStream(sidecarPath, FileMode.Open, FileAccess.Read,
+                        FileShare.Read, 4096, FileOptions.Asynchronous | FileOptions.SequentialScan);
                     using JsonDocument document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
                     JsonElement root = document.RootElement;
-                    return new VolumeSliceDescriptor(
+                    if (root.ValueKind != JsonValueKind.Object)
+                    {
+                        warnings.Add(UiText.Format("VolumeMetadataInvalidSidecar", sidecarPath));
+                        continue;
+                    }
+
+                    var invalidFields = new List<string>();
+                    var descriptor = new VolumeSliceDescriptor(
                         path,
-                        TryGetDouble(root, "zPosition") ?? TryGetDouble(root, "position") ?? TryGetDouble(root, "z"),
-                        TryGetInt(root, "instanceNumber") ?? TryGetInt(root, "instance"),
-                        TryGetDateTime(root, "acquisitionTime") ?? TryGetDateTime(root, "acquiredAt"),
-                        TryGetPositiveDouble(root, "spacingX") ?? TryGetPositiveDouble(root, "pixelSpacingX"),
-                        TryGetPositiveDouble(root, "spacingY") ?? TryGetPositiveDouble(root, "pixelSpacingY"),
-                        TryGetPositiveDouble(root, "spacingZ") ?? TryGetPositiveDouble(root, "sliceSpacing") ?? TryGetPositiveDouble(root, "pixelSpacingZ"));
+                        ReadField(root, ParseDouble, invalidFields, "zPosition", "position", "z"),
+                        ReadField(root, ParseInt, invalidFields, "instanceNumber", "instance"),
+                        ReadField(root, ParseDateTime, invalidFields, "acquisitionTime", "acquiredAt"),
+                        ReadField(root, ParsePositiveDouble, invalidFields, "spacingX", "pixelSpacingX"),
+                        ReadField(root, ParsePositiveDouble, invalidFields, "spacingY", "pixelSpacingY"),
+                        ReadField(root, ParsePositiveDouble, invalidFields, "spacingZ", "sliceSpacing", "pixelSpacingZ"));
+                    if (invalidFields.Count > 0)
+                    {
+                        warnings.Add(UiText.Format("VolumeMetadataInvalidFields", sidecarPath, string.Join(", ", invalidFields)));
+                    }
+                    if (descriptor.Position.HasValue || descriptor.InstanceNumber.HasValue || descriptor.AcquisitionTime.HasValue ||
+                        descriptor.SpacingX.HasValue || descriptor.SpacingY.HasValue || descriptor.SpacingZ.HasValue)
+                    {
+                        if (earlierSidecarWasRejected)
+                        {
+                            warnings.Add(UiText.Format("VolumeMetadataFallbackSidecar", sidecarPath));
+                        }
+                        return new SliceMetadata(descriptor, warnings);
+                    }
+
+                    if (invalidFields.Count == 0)
+                    {
+                        warnings.Add(UiText.Format("VolumeMetadataNoUsableFields", sidecarPath));
+                    }
                 }
                 catch (JsonException)
                 {
-                    // An invalid sidecar is reported through the fallback warning rather than
-                    // preventing the remaining images from being inspected.
+                    warnings.Add(UiText.Format("VolumeMetadataInvalidSidecar", sidecarPath));
                 }
-                catch (IOException)
+                catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
                 {
-                    // The image itself can still be opened; retain deterministic fallback ordering.
+                    // Sidecars are optional.
                 }
-                catch (UnauthorizedAccessException)
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
-                    // The image itself can still be opened; retain deterministic fallback ordering.
+                    warnings.Add(UiText.Format("VolumeMetadataUnreadableSidecar", sidecarPath));
                 }
             }
 
-            return new VolumeSliceDescriptor(path);
+            return new SliceMetadata(new VolumeSliceDescriptor(path), warnings);
         }
+
+        private sealed record SliceMetadata(VolumeSliceDescriptor Descriptor, IReadOnlyList<string> Warnings);
 
         private static IEnumerable<string> GetSidecarPaths(string path)
         {
             yield return path + ".slice.json";
-            string? directory = Path.GetDirectoryName(path);
-            string fileName = Path.GetFileNameWithoutExtension(path);
-            if (!string.IsNullOrWhiteSpace(directory))
+            string legacy = Path.ChangeExtension(path, ".json");
+            if (!string.Equals(legacy, path, StringComparison.OrdinalIgnoreCase))
             {
-                yield return Path.Combine(directory, fileName + ".json");
+                yield return legacy;
             }
         }
 
-        private static double? TryGetDouble(JsonElement element, string name)
+        private static T? ReadField<T>(JsonElement root, Func<JsonElement, T?> parse,
+            List<string> invalidFields, params string[] aliases) where T : struct
         {
-            if (!element.TryGetProperty(name, out JsonElement value)) return null;
+            foreach (string name in aliases)
+            {
+                if (root.TryGetProperty(name, out JsonElement value))
+                {
+                    if (parse(value) is { } parsed)
+                    {
+                        return parsed;
+                    }
+                    invalidFields.Add(name);
+                }
+            }
+            return null;
+        }
+
+        private static double? ParseDouble(JsonElement value)
+        {
             if (value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out double number) && double.IsFinite(number)) return number;
             return value.ValueKind == JsonValueKind.String && double.TryParse(value.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out number) && double.IsFinite(number) ? number : null;
         }
 
-        private static double? TryGetPositiveDouble(JsonElement element, string name)
+        private static double? ParsePositiveDouble(JsonElement element)
         {
-            double? value = TryGetDouble(element, name);
+            double? value = ParseDouble(element);
             return value is { } number && number > 0 ? number : null;
         }
 
-        private static int? TryGetInt(JsonElement element, string name)
+        private static int? ParseInt(JsonElement value)
         {
-            if (!element.TryGetProperty(name, out JsonElement value)) return null;
             if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out int number)) return number;
             return value.ValueKind == JsonValueKind.String && int.TryParse(value.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out number) ? number : null;
         }
 
-        private static DateTimeOffset? TryGetDateTime(JsonElement element, string name)
+        private static DateTimeOffset? ParseDateTime(JsonElement value)
         {
-            if (!element.TryGetProperty(name, out JsonElement value)) return null;
             return value.ValueKind == JsonValueKind.String && DateTimeOffset.TryParse(value.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out DateTimeOffset timestamp)
                 ? timestamp
                 : null;

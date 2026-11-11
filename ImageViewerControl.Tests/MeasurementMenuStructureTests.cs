@@ -46,13 +46,72 @@ public sealed class MeasurementMenuStructureTests
             using var viewer = new ImageViewer.Controls.ImageViewer();
             MenuItem imageDisplay = FindRootMenu(viewer, UiText.Get("MenuImageDisplay"));
             MenuItem performance = FindRootMenu(viewer, UiText.Get("MenuPerformance"));
+            MenuItem imageAdjustment = imageDisplay.Items.OfType<MenuItem>()
+                .Single(item => Equals(item.Header, UiText.Get("MenuImageAdjustment")));
+            MenuItem displayOverlays = imageDisplay.Items.OfType<MenuItem>()
+                .Single(item => Equals(item.Header, UiText.Get("MenuDisplayOverlays")));
+            MenuItem advancedPerformance = performance.Items.OfType<MenuItem>()
+                .Single(item => Equals(item.Header, UiText.Get("MenuAdvancedPerformance")));
+            MenuItem pseudoColorStrategy = advancedPerformance.Items.OfType<MenuItem>()
+                .Single(item => Equals(item.Header, UiText.Get("MenuPseudoColorStrategy")));
 
-            Assert.Contains(viewer.pseudoColorMenuItem, imageDisplay.Items.OfType<MenuItem>());
-            Assert.Contains(viewer.showHistogramMenuItem, imageDisplay.Items.OfType<MenuItem>());
-            Assert.Contains(viewer.showProfileMenuItem, imageDisplay.Items.OfType<MenuItem>());
+            Assert.Contains(viewer.pseudoColorMenuItem, imageAdjustment.Items.OfType<MenuItem>());
+            Assert.Contains(viewer.showHistogramMenuItem, displayOverlays.Items.OfType<MenuItem>());
+            Assert.Contains(viewer.pauseRealtimeHistogramMenuItem, displayOverlays.Items.OfType<MenuItem>());
+            Assert.Contains(viewer.showProfileMenuItem, displayOverlays.Items.OfType<MenuItem>());
+            Assert.Contains(viewer.pauseRealtimeProfileMenuItem, displayOverlays.Items.OfType<MenuItem>());
+            Assert.Contains(viewer.showToolbarMenuItem, displayOverlays.Items.OfType<MenuItem>());
+            Assert.Contains(viewer.showRoiListMenuItem, displayOverlays.Items.OfType<MenuItem>());
             Assert.Contains(viewer.enableImagePyramidMenuItem, performance.Items.OfType<MenuItem>());
             Assert.Contains(viewer.showRenderStatusMenuItem, performance.Items.OfType<MenuItem>());
+            Assert.Contains(viewer.preferShaderPseudoColorMenuItem, pseudoColorStrategy.Items.OfType<MenuItem>());
             Assert.DoesNotContain(performance.Items.OfType<MenuItem>(), item => ReferenceEquals(item, viewer.pseudoColorMenuItem));
+        });
+    }
+
+    [Fact]
+    public void MenuTaxonomyKeepsRelatedCommandsTogether()
+    {
+        WpfTestRunner.Run(() =>
+        {
+            using var viewer = new ImageViewer.Controls.ImageViewer();
+            MenuItem fileMenu = FindRootMenu(viewer, UiText.Get("MenuFileAndProjects"));
+            MenuItem measureMenu = FindRootMenu(viewer, UiText.Get("MenuMeasure"));
+            MenuItem analysisMenu = FindRootMenu(viewer, UiText.Get("MenuAnalysisAndExport"));
+            MenuItem performance = FindRootMenu(viewer, UiText.Get("MenuPerformance"));
+
+            // Calibration lives with file-level setup, not with ROI editing.
+            MenuItem calibration = fileMenu.Items.OfType<MenuItem>()
+                .Single(item => Equals(item.Header, UiText.Get("MenuCalibration")));
+            Assert.Contains(viewer.calibratePixelsMenuItem, calibration.Items.OfType<MenuItem>());
+            Assert.Contains(viewer.checkCalibrationReadinessMenuItem, calibration.Items.OfType<MenuItem>());
+            Assert.DoesNotContain(
+                viewer.roiOperationsMenuItem.Items.OfType<MenuItem>(),
+                item => ReferenceEquals(item, viewer.calibratePixelsMenuItem));
+
+            // Recipe workflow commands belong to the measurement menu.
+            MenuItem recipe = measureMenu.Items.OfType<MenuItem>()
+                .Single(item => Equals(item.Header, UiText.Get("MenuRecipe")));
+            Assert.Contains(viewer.saveRecipeMenuItem, recipe.Items.OfType<MenuItem>());
+            Assert.Contains(viewer.loadRecipeMenuItem, recipe.Items.OfType<MenuItem>());
+            Assert.DoesNotContain(fileMenu.Items.OfType<MenuItem>(), item => ReferenceEquals(item, viewer.saveRecipeMenuItem));
+
+            // Advanced measurements are a measurement entry, not an export command.
+            Assert.Contains(viewer.advancedMeasurementsMenuItem, measureMenu.Items.OfType<MenuItem>());
+            Assert.DoesNotContain(analysisMenu.Items.OfType<MenuItem>(), item => ReferenceEquals(item, viewer.advancedMeasurementsMenuItem));
+
+            // The four zoom commands sit together at the top level.
+            MenuItem[] rootItems = viewer.mainContextMenu.Items.OfType<MenuItem>().ToArray();
+            Assert.Contains(viewer.fitToViewMenuItem, rootItems);
+            Assert.Contains(viewer.fillToViewMenuItem, rootItems);
+            Assert.Contains(viewer.actualSizeMenuItem, rootItems);
+            Assert.Contains(viewer.resetViewMenuItem, rootItems);
+
+            // Cache maintenance is separate from rendering switches.
+            MenuItem cacheMaintenance = performance.Items.OfType<MenuItem>()
+                .Single(item => Equals(item.Header, UiText.Get("MenuCacheMaintenance")));
+            Assert.Contains(viewer.clearPyramidCacheMenuItem, cacheMaintenance.Items.OfType<MenuItem>());
+            Assert.Contains(viewer.clearAnalysisCacheMenuItem, cacheMaintenance.Items.OfType<MenuItem>());
         });
     }
 
@@ -84,6 +143,28 @@ public sealed class MeasurementMenuStructureTests
             Assert.Equal(AdvancedMeasurementMenuCatalog.All.Count, advancedItems.Select(item => ((ImageViewerAdvancedMeasurementMenuTag)item.Tag).Kind).Distinct().Count());
             Assert.All(advancedItems.Where(item => !item.IsEnabled), item => Assert.False(string.IsNullOrWhiteSpace(item.ToolTip?.ToString())));
             Assert.Contains(groups.SelectMany(group => group.Items.OfType<MenuItem>()), item => ReferenceEquals(item, viewer.gradientDetectMenuItem));
+        });
+    }
+
+    [Fact]
+    public void BlobAnalysisIsDetectedAsMeasurementAndSitsInTheEdgeGroup()
+    {
+        WpfTestRunner.Run(() =>
+        {
+            using var viewer = new ImageViewer.Controls.ImageViewer();
+            WpfTestRunner.InvokePrivate(viewer, "PopulateMeasurementMenu", viewer.AvailableDrawingTools);
+
+            string blobHeader = UiText.Get("ToolBlobAnalysis");
+            RoiToolDescriptor blobTool = Assert.Single(
+                viewer.AvailableDrawingTools.Where(tool => string.Equals(tool.Header, blobHeader, System.StringComparison.Ordinal)));
+            Assert.True(blobTool.IsMeasurement);
+
+            MenuItem edgeGroup = viewer.measureMenuItem.Items.OfType<MenuItem>()
+                .Single(item => Equals(item.Header, UiText.Get("MenuMeasurementEdge")));
+            Assert.Contains(edgeGroup.Items.OfType<MenuItem>(), item => Equals(item.Header, blobHeader));
+
+            // Detection tools must no longer clutter the drawing menu.
+            Assert.DoesNotContain(viewer.drawRoiMenuItem.Items.OfType<MenuItem>(), item => Equals(item.Header, blobHeader));
         });
     }
 

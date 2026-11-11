@@ -52,6 +52,7 @@ dotnet run --project ImageViewerDemo/ImageViewerDemo.csproj
 ```
 
 演示程序启动后，可点击“打开图像”或按 `Ctrl+O` 选择图像文件。右键菜单支持直接键入命令搜索；按 `Ctrl+F` 可将图像适应窗口。
+第一次使用测量功能时，可点击 Demo 顶部的“测量示例”，按提示完成标定、尺寸检查、公差设置和 CSV 导出。
 
 ### NuGet 包
 
@@ -145,6 +146,8 @@ dotnet test ImageViewer.sln --configuration Release --no-build --filter "Categor
 dotnet test ImageViewerControl.Tests/ImageViewerControl.Tests.csproj --configuration Release --no-build --filter "Category=Smoke" --nologo
 ```
 
+运行 `./build/test-batch-performance.ps1` 可复现批量导出基准：使用固定的 24 张 4096 × 4096 图像，默认在独立进程中运行三次，记录峰值私有内存、耗时和标准化 CSV 的 SHA-256。报告写入 `artifacts/performance/batch/report.json`。CI 会检查内存与 CSV 基线；耗时超过观察阈值会发出提示。
+
 所有新增用户可见文本应放在 `ImageViewerControl/Resources/UiText.resx` 或 `ImageViewerDemo/Resources/DemoText.resx` 中。WPF 相关实现保留在控件工程；新建可跨平台算法、数据契约和序列化逻辑应遵循 [docs/architecture-boundaries.md](docs/architecture-boundaries.md) 的依赖边界。
 
 ### CI 与覆盖率
@@ -158,10 +161,10 @@ dotnet test ImageViewer.Core.Tests/ImageViewer.Core.Tests.csproj `
   --configuration Release --settings coverage.runsettings `
   --collect:"XPlat Code Coverage" --results-directory artifacts/coverage/core
 ./build/coverage-summary.ps1 -CoverageRoot artifacts/coverage/core `
-  -AssemblyPattern 'ImageViewer.Core' -MinimumLineRate 0.80
+  -AssemblyPattern 'ImageViewer.Core' -MinimumLineRate 0.82
 ```
 
-覆盖率使用 Cobertura 和 OpenCover 两种格式输出，CI 会上传原始报告；Core 行覆盖率低于 80% 时构建失败。
+覆盖率使用 Cobertura 和 OpenCover 两种格式输出，CI 会上传原始报告；Core 行覆盖率低于 82%、ImageViewerControl 低于 68% 时构建失败。
 
 ## 文档索引
 

@@ -148,6 +148,29 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
+        public async Task GetSlice_RapidDifferentPlanes_NeverExceedsBuildConcurrencyLimit()
+        {
+            VolumeData volume = CreateVolume(depth: 64, width: 256, height: 256);
+            const int planeCount = 8;
+            var tasks = new Task<BitmapSource>[planeCount];
+
+            for (int index = 0; index < planeCount; index++)
+            {
+                int planeIndex = index;
+                tasks[index] = Task.Run(() =>
+                    VolumeSliceService.GetSlice(volume, VolumeSliceOrientation.Coronal, planeIndex));
+            }
+
+            BitmapSource[] slices = await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(30));
+            Assert.All(slices, slice => Assert.NotNull(slice));
+            Assert.Equal(planeCount, VolumeSliceService.GetSliceBuildCount(volume));
+            Assert.InRange(
+                VolumeSliceService.GetMaxObservedSliceBuilds(volume),
+                1,
+                VolumeSliceService.MaxConcurrentSliceBuilds);
+        }
+
+        [Fact]
         public void GetSlice_FaultedBuild_IsRemovedSoTheNextCallRetries()
         {
             VolumeData volume = CreateVolume(depth: 32, width: 64, height: 48);

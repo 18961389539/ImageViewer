@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using System.Windows;
 using ImageViewer.Abstractions;
 using ImageViewer.Controls;
@@ -100,10 +101,8 @@ namespace ImageViewerControl.Tests
                     {
                         GetRetryCount = () => 0,
                         GetRetryDelayMilliseconds = () => 0,
-                        SetImage = _ => { },
+                        PrepareReplacementAsync = (_, _) => Task.FromResult<Action?>(null),
                         SetImageLoadState = (_, _, _, _) => { },
-                        FitToView = () => { },
-                        ClearUndoHistory = () => { },
                         ShowNonCriticalError = (_, _, _) => { }
                     },
                     RoiEditing = new ImageViewerDialogRoiWorkflow

@@ -73,8 +73,7 @@ internal static class SpcMeasurementSeriesBuilder
 
     /// <summary>由批次导出行构建序列（按模板槽位跨图聚合，顺序即批次顺序）。</summary>
     public static IReadOnlyList<SpcMeasurementSeries> BuildFromBatchRows(
-        IEnumerable<RoiAnalysisBatchCsvRow> rows,
-        string? physicalUnit)
+        IEnumerable<RoiAnalysisBatchCsvRow> rows)
     {
         ArgumentNullException.ThrowIfNull(rows);
 
@@ -85,22 +84,15 @@ internal static class SpcMeasurementSeriesBuilder
         {
             string key = row.MeasurementItemKey ?? $"unidentified-row:{index}";
             index++;
-            if (row.Bitmap == null)
-            {
-                continue;
-            }
-
-            RoiInspectionResult inspection = RoiInspectionEvaluator.Evaluate(row.Roi, row.PixelSize, row.Calibration);
+            RoiInspectionResult inspection = row.Inspection;
             if (inspection.MeasuredValue is not { } measured || !double.IsFinite(measured))
             {
                 continue;
             }
 
-            string label = RoiAnalysisExportService.DescribeRoi(row.Roi);
-            string unit = RoiAnalysisExportService.DescribeUnit(row.Roi, row.PhysicalUnit ?? physicalUnit);
             if (!groups.TryGetValue(key, out SeriesAccumulator? accumulator))
             {
-                accumulator = new SeriesAccumulator(key, label, unit);
+                accumulator = new SeriesAccumulator(key, row.DisplayLabel, row.Unit);
                 groups.Add(key, accumulator);
                 order.Add(accumulator);
             }

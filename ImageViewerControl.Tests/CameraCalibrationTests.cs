@@ -1,4 +1,3 @@
-using System.Windows;
 using ImageViewer.Models;
 using ImageViewer.Plugins;
 using ImageViewer.Services;
@@ -7,48 +6,12 @@ using Xunit;
 namespace ImageViewerControl.Tests
 {
     /// <summary>
-    /// 相机畸变标定模型及信息面板校正应用测试。
-    /// English: Camera distortion calibration model and info-panel application tests.
+    /// 信息面板与 ROI 辅助对畸变标定的应用测试。
+    /// English: WPF-side application tests for how ROI helpers and the info panel consume
+    /// calibration corrections. Pure model tests live in ImageViewer.Core.Tests.
     /// </summary>
     public class CameraCalibrationTests
     {
-        [Fact]
-        public void UndistortScaleFactor_NoCoefficients_ReturnsOne()
-        {
-            var calibration = new CameraCalibration { PrincipalX = 100, PrincipalY = 100, NormalizationRadius = 100 };
-
-            Assert.Equal(1.0, calibration.UndistortScaleFactor(new PointD(150, 150)), 9);
-        }
-
-        [Fact]
-        public void UndistortScaleFactor_AtPrincipalPoint_ReturnsOne()
-        {
-            var calibration = new CameraCalibration { PrincipalX = 100, PrincipalY = 80, NormalizationRadius = 100, K1 = 0.1 };
-
-            Assert.Equal(1.0, calibration.UndistortScaleFactor(new PointD(100, 80)), 9);
-        }
-
-        [Fact]
-        public void UndistortScaleFactor_PositiveK1_ReducesOffCenterMagnification()
-        {
-            // dx=100, R=100 → r²=1; local scale=1+K1=1.25 → factor=0.8
-            var calibration = new CameraCalibration { PrincipalX = 100, PrincipalY = 100, NormalizationRadius = 100, K1 = 0.25 };
-
-            double factor = calibration.UndistortScaleFactor(new PointD(200, 100));
-
-            Assert.Equal(0.8, factor, 9);
-        }
-
-        [Fact]
-        public void CorrectPixelLength_AppliesFactorAtMidpoint()
-        {
-            var calibration = new CameraCalibration { PrincipalX = 0, PrincipalY = 0, NormalizationRadius = 100, K1 = 0.25 };
-
-            double corrected = calibration.CorrectPixelLength(100, new PointD(100, 0));
-
-            Assert.Equal(80.0, corrected, 9);
-        }
-
         [Fact]
         public void RoiCalibrationHelper_UsesEndpointCorrectionForBasicRadialModel()
         {
@@ -93,43 +56,6 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
-        public void UndistortScaleFactor_ExtremeCoefficients_AreClamped()
-        {
-            var calibration = new CameraCalibration { PrincipalX = 100, PrincipalY = 100, NormalizationRadius = 100, K1 = 10 };
-
-            double factor = calibration.UndistortScaleFactor(new PointD(200, 100));
-
-            Assert.InRange(factor, 0.0, 5.0);
-            Assert.True(factor > 0);
-        }
-
-        [Fact]
-        public void NormalizedRadiusSquared_AtPrincipalPoint_IsZero()
-        {
-            var calibration = new CameraCalibration { PrincipalX = 50, PrincipalY = 60, NormalizationRadius = 10 };
-
-            Assert.Equal(0.0, calibration.NormalizedRadiusSquared(new PointD(50, 60)), 9);
-        }
-
-        [Fact]
-        public void NormalizedRadiusSquared_UsesPrincipalOffset()
-        {
-            var calibration = new CameraCalibration { PrincipalX = 90, PrincipalY = 80, NormalizationRadius = 10 };
-
-            Assert.Equal(1.0, calibration.NormalizedRadiusSquared(new PointD(100, 80)), 9);
-        }
-
-        [Fact]
-        public void CreateForImage_SetsPrincipalToCenter_AndRadiusToHalfShortSide()
-        {
-            var calibration = CameraCalibration.CreateForImage(0.1, 0.01, 1920, 1080);
-
-            Assert.Equal(960, calibration.PrincipalX, 9);
-            Assert.Equal(540, calibration.PrincipalY, 9);
-            Assert.Equal(540, calibration.NormalizationRadius, 9);
-        }
-
-        [Fact]
         public void RoiInfoService_BuildInfo_AppliesDistortionCorrectionAtRoiCenter()
         {
             var registry = RoiPluginRegistry.CreateBuiltIn();
@@ -154,48 +80,6 @@ namespace ImageViewerControl.Tests
             string info = RoiInfoService.BuildInfo(circle, null, 0.01, "mm", registry, includeStatistics: false);
 
             Assert.DoesNotContain("畸变校正", info);
-        }
-
-        [Fact]
-        public void ExtendedBrownConradyModel_RoundTripsDistortedPoint()
-        {
-            var calibration = new CameraCalibration
-            {
-                PrincipalX = 320,
-                PrincipalY = 240,
-                NormalizationRadius = 320,
-                K1 = 0.08,
-                K2 = -0.015,
-                K3 = 0.002,
-                TangentialP1 = 0.001,
-                TangentialP2 = -0.0008
-            };
-            PointD ideal = new(410, 285);
-
-            PointD distorted = calibration.DistortPoint(ideal);
-            PointD restored = calibration.UndistortPoint(distorted);
-
-            Assert.InRange(Math.Abs(restored.X - ideal.X), 0, 1e-6);
-            Assert.InRange(Math.Abs(restored.Y - ideal.Y), 0, 1e-6);
-            Assert.True(calibration.IsValid);
-            Assert.True(calibration.HasExtendedDistortionModel);
-        }
-
-        [Fact]
-        public void Calibration_WithNonFiniteParameter_IsInvalidAndDoesNotTransform()
-        {
-            var calibration = new CameraCalibration
-            {
-                PrincipalX = 10,
-                PrincipalY = 10,
-                NormalizationRadius = 10,
-                K1 = double.NaN
-            };
-            PointD point = new(14, 12);
-
-            Assert.False(calibration.IsValid);
-            Assert.Equal(point, calibration.DistortPoint(point));
-            Assert.Equal(point, calibration.UndistortPoint(point));
         }
     }
 }

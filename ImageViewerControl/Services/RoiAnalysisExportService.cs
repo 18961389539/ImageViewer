@@ -35,14 +35,19 @@ namespace ImageViewer.Services
                 lines.Add($"- {group.Key}: {group.Count()}");
             }
 
-            double totalLineLength = roiList.OfType<LineMeasureRoi>().Sum(line => GeometryUtils.Distance(line.P1.ToWpfPoint(), line.P2.ToWpfPoint()) * RoiCalibrationHelper.GetLengthCorrection(line, calibration) * pixelSize);
-            double totalPolylineLength = roiList.OfType<PolylineRoi>().Sum(poly => GeometryUtils.PolylineLength(poly.Points.ToWpfPointArray()) * RoiCalibrationHelper.GetLengthCorrection(poly, calibration)) * pixelSize;
-            double totalPolygonArea = roiList.OfType<PolygonRoi>().Where(poly => poly.IsClosed && poly.Points.Count >= 3).Sum(poly => GeometryUtils.PolygonArea(poly.Points.ToWpfPointArray()) * RoiCalibrationHelper.GetAreaCorrection(poly, calibration)) * pixelSize * pixelSize;
-            double totalRectArea = roiList.OfType<RotatedRect>().Sum(rect => rect.Width * rect.Height * RoiCalibrationHelper.GetAreaCorrection(rect, calibration)) * pixelSize * pixelSize;
-            double totalEllipseArea = roiList.OfType<EllipseRoi>().Sum(ellipse => Math.PI * ellipse.RadiusX * ellipse.RadiusY * RoiCalibrationHelper.GetAreaCorrection(ellipse, calibration)) * pixelSize * pixelSize;
-            double totalCircleArea = roiList.OfType<CircleRoi>().Sum(circle => Math.PI * circle.Radius * circle.Radius * RoiCalibrationHelper.GetAreaCorrection(circle, calibration)) * pixelSize * pixelSize;
-            totalCircleArea += roiList.OfType<ThreePointCircleMeasureRoi>().Where(circle => circle.IsValid).Sum(circle => Math.PI * circle.Radius * circle.Radius * RoiCalibrationHelper.GetAreaCorrection(circle, calibration)) * pixelSize * pixelSize;
-            double totalCenterDistance = roiList.OfType<CenterDistanceMeasureRoi>().Sum(distance => distance.CenterDistance * RoiCalibrationHelper.GetLengthCorrection(distance, calibration)) * pixelSize;
+            var usable = roiList.Where(roi => !RoiCalibrationHelper.AuditRoi(roi, calibration).HasNonConvergedPoints).ToList();
+            if (usable.Count != roiList.Count)
+            {
+                lines.Add($"ROIs excluded from measurement totals (undistortion did not converge): {roiList.Count - usable.Count}");
+            }
+            double totalLineLength = usable.OfType<LineMeasureRoi>().Sum(line => GeometryUtils.Distance(line.P1.ToWpfPoint(), line.P2.ToWpfPoint()) * RoiCalibrationHelper.GetLengthCorrection(line, calibration) * pixelSize);
+            double totalPolylineLength = usable.OfType<PolylineRoi>().Sum(poly => GeometryUtils.PolylineLength(poly.Points.ToWpfPointArray()) * RoiCalibrationHelper.GetLengthCorrection(poly, calibration)) * pixelSize;
+            double totalPolygonArea = usable.OfType<PolygonRoi>().Where(poly => poly.IsClosed && poly.Points.Count >= 3).Sum(poly => GeometryUtils.PolygonArea(poly.Points.ToWpfPointArray()) * RoiCalibrationHelper.GetAreaCorrection(poly, calibration)) * pixelSize * pixelSize;
+            double totalRectArea = usable.OfType<RotatedRect>().Sum(rect => rect.Width * rect.Height * RoiCalibrationHelper.GetAreaCorrection(rect, calibration)) * pixelSize * pixelSize;
+            double totalEllipseArea = usable.OfType<EllipseRoi>().Sum(ellipse => Math.PI * ellipse.RadiusX * ellipse.RadiusY * RoiCalibrationHelper.GetAreaCorrection(ellipse, calibration)) * pixelSize * pixelSize;
+            double totalCircleArea = usable.OfType<CircleRoi>().Sum(circle => Math.PI * circle.Radius * circle.Radius * RoiCalibrationHelper.GetAreaCorrection(circle, calibration)) * pixelSize * pixelSize;
+            totalCircleArea += usable.OfType<ThreePointCircleMeasureRoi>().Where(circle => circle.IsValid).Sum(circle => Math.PI * circle.Radius * circle.Radius * RoiCalibrationHelper.GetAreaCorrection(circle, calibration)) * pixelSize * pixelSize;
+            double totalCenterDistance = usable.OfType<CenterDistanceMeasureRoi>().Sum(distance => distance.CenterDistance * RoiCalibrationHelper.GetLengthCorrection(distance, calibration)) * pixelSize;
             string unit = string.IsNullOrWhiteSpace(physicalUnit) ? "px" : physicalUnit;
 
             lines.Add(string.Empty);
@@ -50,9 +55,9 @@ namespace ImageViewer.Services
             lines.Add($"Center Distance Total: {totalCenterDistance:F2} {unit}");
             lines.Add($"Polyline Length Total: {totalPolylineLength:F2} {unit}");
             lines.Add($"Area Total: {totalPolygonArea + totalRectArea + totalEllipseArea + totalCircleArea:F2} {unit}²");
-            if (roiList.OfType<AngleMeasureRoi>().Any())
+            if (usable.OfType<AngleMeasureRoi>().Any())
             {
-                lines.Add($"Average Angle: {roiList.OfType<AngleMeasureRoi>().Average(angle => GeometryUtils.SmallestAngle(angle.P1.ToWpfPoint(), angle.Vertex.ToWpfPoint(), angle.P2.ToWpfPoint())):F2}°");
+                lines.Add($"Average Angle: {usable.OfType<AngleMeasureRoi>().Average(angle => GeometryUtils.SmallestAngle(angle.P1.ToWpfPoint(), angle.Vertex.ToWpfPoint(), angle.P2.ToWpfPoint())):F2}°");
             }
 
             if (bitmap != null)
@@ -115,11 +120,14 @@ namespace ImageViewer.Services
         {
             ArgumentNullException.ThrowIfNull(rois);
 
-            var items = rois.Select(roi =>
+            var items = new List<MeasurementReportItem>();
+            DistortionAudit distortionAudit = DistortionAudit.Empty;
+            foreach (RoiBase roi in rois)
             {
                 RoiInspectionResult inspection = RoiInspectionEvaluator.Evaluate(roi, pixelSize, calibration);
+                distortionAudit = distortionAudit.Combine(inspection.DistortionAudit);
                 string unit = IsAngularQuantity(roi) ? "°" : string.IsNullOrWhiteSpace(physicalUnit) ? "px" : physicalUnit!;
-                return new MeasurementReportItem(
+                items.Add(new MeasurementReportItem(
                     DescribeRoi(roi),
                     DescribeQuantity(roi),
                     unit,
@@ -128,8 +136,8 @@ namespace ImageViewer.Services
                     inspection.TolerancePlus,
                     inspection.ToleranceMinus,
                     inspection.DetectionStatus.ToString(),
-                    inspection.SpecificationStatus.ToString());
-            }).ToList();
+                    inspection.SpecificationStatus.ToString()));
+            }
 
             return MeasurementReportBuilder.Build(
                 items,
@@ -138,7 +146,10 @@ namespace ImageViewer.Services
                 calibration,
                 sourceName: sourceName,
                 sourceSha256: sourceSha256,
-                hasKnownReference: hasKnownReference);
+                hasKnownReference: hasKnownReference,
+                title: null,
+                generatedAtUtc: null,
+                distortionAudit: distortionAudit);
         }
 
         /// <summary>报告落到 CSV 同目录、同基名的 <c>.report.md</c>。</summary>
@@ -177,15 +188,13 @@ namespace ImageViewer.Services
                 // Batch identity follows the template slot across input images. Labels describe
                 // the item to a person, but may be duplicated or blank and are not grouping keys.
                 string key = row.MeasurementItemKey ?? $"unidentified-row:{index}";
-                string label = DescribeRoi(row.Roi);
+                string label = row.DisplayLabel;
 
-                toleranceByKey.TryAdd(key, ToToleranceInput(row.Roi.Tolerance));
-                quantityByKey.TryAdd(key, DescribeQuantity(row.Roi));
-                unitByKey.TryAdd(key, DescribeUnit(row.Roi, row.PhysicalUnit ?? physicalUnit));
+                toleranceByKey.TryAdd(key, row.Tolerance);
+                quantityByKey.TryAdd(key, row.Quantity);
+                unitByKey.TryAdd(key, row.Unit);
 
-                RoiInspectionResult inspection = row.Bitmap == null
-                    ? RoiInspectionEvaluator.EvaluateInputFailure(row.Roi)
-                    : RoiInspectionEvaluator.Evaluate(row.Roi, row.PixelSize, row.Calibration);
+                RoiInspectionResult inspection = row.Inspection;
                 if (inspection.MeasuredValue is not { } measured || !double.IsFinite(measured))
                 {
                     // 未测得值不计入样本：留空是"不知道"，不是"等于 0"。
@@ -263,11 +272,13 @@ namespace ImageViewer.Services
                 ? calibration.MeasurementUncertaintyPixels
                 : null;
             double? reprojectionErrorRms = calibration is { } c && c.ReprojectionErrorRms > 0 ? c.ReprojectionErrorRms : null;
+            DistortionAudit summaryAudit = RoiCalibrationHelper.AuditRois(toleranceRois, calibration);
 
             yield return string.Empty;
             yield return $"[Precision] calibrated={calibration is { IsValid: true }} " +
                 $"calibrationUncertainty={(calibrationUncertaintyPixels.HasValue ? $"{calibrationUncertaintyPixels.Value * pixelSize:F4} {unit}" : "n/a")} " +
-                $"reprojectionRms={(reprojectionErrorRms.HasValue ? $"{reprojectionErrorRms.Value:F4} px" : "n/a")}";
+                $"reprojectionRms={(reprojectionErrorRms.HasValue ? $"{reprojectionErrorRms.Value:F4} px" : "n/a")} " +
+                $"undistortion={DescribeDistortionAudit(calibration, summaryAudit)}";
 
             foreach (var roi in toleranceRois)
             {
@@ -279,13 +290,34 @@ namespace ImageViewer.Services
                 }
 
                 // 单次测量无重复性可言，因此只报告标定侧不确定度，并明确说明重复性样本数为 1。
-                double? combined = calibrationUncertaintyPixels.HasValue
-                    ? calibrationUncertaintyPixels.Value * pixelSize
+                // 若该 ROI 的测量点反解未收敛，取"标定不确定度 ⊕ 反解残差"中的较大值，
+                // 而不是继续声称一个已经被残差突破的精度。
+                DistortionAudit roiAudit = RoiCalibrationHelper.AuditRoi(roi, calibration);
+                double? effectiveUncertaintyPixels = roiAudit.HasPoints
+                    ? roiAudit.MaximumUncertaintyPixels
+                    : calibrationUncertaintyPixels;
+                double? combined = effectiveUncertaintyPixels.HasValue
+                    ? effectiveUncertaintyPixels.Value * pixelSize
                     : null;
+                string distortionSuffix = roiAudit.HasNonConvergedPoints
+                    ? $" undistortion=not-converged({roiAudit.NonConvergedPointCount}/{roiAudit.PointCount},maxResidual={roiAudit.MaximumResidualPixels:F4}px)"
+                    : string.Empty;
                 yield return $"[Precision] {DescribeRoi(roi)}: measured={measured:F4} {unit} " +
                     $"combinedUncertainty(k=2)={(combined.HasValue ? $"{combined.Value:F4} {unit}" : "n/a")} " +
-                    $"repeatability=1 sample";
+                    $"repeatability=1 sample{distortionSuffix}";
             }
+        }
+
+        private static string DescribeDistortionAudit(CameraCalibration? calibration, DistortionAudit audit)
+        {
+            if (calibration is not { IsEnabled: true, IsValid: true } || !audit.HasPoints)
+            {
+                return "n/a";
+            }
+
+            return audit.HasNonConvergedPoints
+                ? $"not-converged({audit.NonConvergedPointCount}/{audit.PointCount},maxResidual={audit.MaximumResidualPixels:F4}px)"
+                : "converged";
         }
 
         internal static string DescribeRoi(RoiBase roi)
@@ -436,7 +468,7 @@ namespace ImageViewer.Services
                     ["ellipseMaxIterations"] = EllipseFitOptions.Default.MaxIterations,
                     ["ellipseMaxRansacSamples"] = EllipseFitOptions.Default.MaxRansacSamples,
                     ["ellipseRandomSeed"] = EllipseFitOptions.Default.RandomSeed,
-                    ["fittedEllipses"] = rois.OfType<FittedEllipseRoi>().Select(ellipse => new Dictionary<string, object?>
+                    ["fittedEllipses"] = rois.OfType<FittedEllipseRoi>().Where(ellipse => ellipse.HasFitEvidence).Select(ellipse => new Dictionary<string, object?>
                     {
                         ["label"] = ellipse.Label,
                         ["sourcePointCount"] = ellipse.SourcePointCount,
@@ -468,7 +500,8 @@ namespace ImageViewer.Services
                             ["nominalValue"] = inspection.NominalValue,
                             ["tolerancePlus"] = inspection.TolerancePlus,
                             ["toleranceMinus"] = inspection.ToleranceMinus,
-                            ["physicalUnit"] = string.IsNullOrWhiteSpace(physicalUnit) ? "px" : physicalUnit
+                            ["physicalUnit"] = string.IsNullOrWhiteSpace(physicalUnit) ? "px" : physicalUnit,
+                            ["distortionAudit"] = BuildDistortionMetadata(inspection.DistortionAudit)
                         };
                     }).ToList()
                 },
@@ -513,7 +546,8 @@ namespace ImageViewer.Services
 
             foreach (var roi in rois)
             {
-                var metrics = GetMetrics(roi, pixelSize, unit, calibration);
+                RoiInspectionResult inspection = RoiInspectionEvaluator.Evaluate(roi, pixelSize, calibration);
+                var metrics = GetAuditedMetrics(roi, pixelSize, unit, calibration, inspection);
                 string mean = string.Empty;
                 string min = string.Empty;
                 string max = string.Empty;
@@ -528,8 +562,6 @@ namespace ImageViewer.Services
                     stddev = statistics.StandardDeviation.ToString("F2", CultureInfo.InvariantCulture);
                     pixelCount = statistics.PixelCount.ToString(CultureInfo.InvariantCulture);
                 }
-
-                RoiInspectionResult inspection = RoiInspectionEvaluator.Evaluate(roi, pixelSize, calibration);
 
                 builder.AppendLine(string.Join(",",
                     Escape(roi.RoiTypeName),
@@ -561,7 +593,7 @@ namespace ImageViewer.Services
             return roi switch
             {
                 RotatedRect rect => ($"Width={rect.Width * correction * pixelSize:F2} {unit}", $"Height={rect.Height * correction * pixelSize:F2} {unit}", $"Angle={rect.Angle:F1}°"),
-                FittedEllipseRoi fittedEllipse => ($"RadiusX={fittedEllipse.RadiusX * correction * pixelSize:F2} {unit}", $"RadiusY={fittedEllipse.RadiusY * correction * pixelSize:F2} {unit}", $"Angle={fittedEllipse.Angle:F1}°;RMS={fittedEllipse.FitResidualRms * correction * pixelSize:F3};Inliers={fittedEllipse.FitInlierCount}"),
+                FittedEllipseRoi fittedEllipse when fittedEllipse.HasFitEvidence => ($"RadiusX={fittedEllipse.RadiusX * correction * pixelSize:F2} {unit}", $"RadiusY={fittedEllipse.RadiusY * correction * pixelSize:F2} {unit}", $"Angle={fittedEllipse.Angle:F1}°;RMS={fittedEllipse.FitResidualRms * correction * pixelSize:F3};Inliers={fittedEllipse.FitInlierCount}"),
                 EllipseRoi ellipse => ($"RadiusX={ellipse.RadiusX * correction * pixelSize:F2} {unit}", $"RadiusY={ellipse.RadiusY * correction * pixelSize:F2} {unit}", $"Angle={ellipse.Angle:F1}°"),
                 CaliperMeasureRoi caliper => GetDualEdgeCaliperMetrics(caliper, correction, pixelSize, unit),
                 LineCaliperMeasureRoi lineCaliper => (
@@ -591,6 +623,21 @@ namespace ImageViewer.Services
             };
         }
 
+        private static (string Metric1, string Metric2, string Metric3) GetAuditedMetrics(
+            RoiBase roi, double pixelSize, string unit, CameraCalibration? calibration, RoiInspectionResult inspection)
+            => inspection.DistortionAudit is { HasNonConvergedPoints: true }
+                ? (string.Empty, string.Empty, string.Empty)
+                : GetMetrics(roi, pixelSize, unit, calibration);
+
+        internal static Dictionary<string, object?>? BuildDistortionMetadata(DistortionAudit? audit)
+            => audit is not { HasPoints: true } ? null : new()
+            {
+                ["pointCount"] = audit.PointCount,
+                ["nonConvergedPointCount"] = audit.NonConvergedPointCount,
+                ["maximumResidualPixels"] = double.IsFinite(audit.MaximumResidualPixels) ? audit.MaximumResidualPixels : null,
+                ["maximumUncertaintyPixels"] = double.IsFinite(audit.MaximumUncertaintyPixels) ? audit.MaximumUncertaintyPixels : null
+            };
+
         private static (string Metric1, string Metric2, string Metric3) GetDualEdgeCaliperMetrics(CaliperMeasureRoi caliper, double correction, double pixelSize, string unit)
         {
             CaliperWidthMeasurementResult width = caliper.WidthMeasurement;
@@ -604,6 +651,24 @@ namespace ImageViewer.Services
             return (requested, detection, spread);
         }
 
+        // Extract all bitmap-dependent data before the next input is decoded.
+        internal static RoiAnalysisBatchCsvRow CaptureBatchRow(
+            string sourcePath, string status, string? error, RoiBase roi, BitmapSource? bitmap,
+            double pixelSize, string? physicalUnit, CameraCalibration? calibration, int sourceIndex, string measurementItemKey)
+        {
+            string unit = string.IsNullOrWhiteSpace(physicalUnit) ? "px" : physicalUnit;
+            RoiStatistics? statistics = bitmap != null && ImageAnalysisService.TryCalculateStatistics(bitmap, roi, out RoiStatistics result)
+                ? result
+                : null;
+            RoiInspectionResult inspection = bitmap == null
+                ? RoiInspectionEvaluator.EvaluateInputFailure(roi)
+                : RoiInspectionEvaluator.Evaluate(roi, pixelSize, calibration);
+            return new RoiAnalysisBatchCsvRow(
+                sourcePath, status, error, roi.RoiTypeName, roi.Label, DescribeQuantity(roi), DescribeUnit(roi, unit), unit,
+                GetAuditedMetrics(roi, pixelSize, unit, calibration, inspection), statistics, inspection, ToToleranceInput(roi.Tolerance),
+                sourceIndex, measurementItemKey);
+        }
+
         internal static string BuildBatchCsv(IEnumerable<RoiAnalysisBatchCsvRow> rows)
         {
             ArgumentNullException.ThrowIfNull(rows);
@@ -612,13 +677,13 @@ namespace ImageViewer.Services
             builder.AppendLine("Source,Status,Error,Type,Label,Metric1,Metric2,Metric3,Mean,Min,Max,StdDev,PixelCount,DetectionStatus,SpecificationStatus,MeasuredValue,NominalValue,TolerancePlus,ToleranceMinus,PhysicalUnit,SourceIndex,MeasurementItemKey");
             foreach (RoiAnalysisBatchCsvRow row in rows)
             {
-                var metrics = GetMetrics(row.Roi, row.PixelSize, string.IsNullOrWhiteSpace(row.PhysicalUnit) ? "px" : row.PhysicalUnit, row.Calibration);
+                var metrics = row.Metrics;
                 string mean = string.Empty;
                 string min = string.Empty;
                 string max = string.Empty;
                 string stddev = string.Empty;
                 string pixelCount = string.Empty;
-                if (row.Bitmap != null && ImageAnalysisService.TryCalculateStatistics(row.Bitmap, row.Roi, out RoiStatistics statistics))
+                if (row.Statistics is { } statistics)
                 {
                     mean = statistics.Mean.ToString("F2", CultureInfo.InvariantCulture);
                     min = statistics.Min.ToString(CultureInfo.InvariantCulture);
@@ -627,17 +692,14 @@ namespace ImageViewer.Services
                     pixelCount = statistics.PixelCount.ToString(CultureInfo.InvariantCulture);
                 }
 
-                RoiInspectionResult inspection = row.Bitmap == null
-                    ? RoiInspectionEvaluator.EvaluateInputFailure(row.Roi)
-                    : RoiInspectionEvaluator.Evaluate(row.Roi, row.PixelSize, row.Calibration);
-                string unit = string.IsNullOrWhiteSpace(row.PhysicalUnit) ? "px" : row.PhysicalUnit!;
+                RoiInspectionResult inspection = row.Inspection;
 
                 builder.AppendLine(string.Join(",",
                     Escape(row.SourcePath),
                     Escape(row.Status),
                     Escape(row.Error),
-                    Escape(row.Roi.RoiTypeName),
-                    Escape(row.Roi.Label),
+                    Escape(row.RoiType),
+                    Escape(row.RoiLabel),
                     Escape(metrics.Metric1),
                     Escape(metrics.Metric2),
                     Escape(metrics.Metric3),
@@ -652,7 +714,7 @@ namespace ImageViewer.Services
                     FormatNullable(inspection.NominalValue),
                     FormatNullable(inspection.TolerancePlus),
                     FormatNullable(inspection.ToleranceMinus),
-                    Escape(unit),
+                    Escape(row.PhysicalUnit),
                     row.SourceIndex.ToString(CultureInfo.InvariantCulture),
                     Escape(row.MeasurementItemKey)));
             }

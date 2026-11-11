@@ -61,6 +61,17 @@ namespace ImageViewerControl.Tests
                 service.LoadFromJson("{ invalid", RoiPluginRegistry.CreateBuiltIn()));
         }
 
+        [Theory]
+        [InlineData("not-a-sha256")]
+        [InlineData("")]
+        public void LoadFromJson_InvalidImageSha256IsRejected(string digest)
+        {
+            var service = new ImageViewerSessionService();
+            string sessionJson = $$"""{"Version":2,"ImagePath":"source.png","ImageSha256":"{{digest}}"}""";
+
+            Assert.Throws<InvalidDataException>(() => service.LoadFromJson(sessionJson, RoiPluginRegistry.CreateBuiltIn()));
+        }
+
         [Fact]
         public void LoadFromJson_MissingRoiValues_UsesDocumentDefaults()
         {
@@ -158,6 +169,27 @@ namespace ImageViewerControl.Tests
             Assert.Equal(profile, result.QualityProfile);
             Assert.Contains("\"QualityProfile\"", sessionJson, StringComparison.Ordinal);
             Assert.Contains("\"PassResidualRms\": 0.9", sessionJson, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public void LoadFromJson_LegacySessionHasEmptyPlacement()
+        {
+            var service = new ImageViewerSessionService();
+            ImageViewerSessionData result = service.LoadFromJson("""{"Version":2}""", RoiPluginRegistry.CreateBuiltIn());
+            Assert.Null(result.CoordinateSystem);
+            Assert.Empty(result.ReferenceDatumPoints);
+            Assert.Empty(result.CurrentDatumPoints);
+        }
+
+        [Theory]
+        [InlineData("""[null]""")]
+        [InlineData("""[{"X":1e500,"Y":0}]""")]
+        [InlineData("""[{}, {}, {}]""")]
+        public void LoadFromJson_RejectsInvalidDatumPoints(string points)
+        {
+            var service = new ImageViewerSessionService();
+            string json = $$"""{"Version":2,"ReferenceDatumPoints":{{points}}}""";
+            Assert.Throws<InvalidDataException>(() => service.LoadFromJson(json, RoiPluginRegistry.CreateBuiltIn()));
         }
 
         [Fact]

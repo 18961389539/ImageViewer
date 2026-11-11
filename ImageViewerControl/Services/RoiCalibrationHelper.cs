@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Windows;
 using ImageViewer.Models;
 using ImageViewer.Utils;
@@ -80,6 +82,62 @@ namespace ImageViewer.Services
             TextAnnotationRoi text => text.Position.ToWpfPoint(),
             _ => null
         };
+
+        /// <summary>
+        /// 审计单个 ROI 实际参与畸变校正的点：线段类取两端点，其余取测量中心及其数值 Jacobian 抽样点。
+        /// Chinese: 审计点必须与 <see cref="GetLengthCorrection"/> / <see cref="GetAreaCorrection"/>
+        /// 真正做反解的点一致，否则报告会给出一个"没问题"的审计而数值却在别处发散。
+        /// </summary>
+        public static DistortionAudit AuditRoi(RoiBase roi, CameraCalibration? calibration)
+        {
+            ArgumentNullException.ThrowIfNull(roi);
+            return CameraCalibrationAudit.Audit(calibration, GetAuditPoints(roi));
+        }
+
+        /// <summary>汇总多个 ROI 的逐点去畸变审计。</summary>
+        public static DistortionAudit AuditRois(IEnumerable<RoiBase> rois, CameraCalibration? calibration)
+        {
+            ArgumentNullException.ThrowIfNull(rois);
+
+            DistortionAudit audit = DistortionAudit.Empty;
+            foreach (RoiBase roi in rois)
+            {
+                audit = audit.Combine(AuditRoi(roi, calibration));
+            }
+
+            return audit;
+        }
+
+        /// <summary>枚举一个 ROI 在校正计算中实际被反解的点。</summary>
+        public static IEnumerable<PointD> GetAuditPoints(RoiBase roi)
+        {
+            ArgumentNullException.ThrowIfNull(roi);
+
+            if (roi is PointAnnotationRoi or PointCoordinateMeasureRoi or TextAnnotationRoi)
+            {
+                yield break;
+            }
+
+            if (TryGetSegment(roi, out PointD start, out PointD end) && Distance(start, end) > 1e-9)
+            {
+                yield return start;
+                yield return end;
+                yield break;
+            }
+
+            if (GetMeasurementCenter(roi) is not Point center)
+            {
+                yield break;
+            }
+
+            PointD centerPoint = center.ToPointD();
+            yield return centerPoint;
+            // 与 LocalLengthScaleFactor / LocalAreaScaleFactor 的 ±0.5 px 数值 Jacobian 抽样保持一致。
+            yield return new PointD(centerPoint.X + 0.5, centerPoint.Y);
+            yield return new PointD(centerPoint.X - 0.5, centerPoint.Y);
+            yield return new PointD(centerPoint.X, centerPoint.Y + 0.5);
+            yield return new PointD(centerPoint.X, centerPoint.Y - 0.5);
+        }
 
         private static Point Midpoint(Point a, Point b) => new((a.X + b.X) / 2.0, (a.Y + b.Y) / 2.0);
 

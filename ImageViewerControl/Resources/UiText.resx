@@ -21,8 +21,9 @@
   <data name="MenuClearAllRois" xml:space="preserve"><value>清空所有 ROI</value></data>
   <data name="RoiDestructiveActionUndoHint" xml:space="preserve"><value>按 Delete 删除，可使用 Ctrl+Z 撤销</value></data>
   <data name="RoiClearAllUndoHint" xml:space="preserve"><value>清空所有标注，可使用 Ctrl+Z 撤销</value></data>
-  <data name="MenuDrawTooltip" xml:space="preserve"><value>选择要绘制的区域或测量工具
+  <data name="MenuDrawTooltip" xml:space="preserve"><value>选择要绘制的区域工具
 左键绘制，右键完成，Esc 取消。</value></data>
+  <data name="RoiDrawClickToConfirm" xml:space="preserve"><value>点击确认 · 右键取消</value></data>
   <data name="MenuEditProperties" xml:space="preserve"><value>编辑属性...</value></data>
   <data name="MenuSetLabel" xml:space="preserve"><value>设置标签...</value></data>
   <data name="MenuSetColor" xml:space="preserve"><value>设置颜色</value></data>
@@ -43,7 +44,12 @@
   <data name="MenuRecentProjects" xml:space="preserve"><value>最近项目</value></data>
   <data name="MenuExportProjectPackage" xml:space="preserve"><value>导出项目包...</value></data>
   <data name="MenuAutoSave" xml:space="preserve"><value>自动保存</value></data>
-  <data name="MenuAnalysisAndExport" xml:space="preserve"><value>分析与导出</value></data>
+  <data name="MenuAnalysisAndExport" xml:space="preserve"><value>分析与报告</value></data>
+  <data name="MenuCalibration" xml:space="preserve"><value>标定</value></data>
+  <data name="MenuRecipe" xml:space="preserve"><value>配方</value></data>
+  <data name="MenuImageAdjustment" xml:space="preserve"><value>图像调整</value></data>
+  <data name="MenuDisplayOverlays" xml:space="preserve"><value>显示叠加</value></data>
+  <data name="MenuCacheMaintenance" xml:space="preserve"><value>缓存维护</value></data>
   <data name="MenuExportCurrentViewPng" xml:space="preserve"><value>导出当前视图为 PNG...</value></data>
   <data name="MenuExportAnalysisCsv" xml:space="preserve"><value>导出分析结果为 CSV...</value></data>
   <data name="MenuExportBatchAnalysisCsv" xml:space="preserve"><value>批量分析并导出 CSV...</value></data>
@@ -181,6 +187,10 @@
   <data name="DialogAnalysisSummaryTitle" xml:space="preserve"><value>ROI 分析摘要</value></data>
   <data name="DialogRenderStatusTitle" xml:space="preserve"><value>渲染状态</value></data>
   <data name="ImageLoadStatusStarting" xml:space="preserve"><value>正在准备图像...</value></data>
+  <data name="DocumentLoadStatusStarting" xml:space="preserve"><value>正在准备载入...</value></data>
+  <data name="DocumentLoadStatusApplying" xml:space="preserve"><value>正在应用载入内容...</value></data>
+  <data name="DocumentLoadStatusReady" xml:space="preserve"><value>载入完成</value></data>
+  <data name="DocumentLoadStatusFailed" xml:space="preserve"><value>载入失败</value></data>
   <data name="ImageLoadStatusDecoding" xml:space="preserve"><value>正在解码图像...</value></data>
   <data name="ImageLoadStatusApplying" xml:space="preserve"><value>正在应用图像...</value></data>
   <data name="ImageLoadStatusRetrying" xml:space="preserve"><value>加载失败，正在重试...</value></data>
@@ -220,6 +230,7 @@
   <data name="InfoLineCalibrationDistortion" xml:space="preserve"><value>畸变校正: K1={0:F3}, K2={1:F3}</value></data>
   <data name="InfoLineCalibrationDistortionExtended" xml:space="preserve"><value>畸变校正: K1={0:F3}, K2={1:F3}, K3={2:F3}, P1={3:F5}, P2={4:F5}; 标定RMS={5:F4}px, 不确定度={6:F4}px</value></data>
   <data name="InfoLineCalibrationAccuracy" xml:space="preserve"><value>标定精度: 重投影 RMS={0:F4}px, 测量不确定度={1:F4}px (1σ)</value></data>
+  <data name="InfoLineCalibrationUndistortionWarning" xml:space="preserve"><value>畸变反解警告：{0}/{1} 个测量点未收敛（最大残差 {2:F4} px，最大不确定度 {3:F4} px），相关尺寸和公差判定不可评估。</value></data>
   <data name="InfoLineCalibrationIdentity" xml:space="preserve"><value>标定标识: {0}</value></data>
   <data name="InfoLineCalibrationInvalid" xml:space="preserve"><value>⚠ 标定参数不完整或非法，畸变校正按恒等处理</value></data>
   <data name="CaliperFieldCount" xml:space="preserve"><value>卡尺数量</value></data>
@@ -250,12 +261,16 @@
   <data name="CircularCaliperDialogDescription" xml:space="preserve"><value>说明: 拟合圆沿圆周均匀取样；极性控制半径方向上的梯度方向；离群阈值为 0 时会自动估计。</value></data>
   <data name="CircularCaliperDialogInvalidMessage" xml:space="preserve"><value>请输入有效的拟合圆参数。</value></data>
   <data name="FileDialogOpenImageTitle" xml:space="preserve"><value>选择图像文件</value></data>
+  <data name="FileDialogLocateSessionImageTitle" xml:space="preserve"><value>无法使用原路径的底图：请找到原文件（{0}）</value></data>
   <data name="FileDialogOpenBatchImagesTitle" xml:space="preserve"><value>选择要批量分析的图像</value></data>
   <data name="FileDialogOpenImageFilter" xml:space="preserve"><value>图像文件|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.tif;*.tiff|所有文件|*.*</value></data>
   <data name="FileDialogSaveRoiTitle" xml:space="preserve"><value>保存 ROI</value></data>
   <data name="FileDialogOpenRoiTitle" xml:space="preserve"><value>加载 ROI</value></data>
   <data name="FileDialogRoiFilter" xml:space="preserve"><value>ROI 文件|*.json|所有文件|*.*</value></data>
   <data name="FileDialogSaveSessionTitle" xml:space="preserve"><value>保存会话</value></data>
+  <data name="FileDialogSaveNamedSessionTitle" xml:space="preserve"><value>保存{0}会话</value></data>
+  <data name="SessionPrimaryView" xml:space="preserve"><value>主视图</value></data>
+  <data name="SessionAxialView" xml:space="preserve"><value>轴位视图</value></data>
   <data name="FileDialogSessionFilter" xml:space="preserve"><value>ImageViewer 会话|*.ivsession|所有文件|*.*</value></data>
   <data name="FileDialogOpenSessionTitle" xml:space="preserve"><value>打开项目或会话</value></data>
   <data name="FileDialogOpenSessionFilter" xml:space="preserve"><value>ImageViewer 项目|*.ivsession;*.ivpkg|会话文件|*.ivsession|项目包|*.ivpkg|所有文件|*.*</value></data>
@@ -288,8 +303,8 @@
   <data name="StatusRecipeAlignmentDatumsRequired" xml:space="preserve"><value>对齐未执行：配方和当前图像都需要两个不同的基准点。请先记录当前基准点 1、2；现有测量项保持不变。</value></data>
   <data name="StatusRecipeManualAlignmentApplied" xml:space="preserve"><value>已按手动选取的两个基准点完成刚体对齐。</value></data>
   <data name="StatusRecipeAlignmentFailed" xml:space="preserve"><value>配方对齐未完成：{0}。现有测量项保持不变。</value></data>
-  <data name="StatusRecipeImageChangedDuringAlignment" xml:space="preserve"><value>对齐未执行：载入过程中图像已切换，请在当前图像重新记录基准点。</value></data>
-  <data name="StatusRecipeUnsupportedRoiCount" xml:space="preserve"><value>有 {0} 个配方项无法还原；对齐载入已取消。</value></data>
+  <data name="StatusRecipeTargetChanged" xml:space="preserve"><value>载入期间图像或测量项已更改，配方未应用。请核对当前图像和基准点后重新载入。</value></data>
+  <data name="StatusRecipeUnsupportedRoiCount" xml:space="preserve"><value>有 {0} 个配方项无法还原（{1}），请检查 ROI 插件。现有测量项保持不变。</value></data>
   <data name="StatusRecipeSaveSuccess" xml:space="preserve"><value>配方已保存：{0} 个测量项 → {1}</value></data>
   <data name="StatusRecipeLoadSuccess" xml:space="preserve"><value>配方已载入：{0} 个测量项；{1}</value></data>
   <data name="StatusRecipeNoRois" xml:space="preserve"><value>当前没有测量项，未写出配方。</value></data>
@@ -415,6 +430,8 @@
   <data name="InfoLineCaliperDetectedWidth" xml:space="preserve"><value>检测宽度  中心:{0} 均值:{1} 中位数:{2}</value></data>
   <data name="InfoLineCaliperWidthSpread" xml:space="preserve"><value>宽度范围:{0}–{1} 极差:{2} 标准差:{3} 样本:{4}</value></data>
   <data name="InfoLineRegionSearch" xml:space="preserve"><value>区域:{0} 搜索:{1}</value></data>
+  <data name="InfoLineCaliperNotDetected" xml:space="preserve"><value>未检出边缘对：请让卡尺区跨过目标两侧边缘，并确认对比度足够</value></data>
+  <data name="InfoLineCaliperValidCalipers" xml:space="preserve"><value>未检出边缘对：有效卡尺 {0}/{1}，需至少 {2} 条</value></data>
   <data name="InfoLineSingleSearch" xml:space="preserve"><value>搜索:{0}</value></data>
   <data name="InfoLineCaliperParameters" xml:space="preserve"><value>卡尺数:{0} 采样宽度:{1}px 极性:{2}</value></data>
   <data name="InfoLineFit" xml:space="preserve"><value>拟合  有效:{0} 得分:{1:F0}%</value></data>
@@ -582,6 +599,8 @@
   <data name="ErrorExportBatchCsvMessage" xml:space="preserve"><value>无法完成批量分析或导出 CSV。</value></data>
   <data name="ErrorSaveSessionTitle" xml:space="preserve"><value>保存会话失败</value></data>
   <data name="ErrorSaveSessionMessage" xml:space="preserve"><value>无法保存图像查看会话。</value></data>
+  <data name="ErrorSaveSessionOtherViewPath" xml:space="preserve"><value>另一个视图正在使用此会话文件。请为当前视图选择不同的文件。</value></data>
+  <data name="ErrorSaveChangedSessionImage" xml:space="preserve"><value>磁盘上的底图在加载后被替换。请先恢复原文件，再保存；已有保存文件未被覆盖。</value></data>
   <data name="ErrorExportProjectPackageTitle" xml:space="preserve"><value>导出项目包失败</value></data>
   <data name="ErrorExportProjectPackageMessage" xml:space="preserve"><value>无法导出当前项目包。</value></data>
   <data name="WarningFileMissingTitle" xml:space="preserve"><value>文件不存在</value></data>
@@ -714,11 +733,21 @@
   <data name="StatusNoVolume" xml:space="preserve"><value>未加载体数据</value></data>
   <data name="StatusNoDataLoaded" xml:space="preserve"><value>未加载数据</value></data>
   <data name="StatusSingleImage" xml:space="preserve"><value>单张图像</value></data>
-  <data name="StatusVolumeSummary" xml:space="preserve"><value>体数据 {0} x {1} x {2}，间距 {3} x {4} x {5} mm</value></data>
+  <data name="StatusVolumeSummary" xml:space="preserve"><value>体数据 {0} x {1} x {2}，间距 {3:G6} x {4:G6} x {5:G6}</value></data>
   <data name="StatusAxialSlice" xml:space="preserve"><value>轴位切片 {0}/{1}</value></data>
+  <data name="StatusVolumePlaneSpacing" xml:space="preserve"><value>{0} · 横向间距 {1}={2:G6} · 纵向间距 {3}={4:G6}</value></data>
+  <data name="VolumeMetadataInvalidSidecar" xml:space="preserve"><value>侧车文件不是有效的 JSON 对象，已跳过：{0}</value></data>
+  <data name="VolumeMetadataUnreadableSidecar" xml:space="preserve"><value>无法读取侧车文件，已跳过：{0}</value></data>
+  <data name="VolumeMetadataNoUsableFields" xml:space="preserve"><value>侧车文件没有可用的排序或间距字段，已跳过：{0}</value></data>
+  <data name="VolumeMetadataInvalidFields" xml:space="preserve"><value>侧车文件 {0} 中的无效字段已忽略：{1}</value></data>
+  <data name="VolumeMetadataFallbackSidecar" xml:space="preserve"><value>已采用备用侧车文件：{0}</value></data>
+  <data name="VolumeMetadataFieldMissing" xml:space="preserve"><value>切片 {0} 缺少有效的{1}，无法按该字段为整组切片排序。</value></data>
+  <data name="VolumeMetadataPosition" xml:space="preserve"><value>空间位置</value></data>
+  <data name="VolumeMetadataInstance" xml:space="preserve"><value>实例号</value></data>
+  <data name="VolumeMetadataAcquisitionTime" xml:space="preserve"><value>采集时间</value></data>
   <data name="StatusCoronalSlice" xml:space="preserve"><value>冠状切片 {0}/{1}</value></data>
   <data name="StatusSagittalSlice" xml:space="preserve"><value>矢状切片 {0}/{1}</value></data>
-  <data name="Status3DVolumeSummary" xml:space="preserve"><value>3D 空间参考 | {0} x {1} x {2} | 间距 {3} x {4} x {5} mm | 轴 X/Y/Z</value></data>
+  <data name="Status3DVolumeSummary" xml:space="preserve"><value>3D 空间参考 | {0} x {1} x {2} | 间距 {3:G6} x {4:G6} x {5:G6} | 轴 X/Y/Z</value></data>
   <data name="StatusModeFormat" xml:space="preserve"><value>模式：{0}  |  {1}</value></data>
   <data name="ModeAuto" xml:space="preserve"><value>自动</value></data>
   <data name="Mode2D" xml:space="preserve"><value>2D 图像</value></data>
@@ -741,6 +770,7 @@
   <data name="StatusSegmentationFailed" xml:space="preserve"><value>分割失败，请重试。</value></data>
   <data name="StatusLoadVolumeFirstMpr" xml:space="preserve"><value>请先加载体数据再选择 MPR 方向。</value></data>
   <data name="StatusUnableCreateView" xml:space="preserve"><value>无法创建 {0} 视图，请重试。</value></data>
+  <data name="StatusViewerOperationFailed" xml:space="preserve"><value>视图操作失败，请重试。</value></data>
   <data name="StatusAnomalyLocated" xml:space="preserve"><value>已在切片 {0} 定位异常。</value></data>
   <data name="StatusNoSegmentationCandidate" xml:space="preserve"><value>当前没有可接受的分割候选。</value></data>
   <data name="StatusCandidateAccepted" xml:space="preserve"><value>候选区域已记录，待复核；ROI 数据未改动。</value></data>
@@ -817,7 +847,9 @@
   <data name="ToolbarRestoreHint" xml:space="preserve"><value>工具栏已隐藏；点击此处恢复工具栏</value></data>
   <data name="ToolbarHideButton" xml:space="preserve"><value>隐藏工具栏</value></data>
   <data name="ToolbarHideHint" xml:space="preserve"><value>隐藏当前工具栏；可点击左上角按钮或从右键菜单“显示工具栏”重新打开</value></data>
-  <data name="StatusSessionImageMissing" xml:space="preserve"><value>会话中的图像文件不存在：{0}。已加载标注和视口状态，但缺少底图。</value></data>
+  <data name="StatusSessionImageMissing" xml:space="preserve"><value>找不到会话的底图：{0}。当前文档保持不变。</value></data>
+  <data name="StatusSessionImageMismatch" xml:space="preserve"><value>图像内容与会话记录的原文件不一致：{0}。当前文档保持不变。</value></data>
+  <data name="StatusSessionImageRelinked" xml:space="preserve"><value>已找到底图并加载会话。保存会话可记录新路径。</value></data>
   <data name="StatusRotatedLeft" xml:space="preserve"><value>已逆时针旋转 90°</value></data>
   <data name="StatusRotatedRight" xml:space="preserve"><value>已顺时针旋转 90°</value></data>
   <data name="StatusFlippedHorizontal" xml:space="preserve"><value>已水平翻转</value></data>
@@ -848,6 +880,12 @@
   <data name="CalibrationBadgeInvalidWarning" xml:space="preserve"><value>⚠ 标定参数不完整或非法，畸变校正已按恒等处理</value></data>
   <data name="RecoveryBannerText" xml:space="preserve"><value>发现上次未完成的自动保存内容</value></data>
   <data name="RecoveryRestoreButton" xml:space="preserve"><value>恢复</value></data>
+  <data name="RecoveryPickerTitle" xml:space="preserve"><value>恢复自动保存…</value></data>
+  <data name="RecoveryPickerHelp" xml:space="preserve"><value>按保存时间排列。请选择要恢复的快照，恢复后可另存为正式会话。</value></data>
+  <data name="RecoveryPickerImageAndTime" xml:space="preserve"><value>{0} · {1}</value></data>
+  <data name="RecoveryPickerInMemoryImage" xml:space="preserve"><value>内存图像</value></data>
+  <data name="RecoveryPickerCancel" xml:space="preserve"><value>取消</value></data>
+  <data name="StatusRecoverySnapshotChanged" xml:space="preserve"><value>这份恢复快照已发生变化，请重新选择。</value></data>
   <data name="RecoveryDismissButton" xml:space="preserve"><value>稍后处理</value></data>
   <data name="StatusNoRecoverySnapshot" xml:space="preserve"><value>没有可恢复的自动保存内容</value></data>
   <data name="StatusRecoveryLoaded" xml:space="preserve"><value>已恢复自动保存内容，请保存到正式项目文件</value></data>
@@ -860,6 +898,8 @@
   <data name="AdaptivePreviousSlice" xml:space="preserve"><value>上一层</value></data>
   <data name="AdaptiveNextSlice" xml:space="preserve"><value>下一层</value></data>
   <data name="AdaptiveMprSliceStatus" xml:space="preserve"><value>{0} · 第 {1}/{2} 层</value></data>
+  <data name="AdaptiveMprRebuilding" xml:space="preserve"><value>正在重建切片，请稍候…</value></data>
+  <data name="AdaptiveMprCanceled" xml:space="preserve"><value>已取消切片重建，保留上一次可用的视图。</value></data>
   <data name="AdaptiveMprSliceSliderName" xml:space="preserve"><value>MPR 切片位置</value></data>
   <data name="AdaptiveViewerName" xml:space="preserve"><value>自适应图像查看器</value></data>
   <data name="VolumeViewerName" xml:space="preserve"><value>体积切片查看器</value></data>
@@ -913,6 +953,8 @@
   <data name="AdvancedMeasurementDelete" xml:space="preserve"><value>删除测量项</value></data>
   <data name="AdvancedMeasurementRefresh" xml:space="preserve"><value>重新计算</value></data>
   <data name="AdvancedMeasurementExport" xml:space="preserve"><value>导出结果与元数据</value></data>
+  <data name="AdvancedMeasurementExportInProgress" xml:space="preserve"><value>正在导出测量结果，可关闭窗口取消。</value></data>
+  <data name="AdvancedMeasurementExportComplete" xml:space="preserve"><value>测量 CSV 和元数据已导出。</value></data>
   <data name="AdvancedMeasurementClose" xml:space="preserve"><value>关闭</value></data>
   <data name="AdvancedMeasurementResultsLabel" xml:space="preserve"><value>已保存的测量项与结果</value></data>
   <data name="AdvancedMeasurementPreviewLabel" xml:space="preserve"><value>测量几何预览（当前单位）</value></data>
@@ -951,6 +993,8 @@
   <data name="AdvancedMeasurementMetricRow" xml:space="preserve"><value>{0}: {1:G8} {2}</value></data>
   <data name="AdvancedMeasurementMethodRow" xml:space="preserve"><value>方法: {0}</value></data>
   <data name="AdvancedMeasurementErrorRow" xml:space="preserve"><value>原因: {0}</value></data>
+  <data name="AdvancedMeasurementWarningRow" xml:space="preserve"><value>警告: {0}</value></data>
+  <data name="AdvancedMeasurementWarningSuffix" xml:space="preserve"><value>（含警告）</value></data>
   <data name="AdvancedMeasurementWitnessRow" xml:space="preserve"><value>几何点 {0}: ({1:G8}, {2:G8})</value></data>
   <data name="AdvancedMeasurementSourceLine" xml:space="preserve"><value>{0} · {1}</value></data>
   <data name="AdvancedMeasurementParameterHint" xml:space="preserve"><value>间隙：采样间距（当前单位）；投影：方向角（度）；周期节距：负数为暗条纹，否则为亮条纹；轮廓比较：负数为绝对偏差，否则为有符号偏差。</value></data>
@@ -1199,4 +1243,9 @@
   <data name="PrintableReportPrintFailed" xml:space="preserve"><value>打印失败：{0}</value></data>
   <data name="PrintableReportExportXpsSuccess" xml:space="preserve"><value>已导出 XPS：{0}</value></data>
   <data name="PrintableReportExportXpsFailed" xml:space="preserve"><value>导出 XPS 失败：{0}</value></data>
+  <data name="UnsavedDocumentTitle" xml:space="preserve"><value>有未保存的更改</value></data>
+  <data name="UnsavedDocumentReplaceMessage" xml:space="preserve"><value>当前图像或 ROI 有未保存的更改。切换前是否保存？</value></data>
+  <data name="VolumePreflightInvalidSlice" xml:space="preserve"><value>无法读取第 {0} 张切片“{1}”：{2}</value></data>
+  <data name="VolumePreflightChangedSlice" xml:space="preserve"><value>第 {0} 张切片“{1}”在校验后发生变化，请重新选择切片导入。</value></data>
+  <data name="VolumePreflightDimensionMismatch" xml:space="preserve"><value>第 {0} 张切片“{1}”为 {2} × {3}，预期为 {4} × {5}。</value></data>
 </root>

@@ -74,7 +74,7 @@ namespace ImageViewerControl.Tests
                 CreateRow(bitmap, pixelLength: 2, measurementItemKey: "slot-2")
             };
 
-            IReadOnlyList<SpcMeasurementSeries> series = SpcMeasurementSeriesBuilder.BuildFromBatchRows(rows, physicalUnit: "mm");
+            IReadOnlyList<SpcMeasurementSeries> series = SpcMeasurementSeriesBuilder.BuildFromBatchRows(rows);
 
             SpcMeasurementSeries slot = Assert.Single(series);
             Assert.Equal("slot-1", slot.Key);
@@ -123,17 +123,10 @@ namespace ImageViewerControl.Tests
             Radius = radius
         };
 
-        private static RoiAnalysisBatchCsvRow CreateRow(BitmapSource? bitmap, double pixelLength, string measurementItemKey) => new(
-            SourcePath: "image.png",
-            Status: "Completed",
-            Error: null,
-            Roi: CreateLine("长度", pixelLength, tolerance: null),
-            Bitmap: bitmap,
-            PixelSize: 1,
-            PhysicalUnit: "mm",
-            Calibration: null,
-            SourceIndex: 0,
-            MeasurementItemKey: measurementItemKey);
+        private static RoiAnalysisBatchCsvRow CreateRow(BitmapSource? bitmap, double pixelLength, string measurementItemKey) =>
+            RoiAnalysisExportService.CaptureBatchRow(
+                "image.png", "Completed", null, CreateLine("长度", pixelLength, tolerance: null), bitmap,
+                pixelSize: 1, physicalUnit: "mm", calibration: null, sourceIndex: 0, measurementItemKey);
 
         private static BitmapSource CreateBitmap()
         {

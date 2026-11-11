@@ -1,11 +1,14 @@
 using System;
 using System.ComponentModel;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media.Imaging;
 using CoreCircularDetectionResult = ImageViewer.Core.Analysis.CircularCaliperDetectionResult;
 using CoreLineCaliperDetectionResult = ImageViewer.Core.Analysis.LineCaliperDetectionResult;
 using CoreLineMeasureDetectionResult = ImageViewer.Core.Analysis.LineMeasureGradientDetectionResult;
 using ImageViewer.Core.Analysis;
+using ImageViewer.Drawing;
 using ImageViewer.Localization;
 using ImageViewer.Models;
 using ImageViewer.Services;
@@ -77,10 +80,16 @@ namespace ImageViewer.Controls
 
         private bool TrySnapPointToEdge(Point seed, out Point snapped, out double score, out double confidence)
         {
-            if (GetAnalysisBitmapSource() is BitmapSource bitmap &&
-                ImageAnalysisService.TrySnapPointToEdge(bitmap, seed, out snapped, out score, out confidence, QualityProfile))
+            if (GetAnalysisBitmapSource() is BitmapSource bitmap)
             {
-                return true;
+                EdgeSnapResult result = SnapPointToEdge(bitmap, seed, QualityProfile);
+                if (result.Found)
+                {
+                    snapped = result.Point;
+                    score = result.Score;
+                    confidence = result.Confidence;
+                    return true;
+                }
             }
 
             snapped = default;
@@ -88,6 +97,44 @@ namespace ImageViewer.Controls
             confidence = 0;
             return false;
         }
+
+        /// <summary>
+        /// 后台执行边缘吸附；线程亲和状态（分析位图、质量档）在调用线程上取好。
+        /// Chinese: 分析位图来自冻结副本，后台只读像素，不触碰 UI 对象；未冻结时退回同步搜索，
+        /// 保持旧行为而不是静默失去吸附。
+        /// English: Thread-affine state is captured on the calling thread; the frozen analysis bitmap
+        /// is safe to read on a worker. A non-frozen source falls back to the synchronous probe.
+        /// </summary>
+        private Task<EdgeSnapResult> SnapPointToEdgeAsync(Point seed, CancellationToken cancellationToken)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return Task.FromCanceled<EdgeSnapResult>(cancellationToken);
+            }
+
+            BitmapSource? bitmap = GetAnalysisBitmapSource();
+            ImageAnalysisQualityProfile profile = QualityProfile;
+            if (bitmap is null)
+            {
+                return Task.FromResult(EdgeSnapResult.NotFound);
+            }
+
+            if (!bitmap.IsFrozen)
+            {
+                return Task.FromResult(SnapPointToEdge(bitmap, seed, profile));
+            }
+
+            return Task.Run(
+                () => cancellationToken.IsCancellationRequested
+                    ? EdgeSnapResult.NotFound
+                    : SnapPointToEdge(bitmap, seed, profile),
+                cancellationToken);
+        }
+
+        private static EdgeSnapResult SnapPointToEdge(BitmapSource bitmap, Point seed, ImageAnalysisQualityProfile profile)
+            => ImageAnalysisService.TrySnapPointToEdge(bitmap, seed, out Point snapped, out double score, out double confidence, profile)
+                ? new EdgeSnapResult(true, snapped, score, confidence)
+                : EdgeSnapResult.NotFound;
 
         private bool TryApplyArcCaliperDetection(ArcCaliperMeasureRoi caliper, IntensityImage? intensity = null)
         {
@@ -142,35 +189,13 @@ namespace ImageViewer.Controls
 
         private static bool TryDetectBlobFeatures(BitmapSource bitmap, BlobAnalysisRoi blobRoi, out System.Collections.Generic.List<BlobFeature> blobs)
         {
-            blobs = BlobAnalysisService.DetectBlobs(bitmap, GetBlobAnalysisBounds(blobRoi), blobRoi.UseOtsu, blobRoi.ManualThreshold, blobRoi.DetectDark, blobRoi.MinArea);
+            blobs = BlobAnalysisService.DetectBlobs(bitmap, blobRoi, blobRoi.UseOtsu, blobRoi.ManualThreshold, blobRoi.DetectDark, blobRoi.MinArea);
             return true;
         }
 
         private static void ApplyBlobAnalysisResult(BlobAnalysisRoi blobRoi, System.Collections.Generic.List<BlobFeature> blobs)
         {
             blobRoi.DetectedBlobs = blobs;
-        }
-
-        private static Rect GetBlobAnalysisBounds(BlobAnalysisRoi blobRoi)
-        {
-            var rect = new Rect(
-                blobRoi.Center.X - blobRoi.Width / 2,
-                blobRoi.Center.Y - blobRoi.Height / 2,
-                blobRoi.Width,
-                blobRoi.Height);
-
-            if (blobRoi.Angle == 0)
-            {
-                return rect;
-            }
-
-            return Utils.GeometryUtils.GetBoundingBox(new[]
-            {
-                Utils.GeometryUtils.RotatePoint(new Point(rect.Left, rect.Top), blobRoi.Center.ToWpfPoint(), blobRoi.Angle),
-                Utils.GeometryUtils.RotatePoint(new Point(rect.Right, rect.Top), blobRoi.Center.ToWpfPoint(), blobRoi.Angle),
-                Utils.GeometryUtils.RotatePoint(new Point(rect.Right, rect.Bottom), blobRoi.Center.ToWpfPoint(), blobRoi.Angle),
-                Utils.GeometryUtils.RotatePoint(new Point(rect.Left, rect.Bottom), blobRoi.Center.ToWpfPoint(), blobRoi.Angle)
-            });
         }
 
         private void RefreshAllCaliperDetections()

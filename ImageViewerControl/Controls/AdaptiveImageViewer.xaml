@@ -117,6 +117,29 @@
         </Border>
         <Grid Grid.Row="1" PreviewMouseWheel="OnPreviewMouseWheel">
             <ContentControl x:Name="contentHost" />
+            <Border x:Name="mprRebuildOverlay"
+                    Background="{DynamicResource ViewerSurfaceOverlayAltBrush}"
+                    Visibility="Collapsed"
+                    automation:AutomationProperties.LiveSetting="Polite">
+                <Border HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Padding="18,14"
+                        Background="{DynamicResource ViewerSurfaceBrush}"
+                        BorderBrush="{DynamicResource ViewerPanelBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                    <StackPanel>
+                        <TextBlock Text="{localization:UiText AdaptiveMprRebuilding}"
+                                   Foreground="{DynamicResource ViewerTextPrimaryBrush}"
+                                   FontSize="13"
+                                   TextAlignment="Center" />
+                        <ProgressBar Height="5"
+                                     Width="190"
+                                     Margin="0,9,0,0"
+                                     IsIndeterminate="True" />
+                    </StackPanel>
+                </Border>
+            </Border>
             <Border x:Name="operationStatusPanel" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10" Padding="8">
                 <Border.Style>
                     <Style TargetType="Border">

@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using System.Windows;
 using ImageViewer.Localization;
 using ImageViewer.Models;
 using ImageViewer.ViewModels;
@@ -23,7 +24,10 @@ namespace ImageViewer.Controls
             LogNonCriticalError(title, ex);
             DiagnosticErrorText = $"{title}: {message}";
             HasDiagnosticError = true;
-            _dialogWorkflowService.ShowWarning(title, message);
+            if (Window.GetWindow(this) != null)
+            {
+                _dialogWorkflowService.ShowWarning(title, message);
+            }
         }
 
         private async Task RunUiOperationAsync(string operationName, Func<Task> operation)

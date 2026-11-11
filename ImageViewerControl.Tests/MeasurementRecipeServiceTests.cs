@@ -24,6 +24,110 @@ namespace ImageViewerControl.Tests
     {
         private static RoiPluginRegistry CreateRegistry() => RoiPluginRegistry.CreateBuiltIn();
 
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void RecipeKeepsGeometryWithoutCarryingReferenceImageEvidence(bool aligned)
+        {
+            RoiPluginRegistry registry = CreateRegistry();
+            var point = new PointCoordinateMeasureRoi
+            {
+                Position = new PointD(12, 24), IsEdgeSnapped = true, EdgeScore = 87, EdgeConfidence = 0.94
+            };
+            var ellipse = new FittedEllipseRoi
+            {
+                Center = new PointD(20, 30), RadiusX = 8, RadiusY = 4, Angle = 15,
+                SourcePointCount = 42, FitInlierCount = 40, FitOutlierCount = 2,
+                FitResidualRms = 0.31, FitResidualMedian = 0.22, FitResidualMax = 0.55,
+                FitNoiseScale = 0.1, FitAspectRatio = 2, FitAlgorithm = "reference-fit"
+            };
+            MeasurementRecipeDocument recipe = MeasurementRecipeService.Create("template", null, [point, ellipse],
+                0.5, "mm", registry, datumPoints: [new() { X = 10, Y = 20 }, new() { X = 20, Y = 20 }]);
+
+            Assert.False(recipe.Items[0].Template!.IsEdgeSnapped);
+            Assert.Equal(0, recipe.Items[1].Template!.FitInlierCount);
+            Assert.True(point.IsEdgeSnapped);
+            Assert.Equal(40, ellipse.FitInlierCount);
+
+            // Recreate older files that embedded the ROI payload directly, with its original evidence.
+            RoiDocument reference = RoiPersistenceService.CreateDocument([point, ellipse], 0.5, "mm", registry);
+            recipe.Items[0].Template = reference.Items[0];
+            recipe.Items[1].Template = reference.Items[1];
+            string legacyJson = MeasurementRecipeService.Serialize(recipe);
+            MeasurementRecipeDocument legacy = MeasurementRecipeService.Deserialize(legacyJson);
+            RoiDocument restored = aligned
+                ? MeasurementRecipeService.BuildAlignedRoiDocument(legacy, new PointD(30, 40), new PointD(30, 50))
+                : MeasurementRecipeService.BuildRoiDocument(legacy);
+            Assert.Equal(legacyJson, MeasurementRecipeService.Serialize(legacy));
+
+            var rois = RoiPersistenceService.CreateRois(restored, registry).Rois;
+            var loadedPoint = Assert.IsType<PointCoordinateMeasureRoi>(rois[0]);
+            var loadedEllipse = Assert.IsType<FittedEllipseRoi>(rois[1]);
+            Assert.Equal(point.MeasurementId, loadedPoint.MeasurementId);
+            Assert.Equal(aligned ? new PointD(26, 42) : point.Position, loadedPoint.Position);
+            Assert.Equal(aligned ? new PointD(20, 50) : ellipse.Center, loadedEllipse.Center);
+            Assert.Equal(aligned ? 105 : 15, loadedEllipse.Angle);
+            Assert.Equal(ellipse.RadiusX, loadedEllipse.RadiusX);
+            Assert.Equal(ellipse.RadiusY, loadedEllipse.RadiusY);
+            Assert.False(loadedPoint.IsEdgeSnapped);
+            Assert.Equal(0, loadedPoint.EdgeScore);
+            Assert.Equal(0, loadedPoint.EdgeConfidence);
+            Assert.Equal(0, loadedEllipse.SourcePointCount);
+            Assert.Equal(0, loadedEllipse.FitInlierCount);
+            Assert.Equal(0, loadedEllipse.FitOutlierCount);
+            Assert.Equal(0, loadedEllipse.FitResidualRms);
+            Assert.Equal(0, loadedEllipse.FitResidualMedian);
+            Assert.Equal(0, loadedEllipse.FitResidualMax);
+            Assert.Equal(0, loadedEllipse.FitNoiseScale);
+            Assert.Equal(0, loadedEllipse.FitAspectRatio);
+            Assert.Empty(loadedEllipse.FitAlgorithm);
+
+            string referenceCsv = RoiAnalysisExportService.BuildCsv([point, ellipse], null, 0.5, "mm");
+            string loadedCsv = RoiAnalysisExportService.BuildCsv(rois, null, 0.5, "mm");
+            Assert.Contains("EdgeConfidence=", referenceCsv, StringComparison.Ordinal);
+            Assert.Contains("Inliers=40", referenceCsv, StringComparison.Ordinal);
+            Assert.DoesNotContain("EdgeConfidence=", loadedCsv, StringComparison.Ordinal);
+            Assert.DoesNotContain("Inliers=", loadedCsv, StringComparison.Ordinal);
+            Assert.DoesNotContain("RMS=", loadedCsv, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public void DeserializeRejectsNewerRecipeVersion()
+        {
+            string json = MeasurementRecipeService.Serialize(new MeasurementRecipeDocument
+            {
+                Version = MeasurementRecipeDocument.CurrentVersion + 1
+            });
+
+            Assert.Throws<NotSupportedException>(() => MeasurementRecipeService.Deserialize(json));
+        }
+
+        [Fact]
+        public void CreateDetachesCalibrationAndDatumPointsBeforeBackgroundSave()
+        {
+            var calibration = new CameraCalibration { K1 = 0.01, NormalizationRadius = 100, CalibrationId = "original" };
+            var first = new RecipeDatumPoint { Name = "A", X = 10, Y = 20 };
+            var second = new RecipeDatumPoint { Name = "B", X = 110, Y = 20 };
+            var points = new List<RecipeDatumPoint> { first, second };
+            MeasurementRecipeDocument recipe = MeasurementRecipeService.Create(
+                "captured", null, [new CircleRoi { Center = new PointD(20, 30), Radius = 5 }],
+                0.5, "mm", CreateRegistry(), datumPoints: points, calibration: calibration);
+
+            calibration.K1 = 0.5;
+            calibration.CalibrationId = "edited";
+            first.X = 999;
+            second.Name = "edited";
+            points.Clear();
+
+            MeasurementRecipeDocument saved = MeasurementRecipeService.Deserialize(MeasurementRecipeService.Serialize(recipe));
+            Assert.Equal(0.01, saved.Calibration!.K1);
+            Assert.Equal("original", saved.Calibration.CalibrationId);
+            Assert.Equal(2, saved.DatumPoints.Count);
+            Assert.Equal(10, saved.DatumPoints[0].X);
+            Assert.Equal("B", saved.DatumPoints[1].Name);
+            Assert.True(saved.CanLocalize);
+        }
+
         [Fact]
         public void CreateCarriesRoiGeometryIntoTheTemplate()
         {

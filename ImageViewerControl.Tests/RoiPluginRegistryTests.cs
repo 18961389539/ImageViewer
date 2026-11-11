@@ -377,6 +377,7 @@ namespace ImageViewerControl.Tests
             string[] expected =
             [
                 UiText.Get("ToolPointCoordinate"),
+                UiText.Get("ToolBlobAnalysis"),
                 UiText.Get("ToolLineMeasure"),
                 UiText.Get("ToolCaliperMeasure"),
                 UiText.Get("ToolAngleMeasure"),

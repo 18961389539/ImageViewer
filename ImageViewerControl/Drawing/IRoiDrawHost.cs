@@ -1,3 +1,6 @@
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using ImageViewer.Models;
@@ -90,6 +93,29 @@ namespace ImageViewer.Drawing
             confidence = 0;
             return false;
         }
+
+        /// <summary>
+        /// 在后台完成一次边缘吸附搜索。
+        /// Chinese: 默认实现同步转调 <see cref="TrySnapPointToEdge"/>，旧宿主无需修改；
+        /// 真实控件覆写为后台计算，避免高频鼠标移动把卡尺搜索压在 UI 线程上。
+        /// English: Default implementation forwards to the synchronous probe so existing hosts keep
+        /// working; the real control overrides it to keep pointer-move feedback off the UI thread.
+        /// </summary>
+        Task<EdgeSnapResult> SnapPointToEdgeAsync(Point seed, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(
+                TrySnapPointToEdge(seed, out Point snapped, out double score, out double confidence)
+                    ? new EdgeSnapResult(true, snapped, score, confidence)
+                    : EdgeSnapResult.NotFound);
+        }
+
+        /// <summary>
+        /// 把后台完成回调切回 UI 线程。
+        /// Chinese: 默认直接执行，便于纯单测；真实控件覆写为 Dispatcher 投递。
+        /// English: Default runs inline for plain unit tests; the control posts through its dispatcher.
+        /// </summary>
+        void PostToUiThread(Action action) => action();
 
         /// <summary>
         /// 把 ROI 提交进集合（经撤销栈）。

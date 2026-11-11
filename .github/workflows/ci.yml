@@ -63,7 +63,7 @@ jobs:
 
       - name: Enforce Core line coverage
         shell: pwsh
-        run: .\build\coverage-summary.ps1 -CoverageRoot artifacts\coverage\core -AssemblyPattern 'ImageViewer.Core' -MinimumLineRate 0.80 -MinimumFiles 2
+        run: .\build\coverage-summary.ps1 -CoverageRoot artifacts\coverage\core -AssemblyPattern 'ImageViewer.Core' -MinimumLineRate 0.82 -MinimumFiles 2
 
       - name: Upload Core coverage
         uses: actions/upload-artifact@v4
@@ -168,10 +168,10 @@ jobs:
         shell: pwsh
         run: .\build\coverage-summary.ps1 -CoverageRoot artifacts\coverage\full
 
-      # Baseline is ~68% line coverage; 0.65 keeps headroom while still catching regressions.
+      # Baseline is ~69% line coverage; 0.68 keeps headroom while still catching regressions.
       - name: Enforce ImageViewerControl line coverage
         shell: pwsh
-        run: .\build\coverage-summary.ps1 -CoverageRoot artifacts\coverage\full -AssemblyPattern 'ImageViewerControl' -MinimumLineRate 0.65 -MinimumFiles 4
+        run: .\build\coverage-summary.ps1 -CoverageRoot artifacts\coverage\full -AssemblyPattern 'ImageViewerControl' -MinimumLineRate 0.68 -MinimumFiles 4
 
       - name: Upload full regression and coverage
         if: always()
@@ -179,4 +179,16 @@ jobs:
         with:
           name: imageviewer-full-regression
           path: artifacts/coverage/full
+          if-no-files-found: ignore
+
+      - name: Check batch memory and CSV baseline
+        shell: pwsh
+        run: .\build\test-batch-performance.ps1
+
+      - name: Upload batch performance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: imageviewer-batch-performance
+          path: artifacts/performance/batch/report.json
           if-no-files-found: ignore

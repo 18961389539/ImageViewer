@@ -13,6 +13,7 @@ namespace ImageViewerControl.Tests
     /// start without a geometric hit, staying on the final step when the click misses, and right-button
     /// discard.
     /// </summary>
+    [Collection(WpfTestCollection.Name)]
     public class StepClickDrawSessionTests
     {
         [Fact]

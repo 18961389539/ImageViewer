@@ -64,7 +64,5 @@ namespace ImageViewer.Controls
         void UpdateRenderedImage();
 
         void RequestViewportOverlayRefresh();
-
-        void SetImageSource(ImageSource source);
     }
 }

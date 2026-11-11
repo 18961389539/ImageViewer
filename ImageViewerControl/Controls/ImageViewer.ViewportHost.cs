@@ -80,7 +80,5 @@ namespace ImageViewer.Controls
         public void UpdateRenderedImage() => _updateRenderedImage();
 
         public void RequestViewportOverlayRefresh() => _requestViewportOverlayRefresh();
-
-        public void SetImageSource(ImageSource source) => _owner.SetCurrentValue(ImageViewer.ImageSourceProperty, source);
     }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Windows;
 using ImageViewer.Abstractions;
 using ImageViewer.Localization;
@@ -14,6 +15,25 @@ namespace ImageViewer.Dialogs
             {
                 Title = UiText.Get("FileDialogOpenImageTitle"),
                 Filter = UiText.Get("FileDialogOpenImageFilter")
+            };
+
+            return dialog.ShowDialog(owner) == true ? dialog.FileName : null;
+        }
+
+        public string? ShowLocateSessionImageDialog(Window? owner, string missingImagePath, string sessionPath)
+        {
+            if (owner == null)
+            {
+                return null;
+            }
+
+            string? originalDirectory = Path.GetDirectoryName(missingImagePath);
+            var dialog = new OpenFileDialog
+            {
+                Title = UiText.Format("FileDialogLocateSessionImageTitle", Path.GetFileName(missingImagePath)),
+                Filter = UiText.Get("FileDialogOpenImageFilter"),
+                InitialDirectory = (Directory.Exists(originalDirectory) ? originalDirectory : Path.GetDirectoryName(sessionPath)) ?? string.Empty,
+                CheckFileExists = true
             };
 
             return dialog.ShowDialog(owner) == true ? dialog.FileName : null;
@@ -54,11 +74,19 @@ namespace ImageViewer.Dialogs
             return dialog.ShowDialog(owner) == true ? dialog.FileName : null;
         }
 
-        public string? ShowSaveSessionDialog(Window? owner)
+        public string? ShowSaveSessionDialog(Window? owner) => ShowSessionSaveDialog(owner, null);
+
+        public string? ShowSaveSessionDialog(Window? owner, string sessionLabel) =>
+            ShowSessionSaveDialog(owner, sessionLabel);
+
+        private static string? ShowSessionSaveDialog(Window? owner, string? sessionLabel)
         {
             var dialog = new SaveFileDialog
             {
-                Title = UiText.Get("FileDialogSaveSessionTitle"),
+                Title = sessionLabel == null
+                    ? UiText.Get("FileDialogSaveSessionTitle")
+                    : UiText.Format("FileDialogSaveNamedSessionTitle", sessionLabel),
+                FileName = sessionLabel ?? string.Empty,
                 Filter = UiText.Get("FileDialogSessionFilter"),
                 DefaultExt = ".ivsession"
             };

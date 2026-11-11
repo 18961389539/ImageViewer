@@ -6,7 +6,7 @@ namespace ImageViewer.Dialogs
 {
     internal sealed class ReadOnlyTextDialog : Window
     {
-        public ReadOnlyTextDialog(string title, string text)
+        public ReadOnlyTextDialog(string title, string text, string? confirmLabel = null)
         {
             Title = title;
             Width = 420;
@@ -25,7 +25,7 @@ namespace ImageViewer.Dialogs
 
             var closeButton = new Button
             {
-                Content = UiText.Get("DialogButtonClose"),
+                Content = UiText.Get(confirmLabel == null ? "DialogButtonClose" : "DialogButtonCancel"),
                 IsCancel = true,
                 Width = 72,
                 HorizontalAlignment = HorizontalAlignment.Right,
@@ -33,7 +33,24 @@ namespace ImageViewer.Dialogs
             };
             closeButton.Click += (_, _) => Close();
 
-            var buttonHost = new Border { Child = closeButton };
+            var buttonHost = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right
+            };
+            if (confirmLabel != null)
+            {
+                var confirmButton = new Button
+                {
+                    Content = confirmLabel,
+                    MinWidth = 88,
+                    Padding = new Thickness(8, 2, 8, 2),
+                    Margin = new Thickness(0, 0, 0, 12)
+                };
+                confirmButton.Click += (_, _) => DialogResult = true;
+                buttonHost.Children.Add(confirmButton);
+            }
+            buttonHost.Children.Add(closeButton);
             DockPanel.SetDock(buttonHost, Dock.Bottom);
 
             var panel = new DockPanel();

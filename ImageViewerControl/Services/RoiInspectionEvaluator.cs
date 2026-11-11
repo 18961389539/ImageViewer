@@ -31,13 +31,14 @@ namespace ImageViewer.Services
             ArgumentNullException.ThrowIfNull(roi);
 
             RoiDetectionStatus detectionStatus = GetDetectionStatus(roi);
-            double? measuredValue = GetMeasuredValue(roi, pixelSize, calibration, detectionStatus);
+            DistortionAudit audit = RoiCalibrationHelper.AuditRoi(roi, calibration);
+            double? measuredValue = audit.HasNonConvergedPoints ? null : GetMeasuredValue(roi, pixelSize, calibration, detectionStatus);
             MeasurementTolerance? tolerance = roi.Tolerance is { IsEnabled: true } configured
                 ? configured
                 : null;
 
             RoiSpecificationStatus specificationStatus;
-            if (calibration is { IsEnabled: true, IsValid: false })
+            if (audit.HasNonConvergedPoints || calibration is { IsEnabled: true, IsValid: false })
             {
                 // A configured but malformed calibration must never silently fall
                 // back to raw pixels for a dimensional pass/fail decision.
@@ -71,7 +72,10 @@ namespace ImageViewer.Services
                 measuredValue,
                 tolerance?.Nominal,
                 tolerance?.TolerancePlus,
-                tolerance?.ToleranceMinus);
+                tolerance?.ToleranceMinus)
+            {
+                DistortionAudit = audit.HasPoints ? audit : null
+            };
         }
 
         private static RoiDetectionStatus GetDetectionStatus(RoiBase roi)

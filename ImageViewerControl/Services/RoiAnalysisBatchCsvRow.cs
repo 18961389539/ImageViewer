@@ -1,4 +1,3 @@
-using System.Windows.Media.Imaging;
 using ImageViewer.Models;
 
 namespace ImageViewer.Services
@@ -7,11 +6,18 @@ namespace ImageViewer.Services
         string SourcePath,
         string Status,
         string? Error,
-        RoiBase Roi,
-        BitmapSource? Bitmap,
-        double PixelSize,
-        string? PhysicalUnit,
-        CameraCalibration? Calibration,
+        string RoiType,
+        string? RoiLabel,
+        string Quantity,
+        string Unit,
+        string PhysicalUnit,
+        (string Metric1, string Metric2, string Metric3) Metrics,
+        RoiStatistics? Statistics,
+        RoiInspectionResult Inspection,
+        (double? Nominal, double? Plus, double? Minus)? Tolerance,
         int SourceIndex = -1,
-        string? MeasurementItemKey = null);
+        string? MeasurementItemKey = null)
+    {
+        public string DisplayLabel => string.IsNullOrWhiteSpace(RoiLabel) ? RoiType : RoiLabel;
+    }
 }

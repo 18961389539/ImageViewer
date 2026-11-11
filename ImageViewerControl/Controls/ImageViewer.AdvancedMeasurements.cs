@@ -21,7 +21,8 @@ public partial class ImageViewer
         }
         var dialog = new AdvancedMeasurementDialog(() => ViewerState.AllRois, () => PixelSize, () => PhysicalUnit,
             () => Calibration, SetAdvancedMeasurements, GetAnalysisBitmapSource,
-            () => _controlComposition.ViewportController.TryGetCurrentImagePath(), () => WorkpieceCoordinateSystem);
+            () => _controlComposition.ViewportController.TryGetCurrentImagePath(), () => WorkpieceCoordinateSystem,
+            () => PluginRegistry);
         Window? owner = Window.GetWindow(this);
         if (owner != null) dialog.Owner = owner;
         dialog.Resources.MergedDictionaries.Add(ThemeDictionary ?? ViewerThemes.CreateDictionary(Theme));

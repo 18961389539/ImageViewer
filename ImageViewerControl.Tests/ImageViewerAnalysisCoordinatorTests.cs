@@ -110,6 +110,41 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
+        public void UpdateRenderedImageForDisplaySettings_RunsCpuLutOffUiThread()
+        {
+            WpfTestRunner.RunAsync(async () =>
+            {
+                var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                using var gate = new ManualResetEventSlim(false);
+                var renderService = new FakeRenderService
+                {
+                    RenderFrameEntered = entered,
+                    RenderFrameGate = gate
+                };
+                var host = CreateHost(renderService, CreateBitmap());
+                host.PseudoColorPalette = PseudoColorPalette.Hot;
+                var uiFacade = new FakeAnalysisUiFacade
+                {
+                    RenderedImageApplied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)
+                };
+                var coordinator = CreateCoordinator(host, uiFacade, new FakeProfileTargetResolver());
+
+                coordinator.UpdateRenderedImageForDisplaySettings();
+
+                // 后台帧构建先进入并阻塞；若 LUT 仍在 UI 线程执行，这次调用本身就会卡住。
+                await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                Assert.Null(uiFacade.LastRenderedImagePlan);
+                await Task.Yield();
+                Assert.Null(uiFacade.LastRenderedImagePlan);
+
+                gate.Set();
+                await uiFacade.RenderedImageApplied.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                Assert.NotNull(uiFacade.LastRenderedImagePlan);
+                Assert.Equal(PseudoColorPalette.Hot, renderService.LastBuildRenderFrameSettings.Palette);
+            });
+        }
+
+        [Fact]
         public void HandlePseudoColorPaletteChanged_RefreshesOnlyTheRenderedImage()
         {
             WpfTestRunner.Run(() =>
@@ -537,6 +572,8 @@ namespace ImageViewerControl.Tests
 
             public ImageViewerRenderedImagePlan? LastRenderedImagePlan { get; private set; }
 
+            public TaskCompletionSource? RenderedImageApplied { get; set; }
+
             public void SetHistogramPanelVisibility(bool isVisible)
             {
                 IsHistogramPanelVisible = isVisible;
@@ -550,6 +587,7 @@ namespace ImageViewerControl.Tests
             public void ApplyRenderedImagePlan(ImageViewerRenderedImagePlan plan)
             {
                 LastRenderedImagePlan = plan;
+                RenderedImageApplied?.TrySetResult();
             }
 
             public void ApplyPseudoColorMenuState(ImageViewerPseudoColorMenuState state)
@@ -616,6 +654,10 @@ namespace ImageViewerControl.Tests
 
             public TaskCompletionSource<bool>? ProfileGate { get; set; }
 
+            public TaskCompletionSource? RenderFrameEntered { get; set; }
+
+            public ManualResetEventSlim? RenderFrameGate { get; set; }
+
             public byte[]? ProfileResult { get; set; } = [0, 127, 255];
 
             /// <summary>
@@ -671,7 +713,9 @@ namespace ImageViewerControl.Tests
             {
                 BuildRenderFrameCallCount++;
                 LastBuildRenderFrameSettings = settings;
-                return new ImageViewerRenderFrame(new DrawingImage(), 10, 20, 30, 40, 1.0, enableTiledRendering);
+                RenderFrameEntered?.TrySetResult();
+                RenderFrameGate?.Wait(TimeSpan.FromSeconds(2));
+                return new ImageViewerRenderFrame(null, 10, 20, 30, 40, 1.0, enableTiledRendering);
             }
 
             public Task<int[]?> CreateHistogramAsync(BitmapSource? source, int binCount, CancellationToken cancellationToken)
