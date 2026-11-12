@@ -214,6 +214,18 @@
       font-size: 1.02rem;
     }
 
+    .resume-link:not([hidden]) {
+      display: inline-block;
+      margin: 12px 8px 0 0;
+      padding: 7px 12px;
+      color: #c6f2ed;
+      border: 1px solid #5c888c;
+      border-radius: 7px;
+      font-size: 0.9rem;
+    }
+
+    .resume-link:hover { background: #253c44; }
+
     .layout {
       display: grid;
       grid-template-columns: 232px minmax(0, 1fr);
@@ -244,6 +256,17 @@
       font-weight: 700;
       letter-spacing: 0.14em;
       text-transform: uppercase;
+    }
+
+    .toc-toggle { display: none; }
+
+    @media screen {
+      .toc-chapters {
+        max-height: calc(100vh - 172px);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-width: thin;
+      }
     }
 
     .toc a {
@@ -283,8 +306,7 @@
 
     .toc a[aria-current="true"] .toc-num { color: var(--teal-dark); opacity: 1; }
 
-    /* 子目录默认收起：33 项全展开时侧栏装不下。悬停某章或滚动到该章才展开，
-       :has 让"当前章节"自动展开，不需要 JS。 */
+    /* 桌面目录默认收起小节；指针、键盘焦点或当前章均可展开。 */
     .toc-sub {
       display: none;
       margin: 0 0 6px;
@@ -293,6 +315,7 @@
     }
 
     .toc-group:hover .toc-sub,
+    .toc-group:focus-within .toc-sub,
     .toc-group:has(a[aria-current="true"]) .toc-sub { display: block; }
 
     .toc-sub a {
@@ -360,6 +383,57 @@
     }
 
     h2:hover .anchor, .anchor:focus-visible { opacity: 1; }
+
+    .copy-link {
+      display: inline-block;
+      margin-inline-start: 0.6em;
+      padding: 2px 6px;
+      color: var(--teal-dark);
+      background: transparent;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      font-family: inherit;
+      font-size: 0.72rem;
+      font-weight: 500;
+      line-height: 1.6;
+      vertical-align: middle;
+      cursor: pointer;
+    }
+
+    .copy-link:hover { background: var(--soft-teal); }
+
+    .copy-dialog {
+      width: min(calc(100% - 28px), 34rem);
+      padding: 20px;
+      color: var(--ink);
+      background: var(--surface);
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .copy-dialog::backdrop { background: rgba(0, 0, 0, 0.46); }
+    .copy-dialog label { display: block; font-weight: 650; }
+    .copy-dialog input {
+      width: 100%;
+      margin: 8px 0 12px;
+      padding: 7px;
+      color: var(--ink);
+      background: var(--paper);
+      border: 1px solid var(--line-strong);
+      border-radius: 5px;
+      font: inherit;
+    }
+    .copy-dialog p { color: var(--muted); font-size: 0.88rem; }
+    .copy-dialog button {
+      padding: 5px 12px;
+      color: var(--teal-dark);
+      background: var(--soft-teal);
+      border: 1px solid var(--line-strong);
+      border-radius: 5px;
+      font: inherit;
+      cursor: pointer;
+    }
 
     p, ul, ol { max-width: 74ch; }
 
@@ -614,11 +688,30 @@
 
     .toc-search input:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
 
-    .toc.is-searching .toc-title,
-    .toc.is-searching .toc-group,
-    .toc.is-searching .toc-nav { display: none; }
+    .search-status {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
 
-    #toc-results { display: grid; gap: 2px; }
+    @media screen {
+      .toc.is-searching .toc-title,
+      .toc.is-searching .toc-chapters,
+      .toc.is-searching .toc-toggle,
+      .toc.is-searching .toc-nav { display: none; }
+
+      #toc-results:not([hidden]) {
+        display: grid;
+        gap: 2px;
+        max-height: min(55vh, 32rem);
+        overflow-y: auto;
+        overflow-wrap: anywhere;
+        overscroll-behavior: contain;
+      }
+    }
 
     #toc-results a {
       display: block;
@@ -724,13 +817,14 @@
       border-radius: 999px;
       box-shadow: var(--shadow);
       font-size: 0.85rem;
+      visibility: hidden;
       opacity: 0;
       pointer-events: none;
       transform: translateY(8px);
       transition: opacity 0.18s ease, transform 0.18s ease;
     }
 
-    .to-top.is-visible { opacity: 1; pointer-events: auto; transform: none; }
+    .to-top.is-visible { visibility: visible; opacity: 1; pointer-events: auto; transform: none; }
 
     .to-top:hover { border-color: var(--teal); color: var(--teal-dark); }
 
@@ -746,43 +840,65 @@
       text-align: center;
     }
 
-    @media (max-width: 900px) {
-      .layout { grid-template-columns: 1fr; gap: 20px; padding-top: 22px; }
+    @media screen and (max-width: 900px) {
+      .layout { grid-template-columns: minmax(0, 1fr); gap: 20px; padding-top: 22px; }
       .toc {
         position: static;
-        display: flex;
-        gap: 2px;
-        align-items: center;
         max-height: none;
-        padding: 8px 10px;
-        overflow-x: auto;
-        flex-wrap: nowrap;
+        padding: 10px;
+        overflow: visible;
       }
-      .toc-title { margin: 0 6px 0 0; flex: none; }
-      .toc a { flex: none; border-left: 0; border-bottom: 2px solid transparent; border-radius: 5px 5px 0 0; }
-      .toc a[aria-current="true"] { border-left: 0; border-bottom-color: var(--gold); }
-      .toc-num, .toc-sub { display: none; }
+      .toc-toggle:not([hidden]) {
+        display: block;
+        min-height: 42px;
+        padding: 7px 10px;
+        color: var(--teal-dark);
+        background: var(--surface);
+        border: 1px solid var(--line-strong);
+        border-radius: 7px;
+        font: inherit;
+        cursor: pointer;
+      }
+      .toc-toggle:not([hidden])[aria-expanded="false"] ~ .toc-title,
+      .toc-toggle:not([hidden])[aria-expanded="false"] ~ .toc-chapters,
+      .toc-nav { display: none; }
+      .toc-title { margin-top: 12px; }
+      .toc-chapters { max-height: min(52vh, 26rem); }
+      .toc-sub { display: block; }
+      .toc-sub a, #toc-results a { padding-top: 8px; padding-bottom: 8px; }
+      .toc-search input { font-size: max(16px, 0.88rem); }
+      .copy-link { min-height: 32px; }
+      .reader-tools {
+        position: static;
+        display: inline-flex;
+        gap: 3px;
+        margin-top: 12px;
+        padding: 3px;
+        box-shadow: none;
+      }
+      .reader-tools button { width: 38px; height: 38px; }
       section + section { padding-top: 28px; }
       p, ul, ol, .step-list { max-width: none; }
       .chapter-index ol { grid-template-columns: 1fr; }
     }
 
-    @media (max-width: 560px) {
+    @media screen and (max-width: 560px) {
       .header-inner, .layout { width: 100%; padding-right: 14px; padding-left: 14px; }
       .header-inner { padding-top: 36px; padding-bottom: 28px; }
       h1 { font-size: 1.72rem; overflow-wrap: anywhere; }
       h2 { font-size: 1.3rem; }
+      main { overflow-wrap: anywhere; }
+      main :not(pre, td, th) > code { white-space: normal; }
       th, td { padding: 9px 10px; }
       /* 390 宽的屏幕上再保留 420px 最小宽度就会把整页撑出横向滚动 */
       .table-scroll table, .table-scroll table.wide { min-width: 0; }
       .to-top { right: 14px; bottom: 14px; }
-      .reader-tools { right: 14px; bottom: 66px; }
     }
 
     @media print {
       /* 打印必须强制浅色：系统处于暗色模式时，深色变量会一路带进纸张，
          表头会变成深底黑字。这里把屏幕用的每个颜色变量都重置一遍。 */
-      :root {
+      :root[data-theme], :root:not([data-theme]) {
         --ink: #16262f;
         --ink-soft: #2f414c;
         --muted: #5c6f7b;
@@ -801,6 +917,7 @@
         --soft-gold: #fbf2dd;
         --code-ink: #16262f;
       }
+      html { font-size: 16px; color-scheme: light; }
       @page { size: A4; margin: 14mm 12mm; }
       body { background: #fff; font-size: 10.5pt; }
       .page-header { color: #16262f; background: #fff; border-bottom: 2px solid var(--gold); }
@@ -808,21 +925,26 @@
       .subtitle { color: var(--muted); }
       .header-inner { padding: 0 0 14px; }
       .layout { display: block; width: auto; padding: 14px 0 0; }
-      .skip-link, .to-top, .reader-tools, .toc-search { display: none; }
-      .toc-nav { display: none; }
+      .skip-link, .to-top, .reader-tools, .toc-search, .toc-toggle, .search-status { display: none; }
+      .resume-link:not([hidden]), .copy-link, .copy-dialog { display: none; }
+      .toc-nav, #toc-results { display: none; }
       /* 打印件也要目录：独立一页，排在正文之前 */
       .toc {
         position: static;
         display: block;
         max-height: none;
-        padding: 0 0 8px;
+        padding: 0;
         overflow: visible;
         background: none;
         border: 0;
         box-shadow: none;
-        line-height: 1.3;
+        column-count: 2;
+        column-gap: 24px;
+        line-height: 1.24;
         break-after: page;
       }
+      .toc-group { break-inside: avoid; }
+      .toc-chapters { display: contents; }
       .toc a {
         display: flex;
         gap: 10px;
@@ -834,19 +956,22 @@
       .toc-sub { display: block; margin: 0 0 4px; }
       .toc-sub a { padding: 1px 0 1px 40px; color: #5c6f7b; font-size: 9.5pt; }
       figure { break-inside: avoid; margin: 10px 0; }
-      .toc a[aria-current="true"] { font-weight: 600; }
-      .toc-title { margin: 0 0 10px; color: #5c6f7b; font-size: 0.78rem; }
-      /* A4 宽度同样命中 max-width:900px 的窄屏规则，那里会隐藏编号、把目录压成横条；
-         打印必须显式恢复，否则纸质目录没有序号。 */
+      .toc a[aria-current="true"] { background: none; font-weight: 600; }
+      .toc-title { column-span: all; margin: 0 0 10px; color: #5c6f7b; font-size: 0.78rem; }
       .toc-num { display: inline; flex: none; min-width: 2em; color: #5c6f7b; }
       .toc a { border-bottom: 0; }
       h1 { font-size: 22pt; }
       .subtitle { margin-top: 8px; font-size: 10pt; }
+      p, ul, ol, .step-list { max-width: none; }
       /* 纸质件已有完整目录，正文末尾的卡片只是屏幕导航，打印时去掉 */
       .chapter-index, .footer { display: none; }
       section { padding-bottom: 16px; }
       section + section { padding-top: 18px; }
+      #appendix-print { padding-bottom: 8px; }
+      #integration { padding-top: 8px; padding-bottom: 0; }
+      #integration h2 { margin-bottom: 6px; }
       .table-scroll { overflow: visible; border-radius: 0; }
+      .table-scroll.is-scrollable:not(.is-at-end) { mask-image: none; }
       .table-scroll table, .table-scroll table.wide { min-width: 0; }
       table { font-size: 9pt; overflow-wrap: anywhere; }
       thead { display: table-header-group; }
@@ -854,7 +979,7 @@
       h2, h3 { break-after: avoid; }
       pre { white-space: pre-wrap; background: #f5f7f6; color: #16262f; border: 1px solid var(--line); }
       pre[data-lang]::before { display: none; }
-      pre code { color: inherit; }
+      pre code { color: inherit; white-space: pre-wrap; }
       a { color: inherit; text-decoration: none; }
       .anchor { display: none; }
     }
@@ -868,15 +993,23 @@
       <p class="eyebrow">ImageViewer / User Guide</p>
       <h1>ImageViewer 使用手册</h1>
       <p class="subtitle">从第一次标定和导出开始，逐步掌握图像浏览、ROI 测量、体数据与项目交付。</p>
+      <a class="resume-link" id="resume-reading" href="#" hidden></a>
+      <div class="reader-tools" role="group" aria-label="阅读设置">
+        <button type="button" data-action="font-smaller" aria-label="缩小字号">A−</button>
+        <button type="button" data-action="font-larger" aria-label="放大字号">A+</button>
+        <button type="button" data-action="toggle-theme" aria-label="切换深浅色">☾</button>
+      </div>
     </div>
   </header>
 
   <div class="layout">
-    <nav class="toc" aria-label="手册目录">
-      <div class="toc-search">
-        <input id="toc-search" type="search" placeholder="搜索手册…" aria-label="搜索手册" autocomplete="off">
+    <nav class="toc" id="manual-toc" aria-label="手册目录与搜索" tabindex="-1">
+      <div class="toc-search" hidden>
+        <input id="toc-search" type="search" placeholder="搜索手册…" aria-label="搜索手册" aria-controls="toc-results" autocomplete="off">
       </div>
+      <button type="button" class="toc-toggle" aria-controls="toc-chapters" aria-expanded="false" hidden>展开目录</button>
       <p class="toc-title">目录</p>
+      <div class="toc-chapters" id="toc-chapters">
       <div class="toc-group">
         <a href="#start"><span class="toc-num">01</span>启动与界面</a>
       </div>
@@ -890,8 +1023,10 @@
           <li><a href="#s3-2">常用测量</a></li>
           <li><a href="#s3-3">该用哪个工具</a></li>
           <li><a href="#s3-4">调整已有 ROI</a></li>
-          <li><a href="#s3-5">试用推荐检测参数</a></li>
-          <li><a href="#s3-6">高级测量示例：从两个圆心构造中点</a></li>
+          <li><a href="#s3-5">用双边卡尺测宽</a></li>
+          <li><a href="#s3-6">用斑点分析统计亮斑或暗斑</a></li>
+          <li><a href="#s3-7">试用推荐检测参数</a></li>
+          <li><a href="#s3-8">高级测量示例：从两个圆心构造中点</a></li>
         </ul>
       </div>
       <div class="toc-group">
@@ -904,16 +1039,19 @@
           <li><a href="#s5-2">标定对话框字段对照</a></li>
           <li><a href="#s5-3">输入和解读公差</a></li>
           <li><a href="#quality-profile">质量门限与判定阈值</a></li>
+          <li><a href="#circle-review">圆卡尺显示“需复核”怎么办</a></li>
         </ul>
       </div>
       <div class="toc-group">
         <a href="#analysis"><span class="toc-num">06</span>分析与结果导出</a>
         <ul class="toc-sub">
           <li><a href="#s6-1">导出单张图像</a></li>
-          <li><a href="#s6-2">批量分析同类图像</a></li>
-          <li><a href="#s6-3">读懂批次报告</a></li>
-          <li><a href="#s6-4">查看过程能力与控制图</a></li>
-          <li><a href="#s6-5">显示与分析辅助</a></li>
+          <li><a href="#verify-export">复核与交付测量结果</a></li>
+          <li><a href="#s6-3">批量分析同类图像</a></li>
+          <li><a href="#s6-4">读懂批次报告</a></li>
+          <li><a href="#s6-5">查看过程能力与控制图</a></li>
+          <li><a href="#s6-6">显示与分析辅助</a></li>
+          <li><a href="#s6-7">大图卡顿与分析不刷新</a></li>
         </ul>
       </div>
       <div class="toc-group">
@@ -928,8 +1066,10 @@
         <a href="#files"><span class="toc-num">08</span>保存、恢复与配方</a>
         <ul class="toc-sub">
           <li><a href="#s8-1">选择文件类型</a></li>
-          <li><a href="#s8-2">找回自动保存</a></li>
-          <li><a href="#s8-3">用两个基准点对齐测量配方</a></li>
+          <li><a href="#s8-2">打包交接与找回底图</a></li>
+          <li><a href="#s8-3">在已有图像上加载 ROI</a></li>
+          <li><a href="#s8-4">找回自动保存</a></li>
+          <li><a href="#s8-5">用两个基准点对齐测量配方</a></li>
         </ul>
       </div>
       <div class="toc-group">
@@ -961,6 +1101,8 @@
       <div class="toc-group">
         <a href="#integration"><span class="toc-num">16</span>宿主集成</a>
       </div>
+      </div>
+      <p class="search-status" role="status"></p>
       <div id="toc-results" hidden></div>
       <div class="toc-nav">
         <a id="toc-prev" href="#">‹ 上一章</a>
@@ -1197,15 +1339,28 @@
         </figure>
         <p><strong>编辑属性。</strong> 在 ROI 上右键，选菜单顶部的 <strong>编辑属性...</strong>，可打开该对象的属性编辑器。支持专用卡尺参数对话框的对象会直接打开对应的设置。常用属性也可在右侧面板编辑。</p>
         <p><strong>编辑路径。</strong> 拖动折线或多边形的节点可调整轮廓；单击线段可插入节点。右键命中某个节点后，选 <strong>当前对象 → 删除此节点</strong>。折线至少保留两个节点，闭合多边形至少保留三个。<kbd>Ctrl</kbd>+<kbd>Z</kbd> 撤销最近一项支持撤销的编辑，<kbd>Ctrl</kbd>+<kbd>Y</kbd> 重做；<strong>清空所有 ROI</strong> 之后也能用 <kbd>Ctrl</kbd>+<kbd>Z</kbd> 恢复。</p>
-        <p><strong>检测没有成功时。</strong> 先看参考线或搜索区域是否盖住目标、是否混入邻近边缘。选中圆类卡尺可点 <strong>调整圆测量参数</strong>；其他卡尺可选 <strong>当前对象 → 卡尺参数...</strong>。可调项包括 <strong>卡尺数量</strong>、<strong>搜索范围 (px)</strong>、<strong>半宽采样 (px)</strong>、<strong>最小梯度</strong>、<strong>最少有效卡尺</strong>、<strong>离群阈值 (px, 0=自动)</strong> 和 <strong>边缘极性</strong>：极性决定沿搜索方向找由暗到亮还是由亮到暗的过渡。需要看有效点、剔除点和残差时，可启用 <strong>显示卡尺得分</strong>。双边卡尺与圆卡尺还可用 <strong>梯度检测对齐（卡尺）</strong> 按检测到的边缘重新摆正。拟合线的长度与质量指标见<a href="line-fit-result-definition.md">直线拟合结果定义</a>。</p>
-      <h3 id="s3-5">试用推荐检测参数</h3>
+      <h3 id="s3-5">用双边卡尺测宽</h3>
+        <ol>
+        <li>选 <strong>测量 → 基础尺寸 → 宽度测量</strong>。在两条目标边之间选一段平直、清晰的位置，从一侧拖到另一侧。让参考线尽量垂直于两条边，且中点落在两条边之间；测得的宽度沿参考线方向计算，斜着画会量出斜向间距。</li>
+        <li>打开 <strong>当前对象 → 卡尺参数...</strong>。先调整 <strong>搜索范围 (px)</strong>，让每条卡尺都能跨过两条目标边；<strong>区域长度</strong> 控制多条卡尺沿边铺开的长度，靠近拐角时可适当缩短。如果穿过目标时先变亮再变暗（或先变暗再变亮），边缘极性先选 <code>Any</code>，让两种变化都能进入候选。</li>
+        <li>在 <strong>图像显示 → 显示叠加</strong> 开启 <strong>显示卡尺得分</strong>，检查两组检测点是否分别落在正确的边上。点太少时先检查参考线、搜索范围和最小梯度；点落到邻近的纹理上时，先收窄搜索区，再考虑用最小间距排除挨得太近的边缘。卡尺对话框可勾选 <strong>实时预览</strong> 或点 <strong>立即预览</strong>；<strong>确定</strong> 提交，<strong>取消</strong> 恢复原参数与结果。</li>
+        <li>核对宽度、有效卡尺数和各处宽度的离散程度，再填写公差。<strong>标称边缘间距</strong>及其容差按 <code>px</code> 输入，只影响选哪一对边缘。产品的合格范围在 ROI 的 <strong>公差判定</strong> 中单独填写，使用当前测量单位。</li>
+        </ol>
+        <p><strong>其他卡尺。</strong> 拟合直线沿一条目标边画参考线；拟合圆和拟合弧先从近似圆心拖出参考半径。拟合弧选中后，可在右侧属性中调整 <strong>起始角度</strong> 和 <strong>扫掠角度</strong>。圆卡尺可点 <strong>调整圆测量参数</strong>。对双边、圆形和圆弧卡尺，<strong>梯度检测对齐（卡尺）</strong> 会重新检测并更新测量结果，原来画的参考几何会保留。拟合线的长度与质量指标见<a href="line-fit-result-definition.md">直线拟合结果定义</a>。</p>
+      <h3 id="s3-6">用斑点分析统计亮斑或暗斑</h3>
+        <ol>
+        <li>选 <strong>测量 → 边缘检测 → 斑点分析</strong>，拖出一个包含完整目标的搜索框。细长区域可拖动旋转控制点，让框贴合目标方向；阈值统计和检测都只看旋转后的框内像素。如果目标被搜索框截断，面积也只反映框内部分。</li>
+        <li>右键 <strong>编辑属性...</strong>，先用 <strong>使用 Otsu</strong> 自动选阈值；目标比背景暗时勾选 <strong>检测暗斑</strong>。自动阈值把背景或阴影也圈进去时，可缩小搜索区，或关闭 Otsu 后调 <strong>手动阈值</strong>。若只多出零散小点，提高 <strong>最小面积</strong>；这个值按像素数填写。</li>
+        <li>选中 ROI，检查画布上的编号、轮廓和质心。数量比预期少时，检查目标是否连成一块、被最小面积门限滤掉，或根本没落在搜索框内。打开 <strong>显示信息面板</strong> 可看斑点数、总面积和面积最大的五个斑点的详情。</li>
+        </ol>
+      <h3 id="s3-7">试用推荐检测参数</h3>
         <ol>
         <li>选中一个直线、双边、圆形或圆弧卡尺，或一个斑点分析 ROI。对象已锁定时先解锁。在画布上右键，选 <strong>当前对象 → 推荐检测参数…</strong>，也可从 <strong>测量 → 边缘检测</strong> 进入。</li>
         <li>对照 <strong>当前参数试检测</strong> 与 <strong>建议参数试检测</strong>。卡尺先看检测点是否落在目标边缘，再比较评分、残差 RMS 和有效采样数；斑点分析看轮廓是否圈住目标，再核对区域数量与最大面积。试检测不可用或质量不足时，先按提示检查搜索区域和图像对比度，再重新生成建议。</li>
         <li>点击 <strong>应用建议</strong> 才会修改参数和检测结果，可用 <kbd>Ctrl</kbd>+<kbd>Z</kbd> 撤销；点 <strong>取消</strong> 保留原结果。建议不会改动标定、公差或项目质量门限。批量使用前，用几张有代表性的图像复核检测结果。</li>
         </ol>
         <p>各工具可推荐的参数及限制见<a href="detection-parameter-recommendations.md">检测参数推荐</a>。</p>
-      <h3 id="s3-6">高级测量示例：从两个圆心构造中点</h3>
+      <h3 id="s3-8">高级测量示例：从两个圆心构造中点</h3>
         <ol>
         <li>对两个孔分别用 <strong>三点圆</strong> 测量。再用 <strong>距离测量</strong> 沿参考边画一条线，并给这三个来源取容易区分的名字，例如“左孔”“右孔”和“参考边”。</li>
         <li>打开 <strong>测量 → 高级测量</strong>，在 <strong>测量工具</strong> 选 <strong>中点</strong>，将 <strong>测量名称</strong> 填为“孔中心中点”。在 <strong>可用 ROI / 构造结果</strong> 中依次选中两个孔，每选一个就点 <strong>添加来源</strong>，再点 <strong>保存测量项</strong>。核对预览中的中点是否落在两孔圆心之间。</li>
@@ -1266,8 +1421,9 @@
           <figcaption>底部状态栏：左侧是图像尺寸与文件名，右侧是交互模式与标定徽标（未标定时显示“未标定 · px”）</figcaption>
         </figure>
         <p>底部状态栏区分 <strong>仅比例标定</strong>、<strong>畸变校正已启用</strong>、<strong>标定模型无效</strong>。悬停可查看比例、畸变参数、重投影误差或不确定度。交付前可用 <strong>文件与项目 → 标定 → 标定检查</strong> 查看缺失项；若菜单分组难找，可直接搜索“标定检查”。</p>
+        <p>标定检查会报告比例或模型是否可用、是否缺少公差，以及配置了公差却没有可用测量值的情况。检查通过后仍需确认 ROI 覆盖的是正确特征，并用一段已知尺寸复核换算。</p>
       <h3 id="s5-2">标定对话框字段对照</h3>
-        <p>对话框分四个区：必填的实际长度与单位、可选的镜头畸变、可选的标定几何基准、可选的标定精度。除实际长度外，留空或填 <code>0</code> 都表示该项不参与校正。</p>
+        <p>对话框分四个区：实际长度与单位、可选的镜头畸变、可选的标定几何基准、可选的标定精度。实际长度必须大于 0，单位留空时用 <code>mm</code>。</p>
         <div class="table-scroll" tabindex="0" role="region" aria-label="标定与公差：表格">
         <table>
         <thead>
@@ -1316,27 +1472,27 @@
         <tr>
         <td>主点 X (px)</td>
         <td>光学中心在图像上的横向像素坐标</td>
-        <td>留 <code>0</code> 时按图像中心推算</td>
+        <td>与主点 Y、归一化半径一起填写</td>
         </tr>
         <tr>
         <td>主点 Y (px)</td>
         <td>光学中心的纵向像素坐标</td>
-        <td>留 <code>0</code> 时按图像中心推算</td>
+        <td>与主点 X、归一化半径一起填写</td>
         </tr>
         <tr>
         <td>归一化半径 (px)</td>
         <td>畸变公式里用于归一化的半径</td>
-        <td>留 <code>0</code> 时按图像短边一半推算</td>
+        <td>从同一份标定记录填写正值</td>
         </tr>
         <tr>
         <td>重投影 RMS (px)</td>
         <td>标定过程的整体拟合误差</td>
-        <td>照报告填；只影响状态栏徽标，不参与测量换算</td>
+        <td>照标定记录填写，可在徽标和报告中查看</td>
         </tr>
         <tr>
         <td>测量不确定度 (px, 1σ)</td>
         <td>标定给出的单点不确定度</td>
-        <td>同上，仅作参考信息</td>
+        <td>照标定记录填写，可在徽标和报告中查看</td>
         </tr>
         <tr>
         <td>标定标识 / 证书号</td>
@@ -1346,7 +1502,7 @@
         </tbody>
         </table>
         </div>
-        <p><strong>留空与填 0 的差别。</strong> 畸变与几何基准这两组是"整组生效"的开关：五个系数全为 0 时不启用畸变校正，主点与归一化半径再按图像中心与短边推算；只要有一个系数非 0，模型就按表中参数启用。精度区（重投影 RMS、不确定度）无论填不填都不会启用校正，只影响状态栏徽标的提示。</p>
+        <p><strong>几何基准一起填或一起留空。</strong> 三项都留空时，程序在需要保存标定模型时按图像中心和短边的一半推算。只填一部分时，剩余字段可能沿用默认值（主点坐标为 <code>0</code>、归一化半径为 <code>1 px</code>），不会逐项按图像尺寸补齐。畸变系数全为零时不启用畸变校正；精度字段用于记录和复核，不改变尺寸换算。</p>
         <p><strong>系数填反了会怎样。</strong> 畸变符号或主点偏差较大时，参考线校正后长度会明显偏离你量的像素距离，状态栏可能显示 <strong>标定模型无效</strong>。先核对符号与像素坐标原点（图像左上角为 0,0），再考虑换一条更长的参考线。</p>
       <h3 id="s5-3">输入和解读公差</h3>
         <p>选中支持判定的测量 ROI，在右侧 <strong>公差判定</strong> 中填写标称值、上公差、下公差：</p>
@@ -1381,7 +1537,7 @@
         </tr>
         <tr>
         <td><code>Review</code></td>
-        <td>找到了边缘但指标临界（覆盖不足、残差偏大等），建议人工复核。</td>
+        <td>找到了边缘但指标临界。CSV 可以有测量值；即使配置了公差，规格仍为 <code>NotEvaluable</code>，需要先复核检测。</td>
         </tr>
         <tr>
         <td><code>Failed</code></td>
@@ -1423,8 +1579,8 @@
         </table>
         </div>
       <h3 id="quality-profile">质量门限与判定阈值</h3>
-        <p>检测状态里的 <code>Passed</code> / <code>Review</code> / <code>Failed</code> 不是写死的，由一组门限决定，默认值如下。这些值是控件的 <code>QualityProfile</code> 属性，<strong>Demo 不提供编辑入口</strong>（固定用默认值）；宿主可以替换，替换后的门限随会话和测量配方一起保存。</p>
-        <p>圆卡尺（拟合圆、拟合弧、自动圆测量）的判定按固定顺序执行：任一"失败门槛"不满足即 <code>Failed</code>，全部"通过门槛"满足才是 <code>Passed</code>，其余落到 <code>Review</code>。</p>
+        <p>检测状态里的 <code>Passed</code> / <code>Review</code> / <code>Failed</code> 受质量门限影响，默认值如下。这些值是控件的 <code>QualityProfile</code> 属性，<strong>Demo 不提供编辑入口</strong>；载入会话、测量配方或 ROI 文件时，可能应用文件保存的门限。</p>
+        <p>拟合圆和自动圆测量的圆形质量门控按固定顺序执行：任一“失败门槛”不满足即 <code>Failed</code>，全部“通过门槛”满足才是 <code>Passed</code>，其余落到 <code>Review</code>。拟合弧的检测状态取决于是否检出边缘，不使用这里的圆周覆盖门限。</p>
         <div class="table-scroll" tabindex="0" role="region" aria-label="标定与公差：表格">
         <table>
         <thead>
@@ -1542,7 +1698,7 @@
         <td>自动圆测量</td>
         <td><code>AutomaticCircleResidualFraction</code></td>
         <td><code>0.08</code></td>
-        <td>残差占地半径的比例上限</td>
+        <td>残差相对半径的比例上限</td>
         </tr>
         <tr>
         <td>自动圆测量</td>
@@ -1560,12 +1716,18 @@
         </table>
         </div>
         <p><strong>两个自适应项要留意。</strong> 通过门槛的残差上限不是固定 1.5 px，而是 <code>min(1.5, max(0.5, 半径 × 0.04))</code>；失败门槛的残差上限是 <code>max(4.0, 半径 × 0.15)</code>。大半径的圆允许更大的绝对残差，小圆更严格。调门限前先看实际半径，否则会误以为改了 <code>PassResidualRms</code> 却没生效。</p>
+      <h3 id="circle-review">圆卡尺显示“需复核”怎么办</h3>
+        <ol>
+        <li>选中拟合圆或自动圆测量 ROI。在 <strong>图像显示 → 显示叠加</strong> 开启 <strong>显示卡尺得分</strong> 和 <strong>显示信息面板</strong>。查看点是否落在要量的那一圈边缘，再读信息面板里的 <strong>质量门控</strong> 原因、覆盖角度、有效卡尺数和残差。</li>
+        <li>修改前先解锁 ROI。若点混到内外两圈或相邻纹理上，先让参考圆贴近目标边缘，再从 <strong>当前对象 → 卡尺参数...</strong> 收窄搜索范围。若只有一小段能取到点，检查搜索区是否漏掉目标边缘，或圆周是否被遮挡、反光覆盖。边缘本身不清楚时，优先改善成像再拍。</li>
+        <li>调整后从 <strong>测量 → 边缘检测 → 梯度检测对齐（卡尺）</strong> 重新检测。再次核对检测点和状态，再重新导出。仍为 <code>Review</code> 时，把该项留作人工复核。</li>
+        </ol>
     </section>
     <section id="analysis">
       <h2><a class="anchor" href="#analysis" aria-label="链接到本节">#</a>分析与结果导出</h2>
       <h3 id="s6-1">导出单张图像</h3>
         <ol>
-        <li>检查各 ROI 的标签、单位与公差，便于在表格中定位。对卡尺和拟合结果，先复核检测证据。</li>
+        <li>给必检 ROI 取容易区分的标签，再检查单位、公差和检测证据。CSV 会包含当前文档里的 ROI，隐藏标注或取消选中不会把它从 CSV 排除。</li>
         <li>点击顶部 <strong>导出 CSV</strong>，或选择 <strong>分析与报告 → 导出分析结果为 CSV...</strong>。</li>
         <li>在输出目录保留同一基名的三个文件：</li>
         </ol>
@@ -1595,14 +1757,20 @@
         </div>
         <p><code>Metric1</code> 至 <code>Metric3</code> 是各 ROI 的补充指标，例如长度、方向或采样数，字段内容会随 ROI 类型变化。复核合格结论时，以 <code>MeasuredValue</code> 和 <code>SpecificationStatus</code> 为准。若 Excel 将整行读进一列，使用“数据 → 自文本/CSV”导入，选择 UTF-8 和逗号分隔。</p>
         <p>需要截图时，用 <strong>分析与报告 → 导出当前视图为 PNG...</strong>；输出含当前缩放、平移和可见叠加层，适合交流当前看到的结果。需要纸质或固定版式报告时，选择 <strong>打印报告...</strong>，可打印或导出 XPS。打印窗口保留打开时的测量快照；编辑 ROI 后，关闭并重新打开报告再打印。</p>
-      <h3 id="s6-2">批量分析同类图像</h3>
+      <h3 id="verify-export">复核与交付测量结果</h3>
         <ol>
-        <li>在参考图像上设置 ROI、标定和公差，用单图导出验证结果。确认批次图像的被测特征位于同一像素区域；如果工件位置变化，先对齐并在代表性图像上验证，批量导出不会替你自动对齐工件。</li>
-        <li>选 <strong>分析与报告 → 批量分析并导出 CSV...</strong>，选择多张图像，再选择输出 CSV。程序复用当前的 ROI 和检测参数。</li>
-        <li>完成后看 CSV 里的 <code>Source</code>、<code>Status</code>、<code>Error</code> 和 <code>SpecificationStatus</code>。<code>Status</code> 说明图像读取或分析过程，规格是否合格看 <code>SpecificationStatus</code>。同一模板项可用 <code>MeasurementItemKey</code> 在本批次内对应。</li>
+        <li>打开 <code>.report.md</code>，核对图像来源、标定比例、单位和 <strong>前置检查</strong>。如有标定标识，确认它与本次使用的标定记录一致。</li>
+        <li>在 CSV 中逐项找到必检标签，对照 <code>MeasuredValue</code>、<code>PhysicalUnit</code>、<code>DetectionStatus</code> 和 <code>SpecificationStatus</code>。报告 <strong>整体判定</strong> 为“通过”时仍可能有未判定项。例如 <a href="#quick-measure">40 mm 练习</a>里的检查线通过后，基准线仍是 <code>NotConfigured</code>；如果必检项出现这个状态，就补上公差并重新导出。如果有测量值但检测为 <code>Review</code>，先复核边缘，不能用该数值直接判合格。</li>
+        <li>一起交付同名的原始 CSV、报告和元数据。需要在 Excel 整理时编辑副本；若怀疑文件混用或被另存，可用 PowerShell 运行 <code>Get-FileHash -Algorithm SHA256 .\inspection.csv</code>，与同批元数据中的 <code>artifacts.csvSha256</code> 比较（不区分字母大小写）。需要接着编辑 ROI 时，另附 <code>.ivpkg</code>。</li>
+        </ol>
+      <h3 id="s6-3">批量分析同类图像</h3>
+        <ol>
+        <li>在参考图像上设置 ROI、标定和公差，用单图导出验证结果。确认批次图像使用同一成像尺度，且被测特征都落在同一像素区域。工件姿态逐张变化时，先在外部对齐整批图像，或逐张用配方对齐后单独导出。</li>
+        <li>选 <strong>分析与报告 → 批量分析并导出 CSV...</strong>，选择多张图像，再选择输出 CSV。程序在每张图上按相同位置和参数重新检测卡尺。手动画出的距离、三点圆等仍使用模板几何；斑点分析不会逐图重新分割。高级测量项要从 <strong>高级测量 → 导出结果与元数据</strong> 单独导出。</li>
+        <li>完成后按 <code>Source</code> 找输入文件，用 <code>MeasurementItemKey</code> 对应同一模板项。<code>Status</code> 为 <code>Geometry</code> 表示该行未重跑卡尺检测；<code>Measured</code> 表示卡尺产出了检测结果；<code>DetectionFailed</code> 时查看 <code>Error</code> 并检查对应图像。检测质量看 <code>DetectionStatus</code>，是否符合公差看 <code>SpecificationStatus</code>。</li>
         <li>保留同时生成的 <code>.metadata.json</code>、<code>.summary.json</code> 和 <code>.repeatability.md</code>。按 <kbd>Esc</kbd> 取消批次时，可保留已完成的结果；未完成项不应当作合格或失败。</li>
         </ol>
-      <h3 id="s6-3">读懂批次报告</h3>
+      <h3 id="s6-4">读懂批次报告</h3>
         <p>批量分析除了 CSV 还会写三个文件：</p>
         <div class="table-scroll" tabindex="0" role="region" aria-label="分析与结果导出：表格">
         <table>
@@ -1627,21 +1795,22 @@
         <tr>
         <td><code>.metadata.json</code></td>
         <td>复核来源并读取机器可读的统计结果</td>
-        <td>图像指纹、标定、门限、ROI 定义和导出批次；能力指数在 <code>processCapability</code> 中。</td>
+        <td>输入图像记录和指纹、标定、门限、ROI 数量和类型；能力指数在 <code>processCapability</code> 中。</td>
         </tr>
         </tbody>
         </table>
         </div>
+        <p><strong>批次取消后怎么补跑。</strong> 在 <code>.summary.json</code> 看 <code>IsCanceled</code> 和 <code>UnfinishedFileCount</code>，在元数据里对比计划输入 <code>inputs</code> 和已处理记录 <code>inputRecords</code>。后者也包含读取或检测失败的输入，不能把存在记录当成测量成功。补跑未完成的输入时换一个输出文件名，保留原来的批次记录。需要在相同位置和参数下重跑时，事先另存参考会话、项目包或测量配方；批量元数据不含完整的 ROI 定义。</p>
         <p><strong>跨图结果怎样对应。</strong> 过程能力按 <code>MeasurementItemKey</code> 聚合同一个模板项，样本顺序是批次输入顺序。漏测值会跳过。文件名相似、ROI 标签相同都不能替代这个标识。</p>
         <p><strong>什么时候能说“重复性”。</strong> Demo 的批量导出描述输入之间的变化。只有宿主在调用批量分析时明确指定这些输入是同一工件的多轮测量，报告才会给出同件重复性结论及其占用的公差比例。</p>
-      <h3 id="s6-4">查看过程能力与控制图</h3>
+      <h3 id="s6-5">查看过程能力与控制图</h3>
         <ol>
         <li>用 <strong>分析与报告 → 过程能力 / 控制图...</strong> 打开窗口，在 <strong>测量序列</strong> 中选择要看的量。窗口按当前图像的 ROI 顺序取样，同量名、同单位且至少有两个有效值才会列为一条序列；打开后编辑了 ROI，需要关闭并重新打开窗口。</li>
         <li>在 <strong>子组大小</strong> 中选每组样本数。X̄-R 控制图至少需要两个完整子组，例如选择每组 2 个就至少需要 4 个有效样本，末尾不足一组的样本不画入控制图。</li>
         <li>分开看图和能力指数。控制图可在未填公差时查看；<code>Cp</code>／<code>Pp</code> 需要双侧公差，<code>Cpk</code>／<code>Ppk</code> 也可按单侧公差计算。同序列公差冲突或用于计算的标准差为零时，相应指数可能显示 <code>—</code>。<code>Cp</code>／<code>Cpk</code> 用组内波动估计，<code>Pp</code>／<code>Ppk</code> 用序列的整体波动。</li>
         </ol>
         <p>界面控制图用于复核样本变化，不写入导出文件。跨图样本看批次报告；单项合格与否看 <code>SpecificationStatus</code>。字段定义见<a href="import-export-conventions.md">导入导出约定</a>。</p>
-      <h3 id="s6-5">显示与分析辅助</h3>
+      <h3 id="s6-6">显示与分析辅助</h3>
         <p><strong>图像显示</strong> 菜单分两个子菜单：<strong>图像调整</strong> 管亮度、色带一类的视觉参数，<strong>显示叠加</strong> 管网格、直方图、比例尺这类附加层。</p>
         <div class="table-scroll" tabindex="0" role="region" aria-label="分析与结果导出：表格">
         <table>
@@ -1691,10 +1860,40 @@
         </tbody>
         </table>
         </div>
-        <p><strong>读取像素和区域统计。</strong> 把鼠标移到图像上，画布左下角会显示图像坐标 <code>X</code>／<code>Y</code> 和该处的灰度或颜色分量。要看区域统计，选中 ROI，并在 <strong>图像显示 → 显示叠加</strong> 中开启 <strong>显示信息面板</strong>。能够统计的区域会显示均值、最小值、最大值、标准差和像素数。</p>
+        <p><strong>读取像素和区域统计。</strong> 把鼠标移到图像上，画布左下角会显示图像坐标 <code>X</code>／<code>Y</code> 和该处的灰度或颜色分量。要看区域统计，先选中 ROI，再从工具栏 <strong>更多命令 → 图像显示 → 显示叠加</strong> 开启 <strong>显示信息面板</strong>。如果菜单项已勾选但面板被对象属性收起，先关闭再打开。能够统计的区域会显示均值、最小值、最大值、标准差和像素数。</p>
         <p><strong>先预览，再确认显示调节。</strong> 在 <strong>显示调节...</strong> 对话框里，修改字段会实时更新画面。点 <strong>自动窗宽窗位</strong> 可根据原图的灰度分布取得一个起点；点 <strong>全部重置</strong> 可预览默认参数。点 <strong>确定</strong> 保留，点 <strong>取消</strong> 恢复到打开对话框之前的参数。</p>
         <p>显示变换有助于观察，不能替代尺寸标定。图像较大时程序会按需启用金字塔和分块；相关选项在 <strong>性能设置</strong> 中。</p>
-        <p><strong>分析控制。</strong> <strong>分析与报告 → 分析控制</strong> 里可切换 <strong>启用异步分析</strong>（大图时不阻塞界面）与 <strong>立即刷新分析</strong>；<strong>显示分析摘要...</strong> 给出当前文档各测量项的汇总。<strong>性能设置</strong> 里可开关 <strong>启用大图多分辨率渲染</strong>、<strong>自动选择图像分辨率</strong>、<strong>启用大图分块渲染</strong>、<strong>预取邻近图像区域</strong>、<strong>启用 GPU 加速缓存</strong>，在 <strong>伪彩色处理方式</strong> 里选择优先走 Shader 还是允许 CPU 回退，并用 <strong>缓存维护</strong> 清空大图渲染缓存、清空分析缓存或打开 <strong>显示渲染状态...</strong>。</p>
+        <p><strong>分析控制。</strong> 直方图统计整张原图，灰度剖面沿所选距离线读取原始像素；亮度、窗宽窗位和伪彩色不会改变这些数据。<strong>分析与报告 → 分析控制</strong> 里的 <strong>启用异步分析</strong> 可减轻大图分析对界面的影响。<strong>显示分析摘要...</strong> 汇总当前文档的测量项。</p>
+      <h3 id="s6-7">大图卡顿与分析不刷新</h3>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="分析与结果导出：表格">
+        <table>
+        <thead>
+        <tr>
+        <th scope="col">现象</th>
+        <th scope="col">先检查什么</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr>
+        <td>图像能打开，但缩放或平移卡顿</td>
+        <td>在 <strong>性能设置</strong> 中确认已启用 <strong>大图多分辨率渲染</strong> 和 <strong>自动选择图像分辨率</strong>。再到 <strong>高级渲染性能</strong> 检查 <strong>启用大图分块渲染</strong>；可试着切换 <strong>预取邻近图像区域</strong>，用同一张图、同一缩放位置对比。</td>
+        </tr>
+        <tr>
+        <td>开了伪彩色才卡顿</td>
+        <td>先选 <strong>图像显示 → 图像调整 → 伪彩色 → 原始</strong> 对比。重现卡顿后查看渲染状态的 <code>Pseudo color</code>；<code>CPU fallback</code> 表示当前显示处理走 CPU。</td>
+        </tr>
+        <tr>
+        <td>直方图或剖面不再更新</td>
+        <td>检查 <strong>暂停实时直方图／暂停实时剖面图</strong> 是否打开。只想更新一次时，保持图表可见，选 <strong>分析与报告 → 分析控制 → 立即刷新分析</strong>。如果只有剖面空白，先选中一条距离线。</td>
+        </tr>
+        <tr>
+        <td>单张图像打开就报像素超限</td>
+        <td>单图解码上限约 1 亿像素。先在外部降采样或裁切；用处理后的图做测量前，重新核对标定和 ROI 位置。分块渲染只影响图像打开后的显示。</td>
+        </tr>
+        </tbody>
+        </table>
+        </div>
+        <p>需要记录问题时，从 <strong>性能设置 → 显示渲染状态...</strong> 查看原图尺寸和当前帧。<code>Tiled rendering</code> 显示分块开关，<code>Current frame</code> 里的 <code>tiled=</code> 表示最近一帧是否实际分块；缩小后能用较低分辨率直接显示时，两者可以不同。若怀疑显示或分析结果仍在用旧缓存，可在 <strong>性能设置 → 缓存维护</strong> 清理对应缓存；首次重绘或刷新需要重新计算。</p>
     </section>
     <section id="volume">
       <h2><a class="anchor" href="#volume" aria-label="链接到本节">#</a>体数据与切片浏览</h2>
@@ -1771,7 +1970,7 @@
       <h3 id="s7-3">质量分析与分割</h3>
         <ul>
         <li><strong>质量分析</strong>（体数据工具栏）逐层看强度分布：空白切片、过曝、欠曝与低对比度会按当前质量门限列在质量面板里。点其中一条会切到轴位视图并跳到那一层。判定阈值来自质量门限（<code>QualityProfile</code>），同一组切片换门限后结论可能不同。层距、排序与尺寸的问题不在质量分析里报，它们在导入确认与顶部摘要中。</li>
-        <li><strong>分割</strong>在当前切片上找出候选区域，完成后可 <strong>接受</strong> 或 <strong>拒绝</strong>。<strong>拒绝</strong> 不改动 ROI。<strong>接受</strong> 会在当前切片上生成一个名为“分割结果”的 <strong>斑点分析</strong> ROI，所有候选都装在这一个 ROI 里，同时把该切片设为当前 2D 图像——不是每个候选各生成一个 ROI。后续要单独用某个候选，可在斑点分析属性里查看列表。</li>
+        <li><strong>分割候选</strong>分析当前选中的整张轴位切片，即使此时屏幕显示的是冠状、矢状或 3D。先按 <code>1</code> 回到轴位并选好层号，再开始分割。<strong>拒绝</strong> 会丢弃候选；<strong>接受</strong> 会用该切片打开 2D 视图，并将候选放进同一个“分割结果”斑点分析 ROI。选中该 ROI 可在画布上按编号复核候选。</li>
         </ul>
     </section>
     <section id="files">
@@ -1818,20 +2017,30 @@
         <p><strong>文档切换与脏状态。</strong> 图像、ROI、标定、工件坐标系或显示调节发生编辑后，底部显示“未保存”。只缩放、平移、切伪彩色、开关直方图或显示叠加不会触发提示（这些状态要么不保存，要么只是浏览偏好）；手动保存仍会记录这时的视角。替换文档时，选择“保存”会先打开保存对话框；保存成功才继续。取消、关闭保存对话框或保存失败会保留当前文档及撤销记录。</p>
         <p><strong>自动保存与最近项目。</strong> <strong>文件与项目 → 自动保存</strong> 是一个开关：打开后按配置的间隔写恢复快照，关闭后不再产生新快照（已有快照仍可恢复）。<strong>文件与项目 → 最近项目</strong> 列出最近打开过的会话与项目包。如果点选的会话或项目包文件已经不存在，程序会提示并移除这条记录；文件移过位置时，用 <strong>打开项目或会话...</strong> 选择新路径。</p>
         <p><strong>体数据的两份状态。</strong> 体数据模式下，主视图与轴位视图各自维护一份未保存状态。关闭窗口时若两者都有改动，会分别询问保存，不要以为保存一次就覆盖了两边。</p>
-        <p><strong>移动项目。</strong> 普通会话通常引用源图。如果底图移动了，打开会话时按提示选同一张原图，定位成功后重新保存记录新路径。新会话验证图像内容，文件同名同尺寸也不能替代原图。若会话旁存在 <code>ImageViewer.assets</code>（如从项目包保存为会话、或图像来自宿主提供的内存位图），移动时将目录和会话一起带走。需要只移交一个文件时用 <code>.ivpkg</code>。</p>
-      <h3 id="s8-2">找回自动保存</h3>
+      <h3 id="s8-2">打包交接与找回底图</h3>
+        <ol>
+        <li><strong>跨电脑交接：</strong> 用 <strong>文件与项目 → 导出项目包...</strong> 将当前会话和底图一起保存为 <code>.ivpkg</code>。发送前用 <strong>打开项目或会话...</strong> 打开导出的包，核对底图、标注和标定。测量报告需单独导出；体数据的整组原始切片也要另行保留。</li>
+        <li><strong>搬动普通会话：</strong> <code>.ivsession</code> 通常引用源图，搬动时保留源图；若旁边有 <code>ImageViewer.assets</code>（例如从项目包另存的会话），连同目录一起搬动。</li>
+        <li><strong>打开时要求定位底图：</strong> 选择原图或文件内容未变的副本。会话存有图像指纹时，重新编码过的图即使看起来相同也可能无法通过校验。定位成功后按 <kbd>Ctrl</kbd>+<kbd>S</kbd> 记录新路径；取消定位或校验失败会保留原先打开的文档。如果原图已丢失，先用替代图新建文档，再重新核对标定和测量位置。</li>
+        </ol>
+      <h3 id="s8-3">在已有图像上加载 ROI</h3>
+        <p>先打开对应的底图。如果要保留现有标注，先保存一份会话。选择 <strong>文件与项目 → 加载 ROI...</strong> 后，文件中的 ROI 会替换当前全部标注，撤销记录也会清空。加载后核对标注是否落在正确位置，以及文件带入的比例和物理单位；需要完整的相机标定时，请交接会话或项目包。</p>
+        <p>若状态栏提示有标注因缺少插件未载入，保留原始 JSON。等接收端装好对应 ROI 插件后再打开原文件；从当前视图重新导出不会补回缺失的标注。</p>
+      <h3 id="s8-4">找回自动保存</h3>
         <ol>
         <li>界面出现恢复提示时点击 <strong>恢复</strong>，也可从 <strong>文件与项目 → 恢复自动保存…</strong> 打开列表。</li>
         <li>按时间和项目选择快照。底图已移动时按提示定位原图；取消定位或解码失败会保留当前文档。</li>
         <li>检查恢复的图像、测量项和标定。恢复后尽快保存为正式会话或项目包。关闭恢复提示后仍可从菜单打开列表；不同窗口的自动保存相互独立。</li>
         </ol>
-      <h3 id="s8-3">用两个基准点对齐测量配方</h3>
+        <p><strong>列表为空或快照太早时。</strong> 默认约每 30 秒写一次快照，意外退出前最后几次修改可能还没写入。正常保存或关闭后，对应的旧快照会被清理；仍在使用中的窗口也不会出现在其他窗口的恢复列表中。列表为空时，先从 <strong>最近项目</strong> 打开上次手动保存的文件。</p>
+      <h3 id="s8-5">用两个基准点对齐测量配方</h3>
         <ol>
         <li>在参考图上建立测量 ROI，另用 <strong>点坐标测量</strong> 标记两个不同且容易复现的特征。依次选中点 ROI，在 <strong>测量 → 配方</strong> 中记录 <strong>参考基准点 1</strong>、<strong>参考基准点 2</strong>，然后保存配方。</li>
         <li>打开待测图，按相同顺序标记对应的两个特征，记录 <strong>当前基准点 1</strong>、<strong>当前基准点 2</strong>。切换图像会同时清空界面上已记录的参考点与当前点（配方文件里的参考点不受影响）。</li>
         <li>选 <strong>按基准对齐并载入配方...</strong>。系统按两个点平移和旋转模板，标定比例不随对齐缩放。若图像位置本来一致，或旧配方没有基准，可用 <strong>载入测量配方...</strong> 按原像素坐标加载。</li>
         <li>核对模板是否覆盖正确特征，重新检测并执行标定检查，再导出。载入配方会替换当前测量项；参考图的拟合残差、吸附置信度等检测证据不能直接用于新图。重新保存配方时会使用当前图像的 ROI 和基准点。</li>
         </ol>
+        <p><strong>对齐后仍有偏移时。</strong> 基准点 1 确定模板位置，基准点 1 指向基准点 2 的方向决定旋转。两个点要取自相同特征、顺序一致，尽量拉开距离。程序不会缩放模板：若两张图上基准点之间的像素距离明显不同，先检查点位和拍摄倍率；倍率改变时用新图重新标定并调整模板。对齐只作用于当前图像，加载一次配方不会给随后导入的每张图自动找基准。</p>
         <p>格式版本、缓存和指纹细节见<a href="project-file-format.md">项目文件格式</a>。</p>
     </section>
     <section id="shortcuts">
@@ -1939,7 +2148,11 @@
         </tr>
         <tr>
         <td>CSV 某行是 <code>NotEvaluable</code></td>
-        <td>先看检测状态与标定提示。检查采样区域是否覆盖目标、校正是否成功；解决原因后重新检测与导出。</td>
+        <td>检测状态为 <code>Review</code> 时，即使有数值也要先<a href="#circle-review">复核圆卡尺的取点</a>。没有数值时，先看检测失败或标定校正的提示。</td>
+        </tr>
+        <tr>
+        <td>报告整体通过，但某项未判定</td>
+        <td>按<a href="#verify-export">交付步骤</a>逐项核对必检 ROI 的检测、规格和单位；有缺失项时先修正再交付。</td>
         </tr>
         <tr>
         <td>检测“通过”，规格却是 <code>Failed</code></td>
@@ -1958,8 +2171,8 @@
         <td>正常情况会自动按 EXIF 旋正。若图像没有 EXIF 或方向标记被清除，用 <strong>视图 → 旋转 90°／翻转</strong> 手动摆正；旋转不改变测量坐标。</td>
         </tr>
         <tr>
-        <td>打开大图直接报错</td>
-        <td>单图解码上限约 1 亿像素。先在外部降采样或裁切，或改用体数据/分块流程；错误提示会给出实际像素数。</td>
+        <td>打开大图直接报像素超限</td>
+        <td>单图解码上限约 1 亿像素。先在外部降采样或裁切；用新图测量前重新核对标定和 ROI。</td>
         </tr>
         <tr>
         <td>调完亮度直接关窗，再打开发现没保存</td>
@@ -1987,7 +2200,7 @@
         </tr>
         <tr>
         <td>分割“接受”后只多了一个 ROI</td>
-        <td>这是设计如此：所有候选装在同一个“分割结果”斑点分析 ROI 里，用它的属性面板查看候选列表。</td>
+        <td>所有候选装在同一个“分割结果”斑点分析 ROI 里。选中它可在画布查看候选编号和轮廓。</td>
         </tr>
         </tbody>
         </table>
@@ -2046,14 +2259,14 @@
         <tr>
         <td>分割"接受"只生成一个 ROI</td>
         <td>多个候选都装在一个"分割结果"斑点分析里</td>
-        <td>一个 ROI 承载候选列表，便于整体复核</td>
-        <td>在斑点分析属性里逐个查看候选</td>
+        <td>一个 ROI 承载全部候选</td>
+        <td>选中 ROI，在画布按编号复核</td>
         </tr>
         <tr>
         <td>批量导出不会自动对齐工件</td>
-        <td>工件位置变化时整批结果偏移</td>
+        <td>工件位置变化时可能量错边或无法检出</td>
         <td>批处理复用当前 ROI 与检测参数</td>
-        <td>用配方的两个基准点对齐后再批量</td>
+        <td>先对齐全部输入，或逐张用配方对齐后单独导出</td>
         </tr>
         <tr>
         <td>只有两种 ROI 能当标定参考线</td>
@@ -2430,7 +2643,7 @@
         </tr>
         <tr>
         <td>性能设置</td>
-        <td>启用大图多分辨率渲染、自动选择图像分辨率、启用大图分块渲染、预取邻近图像区域、启用 GPU 加速缓存；高级渲染性能；伪彩色处理方式；缓存维护（清空大图渲染缓存、清空分析缓存、显示渲染状态...）</td>
+        <td>启用大图多分辨率渲染、自动选择图像分辨率、显示渲染状态...；高级渲染性能（启用大图分块渲染、预取邻近图像区域、启用 GPU 加速缓存、伪彩色处理方式）；缓存维护（清空大图渲染缓存、清空分析缓存）</td>
         </tr>
         </tbody>
         </table>
@@ -2521,6 +2734,7 @@
     </section>
     <section id="appendix-print">
       <h2><a class="anchor" href="#appendix-print" aria-label="链接到本节">#</a>附录 D：打印与另存 PDF</h2>
+        <p>网页版每个章节和小节旁都有 <strong>复制链接</strong>，可以直接定位到该标题。浏览器若不允许自动复制，会显示可手动复制的地址。本地文件链接只在能访问该文件的地方可用。浏览器允许本地存储时，重新打开手册后可在页首点 <strong>继续阅读</strong>，返回上次读到的章节或小节。</p>
         <p>手册为打印做了适配：目录单独排在正文之前，表格跨页重复表头，图片不跨页，隐藏浮动按钮。浏览器按 <kbd>Ctrl</kbd>+<kbd>P</kbd> 后建议选 A4、使用默认页边距、勾选“背景图形”以保留表格底色，并关闭浏览器的页眉页脚以免打印本地文件路径。</p>
         <p>需要一份现成的 PDF 时，仓库里有 <code>docs/usage.pdf</code>，它与 HTML 同源，由 <code>build/docs-pdf.ps1</code> 调用本机 Edge 的 headless 打印生成。换了手册内容后重新跑一次脚本即可，它会覆盖旧文件。</p>
     </section>
@@ -2552,23 +2766,40 @@
     </main>
   </div>
 
-  <div class="reader-tools" role="group" aria-label="阅读设置">
-    <button type="button" data-action="font-smaller" aria-label="缩小字号">A−</button>
-    <button type="button" data-action="font-larger" aria-label="放大字号">A+</button>
-    <button type="button" data-action="toggle-theme" aria-label="切换深浅色">☾</button>
-  </div>
-
   <a class="to-top" href="#main" aria-label="回到顶部">回到顶部</a>
+
+  <p class="search-status" id="copy-status" role="status"></p>
+  <dialog class="copy-dialog" id="copy-dialog" aria-labelledby="copy-link-label">
+    <form method="dialog">
+      <label for="copy-url" id="copy-link-label">手动复制本节链接</label>
+      <input type="text" id="copy-url" readonly autofocus>
+      <p id="copy-local-note" hidden>这是本机文件地址；其他读者需要能访问同一份手册。</p>
+      <button type="submit">关闭</button>
+    </form>
+  </dialog>
 
   <footer class="footer">ImageViewer 使用手册 · 由 docs/usage.md 生成 · 可离线打开与打印</footer>
 
   <script>
     (function () {
       var root = document.documentElement;
-      var links = Array.prototype.slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+      var toc = document.getElementById('manual-toc');
+      var chapterList = document.getElementById('toc-chapters');
+      var tocToggle = toc.querySelector('.toc-toggle');
+      var narrow = window.matchMedia('(max-width: 900px)');
+      var links = Array.prototype.slice.call(chapterList.querySelectorAll('a[href^="#"]'));
       var byId = {};
       links.forEach(function (link) { byId[link.getAttribute('href').slice(1)] = link; });
-      var sections = Array.prototype.slice.call(document.querySelectorAll('main section[id]'));
+      var sections = Array.prototype.slice.call(document.querySelectorAll('main > section[id]'));
+
+      function showDirectory(open) {
+        tocToggle.setAttribute('aria-expanded', String(open));
+        tocToggle.textContent = open ? '收起目录' : '展开目录';
+      }
+      tocToggle.hidden = false;
+      tocToggle.addEventListener('click', function () {
+        showDirectory(tocToggle.getAttribute('aria-expanded') !== 'true');
+      });
 
       // ---- 阅读设置：字号与深浅色（存 localStorage，file:// 下可能被禁用，故都包了 try） ----
       function readStore(key) {
@@ -2656,7 +2887,13 @@
         var active = byId[id];
         if (active) {
           active.setAttribute('aria-current', 'true');
-          if (active.scrollIntoView) { active.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
+          // 只滚动桌面的目录列表，不能把窄屏上的正文拉回页首。
+          if (!narrow.matches && !toc.classList.contains('is-searching') && !toc.contains(document.activeElement)) {
+            var item = active.getBoundingClientRect();
+            var list = chapterList.getBoundingClientRect();
+            if (item.top < list.top) { chapterList.scrollTop += item.top - list.top; }
+            if (item.bottom > list.bottom) { chapterList.scrollTop += item.bottom - list.bottom; }
+          }
         }
         updateChapterNav();
       }
@@ -2670,38 +2907,184 @@
         sections.forEach(function (section) { observer.observe(section); });
       }
 
-      setCurrent((window.location.hash || '').slice(1) || (sections[0] && sections[0].id));
+      function syncChapterFromHash() {
+        var target = document.getElementById(window.location.hash.slice(1));
+        var section = target && target.closest('main > section[id]');
+        if (section) { setCurrent(section.id); }
+      }
+      setCurrent(sections[0] && sections[0].id);
+      syncChapterFromHash();
+      window.addEventListener('hashchange', syncChapterFromHash);
 
-      // ---- 站内搜索：标题与正文做子串匹配，命中片段带高亮 ----
+      function jumpTo(id) {
+        var target = document.getElementById(id);
+        if (!target) { return; }
+        if (window.location.hash === '#' + id) {
+          target.scrollIntoView();
+        } else {
+          window.location.hash = id;
+        }
+        var heading = target.matches('section') ? target.querySelector('h2') : target;
+        if (heading) {
+          heading.setAttribute('tabindex', '-1');
+          heading.focus({ preventScroll: true });
+        }
+        rememberReading(id);
+      }
+
+      function followJump(event, link, beforeJump) {
+        if (event.defaultPrevented || event.button !== 0 ||
+            event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) { return; }
+        event.preventDefault();
+        if (beforeJump) { beforeJump(); }
+        jumpTo(link.getAttribute('href').slice(1));
+      }
+
+      links.forEach(function (link) {
+        link.addEventListener('click', function (event) {
+          followJump(event, link, function () {
+            if (narrow.matches) { showDirectory(false); }
+          });
+        });
+      });
+
+      // ---- 站内搜索：按最接近的小节分组，优先匹配标题 ----
       var searchInput = document.getElementById('toc-search');
       var results = document.getElementById('toc-results');
-      var toc = document.querySelector('.toc');
+      var searchStatus = toc.querySelector('.search-status');
       var searchIndex = [];
+      var readingHeadings = [];
+      var readingById = Object.create(null);
+
+      function cleanText(text) { return text.replace(/\s+/g, ' ').trim(); }
 
       sections.forEach(function (section) {
-        var heading = section.querySelector('h2');
-        var title = section.id;
-        if (heading) {
-          // h2 里的 "#" 是锚点链接的文字，搜索结果里不该带出来
-          var headingCopy = heading.cloneNode(true);
-          var headingAnchor = headingCopy.querySelector('.anchor');
-          if (headingAnchor) { headingAnchor.parentNode.removeChild(headingAnchor); }
-          title = headingCopy.textContent.replace(/\s+/g, ' ').trim() || section.id;
+        var chapter = section.querySelector('h2');
+        var anchor = chapter && chapter.querySelector('.anchor');
+        var chapterTitle = chapter ? cleanText(chapter.textContent.slice(anchor ? anchor.textContent.length : 0)) : section.id;
+        var id = section.id;
+        var title = chapterTitle;
+        Array.prototype.forEach.call(section.querySelectorAll('h2, h3[id], p, li, td, th, figcaption, pre'), function (node) {
+          var text = node === chapter ? chapterTitle : cleanText(node.textContent);
+          if (node.matches('h3[id]')) {
+            id = node.id;
+            title = chapterTitle + ' › ' + text;
+          }
+          if (text) {
+            var isHeading = node.matches('h2, h3');
+            searchIndex.push({
+              id: id, title: title, text: text, normalized: text.toLowerCase(), heading: isHeading
+            });
+            if (isHeading) {
+              var heading = { id: id, title: text, node: node };
+              readingHeadings.push(heading);
+              readingById[id] = heading;
+            }
+          }
+        });
+      });
+
+      // ---- 本机阅读位置：仅显示返回入口，直接打开带锚点的地址仍走浏览器的跳转 ----
+      var resumeLink = document.getElementById('resume-reading');
+      var readingKey = 'iv-manual-reading-anchor-v1';
+      var readingId = readStore(readingKey);
+      var printing = window.matchMedia('print');
+      var readingTimer = null;
+
+      function updateResumeLink() {
+        var heading = readingById[readingId];
+        resumeLink.hidden = !heading;
+        if (!heading) { return; }
+        resumeLink.href = '#' + heading.id;
+        resumeLink.textContent = '继续阅读 · ' + heading.title;
+      }
+
+      function rememberReading(id) {
+        if (printing.matches || id === readingId || !readingById[id]) { return; }
+        readingId = id;
+        writeStore(readingKey, id);
+        updateResumeLink();
+      }
+
+      function recordVisibleHeading() {
+        if (printing.matches || !readingHeadings.length ||
+            readingHeadings[0].node.getBoundingClientRect().top > 0) { return; }
+        var readingLine = Math.min(108, window.innerHeight / 4);
+        for (var i = readingHeadings.length - 1; i >= 0; i--) {
+          var entry = readingHeadings[i];
+          var top = entry.node.getBoundingClientRect().top;
+          if (top <= readingLine) {
+            // 打开分享链接时，原生锚点定位本身不覆盖上次的位置。
+            if (top < 0 || window.location.hash !== '#' + entry.id) { rememberReading(entry.id); }
+            return;
+          }
         }
-        Array.prototype.forEach.call(section.querySelectorAll('h3, p, li, td, th'), function (node) {
-          var text = node.textContent.replace(/\s+/g, ' ').trim();
-          if (text.length >= 6) { searchIndex.push({ id: section.id, title: title, text: text }); }
+      }
+
+      updateResumeLink();
+      resumeLink.addEventListener('click', function (event) { followJump(event, resumeLink); });
+      window.addEventListener('scroll', function () {
+        window.clearTimeout(readingTimer);
+        readingTimer = window.setTimeout(function () {
+          readingTimer = null;
+          recordVisibleHeading();
+        }, 180);
+      }, { passive: true });
+      window.addEventListener('pagehide', function () {
+        if (readingTimer === null) { return; }
+        window.clearTimeout(readingTimer);
+        readingTimer = null;
+        recordVisibleHeading();
+      });
+
+      // ---- 复制小节链接：浏览器禁止剪贴板时提供可选择的地址 ----
+      var copyDialog = document.getElementById('copy-dialog');
+      var copyInput = document.getElementById('copy-url');
+      var copyLocalNote = document.getElementById('copy-local-note');
+      var copyStatus = document.getElementById('copy-status');
+
+      readingHeadings.forEach(function (entry) {
+        var button = document.createElement('button');
+        button.className = 'copy-link';
+        button.type = 'button';
+        button.textContent = '复制链接';
+        button.setAttribute('aria-label', '复制「' + entry.title + '」的链接');
+        entry.node.setAttribute('aria-label', entry.title);
+        entry.node.appendChild(button);
+        var feedbackTimer;
+        button.addEventListener('click', async function () {
+          var url = new URL(window.location.href);
+          url.hash = entry.id;
+          try {
+            await navigator.clipboard.writeText(url.href);
+            button.textContent = '已复制';
+            copyStatus.textContent = '已复制「' + entry.title + '」的链接';
+            window.clearTimeout(feedbackTimer);
+            feedbackTimer = window.setTimeout(function () { button.textContent = '复制链接'; }, 1500);
+          } catch (error) {
+            copyInput.value = url.href;
+            copyLocalNote.hidden = url.protocol !== 'file:';
+            if (!copyDialog.open) { copyDialog.showModal(); }
+            copyInput.select();
+          }
         });
       });
 
       function clearResults() {
-        if (!results) { return; }
         results.textContent = '';
         results.hidden = true;
-        if (toc) { toc.classList.remove('is-searching'); }
+        searchStatus.textContent = '';
+        toc.classList.remove('is-searching');
       }
 
-      function buildResult(item, position, length) {
+      function resetSearch() {
+        searchInput.value = '';
+        clearResults();
+      }
+
+      function buildResult(match, length) {
+        var item = match.item;
+        var position = match.position;
         var link = document.createElement('a');
         link.href = '#' + item.id;
         var chapter = document.createElement('span');
@@ -2720,58 +3103,81 @@
         snippet.appendChild(document.createTextNode(item.text.slice(position + length, end)));
         if (end < item.text.length) { snippet.appendChild(document.createTextNode('…')); }
         link.appendChild(snippet);
-        link.addEventListener('click', function () {
-          if (searchInput) { searchInput.value = ''; }
-          clearResults();
+        link.addEventListener('click', function (event) {
+          followJump(event, link, function () {
+            resetSearch();
+            if (narrow.matches) { showDirectory(false); }
+          });
         });
         return link;
       }
 
       function showResults(query) {
-        if (!results) { return; }
         var needle = query.toLowerCase();
-        var seen = {};
-        var count = 0;
+        var best = Object.create(null);
         results.textContent = '';
-        for (var i = 0; i < searchIndex.length && count < 12; i++) {
-          var item = searchIndex[i];
-          var position = item.text.toLowerCase().indexOf(needle);
-          if (position < 0) { continue; }
-          var key = item.id + '|' + item.text.slice(0, 24);
-          if (seen[key]) { continue; }
-          seen[key] = 1;
-          count += 1;
-          results.appendChild(buildResult(item, position, needle.length));
-        }
-        if (count === 0) {
-          var empty = document.createElement('p');
-          empty.className = 'toc-empty';
-          empty.textContent = '没有匹配的内容';
-          results.appendChild(empty);
-        }
-        results.hidden = false;
-        if (toc) { toc.classList.add('is-searching'); }
-      }
-
-      if (searchInput && results) {
-        var timer = null;
-        searchInput.addEventListener('input', function () {
-          var value = searchInput.value.trim();
-          window.clearTimeout(timer);
-          if (!value) { clearResults(); return; }
-          timer = window.setTimeout(function () { showResults(value); }, 90);
-        });
-        searchInput.addEventListener('keydown', function (event) {
-          if (event.key === 'Escape') {
-            event.stopPropagation();
-            searchInput.value = '';
-            clearResults();
+        searchIndex.forEach(function (item, index) {
+          var position = item.normalized.indexOf(needle);
+          if (position < 0) { return; }
+          var rank = item.heading ? (item.normalized === needle ? 3 : 2) : 1;
+          if (!best[item.id] || rank > best[item.id].rank) {
+            best[item.id] = { item: item, index: index, position: position, rank: rank };
           }
         });
+        var matches = Object.keys(best).map(function (id) { return best[id]; });
+        matches.sort(function (a, b) { return b.rank - a.rank || a.index - b.index; });
+        var limit = 12;
+        var summary = matches.length ? '找到 ' + matches.length + ' 处匹配' : '没有匹配的内容';
+        if (matches.length > limit) { summary += '，显示前 ' + limit + ' 处'; }
+        var message = document.createElement('p');
+        message.className = 'toc-empty';
+        message.setAttribute('aria-hidden', 'true');
+        message.textContent = summary;
+        results.appendChild(message);
+        matches.slice(0, limit).forEach(function (match) {
+          results.appendChild(buildResult(match, needle.length));
+        });
+        results.hidden = false;
+        results.scrollTop = 0;
+        searchStatus.textContent = summary;
+        toc.classList.add('is-searching');
       }
+
+      function refreshSearch() {
+        var value = cleanText(searchInput.value);
+        if (value) { showResults(value); } else { clearResults(); }
+      }
+      var composing = false;
+      searchInput.parentElement.hidden = false;
+      searchInput.addEventListener('compositionstart', function () { composing = true; });
+      searchInput.addEventListener('compositionend', function () { composing = false; refreshSearch(); });
+      searchInput.addEventListener('input', function (event) {
+        if (!composing && !event.isComposing) { refreshSearch(); }
+      });
+      toc.addEventListener('keydown', function (event) {
+        if (composing || event.isComposing || event.keyCode === 229) { return; }
+        if (event.key === 'Escape' && !results.hidden) {
+          event.preventDefault();
+          resetSearch();
+          searchInput.focus();
+        } else if (event.target === searchInput && (event.key === 'Enter' || event.key === 'ArrowDown')) {
+          var first = results.querySelector('a');
+          if (!first) { return; }
+          event.preventDefault();
+          if (event.key === 'Enter') { first.click(); } else { first.focus(); }
+        }
+      });
 
       // ---- 回顶按钮与表格横向溢出提示 ----
       var toTop = document.querySelector('.to-top');
+      function updateReturnLink() {
+        var label = narrow.matches ? '目录与搜索' : '回到正文顶部';
+        toTop.setAttribute('href', narrow.matches ? '#manual-toc' : '#main');
+        toTop.textContent = label;
+        toTop.setAttribute('aria-label', label);
+      }
+      updateReturnLink();
+      narrow.addEventListener('change', updateReturnLink);
       function onScroll() {
         if (!toTop) { return; }
         toTop.classList.toggle('is-visible', window.scrollY > 640);

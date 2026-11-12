@@ -8,8 +8,8 @@
 * 支持的 Markdown 子集（够用即可，不引入第三方依赖）：
   ``#`` 标题、``##`` 章节、``###`` 小节、段落、``-`` / ``1.`` 列表、
   管道表格、围栏代码块、``>`` 提示块、行内 ``**加粗**`` / ``` `代码` ``` / ``[文字](链接)``；
-  另外支持三种行内指令：
-  ``<a id="anchor"></a>`` 给下一个标题指定锚点，
+  另外支持两种指令：
+  ``<a id="anchor"></a>`` 给下一个章节或小节指定固定锚点；移动或重命名标题时保留它，
   ``<!-- steps -->`` 让紧随其后的有序列表变成带序号圆点的时间线样式。
 * ``--check`` 模式不写文件：确认 HTML 与 md 同步，并检查 31 个 ROI 工具、
   18 个高级测量项和顶层菜单分组都在手册里出现过。CI 跑这个模式，防止文档再漂移。
@@ -25,6 +25,7 @@ from __future__ import annotations
 import html
 import re
 import sys
+from html.parser import HTMLParser
 from pathlib import Path
 from xml.etree import ElementTree
 
@@ -166,33 +167,30 @@ def render_list(items: list[tuple[bool, str]], ordered_class: str, indent: str) 
     return "\n".join(lines)
 
 
-def slug(text: str) -> str:
-    return re.sub(r"[^0-9a-zA-Z]+", "-", text).strip("-").lower() or "section"
-
-
-def convert(md_text: str) -> tuple[str, str, list[tuple[str, str]]]:
+def convert(md_text: str) -> tuple[str, str, list[tuple[str, str, list[tuple[str, str]]]]]:
     """返回 (标题, 正文 HTML, 目录项)。"""
     lines = md_text.splitlines()
     title = ""
     body: list[str] = []
     toc: list[tuple[str, str, list[tuple[str, str]]]] = []
-    section_no = 0
-    sub_no = 0
     pending_id: str | None = None
     pending_steps = False
     section_open = False
     section_title = "手册"
-    level_three_open = False
     index = 0
 
     def close_section() -> None:
-        nonlocal section_open, level_three_open
-        if level_three_open:
-            body.append("      </section>")
-            level_three_open = False
+        nonlocal section_open
         if section_open:
             body.append("    </section>")
             section_open = False
+
+    def consume_anchor(heading: str) -> str:
+        nonlocal pending_id
+        if pending_id is None:
+            raise DocError(f"标题「{heading}」缺少固定锚点，请在前一行指定 <a id=\"anchor\"></a>")
+        anchor_id, pending_id = pending_id, None
+        return anchor_id
 
     while index < len(lines):
         line = lines[index]
@@ -201,6 +199,9 @@ def convert(md_text: str) -> tuple[str, str, list[tuple[str, str]]]:
         if not stripped:
             index += 1
             continue
+
+        if pending_id is not None and not stripped.startswith(("## ", "### ")):
+            raise DocError(f"锚点 #{pending_id} 后应紧跟章节或小节标题")
 
         if stripped.startswith("```"):
             language = stripped[3:].strip()
@@ -221,7 +222,7 @@ def convert(md_text: str) -> tuple[str, str, list[tuple[str, str]]]:
             )
             continue
 
-        anchor = re.fullmatch(r'<a id="([^"]+)"></a>', stripped)
+        anchor = re.fullmatch(r'<a id="([a-z][a-z0-9-]*)"></a>', stripped)
         if anchor:
             pending_id = anchor.group(1)
             index += 1
@@ -240,11 +241,8 @@ def convert(md_text: str) -> tuple[str, str, list[tuple[str, str]]]:
         if stripped.startswith("## "):
             close_section()
             heading = stripped[3:].strip()
-            anchor_id = pending_id or slug(heading)
-            pending_id = None
+            anchor_id = consume_anchor(heading)
             section_title = heading
-            section_no += 1
-            sub_no = 0
             toc.append((anchor_id, heading, []))
             body.append(f'    <section id="{anchor_id}">')
             body.append(
@@ -257,9 +255,7 @@ def convert(md_text: str) -> tuple[str, str, list[tuple[str, str]]]:
 
         if stripped.startswith("### "):
             heading = stripped[4:].strip()
-            sub_no += 1
-            sub_id = pending_id or f"s{section_no}-{sub_no}"
-            pending_id = None
+            sub_id = consume_anchor(heading)
             if toc:
                 toc[-1][2].append((sub_id, heading))
             body.append(f'      <h3 id="{sub_id}">{render_inline(heading)}</h3>')
@@ -335,6 +331,8 @@ def convert(md_text: str) -> tuple[str, str, list[tuple[str, str]]]:
             index += 1
         body.append("        <p>" + " ".join(render_inline(text) for text in paragraph) + "</p>")
 
+    if pending_id is not None:
+        raise DocError(f"锚点 #{pending_id} 后应紧跟章节或小节标题")
     close_section()
     return title, "\n".join(body), toc
 
@@ -437,7 +435,7 @@ def collect_quality_fields() -> list[str]:
     return re.findall(r"public\s+[\w<>?\[\]]+\s+(\w+)\s*\{\s*get;", text)
 
 
-def check_coverage(md_text: str, strings: dict[str, str], sections: set[str]) -> list[str]:
+def check_coverage(md_text: str, strings: dict[str, str]) -> list[str]:
     problems: list[str] = []
     tools = collect_tools()
     drawing = [key for key, measurement in tools if not measurement]
@@ -477,16 +475,37 @@ def check_coverage(md_text: str, strings: dict[str, str], sections: set[str]) ->
         if field not in md_text:
             problems.append(f"手册没写到质量门限字段「{field}」")
 
-    for anchor in re.findall(r'<a id="([^"]+)"></a>', md_text):
-        if anchor in sections:
-            continue  # 章节锚点由自动生成的目录链接，不必在正文里再写一遍
-        if f"(#{anchor})" not in md_text:
-            problems.append(f"锚点 #{anchor} 没有任何链接指向它")
-
     for target in re.findall(r"\]\((?!https?://)([^)#]+)", md_text):
         if not (DOCS / target).exists():
             problems.append(f"链接指向的文件不存在：docs/{target}")
     return problems
+
+
+class AnchorCheck(HTMLParser):
+    """检查生成后实际出现在页面中的 ID 与链接，包括模板本身。"""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.ids: set[str] = set()
+        self.duplicates: set[str] = set()
+        self.targets: set[str] = set()
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        for name, value in attrs:
+            if not value:
+                continue
+            if name == "id":
+                if value in self.ids:
+                    self.duplicates.add(value)
+                self.ids.add(value)
+            if tag == "a" and name == "href" and value.startswith("#") and len(value) > 1:
+                self.targets.add(value[1:])
+
+    def problems(self) -> list[str]:
+        return [
+            *(f"页面内重复的锚点 #{anchor}" for anchor in sorted(self.duplicates)),
+            *(f"页面内链接指向不存在的锚点 #{anchor}" for anchor in sorted(self.targets - self.ids)),
+        ]
 
 
 # --------------------------------------------------------------------------- 入口
@@ -494,26 +513,30 @@ def check_coverage(md_text: str, strings: dict[str, str], sections: set[str]) ->
 
 def main(argv: list[str]) -> int:
     check_only = "--check" in argv
-    html_text = build_html()
+    try:
+        html_text = build_html()
+    except DocError as error:
+        print(f"手册检查未通过：{error}", file=sys.stderr)
+        return 1
     md_text = MD_PATH.read_text(encoding="utf-8")
-    sections = {anchor for anchor, _, _ in convert(md_text)[2]}
-    problems = check_coverage(md_text, load_strings(), sections)
+    anchors = AnchorCheck()
+    anchors.feed(html_text)
+    problems = check_coverage(md_text, load_strings()) + anchors.problems()
 
     if check_only:
         current = HTML_PATH.read_text(encoding="utf-8").replace("\r\n", "\n")
         if current != html_text:
             problems.append("docs/usage.html 与 usage.md 不同步，运行 python build/docs.py 重新生成")
-    else:
-        HTML_PATH.write_text(html_text, encoding="utf-8", newline="\n")
-        print(f"已生成 {HTML_PATH.relative_to(ROOT)}（{len(html_text)} 字符）")
-
     if problems:
         print("手册检查未通过：", file=sys.stderr)
         for problem in problems:
             print(f"  - {problem}", file=sys.stderr)
         return 1
 
-    print("手册检查通过：HTML 与 md 同步，工具与菜单覆盖完整")
+    if not check_only:
+        HTML_PATH.write_text(html_text, encoding="utf-8", newline="\n")
+        print(f"已生成 {HTML_PATH.relative_to(ROOT)}（{len(html_text)} 字符）")
+    print("手册检查通过：HTML 与 md 同步，工具、菜单和内部链接检查通过")
     return 0
 
 
