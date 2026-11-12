@@ -178,12 +178,17 @@ namespace ImageViewer.Controls
         /// 显示调节变化。
         /// Chinese: 和调色板一样只需重绘——调节参数已经在显示设置的缓存键里，不同取值天然是不同条目，
         /// 因此不必清缓存；直方图/剖面读的是原始强度图，也不受显示调节影响。
+        /// 与调色板不同的是，<see cref="DisplayAdjustment"/> 会随会话保存并在打开会话时恢复，
+        /// 所以它是文档状态的一部分：这里必须标记未保存，否则用户调完窗宽窗位直接关窗，改动会被静默丢弃。
+        /// 加载会话时 <c>ApplySession</c> 会在设置显示参数之后再显式 MarkClean/MarkDirty，
+        /// 因此这条标记不会让刚打开的会话变脏。
         /// </summary>
         private static void OnDisplayAdjustmentChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             if (d is ImageViewer viewer)
             {
                 viewer._analysisController.HandleRenderingOptionChanged();
+                viewer._controlComposition?.SessionController.MarkDirty();
             }
         }
 
