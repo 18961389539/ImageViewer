@@ -258,6 +258,31 @@
 
     .toc a[aria-current="true"] .toc-num { color: var(--teal-dark); opacity: 1; }
 
+    /* 子目录默认收起：33 项全展开时侧栏装不下。悬停某章或滚动到该章才展开，
+       :has 让"当前章节"自动展开，不需要 JS。 */
+    .toc-sub {
+      display: none;
+      margin: 0 0 6px;
+      padding: 0;
+      list-style: none;
+    }
+
+    .toc-group:hover .toc-sub,
+    .toc-group:has(a[aria-current="true"]) .toc-sub { display: block; }
+
+    .toc-sub a {
+      padding: 3px 8px 3px 34px;
+      color: var(--muted);
+      border-left: 2px solid transparent;
+      font-size: 0.84rem;
+      line-height: 1.5;
+    }
+
+    .toc-sub a:hover, .toc-sub a:focus-visible {
+      color: var(--teal-dark);
+      background: var(--soft-teal);
+    }
+
     main { min-width: 0; }
 
     section {
@@ -487,6 +512,29 @@
 
     td code { white-space: nowrap; }
 
+    figure {
+      margin: 20px 0 22px;
+    }
+
+    /* 原尺寸显示、超宽才缩：小图（面板、状态栏）不该被放大成马赛克。 */
+    figure img {
+      display: block;
+      width: auto;
+      max-width: 100%;
+      height: auto;
+      margin: 0 auto;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
+    figcaption {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 0.84rem;
+      line-height: 1.55;
+    }
+
     pre {
       position: relative;
       margin: 18px 0 20px;
@@ -576,7 +624,7 @@
       .toc-title { margin: 0 6px 0 0; flex: none; }
       .toc a { flex: none; border-left: 0; border-bottom: 2px solid transparent; border-radius: 5px 5px 0 0; }
       .toc a[aria-current="true"] { border-left: 0; border-bottom-color: var(--gold); }
-      .toc-num { display: none; }
+      .toc-num, .toc-sub { display: none; }
       section + section { padding-top: 28px; }
       p, ul, ol, .step-list { max-width: none; }
       .chapter-index ol { grid-template-columns: 1fr; }
@@ -643,6 +691,9 @@
         color: #16262f;
         border: 0;
       }
+      .toc-sub { display: block; margin: 0 0 4px; }
+      .toc-sub a { padding: 1px 0 2px 40px; color: #5c6f7b; font-size: 9.5pt; }
+      figure { break-inside: avoid; margin: 10px 0; }
       .toc a[aria-current="true"] { font-weight: 600; }
       .toc-title { margin: 0 0 10px; color: #5c6f7b; font-size: 0.78rem; }
       /* A4 宽度同样命中 max-width:900px 的窄屏规则，那里会隐藏编号、把目录压成横条；
@@ -651,7 +702,8 @@
       .toc a { border-bottom: 0; }
       h1 { font-size: 22pt; }
       .subtitle { margin-top: 8px; font-size: 10pt; }
-      .chapter-index { break-inside: avoid; }
+      /* 纸质件已有完整目录，正文末尾的卡片只是屏幕导航，打印时去掉 */
+      .chapter-index { display: none; }
       section { padding-bottom: 16px; }
       section + section { padding-top: 18px; }
       .table-scroll { overflow: visible; border-radius: 0; }
@@ -682,21 +734,83 @@
   <div class="layout">
     <nav class="toc" aria-label="手册目录">
       <p class="toc-title">目录</p>
-      <a href="#start"><span class="toc-num">01</span>启动与界面</a>
-      <a href="#image"><span class="toc-num">02</span>打开图像与浏览</a>
-      <a href="#roi"><span class="toc-num">03</span>绘制与编辑 ROI</a>
-      <a href="#quick-measure"><span class="toc-num">04</span>第一次测量：从标定到 CSV</a>
-      <a href="#calibration"><span class="toc-num">05</span>标定与公差</a>
-      <a href="#analysis"><span class="toc-num">06</span>分析与结果导出</a>
-      <a href="#volume"><span class="toc-num">07</span>体数据与切片浏览</a>
-      <a href="#files"><span class="toc-num">08</span>保存、恢复与配方</a>
-      <a href="#shortcuts"><span class="toc-num">09</span>快捷键速查</a>
-      <a href="#faq"><span class="toc-num">10</span>常见问题</a>
-      <a href="#limits"><span class="toc-num">11</span>已知限制与边界</a>
-      <a href="#appendix-tools"><span class="toc-num">12</span>附录 A：工具清单</a>
-      <a href="#appendix-menu"><span class="toc-num">13</span>附录 B：菜单结构速查</a>
-      <a href="#appendix-errors"><span class="toc-num">14</span>附录 C：错误消息对照</a>
-      <a href="#integration"><span class="toc-num">15</span>宿主集成</a>
+      <div class="toc-group">
+        <a href="#start"><span class="toc-num">01</span>启动与界面</a>
+      </div>
+      <div class="toc-group">
+        <a href="#image"><span class="toc-num">02</span>打开图像与浏览</a>
+      </div>
+      <div class="toc-group">
+        <a href="#roi"><span class="toc-num">03</span>绘制与编辑 ROI</a>
+        <ul class="toc-sub">
+          <li><a href="#s3-1">基础绘制与标注</a></li>
+          <li><a href="#s3-2">常用测量</a></li>
+          <li><a href="#s3-3">该用哪个工具</a></li>
+          <li><a href="#s3-4">调整已有 ROI</a></li>
+        </ul>
+      </div>
+      <div class="toc-group">
+        <a href="#quick-measure"><span class="toc-num">04</span>第一次测量：从标定到 CSV</a>
+      </div>
+      <div class="toc-group">
+        <a href="#calibration"><span class="toc-num">05</span>标定与公差</a>
+        <ul class="toc-sub">
+          <li><a href="#s5-1">在自己的图像上标定</a></li>
+          <li><a href="#s5-2">标定对话框字段对照</a></li>
+          <li><a href="#s5-3">输入和解读公差</a></li>
+          <li><a href="#quality-profile">质量门限与判定阈值</a></li>
+        </ul>
+      </div>
+      <div class="toc-group">
+        <a href="#analysis"><span class="toc-num">06</span>分析与结果导出</a>
+        <ul class="toc-sub">
+          <li><a href="#s6-1">导出单张图像</a></li>
+          <li><a href="#s6-2">批量分析同类图像</a></li>
+          <li><a href="#s6-3">显示与分析辅助</a></li>
+        </ul>
+      </div>
+      <div class="toc-group">
+        <a href="#volume"><span class="toc-num">07</span>体数据与切片浏览</a>
+        <ul class="toc-sub">
+          <li><a href="#s7-1">导入一组切片</a></li>
+          <li><a href="#s7-2">切换视图和层号</a></li>
+          <li><a href="#s7-3">质量分析与分割</a></li>
+        </ul>
+      </div>
+      <div class="toc-group">
+        <a href="#files"><span class="toc-num">08</span>保存、恢复与配方</a>
+        <ul class="toc-sub">
+          <li><a href="#s8-1">选择文件类型</a></li>
+          <li><a href="#s8-2">找回自动保存</a></li>
+          <li><a href="#s8-3">用两个基准点对齐测量配方</a></li>
+        </ul>
+      </div>
+      <div class="toc-group">
+        <a href="#shortcuts"><span class="toc-num">09</span>快捷键速查</a>
+      </div>
+      <div class="toc-group">
+        <a href="#faq"><span class="toc-num">10</span>常见问题</a>
+      </div>
+      <div class="toc-group">
+        <a href="#limits"><span class="toc-num">11</span>已知限制与边界</a>
+      </div>
+      <div class="toc-group">
+        <a href="#appendix-tools"><span class="toc-num">12</span>附录 A：工具清单</a>
+        <ul class="toc-sub">
+          <li><a href="#s12-1">A.1 绘制与标注（10 项，不算测量）</a></li>
+          <li><a href="#s12-2">A.2 测量（21 项，按菜单分组）</a></li>
+          <li><a href="#appendix-advanced">A.3 高级测量（18 项，测量 → 高级测量…）</a></li>
+        </ul>
+      </div>
+      <div class="toc-group">
+        <a href="#appendix-menu"><span class="toc-num">13</span>附录 B：菜单结构速查</a>
+      </div>
+      <div class="toc-group">
+        <a href="#appendix-errors"><span class="toc-num">14</span>附录 C：错误消息对照</a>
+      </div>
+      <div class="toc-group">
+        <a href="#integration"><span class="toc-num">15</span>宿主集成</a>
+      </div>
     </nav>
 
     <main id="main">
@@ -709,7 +823,8 @@
       <h2><a class="anchor" href="#start" aria-label="链接到本节">#</a>启动与界面</h2>
         <p>直接启动已构建的 <code>ImageViewerDemo.exe</code>。如果从源码运行，在 Windows 上打开终端，进入仓库根目录，选择与本机 .NET SDK 对应的目标框架：</p>
       <pre data-lang="powershell"><code class="language-powershell">dotnet run --project ImageViewerDemo/ImageViewerDemo.csproj --framework net10.0-windows</code></pre>
-        <p>使用 .NET 8 时，把参数改为 <code>--framework net8.0-windows</code>。Demo 启动时通常会打开随程序附带的灰度测试图；没有看到图像时，可手动选择 <strong>打开图像文件</strong> 或 <strong>测量示例</strong>。</p>
+        <p>使用 .NET 8 时，把参数改为 <code>--framework net8.0-windows</code>。Demo 启动时通常会打开随程序附带的灰度测试图；没有看到图像时，可手动选择 <strong>打开图像文件</strong> 或 <strong>测量示例</strong>。加上 <code>--sample</code> 参数（例如 <code>ImageViewerDemo.exe --sample</code>）会跳过测试图，直接载入测量示例，适合演示和录屏。</p>
+        <p><strong>运行环境。</strong> Windows 10 或更高版本；控件与 Demo 都提供 <code>net8.0-windows</code> 与 <code>net10.0-windows</code> 两份产物，按宿主的目标框架选择；需要可用的 DirectX 图形驱动，WPF 渲染依赖它。界面按系统 DPI 缩放，4K 屏 200% 缩放下布局与截图都以物理像素呈现；多显示器时窗口跟随所在屏幕的缩放比例。</p>
         <div class="table-scroll" tabindex="0" role="region" aria-label="启动与界面：表格">
         <table>
         <thead>
@@ -742,6 +857,10 @@
         </tbody>
         </table>
         </div>
+        <figure>
+          <img src="images/demo-window.png" alt="ImageViewer Demo 主界面：顶部是说明与文件入口，第二行是常用工具栏，中间画布显示测量结果，右侧是 ROI 列表与属性，底部状态栏显示文件、模式与标定" loading="lazy">
+          <figcaption>ImageViewer Demo 主界面：顶部是说明与文件入口，第二行是常用工具栏，中间画布显示测量结果，右侧是 ROI 列表与属性，底部状态栏显示文件、模式与标定</figcaption>
+        </figure>
         <p>窗口窄时，点 <strong>ROI 面板</strong> 展开右侧栏。如果常用工具被手动隐藏，点 <strong>恢复工具栏</strong>。在画布空白处右键也可打开完整菜单；在 ROI 上右键会先选中该对象，再显示与它相关的操作。</p>
         <p><strong>查找命令。</strong> 打开右键菜单后直接输入“槽孔”“显示灰度剖面图”等关键词。按 <kbd>↓</kbd> 移到第一个可执行结果；只有一个可执行结果时，可直接按 <kbd>Enter</kbd>。<kbd>Esc</kbd> 先清空搜索，再按一次关闭菜单。命令呈灰色时，悬停可查看缺少的图像、选区或其他条件。完整菜单树见<a href="#appendix-menu">附录 B</a>，逐条说明见<a href="context-menu.md">右键菜单</a>。</p>
     </section>
@@ -760,8 +879,8 @@
     </section>
     <section id="roi">
       <h2><a class="anchor" href="#roi" aria-label="链接到本节">#</a>绘制与编辑 ROI</h2>
-        <p>ROI 是图像上的感兴趣区域或测量对象。工具分三类：<strong>绘制</strong>标记区域、点或文字；<strong>测量</strong>记录尺寸、几何关系；<strong>边缘检测</strong>沿着你给的参考线或圆搜索真实边缘（卡尺、拟合、斑点）。画布底部的提示会随工具更新。全部 31 个工具见<a href="#appendix-tools">附录 A</a>。</p>
-      <h3>基础绘制与标注</h3>
+        <p>ROI 是图像上的感兴趣区域或测量对象。卡尺、拟合、基准这些词的确切含义见<a href="terminology.md">术语表</a>。工具分三类：<strong>绘制</strong>标记区域、点或文字；<strong>测量</strong>记录尺寸、几何关系；<strong>边缘检测</strong>沿着你给的参考线或圆搜索真实边缘（卡尺、拟合、斑点）。画布底部的提示会随工具更新。全部 31 个工具见<a href="#appendix-tools">附录 A</a>。</p>
+      <h3 id="s3-1">基础绘制与标注</h3>
         <div class="table-scroll" tabindex="0" role="region" aria-label="绘制与编辑 ROI：表格">
         <table>
         <thead>
@@ -806,7 +925,7 @@
         </table>
         </div>
         <p>这些工具只画不测，适合圈出关注区域、写批注、给下游分析留位置。</p>
-      <h3>常用测量</h3>
+      <h3 id="s3-2">常用测量</h3>
         <div class="table-scroll" tabindex="0" role="region" aria-label="绘制与编辑 ROI：表格">
         <table>
         <thead>
@@ -851,7 +970,11 @@
         </tbody>
         </table>
         </div>
-      <h3>该用哪个工具</h3>
+        <figure>
+          <img src="images/demo-canvas.png" alt="测量示例的画布：两条距离测量各自带标签与长度，选中项的标签会高亮" loading="lazy">
+          <figcaption>测量示例的画布：两条距离测量各自带标签与长度，选中项的标签会高亮</figcaption>
+        </figure>
+      <h3 id="s3-3">该用哪个工具</h3>
         <p>同一条边可以有多种测法，差别在于“谁决定边缘位置”：手工点哪就是哪、卡尺亚像素搜索、还是先拟合再算形位。</p>
         <div class="table-scroll" tabindex="0" role="region" aria-label="绘制与编辑 ROI：表格">
         <table>
@@ -911,10 +1034,14 @@
         </tbody>
         </table>
         </div>
-      <h3>调整已有 ROI</h3>
+      <h3 id="s3-4">调整已有 ROI</h3>
         <p>在画布或右侧列表选中对象，拖动主体可移动，拖动控制点可调整几何。选中后按方向键可微移 1 px，按住 <kbd>Shift</kbd> 方向键微移 10 px（有多个选区时移动选中的那个）。在“当前对象”菜单可改标签和颜色，或缩放到该对象。已锁定的 ROI 要先解除锁定才能编辑；隐藏与删除是两个独立操作。用列表筛选可在对象较多时按名称、类型或标签定位。</p>
+        <figure>
+          <img src="images/demo-roi-panel.png" alt="右侧 ROI 面板：上方是带搜索与显示/锁定开关的列表，下方是选中项的对象属性（标签、线宽、坐标、公差判定）" loading="lazy">
+          <figcaption>右侧 ROI 面板：上方是带搜索与显示/锁定开关的列表，下方是选中项的对象属性（标签、线宽、坐标、公差判定）</figcaption>
+        </figure>
         <p><strong>编辑路径。</strong> 拖动折线或多边形的节点可调整轮廓；单击线段可插入节点。右键命中某个节点后，选 <strong>当前对象 → 删除此节点</strong>。折线至少保留两个节点，闭合多边形至少保留三个。<kbd>Ctrl</kbd>+<kbd>Z</kbd> 撤销最近一项支持撤销的编辑，<kbd>Ctrl</kbd>+<kbd>Y</kbd> 重做；<strong>清空所有 ROI</strong> 之后也能用 <kbd>Ctrl</kbd>+<kbd>Z</kbd> 恢复。</p>
-        <p><strong>检测没有成功时。</strong> 先看参考线或搜索区域是否盖住目标、是否混入邻近边缘。选中圆类卡尺可点 <strong>调整圆测量参数</strong>；其他卡尺可选 <strong>当前对象 → 卡尺参数...</strong>。可调项包括 <strong>卡尺数量</strong>、<strong>搜索范围 (px)</strong>、<strong>半宽采样 (px)</strong>、<strong>最小梯度</strong>、<strong>最少有效卡尺</strong>、<strong>离群阈值 (px, 0=自动)</strong> 和 <strong>边缘极性</strong>：极性决定沿搜索方向找由暗到亮还是由亮到暗的过渡，选反了就完全找不到边。需要看有效点、剔除点和残差时，再启用 <strong>显示卡尺得分</strong>。双边卡尺与圆卡尺还可用 <strong>梯度检测对齐（卡尺）</strong> 按检测到的边缘重新摆正。详见<a href="detection-parameter-recommendations.md">检测参数推荐</a>和<a href="advanced-measurements.md">高级测量</a>。</p>
+        <p><strong>检测没有成功时。</strong> 先看参考线或搜索区域是否盖住目标、是否混入邻近边缘。选中圆类卡尺可点 <strong>调整圆测量参数</strong>；其他卡尺可选 <strong>当前对象 → 卡尺参数...</strong>。可调项包括 <strong>卡尺数量</strong>、<strong>搜索范围 (px)</strong>、<strong>半宽采样 (px)</strong>、<strong>最小梯度</strong>、<strong>最少有效卡尺</strong>、<strong>离群阈值 (px, 0=自动)</strong> 和 <strong>边缘极性</strong>：极性决定沿搜索方向找由暗到亮还是由亮到暗的过渡，选反了就完全找不到边。需要看有效点、剔除点和残差时，再启用 <strong>显示卡尺得分</strong>。双边卡尺与圆卡尺还可用 <strong>梯度检测对齐（卡尺）</strong> 按检测到的边缘重新摆正。详见<a href="detection-parameter-recommendations.md">检测参数推荐</a>、<a href="advanced-measurements.md">高级测量</a>和<a href="line-fit-result-definition.md">直线拟合结果定义</a>。</p>
     </section>
     <section id="quick-measure">
       <h2><a class="anchor" href="#quick-measure" aria-label="链接到本节">#</a>第一次测量：从标定到 CSV</h2>
@@ -954,7 +1081,7 @@
     </section>
     <section id="calibration">
       <h2><a class="anchor" href="#calibration" aria-label="链接到本节">#</a>标定与公差</h2>
-      <h3>在自己的图像上标定</h3>
+      <h3 id="s5-1">在自己的图像上标定</h3>
         <ol>
         <li>让已知尺寸的参考物与待测特征处于同一成像条件下。打开图像后，用 <strong>距离测量</strong> 在参考物的两个已知位置之间画线并选中。</li>
         <li>点 <strong>尺寸标定</strong>（菜单里同名命令为 <strong>标定 → 像素/物理尺寸校准...</strong>，两者是同一个对话框）。输入参考物的实际长度与单位，例如 <code>25</code> 和 <code>mm</code>。</li>
@@ -963,8 +1090,12 @@
         <li>启用畸变校正时，程序先校正参考线，再据此计算比例。如果参考线无法按新模型校正，保留原标定。已生效模型在某个 ROI 上反解失败时，该项显示 <strong>无法测量</strong>；CSV 的测量值留空，规格状态为 <code>NotEvaluable</code>。请检查模型参数、参考线和 ROI 位置后重测。</li>
         </ol>
         <p><strong>谁能当参考线。</strong> 只有 <strong>距离测量</strong> 和 <strong>宽度测量</strong> 两种 ROI 能打开标定对话框；拟合直线、拟合圆、三点圆等都不行（按钮保持可见但不可执行，悬停可看原因）。用 <strong>宽度测量</strong> 标定时，程序取你画的两点距离，<strong>不是</strong>卡尺检测到的边缘间距——如果两点没卡在真实边缘上，标定就会带上这个误差。</p>
+        <figure>
+          <img src="images/demo-status.png" alt="底部状态栏：左侧是图像尺寸与文件名，右侧是交互模式与标定徽标（未标定时显示“未标定 · px”）" loading="lazy">
+          <figcaption>底部状态栏：左侧是图像尺寸与文件名，右侧是交互模式与标定徽标（未标定时显示“未标定 · px”）</figcaption>
+        </figure>
         <p>底部状态栏区分 <strong>仅比例标定</strong>、<strong>畸变校正已启用</strong>、<strong>标定模型无效</strong>。悬停可查看比例、畸变参数、重投影误差或不确定度。交付前可用 <strong>文件与项目 → 标定 → 标定检查</strong> 查看缺失项；若菜单分组难找，可直接搜索“标定检查”。</p>
-      <h3>标定对话框字段对照</h3>
+      <h3 id="s5-2">标定对话框字段对照</h3>
         <p>对话框分四个区：必填的实际长度与单位、可选的镜头畸变、可选的标定几何基准、可选的标定精度。除实际长度外，留空或填 <code>0</code> 都表示该项不参与校正。</p>
         <div class="table-scroll" tabindex="0" role="region" aria-label="标定与公差：表格">
         <table>
@@ -1046,7 +1177,7 @@
         </div>
         <p><strong>留空与填 0 的差别。</strong> 畸变与几何基准这两组是"整组生效"的开关：五个系数全为 0 时不启用畸变校正，主点与归一化半径再按图像中心与短边推算；只要有一个系数非 0，模型就按表中参数启用。精度区（重投影 RMS、不确定度）无论填不填都不会启用校正，只影响状态栏徽标的提示。</p>
         <p><strong>系数填反了会怎样。</strong> 畸变符号或主点偏差较大时，参考线校正后长度会明显偏离你量的像素距离，状态栏可能显示 <strong>标定模型无效</strong>。先核对符号与像素坐标原点（图像左上角为 0,0），再考虑换一条更长的参考线。</p>
-      <h3>输入和解读公差</h3>
+      <h3 id="s5-3">输入和解读公差</h3>
         <p>选中支持判定的测量 ROI，在右侧 <strong>公差判定</strong> 中填写标称值、上公差、下公差：</p>
         <ul>
         <li><strong>标称值</strong>是目标尺寸。留空表示不启用此项的规格判定。</li>
@@ -1261,7 +1392,7 @@
     </section>
     <section id="analysis">
       <h2><a class="anchor" href="#analysis" aria-label="链接到本节">#</a>分析与结果导出</h2>
-      <h3>导出单张图像</h3>
+      <h3 id="s6-1">导出单张图像</h3>
         <ol>
         <li>检查各 ROI 的标签、单位与公差，便于在表格中定位。对卡尺和拟合结果，先复核检测证据。</li>
         <li>点击顶部 <strong>导出 CSV</strong>，或选择 <strong>分析与报告 → 导出分析结果为 CSV...</strong>。</li>
@@ -1293,14 +1424,14 @@
         </div>
         <p><code>Metric1</code> 至 <code>Metric3</code> 是各 ROI 的补充指标，例如长度、方向或采样数，字段内容会随 ROI 类型变化。复核合格结论时，以 <code>MeasuredValue</code> 和 <code>SpecificationStatus</code> 为准。若 Excel 将整行读进一列，使用“数据 → 自文本/CSV”导入，选择 UTF-8 和逗号分隔。</p>
         <p>需要截图时，用 <strong>分析与报告 → 导出当前视图为 PNG...</strong>；输出含当前缩放、平移和可见叠加层，适合交流当前看到的结果。需要纸质或固定版式报告时，选择 <strong>打印报告...</strong>，可打印或导出 XPS。打印窗口保留打开时的测量快照；编辑 ROI 后，关闭并重新打开报告再打印。</p>
-      <h3>批量分析同类图像</h3>
+      <h3 id="s6-2">批量分析同类图像</h3>
         <ol>
         <li>在参考图像上设置 ROI、标定和公差，用单图导出验证结果。确认批次图像的被测特征位于同一像素区域；如果工件位置变化，先对齐并在代表性图像上验证，批量导出不会替你自动对齐工件。</li>
         <li>选 <strong>分析与报告 → 批量分析并导出 CSV...</strong>，选择多张图像，再选择输出 CSV。程序复用当前的 ROI 和检测参数。</li>
         <li>完成后看 CSV 里的 <code>Source</code>、<code>Status</code>、<code>Error</code> 和 <code>SpecificationStatus</code>。<code>Status</code> 说明图像读取或分析过程，规格是否合格看 <code>SpecificationStatus</code>。同一模板项可用 <code>MeasurementItemKey</code> 在本批次内对应。</li>
         <li>保留同时生成的 <code>.metadata.json</code>、<code>.summary.json</code> 和 <code>.repeatability.md</code>。按 <kbd>Esc</kbd> 取消批次时，可保留已完成的结果；未完成项不应当作合格或失败。默认的批次报告描述不同输入之间的变化，只有明确标为同一工件的多轮测量时，才给出同件重复性结论。</li>
         </ol>
-      <h3>显示与分析辅助</h3>
+      <h3 id="s6-3">显示与分析辅助</h3>
         <p><strong>图像显示</strong> 菜单分两个子菜单：<strong>图像调整</strong> 管亮度、色带一类的视觉参数，<strong>显示叠加</strong> 管网格、直方图、比例尺这类附加层。</p>
         <div class="table-scroll" tabindex="0" role="region" aria-label="分析与结果导出：表格">
         <table>
@@ -1356,7 +1487,7 @@
     </section>
     <section id="volume">
       <h2><a class="anchor" href="#volume" aria-label="链接到本节">#</a>体数据与切片浏览</h2>
-      <h3>导入一组切片</h3>
+      <h3 id="s7-1">导入一组切片</h3>
         <ol>
         <li>在 Demo 顶部点 <strong>打开体数据</strong>，一次选择同一序列的多个切片文件。检查文件是否属于同一方向和同一组采集，宽、高应一致。</li>
         <li>在导入确认中核对 <strong>张数、排序依据、首尾文件与体素间距</strong>。程序优先读取切片旁的 <code>.slice.json</code>，无法读取或缺少可用字段时尝试同名 <code>.json</code>。可用的排序信息包括空间位置、实例号与采集时间；信息不足时按文件名中的数字自然排序并要求确认，例如 <code>slice2</code> 排在 <code>slice10</code> 前。</li>
@@ -1364,7 +1495,7 @@
         <li>确认后等待解码，可随时取消。程序会检查尺寸、文件变化及内存估算；超过 768 MiB 时会先要求确认。读取失败时按提示核对相应切片，当前文档会保留。</li>
         <li>加载完成后，Demo 顶部会保留一行摘要：层数、宽 × 高、X／Y／Z 间距与排序来源。尺寸以这行摘要为准，导入确认框本身不显示宽高。</li>
         </ol>
-      <h3>切换视图和层号</h3>
+      <h3 id="s7-2">切换视图和层号</h3>
         <div class="table-scroll" tabindex="0" role="region" aria-label="体数据与切片浏览：表格">
         <table>
         <thead>
@@ -1424,7 +1555,7 @@
         </div>
         <p><code>Shift+滚轮</code> 在任何切片视图里都是快速切层。轴位视图没有“上一层／下一层”按钮，也不响应 <kbd>↑</kbd> / <kbd>↓</kbd>——这两个键在体数据模式里只用于重建切片；切回普通单图后，它们又变成 ROI 的微移键。重建冠状或矢状切片时等待进度结束；<kbd>Esc</kbd> 或 <strong>取消</strong> 可保留上一次可用视图。切层时 3D 中对应平面会同步移动。</p>
         <p>在 3D 视图里按 <code>F</code> 适配体数据，按 <kbd>Home</kbd> 重置相机，也可以用右键菜单选择相机预设、切面显示与透明度。3D 是空间定位视图；需要观察灰度或做 ROI 测量时，切到相应的二维切片。Gray16 切片重建保持 16 位输出。界面显示的体素间距用于空间定位，<strong>ROI 的物理尺寸仍按独立标定换算</strong>；在新平面测量前先核对标定和单位。</p>
-      <h3>质量分析与分割</h3>
+      <h3 id="s7-3">质量分析与分割</h3>
         <ul>
         <li><strong>质量分析</strong>（体数据工具栏）逐层看强度分布：空白切片、过曝、欠曝与低对比度会按当前质量门限列在质量面板里。点其中一条会切到轴位视图并跳到那一层。判定阈值来自质量门限（<code>QualityProfile</code>），同一组切片换门限后结论可能不同。层距、排序与尺寸的问题不在质量分析里报，它们在导入确认与顶部摘要中。</li>
         <li><strong>分割</strong>在当前切片上找出候选区域，完成后可 <strong>接受</strong> 或 <strong>拒绝</strong>。<strong>拒绝</strong> 不改动 ROI。<strong>接受</strong> 会在当前切片上生成一个名为“分割结果”的 <strong>斑点分析</strong> ROI，所有候选都装在这一个 ROI 里，同时把该切片设为当前 2D 图像——不是每个候选各生成一个 ROI。后续要单独用某个候选，可在斑点分析属性里查看列表。</li>
@@ -1432,7 +1563,7 @@
     </section>
     <section id="files">
       <h2><a class="anchor" href="#files" aria-label="链接到本节">#</a>保存、恢复与配方</h2>
-      <h3>选择文件类型</h3>
+      <h3 id="s8-1">选择文件类型</h3>
         <div class="table-scroll" tabindex="0" role="region" aria-label="保存、恢复与配方：表格">
         <table>
         <thead>
@@ -1475,13 +1606,13 @@
         <p><strong>自动保存与最近项目。</strong> <strong>文件与项目 → 自动保存</strong> 是一个开关：打开后按配置的间隔写恢复快照，关闭后不再产生新快照（已有快照仍可恢复）。<strong>文件与项目 → 最近项目</strong> 列出最近打开过的会话与项目包，路径失效时会提示重新定位。</p>
         <p><strong>体数据的两份状态。</strong> 体数据模式下，主视图与轴位视图各自维护一份未保存状态。关闭窗口时若两者都有改动，会分别询问保存，不要以为保存一次就覆盖了两边。</p>
         <p><strong>移动项目。</strong> 普通会话通常引用源图。如果底图移动了，打开会话时按提示选同一张原图，定位成功后重新保存记录新路径。新会话验证图像内容，文件同名同尺寸也不能替代原图。若会话旁存在 <code>ImageViewer.assets</code>（如从项目包保存为会话、或图像来自宿主提供的内存位图），移动时将目录和会话一起带走。需要只移交一个文件时用 <code>.ivpkg</code>。</p>
-      <h3>找回自动保存</h3>
+      <h3 id="s8-2">找回自动保存</h3>
         <ol>
         <li>界面出现恢复提示时点击 <strong>恢复</strong>，也可从 <strong>文件与项目 → 恢复自动保存…</strong> 打开列表。</li>
         <li>按时间和项目选择快照。底图已移动时按提示定位原图；取消定位或解码失败会保留当前文档。</li>
         <li>检查恢复的图像、测量项和标定。恢复后尽快保存为正式会话或项目包。关闭恢复提示后仍可从菜单打开列表；不同窗口的自动保存相互独立。</li>
         </ol>
-      <h3>用两个基准点对齐测量配方</h3>
+      <h3 id="s8-3">用两个基准点对齐测量配方</h3>
         <ol>
         <li>在参考图上建立测量 ROI，另用 <strong>点坐标测量</strong> 标记两个不同且容易复现的特征。依次选中点 ROI，在 <strong>测量 → 配方</strong> 中记录 <strong>参考基准点 1</strong>、<strong>参考基准点 2</strong>，然后保存配方。</li>
         <li>打开待测图，按相同顺序标记对应的两个特征，记录 <strong>当前基准点 1</strong>、<strong>当前基准点 2</strong>。切换图像会同时清空界面上已记录的参考点与当前点（配方文件里的参考点不受影响）。</li>
@@ -1738,7 +1869,7 @@
     <section id="appendix-tools">
       <h2><a class="anchor" href="#appendix-tools" aria-label="链接到本节">#</a>附录 A：工具清单</h2>
         <p>菜单把工具分成 <strong>绘制</strong> 和 <strong>测量</strong> 两组：绘制组只标注，测量组参与计算。全部 31 个工具如下。</p>
-      <h3>A.1 绘制与标注（10 项，不算测量）</h3>
+      <h3 id="s12-1">A.1 绘制与标注（10 项，不算测量）</h3>
         <div class="table-scroll" tabindex="0" role="region" aria-label="附录 A：工具清单：表格">
         <table>
         <thead>
@@ -1802,7 +1933,7 @@
         </tbody>
         </table>
         </div>
-      <h3>A.2 测量（21 项，按菜单分组）</h3>
+      <h3 id="s12-2">A.2 测量（21 项，按菜单分组）</h3>
         <div class="table-scroll" tabindex="0" role="region" aria-label="附录 A：工具清单：表格">
         <table>
         <thead>

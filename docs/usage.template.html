@@ -258,6 +258,31 @@
 
     .toc a[aria-current="true"] .toc-num { color: var(--teal-dark); opacity: 1; }
 
+    /* 子目录默认收起：33 项全展开时侧栏装不下。悬停某章或滚动到该章才展开，
+       :has 让"当前章节"自动展开，不需要 JS。 */
+    .toc-sub {
+      display: none;
+      margin: 0 0 6px;
+      padding: 0;
+      list-style: none;
+    }
+
+    .toc-group:hover .toc-sub,
+    .toc-group:has(a[aria-current="true"]) .toc-sub { display: block; }
+
+    .toc-sub a {
+      padding: 3px 8px 3px 34px;
+      color: var(--muted);
+      border-left: 2px solid transparent;
+      font-size: 0.84rem;
+      line-height: 1.5;
+    }
+
+    .toc-sub a:hover, .toc-sub a:focus-visible {
+      color: var(--teal-dark);
+      background: var(--soft-teal);
+    }
+
     main { min-width: 0; }
 
     section {
@@ -487,6 +512,29 @@
 
     td code { white-space: nowrap; }
 
+    figure {
+      margin: 20px 0 22px;
+    }
+
+    /* 原尺寸显示、超宽才缩：小图（面板、状态栏）不该被放大成马赛克。 */
+    figure img {
+      display: block;
+      width: auto;
+      max-width: 100%;
+      height: auto;
+      margin: 0 auto;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
+    figcaption {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 0.84rem;
+      line-height: 1.55;
+    }
+
     pre {
       position: relative;
       margin: 18px 0 20px;
@@ -576,7 +624,7 @@
       .toc-title { margin: 0 6px 0 0; flex: none; }
       .toc a { flex: none; border-left: 0; border-bottom: 2px solid transparent; border-radius: 5px 5px 0 0; }
       .toc a[aria-current="true"] { border-left: 0; border-bottom-color: var(--gold); }
-      .toc-num { display: none; }
+      .toc-num, .toc-sub { display: none; }
       section + section { padding-top: 28px; }
       p, ul, ol, .step-list { max-width: none; }
       .chapter-index ol { grid-template-columns: 1fr; }
@@ -643,6 +691,9 @@
         color: #16262f;
         border: 0;
       }
+      .toc-sub { display: block; margin: 0 0 4px; }
+      .toc-sub a { padding: 1px 0 2px 40px; color: #5c6f7b; font-size: 9.5pt; }
+      figure { break-inside: avoid; margin: 10px 0; }
       .toc a[aria-current="true"] { font-weight: 600; }
       .toc-title { margin: 0 0 10px; color: #5c6f7b; font-size: 0.78rem; }
       /* A4 宽度同样命中 max-width:900px 的窄屏规则，那里会隐藏编号、把目录压成横条；
@@ -651,7 +702,8 @@
       .toc a { border-bottom: 0; }
       h1 { font-size: 22pt; }
       .subtitle { margin-top: 8px; font-size: 10pt; }
-      .chapter-index { break-inside: avoid; }
+      /* 纸质件已有完整目录，正文末尾的卡片只是屏幕导航，打印时去掉 */
+      .chapter-index { display: none; }
       section { padding-bottom: 16px; }
       section + section { padding-top: 18px; }
       .table-scroll { overflow: visible; border-radius: 0; }

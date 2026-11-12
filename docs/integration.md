@@ -41,3 +41,8 @@ ImageViewer viewer = windowScope.ServiceProvider.GetRequiredService<ImageViewer>
 
 - 主题字典在 `Themes/ViewerTheme.{Dark,Light,HighContrast}.xaml`。控件自己的 `Resources` 会遮蔽应用级资源，所以覆盖外观应通过控件属性或替换主题字典，不要在应用级重复定义同名画刷。
 - 仓库当前只提供中文资源（`Resources/UiText.resx`、Demo 的 `DemoText.resx`），没有卫星程序集，也没有语言切换命令。需要其他语言时由宿主提供同名资源并在 `CurrentUICulture` 上生效。
+
+## 打包与架构约束
+
+- 生成 NuGet 包、符号包与发布流程见[NuGet 发布](nuget-publishing.md)。
+- 控件与 Core 的依赖方向、允许引用的类型，见[架构边界](architecture-boundaries.md)；改动分层前先读这份，避免把 UI 类型漏进 Core。

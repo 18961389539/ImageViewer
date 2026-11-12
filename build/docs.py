@@ -175,7 +175,9 @@ def convert(md_text: str) -> tuple[str, str, list[tuple[str, str]]]:
     lines = md_text.splitlines()
     title = ""
     body: list[str] = []
-    toc: list[tuple[str, str]] = []
+    toc: list[tuple[str, str, list[tuple[str, str]]]] = []
+    section_no = 0
+    sub_no = 0
     pending_id: str | None = None
     pending_steps = False
     section_open = False
@@ -241,7 +243,9 @@ def convert(md_text: str) -> tuple[str, str, list[tuple[str, str]]]:
             anchor_id = pending_id or slug(heading)
             pending_id = None
             section_title = heading
-            toc.append((anchor_id, heading))
+            section_no += 1
+            sub_no = 0
+            toc.append((anchor_id, heading, []))
             body.append(f'    <section id="{anchor_id}">')
             body.append(
                 f'      <h2><a class="anchor" href="#{anchor_id}" aria-label="链接到本节">#</a>'
@@ -253,11 +257,26 @@ def convert(md_text: str) -> tuple[str, str, list[tuple[str, str]]]:
 
         if stripped.startswith("### "):
             heading = stripped[4:].strip()
-            if pending_id:
-                body.append(f'      <h3 id="{pending_id}">{render_inline(heading)}</h3>')
-                pending_id = None
-            else:
-                body.append(f"      <h3>{render_inline(heading)}</h3>")
+            sub_no += 1
+            sub_id = pending_id or f"s{section_no}-{sub_no}"
+            pending_id = None
+            if toc:
+                toc[-1][2].append((sub_id, heading))
+            body.append(f'      <h3 id="{sub_id}">{render_inline(heading)}</h3>')
+            index += 1
+            continue
+
+        image = re.fullmatch(r"!\[([^\]]*)\]\(([^)\s]+)\)", stripped)
+        if image:
+            alt, src = image.group(1), image.group(2)
+            body.append("        <figure>")
+            body.append(
+                f'          <img src="{html.escape(src, quote=True)}" '
+                f'alt="{html.escape(alt, quote=True)}" loading="lazy">'
+            )
+            if alt:
+                body.append(f"          <figcaption>{render_inline(alt)}</figcaption>")
+            body.append("        </figure>")
             index += 1
             continue
 
@@ -307,6 +326,7 @@ def convert(md_text: str) -> tuple[str, str, list[tuple[str, str]]]:
                 or current.startswith(">")
                 or current.startswith("```")
                 or re.match(r"^(\d+\.|[-*])\s+", current)
+                or current.startswith("![")
                 or re.fullmatch(r'<a id="[^"]+"></a>', current)
                 or re.fullmatch(r"<!--\s*steps\s*-->", current)
             ):
@@ -335,16 +355,28 @@ def build_html() -> str:
             f"md 标题“{title}”与模板 h1“{template_title.group(1).strip()}”不一致"
         )
 
-    toc_html = "\n".join(
-        f'      <a href="#{anchor}"><span class="toc-num">{number:02d}</span>{render_inline(text)}</a>'
-        for number, (anchor, text) in enumerate(toc, start=1)
-    )
+    toc_blocks: list[str] = []
+    for number, (anchor, text, subs) in enumerate(toc, start=1):
+        block = [
+            '      <div class="toc-group">',
+            f'        <a href="#{anchor}"><span class="toc-num">{number:02d}</span>{render_inline(text)}</a>',
+        ]
+        if subs:
+            block.append('        <ul class="toc-sub">')
+            for sub_anchor, sub_text in subs:
+                block.append(
+                    f'          <li><a href="#{sub_anchor}">{render_inline(sub_text)}</a></li>'
+                )
+            block.append("        </ul>")
+        block.append("      </div>")
+        toc_blocks.append("\n".join(block))
+    toc_html = "\n".join(toc_blocks)
     # 文末再给一份"全部章节"索引：滚到底部想跳回某节时，不用先滚回顶部或用浏览器后退。
     index_html = ""
     if toc:
         index_items = "\n".join(
             f'          <li><a href="#{anchor}">{render_inline(text)}</a></li>'
-            for anchor, text in toc
+            for anchor, text, _ in toc
         )
         index_html = (
             '\n      <nav class="chapter-index" aria-label="全部章节">\n'
@@ -464,7 +496,7 @@ def main(argv: list[str]) -> int:
     check_only = "--check" in argv
     html_text = build_html()
     md_text = MD_PATH.read_text(encoding="utf-8")
-    sections = {anchor for anchor, _ in convert(md_text)[2]}
+    sections = {anchor for anchor, _, _ in convert(md_text)[2]}
     problems = check_coverage(md_text, load_strings(), sections)
 
     if check_only:
