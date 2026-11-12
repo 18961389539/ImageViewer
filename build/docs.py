@@ -55,12 +55,57 @@ class DocError(RuntimeError):
 # --------------------------------------------------------------------------- 行内
 
 
+MODIFIERS = ("Ctrl", "Shift", "Alt")
+# 单独出现也明确是"按一个键"的名字；数字键不在此列，因为正文里的 `0`、`1` 多是数值。
+SINGLE_KEYS = {
+    "Ctrl", "Shift", "Alt",
+    "Esc", "Enter", "Delete", "Home", "End", "Tab", "PgUp", "PgDn",
+    "↑", "↓", "←", "→",
+}
+
+
+def is_shortcut(text: str) -> bool:
+    """判断行内代码是不是按键：`Ctrl+S`、`Ctrl+Shift+R`、`Ctrl++`、`↑`。
+
+    Chinese: 只把确实表示按键的写法转成 <kbd>；`Ctrl+滚轮`、`px`、`.ivsession`
+    这类含中文或属于数值的内容继续用 <code>，避免整篇都变成键帽。
+    """
+    if text in SINGLE_KEYS:
+        return True
+    if not any(text.startswith(modifier + "+") for modifier in MODIFIERS):
+        return False
+    # `Ctrl++` 表示"Ctrl 加加号"：去掉末尾的 "+" 后只剩修饰键本身。
+    if text.endswith("++"):
+        return text[:-2] in MODIFIERS
+
+    body = text
+    parts = body.split("+")
+    if len(parts) < 2:
+        return False
+    return all(
+        part and len(part) <= 12 and part.isascii() and " " not in part for part in parts
+    )
+
+
+def render_key(text: str) -> str:
+    if text.endswith("++"):
+        body, extra = text[:-2], ["+"]
+    else:
+        body, extra = text, []
+    keys = body.split("+") + extra
+    return "+".join(f"<kbd>{html.escape(key, quote=False)}</kbd>" for key in keys)
+
+
 def render_inline(text: str) -> str:
     """渲染行内语法。先切出行内代码，避免代码里的星号被当成加粗。"""
     out: list[str] = []
     for part in re.split(r"(`[^`]+`)", text):
         if len(part) > 2 and part.startswith("`") and part.endswith("`"):
-            out.append("<code>" + html.escape(part[1:-1], quote=False) + "</code>")
+            content = part[1:-1]
+            if is_shortcut(content):
+                out.append(render_key(content))
+            else:
+                out.append("<code>" + html.escape(content, quote=False) + "</code>")
             continue
         escaped = html.escape(part, quote=False)
         escaped = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", escaped)
@@ -164,8 +209,9 @@ def convert(md_text: str) -> tuple[str, str, list[tuple[str, str]]]:
                 index += 1
             index += 1
             class_attr = f' class="language-{html.escape(language, quote=True)}"' if language else ""
+            lang_attr = f' data-lang="{html.escape(language, quote=True)}"' if language else ""
             body.append(
-                "      <pre><code"
+                f"      <pre{lang_attr}><code"
                 + class_attr
                 + ">"
                 + html.escape("\n".join(code), quote=False)
@@ -197,7 +243,10 @@ def convert(md_text: str) -> tuple[str, str, list[tuple[str, str]]]:
             section_title = heading
             toc.append((anchor_id, heading))
             body.append(f'    <section id="{anchor_id}">')
-            body.append(f"      <h2>{render_inline(heading)}</h2>")
+            body.append(
+                f'      <h2><a class="anchor" href="#{anchor_id}" aria-label="链接到本节">#</a>'
+                f"{render_inline(heading)}</h2>"
+            )
             section_open = True
             index += 1
             continue
@@ -227,7 +276,10 @@ def convert(md_text: str) -> tuple[str, str, list[tuple[str, str]]]:
             while index < len(lines) and lines[index].strip().startswith(">"):
                 quoted.append(render_inline(lines[index].strip().lstrip(">").strip()))
                 index += 1
-            body.append('        <div class="meta">' + "<br>\n        ".join(quoted) + "</div>")
+            lines_html = "\n".join(
+                f'          <span class="meta-line">{text}</span>' for text in quoted
+            )
+            body.append('        <div class="meta">\n' + lines_html + "\n        </div>")
             continue
 
         list_match = re.match(r"^(\d+\.|[-*])\s+(.*)$", stripped)
@@ -284,7 +336,8 @@ def build_html() -> str:
         )
 
     toc_html = "\n".join(
-        f'      <a href="#{anchor}">{render_inline(text)}</a>' for anchor, text in toc
+        f'      <a href="#{anchor}"><span class="toc-num">{number:02d}</span>{render_inline(text)}</a>'
+        for number, (anchor, text) in enumerate(toc, start=1)
     )
     return (
         template.replace("<!--{{TOC}}-->", toc_html)

@@ -4,61 +4,156 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="ImageViewer 图像、ROI、分析和 3D/MPR 浏览使用手册。">
+  <meta name="color-scheme" content="light dark">
   <title>ImageViewer 使用手册</title>
   <style>
     :root {
-      --ink: #152534;
-      --muted: #5f7080;
-      --paper: #f7f8f5;
+      color-scheme: light dark;
+      --ink: #16262f;
+      --ink-soft: #2f414c;
+      --muted: #5c6f7b;
+      --paper: #f6f8f7;
       --surface: #ffffff;
-      --line: #d8e0e4;
-      --teal: #087d79;
-      --teal-dark: #045d5b;
-      --gold: #c78920;
-      --soft-teal: #e4f2f0;
-      --soft-gold: #fbf1d8;
-      --code: #132431;
-      --shadow: 0 14px 32px rgba(21, 37, 52, 0.08);
+      --surface-sunken: #f1f5f4;
+      --th-bg: #e9f1ef;
+      --zebra: rgba(11, 122, 116, 0.055);
+      --meta-ink: #4f6572;
+      --line: #dbe3e6;
+      --line-strong: #c3d0d6;
+      --teal: #0b7a74;
+      --teal-dark: #055c58;
+      --link: #055c58;
+      --gold: #c1861d;
+      --soft-teal: #e6f3f1;
+      --soft-gold: #fbf2dd;
+      --code: #101e27;
+      --code-ink: #dff0ee;
+      --shadow: 0 18px 40px rgba(16, 33, 43, 0.09);
+      --radius: 10px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --ink: #dbe7ed;
+        --ink-soft: #bccfd8;
+        --muted: #8ba1ad;
+        --paper: #0d161c;
+        --surface: #14212a;
+        --surface-sunken: #111c23;
+        --th-bg: #1e2f39;
+        --zebra: rgba(255, 255, 255, 0.055);
+        --meta-ink: #9db3bf;
+        --line: #24343d;
+        --line-strong: #33474f;
+        --teal: #4fbdb4;
+        --teal-dark: #6fd0c7;
+        --link: #6fd0c7;
+        --gold: #d9a441;
+        --soft-teal: rgba(79, 189, 180, 0.14);
+        --soft-gold: rgba(217, 164, 65, 0.14);
+        --code: #081117;
+        --code-ink: #d7e9e6;
+        --shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+      }
     }
 
     * { box-sizing: border-box; }
 
-    html { scroll-behavior: smooth; }
+    html {
+      scroll-behavior: smooth;
+      scroll-padding-top: 20px;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+    }
 
     body {
       margin: 0;
       color: var(--ink);
-      background:
-        linear-gradient(90deg, rgba(8, 125, 121, 0.035) 1px, transparent 1px) 0 0 / 28px 28px,
-        var(--paper);
-      font-family: "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
-      line-height: 1.7;
+      background-color: var(--paper);
+      background-image:
+        linear-gradient(90deg, rgba(11, 122, 116, 0.045) 1px, transparent 1px) 0 0 / 26px 26px;
+      font-family: "Segoe UI", "Microsoft YaHei", "Noto Sans CJK SC", "PingFang SC", sans-serif;
+      font-size: 16px;
+      line-height: 1.75;
+      text-rendering: optimizeLegibility;
     }
 
-    a { color: var(--teal-dark); text-underline-offset: 0.18em; }
+    @media (prefers-color-scheme: dark) {
+      body { background-image: none; }
+    }
 
-    code, kbd {
-      font-family: Consolas, "Cascadia Code", monospace;
-      font-size: 0.9em;
+    ::selection { background: rgba(11, 122, 116, 0.22); }
+
+    a {
+      color: var(--link);
+      text-decoration-color: color-mix(in srgb, var(--link) 40%, transparent);
+      text-underline-offset: 0.18em;
+    }
+
+    a:hover { text-decoration-color: var(--link); }
+
+    :focus-visible {
+      outline: 2px solid var(--teal);
+      outline-offset: 2px;
+      border-radius: 3px;
+    }
+
+    .skip-link {
+      position: absolute;
+      top: -100px;
+      left: 16px;
+      z-index: 20;
+      padding: 10px 16px;
+      color: #fff;
+      background: var(--teal-dark);
+      border-radius: 0 0 6px 6px;
+      text-decoration: none;
+      transition: top 0.15s ease-in-out;
+    }
+
+    .skip-link:focus { top: 0; }
+
+    code, kbd, pre {
+      font-family: Consolas, "Cascadia Mono", "Cascadia Code", ui-monospace, monospace;
+    }
+
+    code {
+      padding: 0.06em 0.34em;
+      color: var(--ink-soft);
+      background: color-mix(in srgb, var(--teal) 9%, transparent);
+      border: 1px solid color-mix(in srgb, var(--teal) 16%, transparent);
+      border-radius: 4px;
+      font-size: 0.88em;
+      white-space: nowrap;
     }
 
     kbd {
       display: inline-block;
-      min-width: 1.8em;
-      padding: 0.08em 0.42em;
+      min-width: 1.7em;
+      margin: 0 0.06em;
+      padding: 0.1em 0.42em;
       color: var(--ink);
-      background: #fff;
-      border: 1px solid #b8c5cc;
+      background: var(--surface);
+      border: 1px solid var(--line-strong);
       border-bottom-width: 2px;
-      border-radius: 3px;
+      border-radius: 4px;
+      box-shadow: 0 1px 0 rgba(16, 33, 43, 0.06);
+      font-size: 0.82em;
+      line-height: 1.6;
       text-align: center;
       white-space: nowrap;
     }
 
     .page-header {
-      color: #f8ffff;
-      background: var(--code);
-      border-bottom: 4px solid var(--gold);
+      position: relative;
+      color: #f6fdfd;
+      background:
+        radial-gradient(1200px 240px at 12% -40%, rgba(79, 189, 180, 0.28), transparent 70%),
+        linear-gradient(180deg, #12222b, #0e1b23 62%, #0d1920);
+      border-bottom: 3px solid var(--gold);
     }
 
     .header-inner, .layout {
@@ -66,65 +161,77 @@
       margin: 0 auto;
     }
 
-    .header-inner { padding: 56px 0 46px; }
+    .header-inner { padding: 52px 0 42px; }
 
     .eyebrow {
-      margin: 0 0 8px;
-      color: #8ed8cf;
-      font-size: 0.83rem;
+      margin: 0 0 10px;
+      color: #85d5cc;
+      font-size: 0.78rem;
       font-weight: 700;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.16em;
       text-transform: uppercase;
     }
 
-    h1, h2, h3 { line-height: 1.25; }
+    h1, h2, h3 { line-height: 1.28; text-wrap: balance; }
 
     h1 {
-      max-width: 760px;
+      max-width: 780px;
       margin: 0;
-      font-size: clamp(2rem, 4vw, 3.45rem);
-      font-weight: 750;
-      letter-spacing: 0;
+      font-size: clamp(2rem, 3.6vw, 3.05rem);
+      font-weight: 700;
+      letter-spacing: -0.01em;
     }
 
     .subtitle {
-      max-width: 700px;
+      max-width: 660px;
       margin: 14px 0 0;
-      color: #c5d5dc;
-      font-size: 1.05rem;
+      color: #b9cdd6;
+      font-size: 1.02rem;
     }
 
     .layout {
       display: grid;
-      grid-template-columns: 228px minmax(0, 1fr);
-      gap: 52px;
+      grid-template-columns: 232px minmax(0, 1fr);
+      gap: 48px;
       align-items: start;
-      padding: 38px 0 72px;
+      padding: 36px 0 64px;
     }
 
     .toc {
       position: sticky;
-      top: 24px;
-      padding: 16px;
-      background: rgba(255, 255, 255, 0.8);
+      top: 18px;
+      max-height: calc(100vh - 36px);
+      padding: 14px 12px;
+      overflow: auto;
+      background: color-mix(in srgb, var(--surface) 86%, transparent);
       border: 1px solid var(--line);
-      border-radius: 6px;
+      border-radius: var(--radius);
+      box-shadow: 0 1px 0 rgba(16, 33, 43, 0.03);
+      backdrop-filter: blur(6px);
+      scrollbar-width: thin;
     }
 
-    .toc strong {
-      display: block;
-      margin-bottom: 8px;
-      font-size: 0.83rem;
-      letter-spacing: 0.06em;
+    .toc-title {
+      margin: 2px 0 10px;
+      padding-left: 8px;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
       text-transform: uppercase;
     }
 
     .toc a {
-      display: block;
+      display: flex;
+      gap: 8px;
+      align-items: baseline;
       padding: 6px 8px;
       color: var(--muted);
-      font-size: 0.93rem;
+      border-left: 2px solid transparent;
+      border-radius: 0 5px 5px 0;
+      font-size: 0.9rem;
       text-decoration: none;
+      transition: background 0.12s ease, color 0.12s ease;
     }
 
     .toc a:hover, .toc a:focus-visible {
@@ -133,125 +240,329 @@
       outline: none;
     }
 
+    .toc a[aria-current="true"] {
+      color: var(--teal-dark);
+      background: var(--soft-teal);
+      border-left-color: var(--gold);
+      font-weight: 600;
+    }
+
+    .toc-num {
+      flex: none;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.02em;
+      opacity: 0.75;
+    }
+
+    .toc a[aria-current="true"] .toc-num { color: var(--teal-dark); opacity: 1; }
+
     main { min-width: 0; }
 
     section {
-      scroll-margin-top: 24px;
-      padding: 8px 0 36px;
+      padding: 4px 0 38px;
       border-bottom: 1px solid var(--line);
     }
 
+    section + section { padding-top: 34px; }
+
     section:last-child { border-bottom: 0; }
 
-    h2 { margin: 0 0 14px; font-size: 1.62rem; }
-    h3 { margin: 28px 0 10px; font-size: 1.14rem; }
+    h2 {
+      position: relative;
+      margin: 0 0 16px;
+      padding-left: 14px;
+      font-size: 1.52rem;
+      font-weight: 700;
+      letter-spacing: -0.005em;
+    }
+
+    h2::before {
+      position: absolute;
+      top: 0.16em;
+      bottom: 0.16em;
+      left: 0;
+      width: 3px;
+      background: linear-gradient(180deg, var(--teal), color-mix(in srgb, var(--teal) 30%, transparent));
+      border-radius: 2px;
+      content: "";
+    }
+
+    h3 {
+      margin: 30px 0 10px;
+      padding-bottom: 6px;
+      color: var(--ink);
+      border-bottom: 1px dashed var(--line);
+      font-size: 1.08rem;
+      font-weight: 650;
+    }
+
+    .anchor {
+      position: absolute;
+      left: -0.72em;
+      padding: 0 0.16em;
+      color: var(--muted);
+      font-weight: 400;
+      text-decoration: none;
+      opacity: 0;
+      transition: opacity 0.12s ease;
+    }
+
+    h2:hover .anchor, .anchor:focus-visible { opacity: 1; }
+
+    p, ul, ol { max-width: 74ch; }
+
     p { margin: 0 0 14px; }
+
     ol, ul { margin: 0 0 16px; padding-left: 1.45rem; }
+
     li + li { margin-top: 5px; }
 
+    li > code { white-space: nowrap; }
+
     .meta {
-      margin: 0 0 26px;
-      padding: 13px 16px;
-      color: var(--muted);
+      display: grid;
+      gap: 4px;
+      margin: 0 0 28px;
+      padding: 14px 18px;
+      color: var(--meta-ink);
       background: var(--surface);
+      border: 1px solid var(--line);
       border-left: 3px solid var(--gold);
-      font-size: 0.94rem;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      font-size: 0.92rem;
+      line-height: 1.65;
     }
 
-    .lead {
-      max-width: 780px;
-      color: var(--muted);
-      font-size: 1.06rem;
-    }
+    .meta-line { display: block; }
 
-    .step-list { counter-reset: step; list-style: none; padding: 0; }
+    .meta code { background: color-mix(in srgb, var(--teal) 7%, transparent); }
+
+    .step-list { counter-reset: step; max-width: 74ch; padding: 0; list-style: none; }
 
     .step-list > li {
       position: relative;
       min-height: 40px;
-      padding: 5px 0 6px 52px;
+      padding: 4px 0 8px 50px;
     }
+
+    .step-list > li + li { margin-top: 4px; }
 
     .step-list > li::before {
       position: absolute;
-      top: 4px;
+      top: 3px;
       left: 0;
-      width: 31px;
-      height: 31px;
+      width: 30px;
+      height: 30px;
       color: var(--teal-dark);
       background: var(--soft-teal);
-      border: 1px solid #b3d8d3;
+      border: 1px solid color-mix(in srgb, var(--teal) 30%, transparent);
       border-radius: 50%;
       content: counter(step);
       counter-increment: step;
+      font-size: 0.86rem;
       font-weight: 700;
-      line-height: 30px;
+      line-height: 29px;
       text-align: center;
     }
 
-    .table-scroll { max-width: 100%; overflow-x: auto; }
-    .table-scroll:focus-visible { outline: 2px solid var(--teal); }
-    .table-scroll table { min-width: 390px; }
-    .table-scroll table.wide { min-width: 660px; }
+    .table-scroll {
+      max-width: 100%;
+      margin: 18px 0 20px;
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      scrollbar-width: thin;
+    }
+
+    .table-scroll:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
 
     table {
       width: 100%;
-      margin: 16px 0;
       border-collapse: collapse;
-      background: var(--surface);
-      border: 1px solid var(--line);
+      font-size: 0.94rem;
+      line-height: 1.62;
+      font-variant-numeric: tabular-nums;
     }
 
-    th, td { padding: 11px 13px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
-    th { background: #edf3f3; font-size: 0.92rem; }
-    tr:last-child td { border-bottom: 0; }
+    .table-scroll table { min-width: 420px; }
+    .table-scroll table.wide { min-width: 700px; }
+
+    th, td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      position: relative;
+      color: var(--ink);
+      background: var(--th-bg);
+      border-bottom: 1px solid var(--line-strong);
+      font-size: 0.86rem;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      white-space: nowrap;
+    }
+
+    th code {
+      background: var(--surface);
+      border-color: var(--line-strong);
+      font-weight: 600;
+    }
+
+    tbody tr:nth-child(even) { background: var(--zebra); }
+
+    tbody tr:hover { background: var(--soft-teal); }
+
+    tbody tr:last-child td { border-bottom: 0; }
+
+    td:first-child { color: var(--ink); }
+
+    td code { white-space: nowrap; }
 
     pre {
+      position: relative;
+      margin: 18px 0 20px;
+      padding: 34px 18px 16px;
       overflow-x: auto;
-      padding: 16px;
-      color: #e4f5f3;
+      color: var(--code-ink);
       background: var(--code);
-      border-radius: 5px;
-      line-height: 1.55;
+      border-radius: var(--radius);
+      line-height: 1.6;
+      tab-size: 4;
     }
 
-    .footer {
-      padding: 24px 0 40px;
-      color: var(--muted);
+    pre[data-lang]::before {
+      position: absolute;
+      top: 0;
+      right: 0;
+      left: 0;
+      padding: 7px 16px;
+      color: #8fb3ae;
+      background: rgba(255, 255, 255, 0.055);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+      content: attr(data-lang);
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      font-size: 0.72rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    pre code {
+      padding: 0;
+      color: inherit;
+      background: none;
+      border: 0;
       font-size: 0.9rem;
+      white-space: pre;
+    }
+
+    .to-top {
+      position: fixed;
+      right: 22px;
+      bottom: 22px;
+      z-index: 10;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 9px 14px;
+      color: var(--ink);
+      background: var(--surface);
+      border: 1px solid var(--line-strong);
+      border-radius: 999px;
+      box-shadow: var(--shadow);
+      font-size: 0.85rem;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(8px);
+      transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+
+    .to-top.is-visible { opacity: 1; pointer-events: auto; transform: none; }
+
+    .to-top:hover { border-color: var(--teal); color: var(--teal-dark); }
+
+    .footer {
+      padding: 26px 0 44px;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+      font-size: 0.86rem;
       text-align: center;
     }
 
-    @media (max-width: 820px) {
-      .layout { grid-template-columns: 1fr; gap: 22px; }
-      .toc { position: static; display: flex; flex-wrap: wrap; gap: 3px; }
-      .toc strong { width: 100%; }
-      .toc a { padding: 5px 7px; }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; gap: 20px; padding-top: 22px; }
+      .toc {
+        position: static;
+        display: flex;
+        gap: 2px;
+        align-items: center;
+        max-height: none;
+        padding: 8px 10px;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+      }
+      .toc-title { margin: 0 6px 0 0; flex: none; }
+      .toc a { flex: none; border-left: 0; border-bottom: 2px solid transparent; border-radius: 5px 5px 0 0; }
+      .toc a[aria-current="true"] { border-left: 0; border-bottom-color: var(--gold); }
+      .toc-num { display: none; }
+      section + section { padding-top: 28px; }
+      p, ul, ol, .step-list { max-width: none; }
     }
 
-    @media (max-width: 520px) {
-      .header-inner, .layout { width: min(100% - 28px, 1180px); }
-      .header-inner { padding: 42px 0 35px; }
-      th, td { padding: 9px; }
+    @media (max-width: 560px) {
+      .header-inner, .layout { width: 100%; padding-right: 14px; padding-left: 14px; }
+      .header-inner { padding-top: 36px; padding-bottom: 28px; }
+      h1 { font-size: 1.72rem; overflow-wrap: anywhere; }
+      h2 { font-size: 1.3rem; }
+      th, td { padding: 9px 10px; }
+      /* 390 宽的屏幕上再保留 420px 最小宽度就会把整页撑出横向滚动 */
+      .table-scroll table, .table-scroll table.wide { min-width: 0; }
+      .to-top { right: 14px; bottom: 14px; }
     }
 
     @media print {
-      body { background: #fff; }
-      .page-header { color: #152534; background: #fff; border-bottom: 2px solid #c78920; }
-      .subtitle { color: #5f7080; }
-      .layout { display: block; width: auto; padding: 20px 34px; }
-      .toc { display: none; }
-      .table-scroll { overflow: visible; }
+      :root {
+        --ink: #16262f;
+        --muted: #5c6f7b;
+        --paper: #fff;
+        --surface: #fff;
+        --surface-sunken: #f5f7f6;
+        --line: #d3dade;
+        --link: #055c58;
+        --soft-teal: #eef7f5;
+      }
+      @page { margin: 14mm 12mm; }
+      body { background: #fff; font-size: 10.5pt; }
+      .page-header { color: #16262f; background: #fff; border-bottom: 2px solid var(--gold); }
+      .eyebrow { color: var(--teal-dark); }
+      .subtitle { color: var(--muted); }
+      .header-inner { padding: 0 0 14px; }
+      .layout { display: block; width: auto; padding: 14px 0 0; }
+      .toc, .skip-link, .to-top { display: none; }
+      section { padding-bottom: 16px; }
+      section + section { padding-top: 18px; }
+      .table-scroll { overflow: visible; border-radius: 0; }
       .table-scroll table, .table-scroll table.wide { min-width: 0; }
-      table { overflow-wrap: anywhere; }
-      tr { break-inside: avoid; }
+      table { font-size: 9pt; overflow-wrap: anywhere; }
+      thead { display: table-header-group; }
+      tr, pre { break-inside: avoid; }
       h2, h3 { break-after: avoid; }
-      pre { white-space: pre-wrap; }
+      pre { white-space: pre-wrap; background: #f5f7f6; color: #16262f; border: 1px solid var(--line); }
+      pre[data-lang]::before { display: none; }
+      pre code { color: inherit; }
       a { color: inherit; text-decoration: none; }
+      .anchor { display: none; }
     }
   </style>
 </head>
 <body>
+  <a class="skip-link" href="#main">跳到正文</a>
+
   <header class="page-header">
     <div class="header-inner">
       <p class="eyebrow">ImageViewer / User Guide</p>
@@ -262,30 +573,32 @@
 
   <div class="layout">
     <nav class="toc" aria-label="手册目录">
-      <strong>目录</strong>
-      <a href="#start">启动与界面</a>
-      <a href="#image">打开图像与浏览</a>
-      <a href="#roi">绘制与编辑 ROI</a>
-      <a href="#quick-measure">第一次测量：从标定到 CSV</a>
-      <a href="#calibration">标定与公差</a>
-      <a href="#analysis">分析与结果导出</a>
-      <a href="#volume">体数据与切片浏览</a>
-      <a href="#files">保存、恢复与配方</a>
-      <a href="#shortcuts">快捷键速查</a>
-      <a href="#faq">常见问题</a>
-      <a href="#appendix-tools">附录 A：工具清单</a>
-      <a href="#appendix-menu">附录 B：菜单结构速查</a>
-      <a href="#integration">宿主集成</a>
+      <p class="toc-title">目录</p>
+      <a href="#start"><span class="toc-num">01</span>启动与界面</a>
+      <a href="#image"><span class="toc-num">02</span>打开图像与浏览</a>
+      <a href="#roi"><span class="toc-num">03</span>绘制与编辑 ROI</a>
+      <a href="#quick-measure"><span class="toc-num">04</span>第一次测量：从标定到 CSV</a>
+      <a href="#calibration"><span class="toc-num">05</span>标定与公差</a>
+      <a href="#analysis"><span class="toc-num">06</span>分析与结果导出</a>
+      <a href="#volume"><span class="toc-num">07</span>体数据与切片浏览</a>
+      <a href="#files"><span class="toc-num">08</span>保存、恢复与配方</a>
+      <a href="#shortcuts"><span class="toc-num">09</span>快捷键速查</a>
+      <a href="#faq"><span class="toc-num">10</span>常见问题</a>
+      <a href="#appendix-tools"><span class="toc-num">11</span>附录 A：工具清单</a>
+      <a href="#appendix-menu"><span class="toc-num">12</span>附录 B：菜单结构速查</a>
+      <a href="#integration"><span class="toc-num">13</span>宿主集成</a>
     </nav>
 
-    <main>
-        <div class="meta">适用版本 0.1.0（<code>net8.0-windows</code> / <code>net10.0-windows</code>）。校对日期 2026-11-12，依据提交 <code>2be5103</code>。<br>
-        本手册讲界面操作，以演示程序 ImageViewerDemo 为例。嵌入自有 WPF 程序请读<a href="integration.md">集成指南</a>。<br>
-        记号约定：<strong>粗体</strong>是界面上的按钮或菜单命令；<code>等宽</code>是输入值、字段名或文件名。</div>
+    <main id="main">
+        <div class="meta">
+          <span class="meta-line">适用版本 0.1.0（<code>net8.0-windows</code> / <code>net10.0-windows</code>）。校对日期 2026-11-12，依据提交 <code>2be5103</code>。</span>
+          <span class="meta-line">本手册讲界面操作，以演示程序 ImageViewerDemo 为例。嵌入自有 WPF 程序请读<a href="integration.md">集成指南</a>。</span>
+          <span class="meta-line">记号约定：<strong>粗体</strong>是界面上的按钮或菜单命令；<code>等宽</code>是输入值、字段名或文件名。</span>
+        </div>
     <section id="start">
-      <h2>启动与界面</h2>
+      <h2><a class="anchor" href="#start" aria-label="链接到本节">#</a>启动与界面</h2>
         <p>直接启动已构建的 <code>ImageViewerDemo.exe</code>。如果从源码运行，在 Windows 上打开终端，进入仓库根目录，选择与本机 .NET SDK 对应的目标框架：</p>
-      <pre><code class="language-powershell">dotnet run --project ImageViewerDemo/ImageViewerDemo.csproj --framework net10.0-windows</code></pre>
+      <pre data-lang="powershell"><code class="language-powershell">dotnet run --project ImageViewerDemo/ImageViewerDemo.csproj --framework net10.0-windows</code></pre>
         <p>使用 .NET 8 时，把参数改为 <code>--framework net8.0-windows</code>。Demo 启动时通常会打开随程序附带的灰度测试图；没有看到图像时，可手动选择 <strong>打开图像文件</strong> 或 <strong>测量示例</strong>。</p>
         <div class="table-scroll" tabindex="0" role="region" aria-label="启动与界面：表格">
         <table>
@@ -320,23 +633,23 @@
         </table>
         </div>
         <p>窗口窄时，点 <strong>ROI 面板</strong> 展开右侧栏。如果常用工具被手动隐藏，点 <strong>恢复工具栏</strong>。在画布空白处右键也可打开完整菜单；在 ROI 上右键会先选中该对象，再显示与它相关的操作。</p>
-        <p><strong>查找命令。</strong> 打开右键菜单后直接输入“槽孔”“显示灰度剖面图”等关键词。按 <code>↓</code> 移到第一个可执行结果；只有一个可执行结果时，可直接按 <code>Enter</code>。<code>Esc</code> 先清空搜索，再按一次关闭菜单。命令呈灰色时，悬停可查看缺少的图像、选区或其他条件。完整菜单树见<a href="#appendix-menu">附录 B</a>，逐条说明见<a href="context-menu.md">右键菜单</a>。</p>
+        <p><strong>查找命令。</strong> 打开右键菜单后直接输入“槽孔”“显示灰度剖面图”等关键词。按 <kbd>↓</kbd> 移到第一个可执行结果；只有一个可执行结果时，可直接按 <kbd>Enter</kbd>。<kbd>Esc</kbd> 先清空搜索，再按一次关闭菜单。命令呈灰色时，悬停可查看缺少的图像、选区或其他条件。完整菜单树见<a href="#appendix-menu">附录 B</a>，逐条说明见<a href="context-menu.md">右键菜单</a>。</p>
     </section>
     <section id="image">
-      <h2>打开图像与浏览</h2>
+      <h2><a class="anchor" href="#image" aria-label="链接到本节">#</a>打开图像与浏览</h2>
         <ol>
-        <li>点击 <strong>打开图像文件</strong>、按 <code>Ctrl+O</code>，或把文件拖到画布。支持 <code>.png</code>、<code>.jpg</code>、<code>.jpeg</code>、<code>.bmp</code>、<code>.gif</code>、<code>.tif</code> 和 <code>.tiff</code>。</li>
+        <li>点击 <strong>打开图像文件</strong>、按 <kbd>Ctrl</kbd>+<kbd>O</kbd>，或把文件拖到画布。支持 <code>.png</code>、<code>.jpg</code>、<code>.jpeg</code>、<code>.bmp</code>、<code>.gif</code>、<code>.tif</code> 和 <code>.tiff</code>。</li>
         <li>JPEG/TIFF 会按 EXIF Orientation 自动旋正，手机和相机照片不会横躺。单图解码上限约 1 亿像素（100,000,000），超过时程序拒绝解码并给出提示，而不是耗尽内存；这类图像请先在外部降采样或裁切后再打开。</li>
         <li>等待解码。耗时较长时可点 <strong>取消加载</strong>；失败后可根据提示检查文件，再点 <strong>重试</strong>。加载失败或取消不会替换当前文档。</li>
-        <li>点击 <strong>适应窗口</strong>（<code>Ctrl+F</code>）看全图；在画布上双击也能适应窗口（正在用绘制工具时不生效）。把鼠标移到要检查的位置，滚轮缩放；按住中键拖动平移。</li>
+        <li>点击 <strong>适应窗口</strong>（<kbd>Ctrl</kbd>+<kbd>F</kbd>）看全图；在画布上双击也能适应窗口（正在用绘制工具时不生效）。把鼠标移到要检查的位置，滚轮缩放；按住中键拖动平移。</li>
         <li>检查细节时，可用 <strong>实际大小（100%）</strong> 查看 1:1 视图，或先选中 ROI，再用 <strong>缩放到所选 ROI</strong>。<strong>填充窗口</strong> 会让图像覆盖视口，边缘可能超出画布。</li>
-        <li>需要改变观察方向时，用 <strong>视图 → 向左旋转 90°</strong>、<strong>向右旋转 90°</strong>、<strong>水平翻转</strong> 或 <strong>垂直翻转</strong>。标签、控制点与图像一起定位，旋转或翻转不会改变测量的图像坐标和数值。按 <code>Ctrl+0</code> 重置视图。</li>
+        <li>需要改变观察方向时，用 <strong>视图 → 向左旋转 90°</strong>、<strong>向右旋转 90°</strong>、<strong>水平翻转</strong> 或 <strong>垂直翻转</strong>。标签、控制点与图像一起定位，旋转或翻转不会改变测量的图像坐标和数值。按 <kbd>Ctrl</kbd>+<kbd>0</kbd> 重置视图。</li>
         </ol>
         <p>画布还接受两类拖放：直接拖入 <code>.ivsession</code> 或 <code>.ivpkg</code> 会按“打开项目或会话”的流程载入；拖入图像则按新文档打开。从体数据切片打开普通图像时，程序会保护当前文档和轴位视图的未保存编辑；确认替换并成功打开后，旧体数据退出，显示新的单图文档。</p>
         <p>图像超过约 400 万像素时，程序自动启用多分辨率金字塔与分块渲染，并按 16 MP、64 MP 两档提高瓦片缓存上限；缩放平移只处理当前视口。相关开关与缓存清理在 <strong>性能设置</strong> 中。</p>
     </section>
     <section id="roi">
-      <h2>绘制与编辑 ROI</h2>
+      <h2><a class="anchor" href="#roi" aria-label="链接到本节">#</a>绘制与编辑 ROI</h2>
         <p>ROI 是图像上的感兴趣区域或测量对象。工具分三类：<strong>绘制</strong>标记区域、点或文字；<strong>测量</strong>记录尺寸、几何关系；<strong>边缘检测</strong>沿着你给的参考线或圆搜索真实边缘（卡尺、拟合、斑点）。画布底部的提示会随工具更新。全部 31 个工具见<a href="#appendix-tools">附录 A</a>。</p>
       <h3>基础绘制与标注</h3>
         <div class="table-scroll" tabindex="0" role="region" aria-label="绘制与编辑 ROI：表格">
@@ -489,19 +802,19 @@
         </table>
         </div>
       <h3>调整已有 ROI</h3>
-        <p>在画布或右侧列表选中对象，拖动主体可移动，拖动控制点可调整几何。选中后按方向键可微移 1 px，按住 <code>Shift</code> 方向键微移 10 px（有多个选区时移动选中的那个）。在“当前对象”菜单可改标签和颜色，或缩放到该对象。已锁定的 ROI 要先解除锁定才能编辑；隐藏与删除是两个独立操作。用列表筛选可在对象较多时按名称、类型或标签定位。</p>
-        <p><strong>编辑路径。</strong> 拖动折线或多边形的节点可调整轮廓；单击线段可插入节点。右键命中某个节点后，选 <strong>当前对象 → 删除此节点</strong>。折线至少保留两个节点，闭合多边形至少保留三个。<code>Ctrl+Z</code> 撤销最近一项支持撤销的编辑，<code>Ctrl+Y</code> 重做；<strong>清空所有 ROI</strong> 之后也能用 <code>Ctrl+Z</code> 恢复。</p>
+        <p>在画布或右侧列表选中对象，拖动主体可移动，拖动控制点可调整几何。选中后按方向键可微移 1 px，按住 <kbd>Shift</kbd> 方向键微移 10 px（有多个选区时移动选中的那个）。在“当前对象”菜单可改标签和颜色，或缩放到该对象。已锁定的 ROI 要先解除锁定才能编辑；隐藏与删除是两个独立操作。用列表筛选可在对象较多时按名称、类型或标签定位。</p>
+        <p><strong>编辑路径。</strong> 拖动折线或多边形的节点可调整轮廓；单击线段可插入节点。右键命中某个节点后，选 <strong>当前对象 → 删除此节点</strong>。折线至少保留两个节点，闭合多边形至少保留三个。<kbd>Ctrl</kbd>+<kbd>Z</kbd> 撤销最近一项支持撤销的编辑，<kbd>Ctrl</kbd>+<kbd>Y</kbd> 重做；<strong>清空所有 ROI</strong> 之后也能用 <kbd>Ctrl</kbd>+<kbd>Z</kbd> 恢复。</p>
         <p><strong>检测没有成功时。</strong> 先看参考线或搜索区域是否盖住目标、是否混入邻近边缘。选中圆类卡尺可点 <strong>调整圆测量参数</strong>；其他卡尺可选 <strong>当前对象 → 卡尺参数...</strong>。可调项包括 <strong>卡尺数量</strong>、<strong>搜索范围 (px)</strong>、<strong>半宽采样 (px)</strong>、<strong>最小梯度</strong>、<strong>最少有效卡尺</strong>、<strong>离群阈值 (px, 0=自动)</strong> 和 <strong>边缘极性</strong>：极性决定沿搜索方向找由暗到亮还是由亮到暗的过渡，选反了就完全找不到边。需要看有效点、剔除点和残差时，再启用 <strong>显示卡尺得分</strong>。双边卡尺与圆卡尺还可用 <strong>梯度检测对齐（卡尺）</strong> 按检测到的边缘重新摆正。详见<a href="detection-parameter-recommendations.md">检测参数推荐</a>和<a href="advanced-measurements.md">高级测量</a>。</p>
     </section>
     <section id="quick-measure">
-      <h2>第一次测量：从标定到 CSV</h2>
+      <h2><a class="anchor" href="#quick-measure" aria-label="链接到本节">#</a>第一次测量：从标定到 CSV</h2>
         <ol class="step-list">
         <li><strong>打开练习。</strong> 点击 Demo 顶部的 <strong>测量示例</strong>。在右侧列表找到 <strong>基准线（100 px）</strong> 和 <strong>检查线（80 px）</strong>；如面板未显示，点击 <strong>ROI 面板</strong>。</li>
         <li><strong>建立比例。</strong> 选中 <strong>基准线（100 px）</strong>，点 <strong>尺寸标定</strong>。实际长度填 <code>50</code>，单位填 <code>mm</code>；本练习不填写畸变参数。确认后，底部徽标显示 <code>1 px = 0.5000 mm</code>（徽标固定保留 4 位小数），状态为“仅比例标定”。</li>
         <li><strong>核对独立尺寸。</strong> 选中 <strong>检查线（80 px）</strong>，画布应显示 <code>40.00 mm</code>，因为 <code>80 × 0.5 = 40</code>。如显示 <code>80 px</code>，先检查标定是否确认并生效。</li>
         <li><strong>设置公差。</strong> 在检查线的 <strong>公差判定</strong> 属性中，标称值填 <code>40</code>，上公差和下公差各填 <code>0.5</code>。允许范围为 <code>39.5–40.5 mm</code>，包含上下限。三个字段填纯数字，不带单位。</li>
         <li><strong>导出并核对。</strong> 点击 <strong>导出 CSV</strong>，保存到可写目录。打开 CSV，在标签为 <strong>检查线（80 px）</strong> 的一行核对以下字段。基准线没有配置公差，看到 <code>NotConfigured</code> 属于预期结果。</li>
-        <li><strong>保存练习。</strong> 按 <code>Ctrl+S</code>，另选一个文件名保存 <code>.ivsession</code>。下次通过 <strong>打开项目或会话</strong> 载入，继续查看标定、ROI 和公差。</li>
+        <li><strong>保存练习。</strong> 按 <kbd>Ctrl</kbd>+<kbd>S</kbd>，另选一个文件名保存 <code>.ivsession</code>。下次通过 <strong>打开项目或会话</strong> 载入，继续查看标定、ROI 和公差。</li>
         </ol>
         <div class="table-scroll" tabindex="0" role="region" aria-label="第一次测量：从标定到 CSV：表格">
         <table class="wide">
@@ -530,7 +843,7 @@
         <p>想练习超差分支，可把检查线的标称值改成 <code>41</code>，保留上下公差各 <code>0.5</code>，再导出到另一个文件。测量值仍为 <code>40 mm</code>，判定应变为 <code>Failed</code>。示例尺寸仅供练习。</p>
     </section>
     <section id="calibration">
-      <h2>标定与公差</h2>
+      <h2><a class="anchor" href="#calibration" aria-label="链接到本节">#</a>标定与公差</h2>
       <h3>在自己的图像上标定</h3>
         <ol>
         <li>让已知尺寸的参考物与待测特征处于同一成像条件下。打开图像后，用 <strong>距离测量</strong> 在参考物的两个已知位置之间画线并选中。</li>
@@ -617,7 +930,7 @@
         </div>
     </section>
     <section id="analysis">
-      <h2>分析与结果导出</h2>
+      <h2><a class="anchor" href="#analysis" aria-label="链接到本节">#</a>分析与结果导出</h2>
       <h3>导出单张图像</h3>
         <ol>
         <li>检查各 ROI 的标签、单位与公差，便于在表格中定位。对卡尺和拟合结果，先复核检测证据。</li>
@@ -655,7 +968,7 @@
         <li>在参考图像上设置 ROI、标定和公差，用单图导出验证结果。确认批次图像的被测特征位于同一像素区域；如果工件位置变化，先对齐并在代表性图像上验证，批量导出不会替你自动对齐工件。</li>
         <li>选 <strong>分析与报告 → 批量分析并导出 CSV...</strong>，选择多张图像，再选择输出 CSV。程序复用当前的 ROI 和检测参数。</li>
         <li>完成后看 CSV 里的 <code>Source</code>、<code>Status</code>、<code>Error</code> 和 <code>SpecificationStatus</code>。<code>Status</code> 说明图像读取或分析过程，规格是否合格看 <code>SpecificationStatus</code>。同一模板项可用 <code>MeasurementItemKey</code> 在本批次内对应。</li>
-        <li>保留同时生成的 <code>.metadata.json</code>、<code>.summary.json</code> 和 <code>.repeatability.md</code>。按 <code>Esc</code> 取消批次时，可保留已完成的结果；未完成项不应当作合格或失败。默认的批次报告描述不同输入之间的变化，只有明确标为同一工件的多轮测量时，才给出同件重复性结论。</li>
+        <li>保留同时生成的 <code>.metadata.json</code>、<code>.summary.json</code> 和 <code>.repeatability.md</code>。按 <kbd>Esc</kbd> 取消批次时，可保留已完成的结果；未完成项不应当作合格或失败。默认的批次报告描述不同输入之间的变化，只有明确标为同一工件的多轮测量时，才给出同件重复性结论。</li>
         </ol>
       <h3>显示与分析辅助</h3>
         <p><strong>图像显示</strong> 菜单分两个子菜单：<strong>图像调整</strong> 管亮度、色带一类的视觉参数，<strong>显示叠加</strong> 管网格、直方图、比例尺这类附加层。</p>
@@ -712,7 +1025,7 @@
         <p><strong>过程能力。</strong> 用 <strong>分析与报告 → 过程能力 / 控制图</strong> 查看 Cp/Cpk、Pp/Ppk 与 X̄-R 控制图。控制图需要至少两个完整子组，子组大小可选 2–10；样本不足时先检查有效样本数和公差配置。详细列定义和成套文件约定见<a href="import-export-conventions.md">导入导出约定</a>。</p>
     </section>
     <section id="volume">
-      <h2>体数据与切片浏览</h2>
+      <h2><a class="anchor" href="#volume" aria-label="链接到本节">#</a>体数据与切片浏览</h2>
       <h3>导入一组切片</h3>
         <ol>
         <li>在 Demo 顶部点 <strong>打开体数据</strong>，一次选择同一序列的多个切片文件。检查文件是否属于同一方向和同一组采集，宽、高应一致。</li>
@@ -773,14 +1086,14 @@
         </tr>
         <tr>
         <td>冠状 / 矢状</td>
-        <td>切片滑块、<strong>上一层／下一层</strong> 按钮、<code>↑</code> / <code>↓</code>、滚轮</td>
+        <td>切片滑块、<strong>上一层／下一层</strong> 按钮、<kbd>↑</kbd> / <kbd>↓</kbd>、滚轮</td>
         <td><code>Ctrl+滚轮</code></td>
         </tr>
         </tbody>
         </table>
         </div>
-        <p><code>Shift+滚轮</code> 在任何切片视图里都是快速切层。轴位视图没有“上一层／下一层”按钮，也不响应 <code>↑</code> / <code>↓</code>——这两个键在体数据模式里只用于重建切片；切回普通单图后，它们又变成 ROI 的微移键。重建冠状或矢状切片时等待进度结束；<code>Esc</code> 或 <strong>取消</strong> 可保留上一次可用视图。切层时 3D 中对应平面会同步移动。</p>
-        <p>在 3D 视图里按 <code>F</code> 适配体数据，按 <code>Home</code> 重置相机，也可以用右键菜单选择相机预设、切面显示与透明度。3D 是空间定位视图；需要观察灰度或做 ROI 测量时，切到相应的二维切片。Gray16 切片重建保持 16 位输出。界面显示的体素间距用于空间定位，<strong>ROI 的物理尺寸仍按独立标定换算</strong>；在新平面测量前先核对标定和单位。</p>
+        <p><code>Shift+滚轮</code> 在任何切片视图里都是快速切层。轴位视图没有“上一层／下一层”按钮，也不响应 <kbd>↑</kbd> / <kbd>↓</kbd>——这两个键在体数据模式里只用于重建切片；切回普通单图后，它们又变成 ROI 的微移键。重建冠状或矢状切片时等待进度结束；<kbd>Esc</kbd> 或 <strong>取消</strong> 可保留上一次可用视图。切层时 3D 中对应平面会同步移动。</p>
+        <p>在 3D 视图里按 <code>F</code> 适配体数据，按 <kbd>Home</kbd> 重置相机，也可以用右键菜单选择相机预设、切面显示与透明度。3D 是空间定位视图；需要观察灰度或做 ROI 测量时，切到相应的二维切片。Gray16 切片重建保持 16 位输出。界面显示的体素间距用于空间定位，<strong>ROI 的物理尺寸仍按独立标定换算</strong>；在新平面测量前先核对标定和单位。</p>
       <h3>质量分析与分割</h3>
         <ul>
         <li><strong>质量分析</strong>（体数据工具栏）逐层看强度分布：空白切片、过曝、欠曝与低对比度会按当前质量门限列在质量面板里。点其中一条会切到轴位视图并跳到那一层。判定阈值来自质量门限（<code>QualityProfile</code>），同一组切片换门限后结论可能不同。层距、排序与尺寸的问题不在质量分析里报，它们在导入确认与顶部摘要中。</li>
@@ -788,7 +1101,7 @@
         </ul>
     </section>
     <section id="files">
-      <h2>保存、恢复与配方</h2>
+      <h2><a class="anchor" href="#files" aria-label="链接到本节">#</a>保存、恢复与配方</h2>
       <h3>选择文件类型</h3>
         <div class="table-scroll" tabindex="0" role="region" aria-label="保存、恢复与配方：表格">
         <table>
@@ -802,7 +1115,7 @@
         <tbody>
         <tr>
         <td>下次接着编辑</td>
-        <td><strong>保存会话...</strong>（<code>Ctrl+S</code>）→ <code>.ivsession</code></td>
+        <td><strong>保存会话...</strong>（<kbd>Ctrl</kbd>+<kbd>S</kbd>）→ <code>.ivsession</code></td>
         <td>图像引用、ROI、标定、工件坐标系、配方基准点、<strong>显示调节</strong>（窗宽窗位／亮度／对比度／伽马／反色）及当前视口的缩放和平移。不保存伪彩色、直方图、剖面与显示叠加开关。每次保存都会让你选择文件。</td>
         </tr>
         <tr>
@@ -848,8 +1161,8 @@
         <p>格式版本、缓存和指纹细节见<a href="project-file-format.md">项目文件格式</a>。</p>
     </section>
     <section id="shortcuts">
-      <h2>快捷键速查</h2>
-        <p>快捷键通常在画布或查看器获得焦点时生效。正在编辑文本时，先离开输入框再执行视图命令。3D 视图里只有相机快捷键生效，<code>Ctrl+S</code>、<code>Ctrl+F</code>、<code>Ctrl+Z</code> 等 2D 命令不响应——先按 <code>1</code>/<code>2</code>/<code>3</code> 回到二维视图再操作。</p>
+      <h2><a class="anchor" href="#shortcuts" aria-label="链接到本节">#</a>快捷键速查</h2>
+        <p>快捷键通常在画布或查看器获得焦点时生效。正在编辑文本时，先离开输入框再执行视图命令。3D 视图里只有相机快捷键生效，<kbd>Ctrl</kbd>+<kbd>S</kbd>、<kbd>Ctrl</kbd>+<kbd>F</kbd>、<kbd>Ctrl</kbd>+<kbd>Z</kbd> 等 2D 命令不响应——先按 <code>1</code>/<code>2</code>/<code>3</code> 回到二维视图再操作。</p>
         <div class="table-scroll" tabindex="0" role="region" aria-label="快捷键速查：表格">
         <table>
         <thead>
@@ -860,31 +1173,31 @@
         </thead>
         <tbody>
         <tr>
-        <td><code>Ctrl+O</code> / <code>Ctrl+S</code></td>
-        <td>打开图像 / 保存会话（3D 视图不响应 <code>Ctrl+S</code>）。</td>
+        <td><kbd>Ctrl</kbd>+<kbd>O</kbd> / <kbd>Ctrl</kbd>+<kbd>S</kbd></td>
+        <td>打开图像 / 保存会话（3D 视图不响应 <kbd>Ctrl</kbd>+<kbd>S</kbd>）。</td>
         </tr>
         <tr>
-        <td><code>Ctrl+F</code> / <code>Ctrl+0</code></td>
+        <td><kbd>Ctrl</kbd>+<kbd>F</kbd> / <kbd>Ctrl</kbd>+<kbd>0</kbd></td>
         <td>适应窗口 / 重置视图；在画布上双击也能适应窗口。</td>
         </tr>
         <tr>
-        <td><code>Ctrl++</code> / <code>Ctrl+-</code></td>
+        <td><kbd>Ctrl</kbd>+<kbd>+</kbd> / <kbd>Ctrl</kbd>+<kbd>-</kbd></td>
         <td>放大 / 缩小（主键盘与小键盘的加号、减号都可用）。</td>
         </tr>
         <tr>
-        <td><code>Ctrl+R</code> / <code>Ctrl+Shift+R</code></td>
+        <td><kbd>Ctrl</kbd>+<kbd>R</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd></td>
         <td>向右 / 向左旋转 90°。</td>
         </tr>
         <tr>
-        <td><code>Ctrl+H</code> / <code>Ctrl+Shift+H</code></td>
+        <td><kbd>Ctrl</kbd>+<kbd>H</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd></td>
         <td>水平 / 垂直翻转。</td>
         </tr>
         <tr>
-        <td><code>Ctrl+Z</code> / <code>Ctrl+Y</code></td>
+        <td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd></td>
         <td>撤销 / 重做。</td>
         </tr>
         <tr>
-        <td><code>Delete</code></td>
+        <td><kbd>Delete</kbd></td>
         <td>删除选中的 ROI；删除后可撤销。</td>
         </tr>
         <tr>
@@ -892,7 +1205,7 @@
         <td>微移选中的 ROI：1 px / 10 px。</td>
         </tr>
         <tr>
-        <td><code>Esc</code></td>
+        <td><kbd>Esc</kbd></td>
         <td>取消当前工具或批量操作；菜单中先清空搜索。</td>
         </tr>
         <tr>
@@ -904,7 +1217,7 @@
         <td>体数据模式切换轴位、冠状、矢状和 3D。</td>
         </tr>
         <tr>
-        <td><code>↑</code> / <code>↓</code></td>
+        <td><kbd>↑</kbd> / <kbd>↓</kbd></td>
         <td>只在冠状、矢状视图切层。</td>
         </tr>
         <tr>
@@ -912,15 +1225,15 @@
         <td>切片视图中快速切层 / 缩放。</td>
         </tr>
         <tr>
-        <td><code>F</code> / <code>Home</code></td>
-        <td>3D 中适配体数据 / 重置相机；轴位与 MPR 中 <code>Home</code> 回到第一层。</td>
+        <td><code>F</code> / <kbd>Home</kbd></td>
+        <td>3D 中适配体数据 / 重置相机；轴位与 MPR 中 <kbd>Home</kbd> 回到第一层。</td>
         </tr>
         </tbody>
         </table>
         </div>
     </section>
     <section id="faq">
-      <h2>常见问题</h2>
+      <h2><a class="anchor" href="#faq" aria-label="链接到本节">#</a>常见问题</h2>
         <div class="table-scroll" tabindex="0" role="region" aria-label="常见问题：表格">
         <table>
         <thead>
@@ -972,7 +1285,7 @@
         </tr>
         <tr>
         <td>调完亮度直接关窗，再打开发现没保存</td>
-        <td>显示调节属于文档状态，改动后状态栏应显示“未保存”。确认没有在 3D 视图里操作（3D 不响应 <code>Ctrl+S</code>），并按提示保存会话；会话是唯一保存显示调节的地方。</td>
+        <td>显示调节属于文档状态，改动后状态栏应显示“未保存”。确认没有在 3D 视图里操作（3D 不响应 <kbd>Ctrl</kbd>+<kbd>S</kbd>），并按提示保存会话；会话是唯一保存显示调节的地方。</td>
         </tr>
         <tr>
         <td>换过伪彩，重开会话却恢复原色</td>
@@ -988,10 +1301,10 @@
         </tr>
         <tr>
         <td>切片中滚轮不缩放</td>
-        <td>切片的普通滚轮用于切层，按住 <code>Ctrl</code> 再滚动即可缩放。</td>
+        <td>切片的普通滚轮用于切层，按住 <kbd>Ctrl</kbd> 再滚动即可缩放。</td>
         </tr>
         <tr>
-        <td>在轴位视图按 <code>↑</code>/<code>↓</code> 没反应</td>
+        <td>在轴位视图按 <kbd>↑</kbd>/<kbd>↓</kbd> 没反应</td>
         <td>轴位没有方向键切层，用滑块或滚轮；方向键切层只在冠状、矢状视图有效。</td>
         </tr>
         <tr>
@@ -1003,7 +1316,7 @@
         </div>
     </section>
     <section id="appendix-tools">
-      <h2>附录 A：工具清单</h2>
+      <h2><a class="anchor" href="#appendix-tools" aria-label="链接到本节">#</a>附录 A：工具清单</h2>
         <p>菜单把工具分成 <strong>绘制</strong> 和 <strong>测量</strong> 两组：绘制组只标注，测量组参与计算。全部 31 个工具如下。</p>
       <h3>A.1 绘制与标注（10 项，不算测量）</h3>
         <div class="table-scroll" tabindex="0" role="region" aria-label="附录 A：工具清单：表格">
@@ -1296,7 +1609,7 @@
         <p>每一项的算法细节与结果字段见<a href="advanced-measurements.md">高级测量</a>。</p>
     </section>
     <section id="appendix-menu">
-      <h2>附录 B：菜单结构速查</h2>
+      <h2><a class="anchor" href="#appendix-menu" aria-label="链接到本节">#</a>附录 B：菜单结构速查</h2>
         <p>完整菜单是画布的右键菜单，点工具栏“更多命令”打开的是同一份。下面按顶层分组列出命令，方便对照界面找入口（末尾省略号表示会弹出对话框）。</p>
         <div class="table-scroll" tabindex="0" role="region" aria-label="附录 B：菜单结构速查：表格">
         <table>
@@ -1309,7 +1622,7 @@
         <tbody>
         <tr>
         <td>顶层（不分组）</td>
-        <td>打开图像文件...（<code>Ctrl+O</code>）、保存会话...（<code>Ctrl+S</code>）、撤销（<code>Ctrl+Z</code>）、重做（<code>Ctrl+Y</code>）</td>
+        <td>打开图像文件...（<kbd>Ctrl</kbd>+<kbd>O</kbd>）、保存会话...（<kbd>Ctrl</kbd>+<kbd>S</kbd>）、撤销（<kbd>Ctrl</kbd>+<kbd>Z</kbd>）、重做（<kbd>Ctrl</kbd>+<kbd>Y</kbd>）</td>
         </tr>
         <tr>
         <td>文件与项目</td>
@@ -1356,12 +1669,56 @@
         </div>
     </section>
     <section id="integration">
-      <h2>宿主集成</h2>
+      <h2><a class="anchor" href="#integration" aria-label="链接到本节">#</a>宿主集成</h2>
         <p>把控件嵌进自己的 WPF 程序、注册依赖注入、管理 runtime 生命周期与释放责任，见<a href="integration.md">集成指南</a>。</p>
     </section>
     </main>
   </div>
 
+  <a class="to-top" href="#main" aria-label="回到顶部">回到顶部</a>
+
   <footer class="footer">ImageViewer 使用手册 · 可离线打开与打印</footer>
+
+  <script>
+    (function () {
+      var links = Array.prototype.slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+      var byId = {};
+      links.forEach(function (link) { byId[link.getAttribute('href').slice(1)] = link; });
+      var sections = Array.prototype.slice.call(document.querySelectorAll('main section[id]'));
+      var current = null;
+
+      function setCurrent(id) {
+        if (!id || id === current) { return; }
+        current = id;
+        links.forEach(function (link) { link.removeAttribute('aria-current'); });
+        var active = byId[id];
+        if (active) {
+          active.setAttribute('aria-current', 'true');
+          if (active.scrollIntoView) {
+            active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+          }
+        }
+      }
+
+      if ('IntersectionObserver' in window && sections.length) {
+        var observer = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (entry.isIntersecting) { setCurrent(entry.target.id); }
+          });
+        }, { rootMargin: '-84px 0px -68% 0px', threshold: 0 });
+        sections.forEach(function (section) { observer.observe(section); });
+      }
+
+      setCurrent((window.location.hash || '').slice(1));
+
+      var toTop = document.querySelector('.to-top');
+      function onScroll() {
+        if (!toTop) { return; }
+        toTop.classList.toggle('is-visible', window.scrollY > 640);
+      }
+      window.addEventListener('scroll', onScroll, { passive: true });
+      onScroll();
+    })();
+  </script>
 </body>
 </html>
