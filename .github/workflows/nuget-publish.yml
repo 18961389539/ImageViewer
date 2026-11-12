@@ -102,7 +102,7 @@ jobs:
           .\build\test-packages.ps1 -Version '${{ steps.version.outputs.value }}' -DependencySource $dependencySource
 
       - name: Upload NuGet artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: imageviewer-nuget-${{ steps.version.outputs.value }}
           path: artifacts/packages/*
