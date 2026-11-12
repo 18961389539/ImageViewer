@@ -161,7 +161,14 @@ jobs:
           dotnet test ImageViewer.sln --configuration Release --no-build --nologo
           --settings coverage.runsettings
           --collect:"XPlat Code Coverage"
+          --logger "trx;LogFileName=full-regression.trx"
           --results-directory artifacts\coverage\full
+
+      # 回归红了要能定位：把 TRX 里 Failed 的用例名与错误首行打进日志。
+      - name: Report failed tests
+        if: failure()
+        shell: pwsh
+        run: .\build\report-failed-tests.ps1 -ResultsRoot artifacts\coverage\full
 
       - name: Print coverage summary
         if: always()
