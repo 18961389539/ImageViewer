@@ -692,9 +692,11 @@
       <a href="#files"><span class="toc-num">08</span>保存、恢复与配方</a>
       <a href="#shortcuts"><span class="toc-num">09</span>快捷键速查</a>
       <a href="#faq"><span class="toc-num">10</span>常见问题</a>
-      <a href="#appendix-tools"><span class="toc-num">11</span>附录 A：工具清单</a>
-      <a href="#appendix-menu"><span class="toc-num">12</span>附录 B：菜单结构速查</a>
-      <a href="#integration"><span class="toc-num">13</span>宿主集成</a>
+      <a href="#limits"><span class="toc-num">11</span>已知限制与边界</a>
+      <a href="#appendix-tools"><span class="toc-num">12</span>附录 A：工具清单</a>
+      <a href="#appendix-menu"><span class="toc-num">13</span>附录 B：菜单结构速查</a>
+      <a href="#appendix-errors"><span class="toc-num">14</span>附录 C：错误消息对照</a>
+      <a href="#integration"><span class="toc-num">15</span>宿主集成</a>
     </nav>
 
     <main id="main">
@@ -962,6 +964,88 @@
         </ol>
         <p><strong>谁能当参考线。</strong> 只有 <strong>距离测量</strong> 和 <strong>宽度测量</strong> 两种 ROI 能打开标定对话框；拟合直线、拟合圆、三点圆等都不行（按钮保持可见但不可执行，悬停可看原因）。用 <strong>宽度测量</strong> 标定时，程序取你画的两点距离，<strong>不是</strong>卡尺检测到的边缘间距——如果两点没卡在真实边缘上，标定就会带上这个误差。</p>
         <p>底部状态栏区分 <strong>仅比例标定</strong>、<strong>畸变校正已启用</strong>、<strong>标定模型无效</strong>。悬停可查看比例、畸变参数、重投影误差或不确定度。交付前可用 <strong>文件与项目 → 标定 → 标定检查</strong> 查看缺失项；若菜单分组难找，可直接搜索“标定检查”。</p>
+      <h3>标定对话框字段对照</h3>
+        <p>对话框分四个区：必填的实际长度与单位、可选的镜头畸变、可选的标定几何基准、可选的标定精度。除实际长度外，留空或填 <code>0</code> 都表示该项不参与校正。</p>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="标定与公差：表格">
+        <table>
+        <thead>
+        <tr>
+        <th scope="col">字段</th>
+        <th scope="col">含义</th>
+        <th scope="col">怎么填</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr>
+        <td>实际长度</td>
+        <td>参考线在工件上的真实长度</td>
+        <td>与单位配套，例如 <code>25</code> + <code>mm</code></td>
+        </tr>
+        <tr>
+        <td>单位</td>
+        <td>长度单位</td>
+        <td>默认 <code>mm</code>；整个会话的物理单位跟随这里</td>
+        </tr>
+        <tr>
+        <td>一阶畸变系数 K1</td>
+        <td>归一化径向畸变的一阶项</td>
+        <td>照相机标定报告原值抄，量级常见 1e-3 到 1e-1</td>
+        </tr>
+        <tr>
+        <td>二阶畸变系数 K2</td>
+        <td>径向畸变的二阶项</td>
+        <td>报告里没有就留 <code>0</code></td>
+        </tr>
+        <tr>
+        <td>三阶畸变系数 K3</td>
+        <td>径向畸变的三阶项</td>
+        <td>多数工业镜头为 <code>0</code></td>
+        </tr>
+        <tr>
+        <td>切向畸变系数 P1</td>
+        <td>镜头与传感器不平行引起的切向畸变</td>
+        <td>报告里没有就留 <code>0</code></td>
+        </tr>
+        <tr>
+        <td>切向畸变系数 P2</td>
+        <td>同上，另一方向</td>
+        <td>报告里没有就留 <code>0</code></td>
+        </tr>
+        <tr>
+        <td>主点 X (px)</td>
+        <td>光学中心在图像上的横向像素坐标</td>
+        <td>留 <code>0</code> 时按图像中心推算</td>
+        </tr>
+        <tr>
+        <td>主点 Y (px)</td>
+        <td>光学中心的纵向像素坐标</td>
+        <td>留 <code>0</code> 时按图像中心推算</td>
+        </tr>
+        <tr>
+        <td>归一化半径 (px)</td>
+        <td>畸变公式里用于归一化的半径</td>
+        <td>留 <code>0</code> 时按图像短边一半推算</td>
+        </tr>
+        <tr>
+        <td>重投影 RMS (px)</td>
+        <td>标定过程的整体拟合误差</td>
+        <td>照报告填；只影响状态栏徽标，不参与测量换算</td>
+        </tr>
+        <tr>
+        <td>测量不确定度 (px, 1σ)</td>
+        <td>标定给出的单点不确定度</td>
+        <td>同上，仅作参考信息</td>
+        </tr>
+        <tr>
+        <td>标定标识 / 证书号</td>
+        <td>这次标定的编号或证书号</td>
+        <td>可选；写进去便于追溯，随会话保存</td>
+        </tr>
+        </tbody>
+        </table>
+        </div>
+        <p><strong>留空与填 0 的差别。</strong> 畸变与几何基准这两组是"整组生效"的开关：五个系数全为 0 时不启用畸变校正，主点与归一化半径再按图像中心与短边推算；只要有一个系数非 0，模型就按表中参数启用。精度区（重投影 RMS、不确定度）无论填不填都不会启用校正，只影响状态栏徽标的提示。</p>
+        <p><strong>系数填反了会怎样。</strong> 畸变符号或主点偏差较大时，参考线校正后长度会明显偏离你量的像素距离，状态栏可能显示 <strong>标定模型无效</strong>。先核对符号与像素坐标原点（图像左上角为 0,0），再考虑换一条更长的参考线。</p>
       <h3>输入和解读公差</h3>
         <p>选中支持判定的测量 ROI，在右侧 <strong>公差判定</strong> 中填写标称值、上公差、下公差：</p>
         <ul>
@@ -1036,6 +1120,144 @@
         </tbody>
         </table>
         </div>
+      <h3 id="quality-profile">质量门限与判定阈值</h3>
+        <p>检测状态里的 <code>Passed</code> / <code>Review</code> / <code>Failed</code> 不是写死的，由一组门限决定，默认值如下。这些值是控件的 <code>QualityProfile</code> 属性，<strong>Demo 不提供编辑入口</strong>（固定用默认值）；宿主可以替换，替换后的门限随会话和测量配方一起保存。</p>
+        <p>圆卡尺（拟合圆、拟合弧、自动圆测量）的判定按固定顺序执行：任一"失败门槛"不满足即 <code>Failed</code>，全部"通过门槛"满足才是 <code>Passed</code>，其余落到 <code>Review</code>。</p>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="标定与公差：表格">
+        <table>
+        <thead>
+        <tr>
+        <th scope="col">分组</th>
+        <th scope="col">字段</th>
+        <th scope="col">默认</th>
+        <th scope="col">作用</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr>
+        <td>卡尺得分</td>
+        <td><code>MaxCaliperScore</code></td>
+        <td><code>255</code></td>
+        <td>卡尺得分的归一化上限，用于把原始梯度换算成 0–1 的置信度</td>
+        </tr>
+        <tr>
+        <td>圆卡尺 · 失败门槛</td>
+        <td><code>MinimumDetectionConfidence</code></td>
+        <td><code>0.05</code></td>
+        <td>置信度低于此值直接判为未检出</td>
+        </tr>
+        <tr>
+        <td>圆卡尺 · 失败门槛</td>
+        <td><code>MinimumReviewConfidence</code></td>
+        <td><code>0.15</code></td>
+        <td>低于此值判 <code>Failed</code></td>
+        </tr>
+        <tr>
+        <td>圆卡尺 · 失败门槛</td>
+        <td><code>MinimumReviewValidRatio</code></td>
+        <td><code>0.50</code></td>
+        <td>有效卡尺占比低于此值判 <code>Failed</code></td>
+        </tr>
+        <tr>
+        <td>圆卡尺 · 失败门槛</td>
+        <td><code>MinimumReviewAngularCoverageDegrees</code></td>
+        <td><code>180</code></td>
+        <td>有效点覆盖角度小于此值判 <code>Failed</code></td>
+        </tr>
+        <tr>
+        <td>圆卡尺 · 失败门槛</td>
+        <td><code>ReviewResidualRms</code></td>
+        <td><code>4.0</code></td>
+        <td>残差超过 <code>max(该值, 半径 × 0.15)</code> 判 <code>Failed</code></td>
+        </tr>
+        <tr>
+        <td>圆卡尺 · 通过门槛</td>
+        <td><code>PassConfidence</code></td>
+        <td><code>0.55</code></td>
+        <td>置信度达到才可能 <code>Passed</code></td>
+        </tr>
+        <tr>
+        <td>圆卡尺 · 通过门槛</td>
+        <td><code>PassValidRatio</code></td>
+        <td><code>0.70</code></td>
+        <td>有效卡尺占比门槛</td>
+        </tr>
+        <tr>
+        <td>圆卡尺 · 通过门槛</td>
+        <td><code>PassAngularCoverageDegrees</code></td>
+        <td><code>270</code></td>
+        <td>圆周覆盖角度门槛</td>
+        </tr>
+        <tr>
+        <td>圆卡尺 · 通过门槛</td>
+        <td><code>PassResidualRms</code></td>
+        <td><code>1.5</code></td>
+        <td>残差需不超过 <code>min(该值, max(0.5, 半径 × 0.04))</code></td>
+        </tr>
+        <tr>
+        <td>体数据质量分析</td>
+        <td><code>VolumeOverexposedMinimumBin</code></td>
+        <td><code>250</code></td>
+        <td>最暗像素高于此灰度即判过曝（256 级直方图）</td>
+        </tr>
+        <tr>
+        <td>体数据质量分析</td>
+        <td><code>VolumeUnderexposedMaximumBin</code></td>
+        <td><code>5</code></td>
+        <td>最亮像素低于此值即判欠曝</td>
+        </tr>
+        <tr>
+        <td>体数据质量分析</td>
+        <td><code>VolumeLowContrastMinimumRange</code></td>
+        <td><code>16</code></td>
+        <td>直方图跨度小于此值判低对比度</td>
+        </tr>
+        <tr>
+        <td>自动圆测量</td>
+        <td><code>AutomaticCircleMinimumValidCalipers</code></td>
+        <td><code>24</code></td>
+        <td>圆周卡尺的最少有效条数</td>
+        </tr>
+        <tr>
+        <td>自动圆测量</td>
+        <td><code>AutomaticCircleCaliperMinimumGradient</code></td>
+        <td><code>8</code></td>
+        <td>单条卡尺的最小梯度</td>
+        </tr>
+        <tr>
+        <td>自动圆测量</td>
+        <td><code>AutomaticCircleMinimumConfidence</code></td>
+        <td><code>0.15</code></td>
+        <td>自动圆的最低置信度</td>
+        </tr>
+        <tr>
+        <td>自动圆测量</td>
+        <td><code>AutomaticCircleMinimumAngularCoverageDegrees</code></td>
+        <td><code>180</code></td>
+        <td>自动圆的最低覆盖角度</td>
+        </tr>
+        <tr>
+        <td>自动圆测量</td>
+        <td><code>AutomaticCircleResidualFraction</code></td>
+        <td><code>0.08</code></td>
+        <td>残差占地半径的比例上限</td>
+        </tr>
+        <tr>
+        <td>自动圆测量</td>
+        <td><code>AutomaticCircleMinimumResidualPixels</code></td>
+        <td><code>3.0</code></td>
+        <td>残差像素下限（小圆时避免过度严格）</td>
+        </tr>
+        <tr>
+        <td>自动圆测量</td>
+        <td><code>AutomaticCircleBoundaryEvidenceRatio</code></td>
+        <td><code>0.60</code></td>
+        <td>圆周上必须有边界证据的比例</td>
+        </tr>
+        </tbody>
+        </table>
+        </div>
+        <p><strong>两个自适应项要留意。</strong> 通过门槛的残差上限不是固定 1.5 px，而是 <code>min(1.5, max(0.5, 半径 × 0.04))</code>；失败门槛的残差上限是 <code>max(4.0, 半径 × 0.15)</code>。大半径的圆允许更大的绝对残差，小圆更严格。调门限前先看实际半径，否则会误以为改了 <code>PassResidualRms</code> 却没生效。</p>
     </section>
     <section id="analysis">
       <h2><a class="anchor" href="#analysis" aria-label="链接到本节">#</a>分析与结果导出</h2>
@@ -1423,6 +1645,96 @@
         </table>
         </div>
     </section>
+    <section id="limits">
+      <h2><a class="anchor" href="#limits" aria-label="链接到本节">#</a>已知限制与边界</h2>
+        <p>这些是当前版本有意如此的行为，不是故障；遇到时按"替代做法"走。需要界面入口却找不到的项，多半属于"只能由宿主设置"。具体报错文案见<a href="#appendix-errors">附录 C</a>。</p>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="已知限制与边界：表格">
+        <table>
+        <thead>
+        <tr>
+        <th scope="col">行为</th>
+        <th scope="col">表现</th>
+        <th scope="col">原因</th>
+        <th scope="col">替代做法</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr>
+        <td>轴位视图不能按方向键切层</td>
+        <td><kbd>↑</kbd>/<kbd>↓</kbd> 只在冠状、矢状有效</td>
+        <td>轴位沿用滑块 + 滚轮的模型</td>
+        <td>用滑块或滚轮；<code>Shift+滚轮</code> 快速切层</td>
+        </tr>
+        <tr>
+        <td>3D 视图不响应二维快捷键</td>
+        <td>在 3D 里按 <kbd>Ctrl</kbd>+<kbd>S</kbd>、<kbd>Ctrl</kbd>+<kbd>F</kbd> 无反应</td>
+        <td>3D 有自己的相机键位，二维命令未接线</td>
+        <td>先按 <code>1</code>/<code>2</code>/<code>3</code> 回到二维视图再操作</td>
+        </tr>
+        <tr>
+        <td>伪彩色与显示叠加不入会话</td>
+        <td>重开会话后色带、直方图、网格恢复默认</td>
+        <td>它们被当作浏览偏好，不写进 <code>.ivsession</code></td>
+        <td>需要固定效果时导出 PNG；显示调节（亮度、窗宽位）会保存</td>
+        </tr>
+        <tr>
+        <td>ROI JSON 不含相机标定</td>
+        <td>交接 ROI 后对方没有畸变与主点</td>
+        <td>ROI 文档只带比例、单位与质量门限</td>
+        <td>连标定一起移交就用 <code>.ivsession</code> 或 <code>.ivpkg</code></td>
+        </tr>
+        <tr>
+        <td>单图解码上限约 1 亿像素</td>
+        <td>超过时直接拒绝打开并提示</td>
+        <td>防止宿主内存被一张图耗尽</td>
+        <td>先在外部降采样或裁切</td>
+        </tr>
+        <tr>
+        <td>体数据导入有内存确认</td>
+        <td>估算超过 768 MiB 先弹确认</td>
+        <td>避免一次性分配过大</td>
+        <td>减少切片数或降采样</td>
+        </tr>
+        <tr>
+        <td>分割"接受"只生成一个 ROI</td>
+        <td>多个候选都装在一个"分割结果"斑点分析里</td>
+        <td>一个 ROI 承载候选列表，便于整体复核</td>
+        <td>在斑点分析属性里逐个查看候选</td>
+        </tr>
+        <tr>
+        <td>批量导出不会自动对齐工件</td>
+        <td>工件位置变化时整批结果偏移</td>
+        <td>批处理复用当前 ROI 与检测参数</td>
+        <td>用配方的两个基准点对齐后再批量</td>
+        </tr>
+        <tr>
+        <td>只有两种 ROI 能当标定参考线</td>
+        <td>拟合直线、圆类 ROI 选中后标定按钮仍不可用</td>
+        <td>标定需要一条你亲手量出的已知长度</td>
+        <td>用距离测量或宽度测量画参考线</td>
+        </tr>
+        <tr>
+        <td>同心度按公差带直径判定</td>
+        <td>填 <code>0.1</code> 表示直径公差 0.1 mm</td>
+        <td>与图纸标注习惯一致</td>
+        <td>需要中心距判定时改用圆心距</td>
+        </tr>
+        <tr>
+        <td>质量门限在 Demo 里不可改</td>
+        <td>找不到设置入口</td>
+        <td>门限是控件属性，Demo 未暴露</td>
+        <td>由宿主设置，或按默认值使用（见<a href="#quality-profile">质量门限</a>）</td>
+        </tr>
+        <tr>
+        <td>界面只有中文</td>
+        <td>没有语言切换</td>
+        <td>仓库只有中文资源，无卫星程序集</td>
+        <td>需要其他语言时由宿主提供资源</td>
+        </tr>
+        </tbody>
+        </table>
+        </div>
+    </section>
     <section id="appendix-tools">
       <h2><a class="anchor" href="#appendix-tools" aria-label="链接到本节">#</a>附录 A：工具清单</h2>
         <p>菜单把工具分成 <strong>绘制</strong> 和 <strong>测量</strong> 两组：绘制组只标注，测量组参与计算。全部 31 个工具如下。</p>
@@ -1776,6 +2088,89 @@
         </table>
         </div>
     </section>
+    <section id="appendix-errors">
+      <h2><a class="anchor" href="#appendix-errors" aria-label="链接到本节">#</a>附录 C：错误消息对照</h2>
+        <p>出错时会弹出带标题的对话框，正文给出具体原因，同样的信息也会进入诊断日志。下表按标题列出全部 13 条，以及通常怎么处理。</p>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="附录 C：错误消息对照：表格">
+        <table>
+        <thead>
+        <tr>
+        <th scope="col">消息</th>
+        <th scope="col">常见触发</th>
+        <th scope="col">处理</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr>
+        <td>打开图像失败</td>
+        <td>文件被占用、格式损坏、路径无权限</td>
+        <td>换一个可读副本；确认扩展名与内容一致</td>
+        </tr>
+        <tr>
+        <td>图像尺寸过大</td>
+        <td>像素数超过约 1 亿</td>
+        <td>先降采样或裁切；消息里会给出实际宽高与上限</td>
+        </tr>
+        <tr>
+        <td>加载项目失败</td>
+        <td><code>.ivsession</code> / <code>.ivpkg</code> 损坏或版本不受支持</td>
+        <td>用自动保存恢复，或回到原图 + ROI JSON</td>
+        </tr>
+        <tr>
+        <td>恢复自动保存失败</td>
+        <td>快照文件不完整，或被其他进程改写</td>
+        <td>保留现场并检查磁盘，必要时把快照交给维护者</td>
+        </tr>
+        <tr>
+        <td>保存会话失败</td>
+        <td>目标目录只读、磁盘满、底图在加载后被替换</td>
+        <td>换可写目录；底图被替换时先恢复原文件，提示会说明已有文件未被覆盖</td>
+        </tr>
+        <tr>
+        <td>保存 ROI 失败</td>
+        <td>路径无写权限</td>
+        <td>换目录后重试</td>
+        </tr>
+        <tr>
+        <td>加载 ROI 失败</td>
+        <td>JSON 格式无效，或不是本工具的 ROI 文件</td>
+        <td>确认文件来自「保存 ROI...」，不要手工改结构</td>
+        </tr>
+        <tr>
+        <td>保存配方失败</td>
+        <td>目标路径不可写，或配方引用了无效基准点</td>
+        <td>换目录；先补全两个基准点再保存</td>
+        </tr>
+        <tr>
+        <td>载入配方失败</td>
+        <td>配方损坏，或版本比当前更旧</td>
+        <td>载入未完成时现有测量结果保持原状，可重新选文件</td>
+        </tr>
+        <tr>
+        <td>导出分析失败</td>
+        <td>CSV 目标被 Excel 等程序占用</td>
+        <td>关闭占用程序后重试</td>
+        </tr>
+        <tr>
+        <td>导出 PNG 失败</td>
+        <td>目标被占用或路径无效</td>
+        <td>换路径；确认当前有可见文档</td>
+        </tr>
+        <tr>
+        <td>导出项目包失败</td>
+        <td>图像资产缺失，或目标盘空间不足</td>
+        <td>先确认底图可访问，再换目录导出</td>
+        </tr>
+        <tr>
+        <td>操作失败</td>
+        <td>菜单命令执行中抛异常，消息里带命令名</td>
+        <td>看诊断信息或 Trace 日志；重复出现时记录复现步骤</td>
+        </tr>
+        </tbody>
+        </table>
+        </div>
+        <p><strong>两条特殊提示。</strong> 保存会话时若磁盘上的底图在加载后被替换，会明确提示"已有保存文件未被覆盖"；两个视图共用一个会话文件时，会提示为当前视图另选文件名。这两句只出现在"保存会话失败"之后，不是独立错误类型。</p>
+    </section>
     <section id="integration">
       <h2><a class="anchor" href="#integration" aria-label="链接到本节">#</a>宿主集成</h2>
         <p>把控件嵌进自己的 WPF 程序、注册依赖注入、管理 runtime 生命周期与释放责任，见<a href="integration.md">集成指南</a>。</p>
@@ -1793,8 +2188,10 @@
           <li><a href="#files">保存、恢复与配方</a></li>
           <li><a href="#shortcuts">快捷键速查</a></li>
           <li><a href="#faq">常见问题</a></li>
+          <li><a href="#limits">已知限制与边界</a></li>
           <li><a href="#appendix-tools">附录 A：工具清单</a></li>
           <li><a href="#appendix-menu">附录 B：菜单结构速查</a></li>
+          <li><a href="#appendix-errors">附录 C：错误消息对照</a></li>
           <li><a href="#integration">宿主集成</a></li>
         </ol>
       </nav>

@@ -398,6 +398,13 @@ def collect_advanced() -> list[str]:
     return kinds
 
 
+def collect_quality_fields() -> list[str]:
+    """质量门限的可配置字段，用于核对手册是否解释了每个阈值。"""
+    path = ROOT / "ImageViewer.Core" / "Analysis" / "ImageAnalysisQualityProfile.cs"
+    text = path.read_text(encoding="utf-8")
+    return re.findall(r"public\s+[\w<>?\[\]]+\s+(\w+)\s*\{\s*get;", text)
+
+
 def check_coverage(md_text: str, strings: dict[str, str], sections: set[str]) -> list[str]:
     problems: list[str] = []
     tools = collect_tools()
@@ -425,6 +432,18 @@ def check_coverage(md_text: str, strings: dict[str, str], sections: set[str]) ->
         name = strings.get(key)
         if name and name not in md_text:
             problems.append(f"手册没写到菜单分组「{name}」（{key}）")
+
+    # 错误标题、标定字段、质量门限：这三类最容易"代码加了、手册没跟上"。
+    # 资源里改了文案或新增一条，这里就会失败，逼着人回来补表。
+    for key, value in sorted(strings.items()):
+        if key.startswith("Error") and key.endswith("Title") and value not in md_text:
+            problems.append(f"手册没写到错误消息「{value}」（{key}）")
+        if key.startswith("CalibrationDialog") and key.endswith("Label") and value not in md_text:
+            problems.append(f"手册没写到标定字段「{value}」（{key}）")
+
+    for field in collect_quality_fields():
+        if field not in md_text:
+            problems.append(f"手册没写到质量门限字段「{field}」")
 
     for anchor in re.findall(r'<a id="([^"]+)"></a>', md_text):
         if anchor in sections:
