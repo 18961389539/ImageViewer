@@ -38,6 +38,15 @@ public partial class MainWindow : Window, IDisposable
     /// </summary>
     private async void OnMainWindowLoaded(object sender, RoutedEventArgs e)
     {
+        // --sample 让 Demo 直接载入随程序分发的测量示例（两张线 + 标定 + 公差），
+        // 用于演示、录屏和文档截图；不带参数时仍按原来的测试图流程启动。
+        if (Environment.GetCommandLineArgs().Any(argument =>
+                string.Equals(argument, "--sample", StringComparison.OrdinalIgnoreCase)))
+        {
+            OnMeasurementSampleClick(this, new RoutedEventArgs());
+            return;
+        }
+
         string path = Path.Combine(AppContext.BaseDirectory, "Resources", "TestImage.png");
         if (!File.Exists(path) || !TryBeginOpen(DemoText.Get("ImageLoadingStatus"), isIndeterminate: false))
         {
