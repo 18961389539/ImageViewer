@@ -7,9 +7,6 @@ using System.Windows.Media.Imaging;
 using ImageViewer.Core.Analysis;
 using ImageViewer.Models;
 using ImageViewer.Utils;
-using CoreCircularDetectionResult = ImageViewer.Core.Analysis.CircularCaliperDetectionResult;
-using CoreLineCaliperDetectionResult = ImageViewer.Core.Analysis.LineCaliperDetectionResult;
-using CoreLineMeasureDetectionResult = ImageViewer.Core.Analysis.LineMeasureGradientDetectionResult;
 
 namespace ImageViewer.Services;
 
@@ -158,7 +155,11 @@ internal static class DetectionRecommendationPreviewService
     {
         cancellationToken.ThrowIfCancellationRequested();
         RoiBase candidate = source.Clone();
-        ClearPreviousDetection(candidate);
+        CaliperRoiDetection.Clear(candidate);
+        if (candidate is BlobAnalysisRoi blobCandidate)
+        {
+            blobCandidate.DetectedBlobs = [];
+        }
         cancellationToken.ThrowIfCancellationRequested();
 
         switch (candidate)
@@ -171,14 +172,13 @@ internal static class DetectionRecommendationPreviewService
                 double configuredAngle = dual.CaliperAngleDegrees;
                 double configuredRegionLength = dual.CaliperRegionLength;
                 bool hadExplicitRegion = dual.HasExplicitCaliperRegion;
-                if (!ImageAnalysisService.TryDetectLineMeasureEdgesCore(bitmap, dual, out CoreLineMeasureDetectionResult dualResult, quality))
+                bool detected = CaliperRoiDetection.TryDetectAndApply(bitmap, dual, out var dualResult, quality);
+                RestoreDualGeometry(dual, configuredCenter, configuredAngle, configuredRegionLength, hadExplicitRegion);
+                if (!detected)
                 {
-                    RestoreDualGeometry(dual, configuredCenter, configuredAngle, configuredRegionLength, hadExplicitRegion);
                     return FailedTrial("RecommendationTrialFailed", candidate);
                 }
 
-                RoiDetectionResultMapper.Apply(dual, dualResult);
-                RestoreDualGeometry(dual, configuredCenter, configuredAngle, configuredRegionLength, hadExplicitRegion);
                 cancellationToken.ThrowIfCancellationRequested();
                 return new DetectionTrial(
                     true,
@@ -191,12 +191,11 @@ internal static class DetectionRecommendationPreviewService
                     candidate);
 
             case LineCaliperMeasureRoi line:
-                if (!ImageAnalysisService.TryDetectLineCaliperEdgesCore(bitmap, line, out CoreLineCaliperDetectionResult lineResult, quality))
+                if (!CaliperRoiDetection.TryDetectAndApply(bitmap, line, out var lineResult, quality))
                 {
                     return FailedTrial("RecommendationTrialFailed", candidate);
                 }
 
-                RoiDetectionResultMapper.Apply(line, lineResult);
                 cancellationToken.ThrowIfCancellationRequested();
                 return new DetectionTrial(
                     true,
@@ -209,12 +208,11 @@ internal static class DetectionRecommendationPreviewService
                     candidate);
 
             case CircularCaliperMeasureRoi circle:
-                if (!ImageAnalysisService.TryDetectCircularCaliperEdgesCore(bitmap, circle, out CoreCircularDetectionResult circleResult, quality))
+                if (!CaliperRoiDetection.TryDetectAndApply(bitmap, circle, out var circleResult, quality))
                 {
                     return FailedTrial("RecommendationTrialFailed", candidate);
                 }
 
-                RoiDetectionResultMapper.Apply(circle, circleResult, quality);
                 cancellationToken.ThrowIfCancellationRequested();
                 bool qualityAccepted = circle is ArcCaliperMeasureRoi || circle.QualityStatus != CircularCaliperQualityStatus.Failed;
                 return new DetectionTrial(
@@ -269,25 +267,6 @@ internal static class DetectionRecommendationPreviewService
         roi.CaliperAngleDegrees = angleDegrees;
         roi.CaliperRegionLength = regionLength;
         roi.HasExplicitCaliperRegion = hasExplicitRegion;
-    }
-
-    private static void ClearPreviousDetection(RoiBase roi)
-    {
-        switch (roi)
-        {
-            case CaliperMeasureRoi dual:
-                dual.ClearDetectedEdges();
-                break;
-            case LineCaliperMeasureRoi line:
-                line.ClearDetectedLine();
-                break;
-            case CircularCaliperMeasureRoi circle:
-                circle.ClearDetectedEdges();
-                break;
-            case BlobAnalysisRoi blob:
-                blob.DetectedBlobs = [];
-                break;
-        }
     }
 
     private static DetectionTrial FailedTrial(string statusKey, RoiBase? detectedRoi = null) =>

@@ -74,7 +74,7 @@ namespace ImageViewer.Rendering
 
                 if (showDetails)
                 {
-                    string info = SingleEdgeCaliperRenderHelper.BuildSummaryText(caliper, $"半径：{context.FormatLength(displayedRadius)}", "圆形边缘测量", context.ShowCaliperScores);
+                    string info = SingleEdgeCaliperRenderHelper.BuildSummaryText(caliper, $"半径：{context.Measure(caliper).FormatPrimary()}", "圆形边缘测量", context.ShowCaliperScores);
                     context.DrawInfoText(info, StandardRoiLayoutHelper.GetTopInfoAnchor(displayedCenter, displayedRadius, context), Brushes.White, true);
                 }
             }
@@ -139,7 +139,8 @@ namespace ImageViewer.Rendering
 
                 if (showDetails)
                 {
-                    string info = SingleEdgeCaliperRenderHelper.BuildSummaryText(caliper, $"半径：{context.FormatLength(displayedRadius)} 弧角：{caliper.SweepAngle:F0}°", "弧形边缘测量", context.ShowCaliperScores);
+                    var measurement = context.Measure(caliper);
+                    string info = SingleEdgeCaliperRenderHelper.BuildSummaryText(caliper, $"弧长：{measurement.FormatPrimary()} 半径：{measurement.FormatLength(displayedRadius)} 弧角：{caliper.SweepAngle:F0}°", "弧形边缘测量", context.ShowCaliperScores);
                     context.DrawInfoText(info, StandardRoiLayoutHelper.GetTopInfoAnchor(displayedCenter, displayedRadius, context), Brushes.White, true);
                 }
             }
@@ -238,7 +239,7 @@ namespace ImageViewer.Rendering
                 {
                     PointD measurementP1 = line.MeasurementP1;
                     PointD measurementP2 = line.MeasurementP2;
-                    string info = SingleEdgeCaliperRenderHelper.BuildSummaryText(line, $"边缘距离：{context.FormatLength(GeometryUtils.Distance(measurementP1.ToWpfPoint(), measurementP2.ToWpfPoint()))}", "单边缘测量", context.ShowCaliperScores);
+                    string info = SingleEdgeCaliperRenderHelper.BuildSummaryText(line, $"边缘距离：{context.Measure(line).FormatPrimary()}", "单边缘测量", context.ShowCaliperScores);
                     context.DrawInfoText(info, new Point((line.P1.X + line.P2.X) / 2, (line.P1.Y + line.P2.Y) / 2), Brushes.White, true);
                 }
             }

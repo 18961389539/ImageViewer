@@ -14,6 +14,9 @@ namespace ImageViewer.Services
     /// </summary>
     internal static class RoiCalibrationHelper
     {
+        public static bool CanUseMeasurements(CameraCalibration? calibration, DistortionAudit? audit)
+            => calibration is not { IsValid: false } && audit is not { HasNonConvergedPoints: true };
+
         /// <summary>长度校正因子（无标定或中心未知时为 1.0）。</summary>
         public static double GetLengthCorrection(RoiBase roi, CameraCalibration? calibration)
         {

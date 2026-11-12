@@ -81,21 +81,25 @@ namespace ImageViewer.Controls
             }
         }
 
-        private void OnToolbarPanelToggleChanged(object sender, RoutedEventArgs e)
-        {
-            UpdateContextMenuState();
-        }
-
         private void OnRightOverlayToggleClick(object sender, RoutedEventArgs e)
         {
-            _rightOverlayPanelsCollapsed = !_rightOverlayPanelsCollapsed;
+            _rightOverlayVisibilityOverride = rightOverlayPanel.Visibility != Visibility.Visible;
             UpdateRightOverlayPanelLayout();
         }
 
         private void UpdateRightOverlayPanelLayout()
         {
-            rightOverlayPanel.Visibility = _rightOverlayPanelsCollapsed ? Visibility.Collapsed : Visibility.Visible;
-            rightOverlayToggleButton.Content = _rightOverlayPanelsCollapsed ? "▶" : "◀";
+            double width = viewerLayout.ActualWidth;
+            bool show = _rightOverlayVisibilityOverride ?? (width <= 0 || width >= RoiSidebarAutoHideWidth);
+            if (width > 0)
+            {
+                rightOverlayPanel.Width = Math.Min(RoiSidebarWidth, width * 0.43);
+            }
+
+            rightOverlayPanel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            string hint = UiText.Get(show ? "RoiSidebarHide" : "RoiSidebarShow");
+            rightOverlayToggleButton.ToolTip = hint;
+            System.Windows.Automation.AutomationProperties.SetHelpText(rightOverlayToggleButton, hint);
         }
 
         private void OnRoiFilterTextChanged(object sender, TextChangedEventArgs e)

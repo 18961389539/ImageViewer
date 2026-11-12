@@ -57,22 +57,9 @@ namespace ImageViewer.Controls
 
         private void ApplyDetectionRefresh(RoiBase? roi, RoiSelectionRefreshKind refreshKind)
         {
-            if (roi == null)
+            if (roi != null && refreshKind != RoiSelectionRefreshKind.None)
             {
-                return;
-            }
-
-            switch (refreshKind)
-            {
-                case RoiSelectionRefreshKind.Caliper:
-                    _host.ApplyCaliperDetection((CaliperMeasureRoi)roi);
-                    break;
-                case RoiSelectionRefreshKind.LineCaliper:
-                    _host.ApplyLineCaliperDetection((LineCaliperMeasureRoi)roi);
-                    break;
-                case RoiSelectionRefreshKind.CircularCaliper:
-                    _host.ApplyCircularCaliperDetection((CircularCaliperMeasureRoi)roi);
-                    break;
+                _host.ApplyCaliperDetection(roi);
             }
         }
     }

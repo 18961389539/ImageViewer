@@ -25,8 +25,8 @@ namespace ImageViewer.Controls
                 IImageViewerAnalysisHost host = new ImageViewerAnalysisCoordinatorHost(
                     _owner,
                     _owner._analysisState,
-                    () => new Point(_owner.translateTransform.X, _owner.translateTransform.Y),
-                    () => new Size(_owner.rootGrid.ActualWidth, _owner.rootGrid.ActualHeight));
+                    _owner.GetTileRenderTranslation,
+                    _owner.GetTileRenderViewportSize);
                 IImageViewerAnalysisUiFacade uiFacade = new ImageViewerAnalysisUiFacade(
                     _owner.histogramPanel,
                     _owner.profilePanel,

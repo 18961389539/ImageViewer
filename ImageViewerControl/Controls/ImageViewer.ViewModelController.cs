@@ -84,6 +84,7 @@ namespace ImageViewer.Controls
             }
 
             _handleSelectedRoiChanged();
+            _updateContextMenuState();
         }
 
         private void OnAllRoisCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)

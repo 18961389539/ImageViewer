@@ -83,20 +83,20 @@ namespace ImageViewerControl.Tests
                     HandleRoiEdited = _ => { },
                     CreateStateCommand = state.CreateStateCommand,
                     ExecuteUndoRedoCommand = command => state.ExecutedCommands.Add(command),
-                    TryApplyCaliperDetection = roi =>
+                    ApplyCaliperDetection = roi =>
                     {
-                        state.CaliperDetectionCount++;
-                        return true;
-                    },
-                    TryApplyLineCaliperDetection = roi =>
-                    {
-                        state.LineCaliperDetectionCount++;
-                        return true;
-                    },
-                    TryApplyCircularCaliperDetection = roi =>
-                    {
-                        state.CircularCaliperDetectionCount++;
-                        return true;
+                        switch (roi)
+                        {
+                            case CaliperMeasureRoi:
+                                state.CaliperDetectionCount++;
+                                break;
+                            case LineCaliperMeasureRoi:
+                                state.LineCaliperDetectionCount++;
+                                break;
+                            case CircularCaliperMeasureRoi:
+                                state.CircularCaliperDetectionCount++;
+                                break;
+                        }
                     }
                 },
                 Calibration = new ImageViewerDialogCalibrationWorkflow

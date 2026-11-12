@@ -8,6 +8,7 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 using ImageViewer.Controls;
 using ImageViewer.Models;
+using ImageViewer.Services;
 
 namespace ImageViewer.Rendering
 {
@@ -52,6 +53,7 @@ namespace ImageViewer.Rendering
         public double Scale { get; }
         public double PixelSize { get; }
         public string? PhysicalUnit { get; }
+        internal CameraCalibration? Calibration { get; init; }
         public bool ShowCaliperScores { get; }
         public double HandleSize { get; }
         public double InfoTextOffset { get; }
@@ -125,7 +127,7 @@ namespace ImageViewer.Rendering
                 StrokeThickness = Math.Max(1, ToScreenLength(thickness)),
                 SnapsToDevicePixels = true,
                 IsHitTestVisible = false,
-                RenderTransform = new RotateTransform(angle, screenWidth / 2, screenHeight / 2)
+                RenderTransform = new RotateTransform(ToScreenAngle(center, angle), screenWidth / 2, screenHeight / 2)
             };
 
             Canvas.SetLeft(shape, screenCenter.X - screenWidth / 2);
@@ -148,7 +150,7 @@ namespace ImageViewer.Rendering
                 StrokeThickness = Math.Max(1, ToScreenLength(thickness)),
                 SnapsToDevicePixels = true,
                 IsHitTestVisible = false,
-                RenderTransform = new RotateTransform(angle, screenWidth / 2, screenHeight / 2)
+                RenderTransform = new RotateTransform(ToScreenAngle(center, angle), screenWidth / 2, screenHeight / 2)
             };
 
             Canvas.SetLeft(shape, screenCenter.X - screenWidth / 2);
@@ -248,6 +250,20 @@ namespace ImageViewer.Rendering
         public string FormatPerimeter(double pixelPerimeter)
         {
             return FormatLength(pixelPerimeter);
+        }
+
+        internal RoiMeasurementDisplay Measure(RoiBase roi) => new(roi, PixelSize, GetDisplayUnit(), Calibration);
+
+        private double ToScreenAngle(Point center, double angle)
+        {
+            Vector direction = ToScreenPoint(PointOnCircle(center, 1, angle)) - ToScreenPoint(center);
+            return Math.Atan2(direction.Y, direction.X) * 180.0 / Math.PI;
+        }
+
+        private static Point PointOnCircle(Point center, double radius, double angle)
+        {
+            double radians = angle * Math.PI / 180.0;
+            return center + new Vector(radius * Math.Cos(radians), radius * Math.Sin(radians));
         }
 
         public void DrawHandle(Point pos, ResizeHandle handleType, double size, bool isRect = true, Brush? stroke = null)
@@ -381,21 +397,16 @@ namespace ImageViewer.Rendering
         {
             if (radius <= 0) return;
 
-            Point screenCenter = ToScreenPoint(center);
             double screenRadius = ToScreenLength(radius);
-
-            double startAngleRad = startAngle * Math.PI / 180.0;
-            Point startPoint = new Point(
-                screenCenter.X + screenRadius * Math.Cos(startAngleRad),
-                screenCenter.Y + screenRadius * Math.Sin(startAngleRad));
-
-            double endAngleRad = (startAngle + sweepAngle) * Math.PI / 180.0;
-            Point endPoint = new Point(
-                screenCenter.X + screenRadius * Math.Cos(endAngleRad),
-                screenCenter.Y + screenRadius * Math.Sin(endAngleRad));
+            Point startPoint = ToScreenPoint(PointOnCircle(center, radius, startAngle));
+            Point endPoint = ToScreenPoint(PointOnCircle(center, radius, startAngle + sweepAngle));
+            Point screenCenter = ToScreenPoint(center);
+            Vector xAxis = ToScreenPoint(center + new Vector(1, 0)) - screenCenter;
+            Vector yAxis = ToScreenPoint(center + new Vector(0, 1)) - screenCenter;
+            bool mirrored = Vector.CrossProduct(xAxis, yAxis) < 0;
 
             bool isLargeArc = Math.Abs(sweepAngle) > 180;
-            SweepDirection sweepDir = sweepAngle >= 0 ? SweepDirection.Clockwise : SweepDirection.Counterclockwise;
+            SweepDirection sweepDir = (sweepAngle >= 0) != mirrored ? SweepDirection.Clockwise : SweepDirection.Counterclockwise;
 
             var path = new Path
             {

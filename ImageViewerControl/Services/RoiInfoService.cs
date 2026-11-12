@@ -29,7 +29,7 @@ namespace ImageViewer.Services
                 lines.Add(UiText.FormatInvariant("InfoLineCalibrationUndistortionWarning",
                     audit.NonConvergedPointCount, audit.PointCount, audit.MaximumResidualPixels, audit.MaximumUncertaintyPixels));
             }
-            else
+            else if (RoiCalibrationHelper.CanUseMeasurements(calibration, inspection.DistortionAudit))
             {
                 var pluginLines = roiPlugins.FindByRoi(roi)?.BuildInfoLines(roi, bitmap, pixelSize, physicalUnit);
                 if (pluginLines is { Count: > 0 })
@@ -38,7 +38,7 @@ namespace ImageViewer.Services
                 }
                 else
                 {
-                    AppendBuiltInInfoLines(lines, roi, pixelSize, physicalUnit, calibration);
+                    AppendBuiltInInfoLines(lines, roi, pixelSize, physicalUnit, calibration, inspection);
                 }
             }
 
@@ -72,10 +72,11 @@ namespace ImageViewer.Services
             return true;
         }
 
-        private static void AppendBuiltInInfoLines(List<string> lines, RoiBase roi, double pixelSize, string? physicalUnit, CameraCalibration? calibration)
+        private static void AppendBuiltInInfoLines(List<string> lines, RoiBase roi, double pixelSize, string? physicalUnit, CameraCalibration? calibration, RoiInspectionResult inspection)
         {
             double correction = RoiCalibrationHelper.GetLengthCorrection(roi, calibration);
-            double areaCorrection = correction * correction;
+            double areaCorrection = RoiCalibrationHelper.GetAreaCorrection(roi, calibration);
+            string FormatPrimaryLength() => FormatMeasuredLength(inspection.MeasuredValue, physicalUnit);
 
             switch (roi)
             {
@@ -83,13 +84,13 @@ namespace ImageViewer.Services
                     AppendBlobAnalysisInfoLines(lines, blob, pixelSize, physicalUnit, correction, areaCorrection);
                     break;
                 case CaliperMeasureRoi caliper:
-                    AppendDualEdgeCaliperInfoLines(lines, caliper, pixelSize, physicalUnit, correction);
+                    AppendDualEdgeCaliperInfoLines(lines, caliper, pixelSize, physicalUnit, correction, inspection.MeasuredValue);
                     break;
                 case LineCaliperMeasureRoi lineCaliper:
                     AppendSingleEdgeCaliperInfoLines(
                         lines,
                         UiText.Get("InfoTitleLineCaliper"),
-                        $"Distance:{FormatLength(GeometryUtils.Distance(lineCaliper.MeasurementP1.ToWpfPoint(), lineCaliper.MeasurementP2.ToWpfPoint()) * correction, pixelSize, physicalUnit)}",
+                        $"Distance:{FormatPrimaryLength()}",
                         lineCaliper,
                         pixelSize,
                         physicalUnit,
@@ -100,7 +101,9 @@ namespace ImageViewer.Services
                     AppendSingleEdgeCaliperInfoLines(
                         lines,
                         UiText.Get("InfoTitleArcCaliper"),
-                        UiText.FormatInvariant("InfoLineArcCaliperGeometry", FormatLength(arcCaliper.MeasurementRadius * correction, pixelSize, physicalUnit), arcCaliper.SweepAngle),
+                        UiText.FormatInvariant("InfoLineArcCaliperGeometry", FormatPrimaryLength(),
+                            inspection.MeasuredValue.HasValue ? FormatLength(arcCaliper.MeasurementRadius * correction, pixelSize, physicalUnit) : UiText.Get("MeasurementUnavailable"),
+                            arcCaliper.SweepAngle),
                         arcCaliper,
                         pixelSize,
                         physicalUnit,
@@ -111,7 +114,7 @@ namespace ImageViewer.Services
                     AppendSingleEdgeCaliperInfoLines(
                         lines,
                         UiText.Get("InfoTitleCircularCaliper"),
-                        $"Radius:{FormatLength(circularCaliper.MeasurementRadius * correction, pixelSize, physicalUnit)}",
+                        $"Radius:{FormatPrimaryLength()}",
                         circularCaliper,
                         pixelSize,
                         physicalUnit,
@@ -140,7 +143,7 @@ namespace ImageViewer.Services
                     lines.Add(UiText.FormatInvariant("InfoLineArea", FormatArea(Math.PI * ellipse.RadiusX * ellipse.RadiusY * areaCorrection, pixelSize, physicalUnit)));
                     break;
                 case CircleRoi circle:
-                    lines.Add(UiText.FormatInvariant("InfoLineCircle", FormatLength(circle.Radius * correction, pixelSize, physicalUnit)));
+                    lines.Add(UiText.FormatInvariant("InfoLineCircle", FormatPrimaryLength()));
                     lines.Add(UiText.FormatInvariant("InfoLineArea", FormatArea(Math.PI * circle.Radius * circle.Radius * areaCorrection, pixelSize, physicalUnit)));
                     break;
                 case RingRoi ring:
@@ -173,7 +176,7 @@ namespace ImageViewer.Services
                     lines.Add(UiText.FormatInvariant("InfoLinePointPair", arrow.P1.X, arrow.P1.Y, arrow.P2.X, arrow.P2.Y));
                     break;
                 case LineMeasureRoi line:
-                    lines.Add(UiText.FormatInvariant("InfoLineLineMeasure", FormatLength(GeometryUtils.Distance(line.P1.ToWpfPoint(), line.P2.ToWpfPoint()) * correction, pixelSize, physicalUnit)));
+                    lines.Add(UiText.FormatInvariant("InfoLineLineMeasure", FormatPrimaryLength()));
                     lines.Add(UiText.FormatInvariant("InfoLinePointPair", line.P1.X, line.P1.Y, line.P2.X, line.P2.Y));
                     break;
                 case AngleMeasureRoi angle:
@@ -182,7 +185,7 @@ namespace ImageViewer.Services
                 case ArcMeasureRoi arc:
                     if (arc.IsValid)
                     {
-                        lines.Add(UiText.FormatInvariant("InfoLineArcMeasureRadius", FormatLength(arc.Radius * correction, pixelSize, physicalUnit)));
+                        lines.Add(UiText.FormatInvariant("InfoLineArcMeasureRadius", FormatPrimaryLength()));
                         lines.Add(UiText.FormatInvariant("InfoLineArcMeasureDetail", FormatLength(arc.ArcLength * correction, pixelSize, physicalUnit), arc.CentralAngle));
                         lines.Add(UiText.FormatInvariant("InfoLineCenterPoint", arc.Center.X, arc.Center.Y));
                     }
@@ -194,7 +197,7 @@ namespace ImageViewer.Services
                 case ThreePointCircleMeasureRoi threePointCircle:
                     if (threePointCircle.IsValid)
                     {
-                        lines.Add(UiText.FormatInvariant("InfoLineThreePointCircle", FormatLength(threePointCircle.Radius * correction, pixelSize, physicalUnit)));
+                        lines.Add(UiText.FormatInvariant("InfoLineThreePointCircle", FormatPrimaryLength()));
                         lines.Add(UiText.FormatInvariant("InfoLineThreePointCircleDetail", threePointCircle.Center.X, threePointCircle.Center.Y));
                     }
                     else
@@ -227,7 +230,7 @@ namespace ImageViewer.Services
                     // 判定用的就是"公差带直径"(= 2 × 中心距)，界面必须显示同一个量，否则用户会拿中心距去比公差。
                     lines.Add(UiText.FormatInvariant(
                         "InfoLineConcentricity",
-                        FormatLength(MeasureZones.ConcentricityZoneDiameter(concentricity) * correction, pixelSize, physicalUnit)));
+                        FormatPrimaryLength()));
                     lines.Add(UiText.FormatInvariant(
                         "InfoLineConcentricityDetail",
                         FormatLength(concentricity.CenterDistance * correction, pixelSize, physicalUnit),
@@ -236,7 +239,7 @@ namespace ImageViewer.Services
                     lines.Add(UiText.Get("InfoLineGeometricToleranceNote"));
                     break;
                 case CenterDistanceMeasureRoi centerDistance:
-                    lines.Add(UiText.FormatInvariant("InfoLineCenterDistance", FormatLength(centerDistance.CenterDistance * correction, pixelSize, physicalUnit)));
+                    lines.Add(UiText.FormatInvariant("InfoLineCenterDistance", FormatPrimaryLength()));
                     lines.Add(UiText.FormatInvariant("InfoLineCenterDistanceDetail", centerDistance.Center1.X, centerDistance.Center1.Y, centerDistance.Center2.X, centerDistance.Center2.Y));
                     break;
                 case PointAnnotationRoi point:
@@ -308,9 +311,9 @@ namespace ImageViewer.Services
             return string.IsNullOrWhiteSpace(physicalUnit) ? UiText.Get("InfoUnitPixels") : physicalUnit;
         }
 
-        private static void AppendDualEdgeCaliperInfoLines(List<string> lines, CaliperMeasureRoi caliper, double pixelSize, string? physicalUnit, double correction)
+        private static void AppendDualEdgeCaliperInfoLines(List<string> lines, CaliperMeasureRoi caliper, double pixelSize, string? physicalUnit, double correction, double? measuredWidth)
         {
-            lines.Add(UiText.FormatInvariant("InfoLineCaliperMeasure", FormatLength(GeometryUtils.Distance(caliper.MeasurementP1.ToWpfPoint(), caliper.MeasurementP2.ToWpfPoint()) * correction, pixelSize, physicalUnit)));
+            lines.Add(UiText.FormatInvariant("InfoLineCaliperMeasure", FormatMeasuredLength(measuredWidth, physicalUnit)));
             lines.Add(UiText.FormatInvariant("InfoLineRegionSearch", FormatLength(caliper.GetResolvedCaliperRegionLength() * correction, pixelSize, physicalUnit), FormatLength(caliper.CaliperSearchRange * 2 * correction, pixelSize, physicalUnit)));
             AppendCaliperParameterLine(lines, caliper);
             if (!caliper.HasDetectedEdges)
@@ -333,7 +336,7 @@ namespace ImageViewer.Services
             {
                 lines.Add(UiText.FormatInvariant(
                     "InfoLineCaliperDetectedWidth",
-                    FormatLength(width.CenterDistance * correction, pixelSize, physicalUnit),
+                    FormatMeasuredLength(measuredWidth, physicalUnit),
                     FormatLength(width.Mean * correction, pixelSize, physicalUnit),
                     FormatLength(width.Median * correction, pixelSize, physicalUnit)));
                 lines.Add(UiText.FormatInvariant(
@@ -427,7 +430,7 @@ namespace ImageViewer.Services
 
             // 畸变模型与精度元数据是两条独立证据：只有比例+精度记录（无畸变系数）也必须显示，
             // 否则用户看不到"这次标定准到什么程度"。
-            if (calibration.HasExtendedDistortionModel)
+            if (calibration.IsValid && calibration.HasExtendedDistortionModel)
             {
                 lines.Add(UiText.FormatInvariant(
                     "InfoLineCalibrationDistortionExtended",
@@ -439,7 +442,7 @@ namespace ImageViewer.Services
                     calibration.ReprojectionErrorRms,
                     calibration.MeasurementUncertaintyPixels));
             }
-            else if (calibration.IsEnabled)
+            else if (calibration.IsValid && calibration.IsEnabled)
             {
                 lines.Add(UiText.FormatInvariant("InfoLineCalibrationDistortion", calibration.K1, calibration.K2));
             }
@@ -467,6 +470,9 @@ namespace ImageViewer.Services
         {
             return $"{pixelLength * pixelSize:F2} {GetDisplayUnit(physicalUnit)}";
         }
+
+        private static string FormatMeasuredLength(double? value, string? physicalUnit)
+            => value is double number ? FormatLength(number, 1, physicalUnit) : UiText.Get("MeasurementUnavailable");
 
         private static string FormatArea(double pixelArea, double pixelSize, string? physicalUnit)
         {

@@ -57,14 +57,8 @@ namespace ImageViewer.Controls
         public ImageViewerViewportState ViewportState
         {
             get => _viewportStateProvider();
-            set
-            {
-                _applyViewportState(value);
-                if (_owner.IsLoaded)
-                {
-                    _owner.MarkDocumentDirty();
-                }
-            }
+            // Persist the viewport with a session, but browsing does not change the document.
+            set => _applyViewportState(value);
         }
 
         public void BeginViewportOverlayBatch() => _beginViewportOverlayBatch();

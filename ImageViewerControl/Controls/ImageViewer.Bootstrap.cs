@@ -52,9 +52,10 @@ namespace ImageViewer.Controls
         private void CompleteBootstrap()
         {
             _lifetime.Attach();
+            UpdateToolbarLayout();
+            UpdateRightOverlayPanelLayout();
             UpdateInteractionModeVisuals();
             UpdateStatusBar();
-            UpdateCalibrationIndicator();
             UpdateRenderedImage();
             RefreshRoiDrawingMenuItems();
             ApplyMenuItemContentAlignment(mainContextMenu);

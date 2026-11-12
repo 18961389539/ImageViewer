@@ -82,6 +82,8 @@ Type,Label,Metric1,Metric2,Metric3,Mean,Min,Max,StdDev,PixelCount,DetectionStatu
 
 这是进程内的回滚保护，多文件替换不具备断电或进程崩溃时的整体原子性。消费者应校验元数据提供的文件哈希及导出批次标识，避免读取混合版本的结果。哈希针对实际落盘的 UTF-8 文件字节，包含 BOM。
 
+批量导出的 `inputRecords[*].sha256` 针对输入图像的原始文件字节。指纹计算和解码共用同一个只读文件句柄，期间 Windows 阻止写入或替换该文件。已读取指纹但无法解码的输入也会保留指纹，便于追查失败原因。
+
 ### 批次离散度与重复性
 
 重复性研究按测量项身份聚合，每个输入轮次对同一项最多贡献一个有效测量值；失败或未测得的值不补零。参与图像数按输入轮次计数，不按结果行数计数。
@@ -96,8 +98,9 @@ Type,Label,Metric1,Metric2,Metric3,Mean,Min,Max,StdDev,PixelCount,DetectionStatu
 - `partiallySuccessfulFileCount`：至少一个 ROI 成功、至少一个 ROI 失败的输入数。
 - `allRoiFailedFileCount`：图像已读取但所有 ROI 都失败的输入数。
 - `inputFailedFileCount`：缺失或无法解码的输入数。
+- `unfinishedFileCount`：取消时尚未开始或尚未完成的输入数；这些输入不计入失败数。
 
-界面摘要使用这些分类，因此“读取成功”不会再被显示成“分析成功”。`inputRecords[*].status` 对应 `Processed`、`PartiallyProcessed`、`AnalysisFailed`、`InputMissing` 或 `DecodeFailed`。
+界面摘要使用这些分类，因此“读取成功”不会再被显示成“分析成功”。`inputRecords[*].status` 对应 `Processed`、`PartiallyProcessed`、`AnalysisFailed`、`InputMissing` 或 `DecodeFailed`。取消时，`inputs` 仍保留完整输入清单；CSV、`inputRecords` 和重复性报告只纳入已完成的输入（含已记录失败的输入）。
 
 ### 过程能力与 SPC
 

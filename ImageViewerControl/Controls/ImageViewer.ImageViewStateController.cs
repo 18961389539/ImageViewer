@@ -29,11 +29,7 @@ namespace ImageViewer.Controls
         bool ShowSnapGrid { get; }
         double Scale { get; }
 
-        /// <summary>视口平移（屏幕像素）。网格/ROI 的可视区域裁剪需要它换算成图像坐标。</summary>
-        double TranslateX { get; }
-
-        /// <summary>见 <see cref="TranslateX"/>。</summary>
-        double TranslateY { get; }
+        Rect GetVisibleImageRect(Size imageSize);
 
         double GridSpacing { get; }
         ImageSource? ImageSource { get; }
@@ -214,12 +210,7 @@ namespace ImageViewer.Controls
             }
 
             // 只创建可视区域内的网格线：整幅图可能有上千条线，而视口通常只覆盖一小块。
-            Rect visible = ImageViewerImageSourceUtilities.GetVisibleImageRect(
-                imageSize,
-                _host.ViewerSize,
-                _host.Scale,
-                _host.TranslateX,
-                _host.TranslateY);
+            Rect visible = _host.GetVisibleImageRect(imageSize);
             if (visible.IsEmpty)
             {
                 return;

@@ -587,6 +587,55 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
+        public void DroppingImageFromAxialView_ProtectsBothViewsAndReplacesTheVolumeDocument()
+        {
+            WpfTestRunner.RunAsync(async () =>
+            {
+                var volume = new VolumeData([CreateBitmap(16, 16), CreateBitmap(16, 16)]);
+                await using var viewer = new AdaptiveImageViewer
+                {
+                    Volume = volume,
+                    ImageSource = volume.GetAxialSlice(0),
+                    DisplayMode = AdaptiveDisplayMode.AxialSlice
+                };
+                var axial = viewer.VolumeViewer.SliceViewer;
+                var drop = GetDroppedContentController(axial);
+                int openedCount = 0;
+                viewer.ImageDocumentOpened += (_, _) => openedCount++;
+                string path = CreateTempPngPath();
+                try
+                {
+                    var data = new DataObject();
+                    data.SetData(DataFormats.FileDrop, new[] { path });
+                    var args = CreateDropArgs(data, axial);
+                    PopulateUndoHistory(viewer.ImageViewer);
+                    PopulateUndoHistory(axial);
+                    viewer.ImageViewer.MarkDocumentClean();
+
+                    await drop.HandleDropAsync(args);
+                    Assert.Same(volume, viewer.Volume);
+                    Assert.Single(axial.ViewerState.AllRois);
+                    Assert.Equal(0, openedCount);
+
+                    axial.MarkDocumentClean();
+                    await drop.HandleDropAsync(args);
+                    Assert.Null(viewer.Volume);
+                    Assert.Equal(AdaptiveDisplayMode.Auto, viewer.DisplayMode);
+                    Assert.Same(viewer.ImageViewer, viewer.ActiveView);
+                    Assert.Same(viewer.ImageSource, viewer.ImageViewer.ImageSource);
+                    Assert.Equal(8, Assert.IsAssignableFrom<BitmapSource>(viewer.ImageSource).PixelWidth);
+                    Assert.Empty(axial.ViewerState.AllRois);
+                    Assert.Empty(viewer.ImageViewer.ViewerState.AllRois);
+                    Assert.Equal(1, openedCount);
+                }
+                finally
+                {
+                    File.Delete(path);
+                }
+            });
+        }
+
+        [Fact]
         public void CancelingOrFailingProjectLoadKeepsCurrentDocumentAndUndoHistory()
         {
             WpfTestRunner.RunAsync(async () =>

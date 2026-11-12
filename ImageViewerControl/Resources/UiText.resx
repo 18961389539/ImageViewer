@@ -117,7 +117,7 @@
   <data name="ActiveToolHint" xml:space="preserve"><value>左键绘制，右键完成，Esc 取消</value></data>
   <data name="ActiveToolCancel" xml:space="preserve"><value>取消</value></data>
   <data name="MenuShowToolbar" xml:space="preserve"><value>显示工具栏</value></data>
-  <data name="MenuShowToolbarTooltip" xml:space="preserve"><value>显示/隐藏左侧浮动工具栏
+  <data name="MenuShowToolbarTooltip" xml:space="preserve"><value>显示/隐藏顶部工具栏
 工具栏提供打开图像、缩放、视图操作和面板开关。
 为保留更多图像可视区域，默认隐藏，可随时在此开启。</value></data>
   <data name="MenuSearchNoResults" xml:space="preserve"><value>未找到匹配的命令</value></data>
@@ -209,6 +209,7 @@
   <data name="CalibrationDialogUnitLabel" xml:space="preserve"><value>单位</value></data>
   <data name="CalibrationDialogWarningTitle" xml:space="preserve"><value>校准</value></data>
   <data name="CalibrationDialogInvalidLengthMessage" xml:space="preserve"><value>请输入有效的实际长度。</value></data>
+  <data name="CalibrationReferenceCorrectionFailed" xml:space="preserve"><value>参考线无法按此畸变模型校正。请检查模型参数或换一条参考线；原标定未更改。</value></data>
   <data name="CalibrationDefaultUnit" xml:space="preserve"><value>mm</value></data>
   <data name="CalibrationDialogDistortionHeader" xml:space="preserve"><value>镜头畸变（可选）</value></data>
   <data name="CalibrationDialogDistortionHint" xml:space="preserve"><value>K1/K2/K3 为归一化径向畸变系数，P1/P2 为切向畸变系数（填 0 表示不校正）。</value></data>
@@ -231,8 +232,9 @@
   <data name="InfoLineCalibrationDistortionExtended" xml:space="preserve"><value>畸变校正: K1={0:F3}, K2={1:F3}, K3={2:F3}, P1={3:F5}, P2={4:F5}; 标定RMS={5:F4}px, 不确定度={6:F4}px</value></data>
   <data name="InfoLineCalibrationAccuracy" xml:space="preserve"><value>标定精度: 重投影 RMS={0:F4}px, 测量不确定度={1:F4}px (1σ)</value></data>
   <data name="InfoLineCalibrationUndistortionWarning" xml:space="preserve"><value>畸变反解警告：{0}/{1} 个测量点未收敛（最大残差 {2:F4} px，最大不确定度 {3:F4} px），相关尺寸和公差判定不可评估。</value></data>
+  <data name="MeasurementUnavailable" xml:space="preserve"><value>无法测量</value></data>
   <data name="InfoLineCalibrationIdentity" xml:space="preserve"><value>标定标识: {0}</value></data>
-  <data name="InfoLineCalibrationInvalid" xml:space="preserve"><value>⚠ 标定参数不完整或非法，畸变校正按恒等处理</value></data>
+  <data name="InfoLineCalibrationInvalid" xml:space="preserve"><value>⚠ 标定模型参数无效，相关尺寸和公差判定不可评估。</value></data>
   <data name="CaliperFieldCount" xml:space="preserve"><value>卡尺数量</value></data>
   <data name="CaliperFieldSearchRange" xml:space="preserve"><value>搜索范围 (px)</value></data>
   <data name="CaliperFieldSamplingHalfWidth" xml:space="preserve"><value>半宽采样 (px)</value></data>
@@ -458,7 +460,7 @@
   <data name="InfoLineStatisticsStdDev" xml:space="preserve"><value>标准差:{0:F2} 数量:{1}</value></data>
   <data name="InfoLineCalibration" xml:space="preserve"><value>校准: 1 px = {0:F4} {1}</value></data>
   <data name="InfoUnitPixels" xml:space="preserve"><value>px</value></data>
-  <data name="InfoLineArcCaliperGeometry" xml:space="preserve"><value>半径:{0} 弧:{1:F1}°</value></data>
+  <data name="InfoLineArcCaliperGeometry" xml:space="preserve"><value>弧长:{0} 半径:{1} 弧角:{2:F1}°</value></data>
   <data name="InfoLineArcCaliperDetail" xml:space="preserve"><value>圆心:({0:F1}, {1:F1}) 起点:{2:F1}°</value></data>
   <data name="InfoLineCircularCaliperDetail" xml:space="preserve"><value>圆心:({0:F1}, {1:F1})</value></data>
   <data name="RenderStatusNotAvailable" xml:space="preserve"><value>n/a</value></data>
@@ -497,6 +499,9 @@
   <data name="EditorToleranceNominal" xml:space="preserve"><value>标称值</value></data>
   <data name="EditorTolerancePlus" xml:space="preserve"><value>上公差</value></data>
   <data name="EditorToleranceMinus" xml:space="preserve"><value>下公差</value></data>
+  <data name="EditorToleranceInvalidNumber" xml:space="preserve"><value>请输入有效的有限数值，或清空此项。</value></data>
+  <data name="EditorToleranceInvalidLimit" xml:space="preserve"><value>请输入大于或等于 0 的有限数值，或清空此项。</value></data>
+  <data name="StatusInvalidToleranceDraft" xml:space="preserve"><value>“{0}”的{1}输入无效。请选中该测量并修正后再试。</value></data>
   <data name="InfoTolerancePass" xml:space="preserve"><value>判定: 合格  实测 {0:G4}，标称 {1:G4}</value></data>
   <data name="InfoToleranceFail" xml:space="preserve"><value>判定: 超差  实测 {0:G4}，标称 {1:G4}</value></data>
   <data name="EditorLabel" xml:space="preserve"><value>标签</value></data>
@@ -844,9 +849,16 @@
   <data name="ToolbarCompactHint" xml:space="preserve"><value>窗口较窄，工具栏已收起；点击打开命令菜单</value></data>
   <data name="ToolbarCommandMenuButton" xml:space="preserve"><value>工具栏</value></data>
   <data name="ToolbarRestoreButton" xml:space="preserve"><value>恢复工具栏</value></data>
+  <data name="ToolbarMoreCommands" xml:space="preserve"><value>更多命令</value></data>
+  <data name="ToolbarSaveSession" xml:space="preserve"><value>保存会话</value></data>
+  <data name="ToolbarCalibrate" xml:space="preserve"><value>尺寸标定</value></data>
+  <data name="ToolbarExportCsv" xml:space="preserve"><value>导出 CSV</value></data>
+  <data name="RoiSidebarButton" xml:space="preserve"><value>ROI 面板</value></data>
+  <data name="RoiSidebarShow" xml:space="preserve"><value>展开右侧 ROI 面板</value></data>
+  <data name="RoiSidebarHide" xml:space="preserve"><value>收起右侧 ROI 面板</value></data>
   <data name="ToolbarRestoreHint" xml:space="preserve"><value>工具栏已隐藏；点击此处恢复工具栏</value></data>
   <data name="ToolbarHideButton" xml:space="preserve"><value>隐藏工具栏</value></data>
-  <data name="ToolbarHideHint" xml:space="preserve"><value>隐藏当前工具栏；可点击左上角按钮或从右键菜单“显示工具栏”重新打开</value></data>
+  <data name="ToolbarHideHint" xml:space="preserve"><value>隐藏常用工具；点击“恢复工具栏”重新显示</value></data>
   <data name="StatusSessionImageMissing" xml:space="preserve"><value>找不到会话的底图：{0}。当前文档保持不变。</value></data>
   <data name="StatusSessionImageMismatch" xml:space="preserve"><value>图像内容与会话记录的原文件不一致：{0}。当前文档保持不变。</value></data>
   <data name="StatusSessionImageRelinked" xml:space="preserve"><value>已找到底图并加载会话。保存会话可记录新路径。</value></data>
@@ -866,18 +878,21 @@
   <data name="CalibrationBadgeAccessibleName" xml:space="preserve"><value>当前标定状态</value></data>
   <data name="CalibrationBadgeText" xml:space="preserve"><value>✓ 已标定 · 1 px = {0:F4} {1}</value></data>
   <data name="CalibrationBadgeUncalibratedText" xml:space="preserve"><value>未标定 · 选中线段后点击“像素/物理尺寸校准”</value></data>
-  <data name="CalibrationBadgeDistortionSuffix" xml:space="preserve"><value>· 畸变已校正</value></data>
+  <data name="CalibrationBadgePixels" xml:space="preserve"><value>未标定 · px</value></data>
+  <data name="CalibrationBadgeDistortionSuffix" xml:space="preserve"><value>· 畸变校正已启用</value></data>
+  <data name="CalibrationBadgeScaleOnlySuffix" xml:space="preserve"><value>· 仅比例标定</value></data>
+  <data name="CalibrationBadgeInvalidDistortionSuffix" xml:space="preserve"><value>· 标定模型无效</value></data>
   <data name="CalibrationBadgeUncertaintySuffix" xml:space="preserve"><value>· ±{0} {1} (1σ)</value></data>
   <data name="CalibrationBadgeReprojectionSuffix" xml:space="preserve"><value>· RMS {0} {1}</value></data>
   <data name="CalibrationBadgeTooltipScale" xml:space="preserve"><value>标定比例: 1 px = {0:F6} {1}</value></data>
   <data name="CalibrationBadgeTooltipDistortion" xml:space="preserve"><value>径向畸变: K1={0:G6}, K2={1:G6}</value></data>
   <data name="CalibrationBadgeTooltipDistortionExtended" xml:space="preserve"><value>畸变模型: K1={0:G6}, K2={1:G6}, K3={2:G6}, P1={3:G6}, P2={4:G6}</value></data>
   <data name="CalibrationBadgeTooltipNoDistortion" xml:space="preserve"><value>未配置畸变模型（仅比例标定）</value></data>
+  <data name="CalibrationBadgeTooltipInvalidDistortion" xml:space="preserve"><value>标定模型参数无效，相关尺寸和公差判定不可评估。</value></data>
   <data name="CalibrationBadgeTooltipAccuracy" xml:space="preserve"><value>标定精度: 重投影 RMS={0:G4} px, 不确定度={1:G4} px (≈ {2} {3}, 1σ)</value></data>
   <data name="CalibrationBadgeTooltipIdentity" xml:space="preserve"><value>标定标识: {0} · 标定时间: {1}</value></data>
   <data name="CalibrationBadgeNoId" xml:space="preserve"><value>(未填)</value></data>
   <data name="CalibrationBadgeNoTimestamp" xml:space="preserve"><value>(未记录)</value></data>
-  <data name="CalibrationBadgeInvalidWarning" xml:space="preserve"><value>⚠ 标定参数不完整或非法，畸变校正已按恒等处理</value></data>
   <data name="RecoveryBannerText" xml:space="preserve"><value>发现上次未完成的自动保存内容</value></data>
   <data name="RecoveryRestoreButton" xml:space="preserve"><value>恢复</value></data>
   <data name="RecoveryPickerTitle" xml:space="preserve"><value>恢复自动保存…</value></data>
@@ -1120,7 +1135,7 @@
   <data name="MenuNothingToUndo" xml:space="preserve"><value>没有可撤销的操作。</value></data>
   <data name="MenuNothingToRedo" xml:space="preserve"><value>没有可重做的操作。</value></data>
   <data name="MenuNoRois" xml:space="preserve"><value>当前没有 ROI。</value></data>
-  <data name="MenuNeedCalibrationLine" xml:space="preserve"><value>请先选择可用于标定的线段。</value></data>
+  <data name="MenuNeedCalibrationLine" xml:space="preserve"><value>请先选中一条已知长度的线段。</value></data>
   <data name="MenuNeedCaliperSelection" xml:space="preserve"><value>请先选择卡尺测量对象。</value></data>
   <data name="MenuNeedDetectableCaliper" xml:space="preserve"><value>请先加载图像并选择支持检测的卡尺对象。</value></data>
   <data name="MenuNeedCompatibleSource" xml:space="preserve"><value>当前对象不能作为此工具的来源。形状偏差需要实际检测边缘或轮廓样本。</value></data>

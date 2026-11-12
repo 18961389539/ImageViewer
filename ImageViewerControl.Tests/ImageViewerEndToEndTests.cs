@@ -28,6 +28,97 @@ namespace ImageViewerControl.Tests
     public sealed class ImageViewerEndToEndTests
     {
         [Fact]
+        public void InvalidToleranceDraft_SurvivesReselectionAndBlocksCsvUntilCorrected()
+        {
+            WpfTestRunner.RunAsync(async () =>
+            {
+                string csvPath = Path.Combine(Path.GetTempPath(), $"iv-tolerance-{Guid.NewGuid():N}.csv");
+                try
+                {
+                    int saveDialogs = 0;
+                    var dialogs = new SaveTargets("", "") { SelectAnalysisCsv = () => { saveDialogs++; return csvPath; } };
+                    using var runtime = ImageViewerTestServices.CreateRuntimeServices(fileDialogService: dialogs);
+                    using var host = ImageViewerTestServices.CreateHost(
+                        RoiPluginRegistry.CreateBuiltIn(), runtime, ImageViewerHostDefaults.CreateHostServices());
+                    using var viewer = host.CreateViewer();
+                    var line = new LineMeasureRoi
+                    {
+                        Label = "检查尺寸",
+                        P1 = new PointD(0, 0),
+                        P2 = new PointD(10, 0),
+                        Tolerance = new MeasurementTolerance { Nominal = 10, TolerancePlus = 0.5 }
+                    };
+                    Assert.True(viewer.AddRoi(line));
+                    var editorHost = Assert.IsType<ContentControl>(viewer.FindName("roiPropertyEditorHost"));
+                    TextBox PlusField() => Assert.Single(Assert.IsType<StackPanel>(editorHost.Content).Children.OfType<TextBox>()
+                        .Where(field => System.Windows.Automation.AutomationProperties.GetName(field) == UiText.Get("EditorTolerancePlus")));
+
+                    PlusField().Text = "-2";
+                    Assert.Equal(0.5, line.Tolerance?.TolerancePlus);
+                    viewer.ViewerState.SelectedRoi = null;
+                    await viewer._controlComposition.FeatureMenuCommandController.ExecuteAsync(ImageViewerFeatureMenuCommand.ExportAnalysisCsv);
+                    Assert.Equal(0, saveDialogs);
+                    Assert.False(File.Exists(csvPath));
+                    Assert.Contains(line.Label, viewer.statusHintTextBlock.Text);
+
+                    viewer.ViewerState.SelectedRoi = line;
+                    Assert.Equal("-2", PlusField().Text);
+                    Assert.Contains(UiText.Get("EditorToleranceInvalidLimit"), System.Windows.Automation.AutomationProperties.GetHelpText(PlusField()));
+                    PlusField().Text = "0.25";
+                    Assert.Equal(0.25, line.Tolerance?.TolerancePlus);
+                    await viewer._controlComposition.FeatureMenuCommandController.ExecuteAsync(ImageViewerFeatureMenuCommand.ExportAnalysisCsv);
+                    Assert.Equal(1, saveDialogs);
+                    Assert.Contains(",\"Passed\",10,10,0.25,", await File.ReadAllTextAsync(csvPath));
+                }
+                finally
+                {
+                    File.Delete(csvPath);
+                    File.Delete(Path.ChangeExtension(csvPath, ".metadata.json"));
+                    File.Delete(Path.ChangeExtension(csvPath, ".report.md"));
+                }
+            });
+        }
+
+        [Fact]
+        public void AxialOpenImageDialog_UsesTheAdaptiveHostWindowAndReplacesTheVolume()
+        {
+            WpfTestRunner.RunAsync(async () =>
+            {
+                string path = Path.Combine(Path.GetTempPath(), $"iv-axial-open-{Guid.NewGuid():N}.png");
+                Window? dialogOwner = null;
+                var dialogs = new SaveTargets("", "") { SelectImage = owner => { dialogOwner = owner; return path; } };
+                using var runtime = ImageViewerTestServices.CreateRuntimeServices(fileDialogService: dialogs);
+                using var host = ImageViewerTestServices.CreateHost(
+                    RoiPluginRegistry.CreateBuiltIn(), runtime, ImageViewerHostDefaults.CreateHostServices());
+                var volume = new VolumeData([CreateBitmap(16, 16, 50), CreateBitmap(16, 16, 60)]);
+                await using var viewer = new AdaptiveImageViewer(host.CreateViewer)
+                {
+                    Volume = volume,
+                    ImageSource = volume.GetAxialSlice(0),
+                    DisplayMode = AdaptiveDisplayMode.AxialSlice
+                };
+                var window = new Window { Width = 800, Height = 600, Content = viewer };
+                try
+                {
+                    SaveBitmap(path, CreateBitmap(8, 6, 25));
+                    window.Show();
+                    WpfTestRunner.DrainDispatcher();
+
+                    await viewer.VolumeViewer.SliceViewer.ShowOpenImageDialogAsync();
+                    Assert.Same(window, dialogOwner);
+                    Assert.Null(viewer.Volume);
+                    Assert.Same(viewer.ImageViewer, viewer.ActiveView);
+                    Assert.Equal(8, Assert.IsAssignableFrom<BitmapSource>(viewer.ImageSource).PixelWidth);
+                }
+                finally
+                {
+                    window.Close();
+                    File.Delete(path);
+                }
+            });
+        }
+
+        [Fact]
         public void LargeImageWorkflow_LoadsPyramidAndUsesTiledViewport()
         {
             WpfTestRunner.RunAsync(async () =>
@@ -59,6 +150,17 @@ namespace ImageViewerControl.Tests
                     Assert.True(viewer._analysisState.LastRenderFrame.IsTiled);
                     Assert.InRange(viewer._analysisState.LastRenderFrame.Width, 1, 2001);
                     Assert.InRange(viewer._analysisState.LastRenderFrame.ScaleFactor, 0.0, 1.0);
+
+                    viewer.RotateImageRight();
+                    viewer.FlipImageHorizontal();
+                    window.UpdateLayout();
+                    Rect visible = viewer.rootGrid.TransformToVisual(viewer.imageContainer).TransformBounds(new Rect(viewer.rootGrid.RenderSize));
+                    visible.Intersect(new Rect(0, 0, 2001, 2001));
+                    Assert.False(visible.IsEmpty);
+                    var frame = viewer._analysisState.LastRenderFrame;
+                    var rendered = new Rect(frame.Left, frame.Top, frame.Width, frame.Height);
+                    rendered.Inflate(1, 1);
+                    Assert.True(rendered.Contains(visible), $"Rendered tile {rendered} should cover visible image {visible}.");
                 }
                 finally
                 {
@@ -723,6 +825,8 @@ namespace ImageViewerControl.Tests
         {
             public Func<string, string, string?>? LocateSessionImage { get; init; }
             public Func<string, string?>? SelectNamedSession { get; init; }
+            public Func<string?>? SelectAnalysisCsv { get; init; }
+            public Func<Window?, string?>? SelectImage { get; init; }
 
             public string? ShowLocateSessionImageDialog(Window? owner, string missingImagePath, string sessionPath)
                 => LocateSessionImage?.Invoke(missingImagePath, sessionPath);
@@ -731,13 +835,13 @@ namespace ImageViewerControl.Tests
             public string? ShowSaveSessionDialog(Window? owner, string sessionLabel) =>
                 SelectNamedSession != null ? SelectNamedSession(sessionLabel) : session;
             public string ShowSaveProjectPackageDialog(Window? owner) => package;
-            public string? ShowOpenImageDialog(Window? owner) => null;
+            public string? ShowOpenImageDialog(Window? owner) => SelectImage?.Invoke(owner);
             public string[] ShowOpenImageFilesDialog(Window? owner) => [];
             public string? ShowSaveRoiDialog(Window? owner) => null;
             public string? ShowOpenRoiDialog(Window? owner) => null;
             public string? ShowOpenSessionDialog(Window? owner) => null;
             public string? ShowSaveSnapshotDialog(Window? owner) => null;
-            public string? ShowSaveAnalysisCsvDialog(Window? owner) => null;
+            public string? ShowSaveAnalysisCsvDialog(Window? owner) => SelectAnalysisCsv?.Invoke();
             public string? ShowSaveXpsDialog(Window? owner) => null;
             public string? ShowSaveRecipeDialog(Window? owner) => null;
             public string? ShowOpenRecipeDialog(Window? owner) => null;

@@ -118,14 +118,14 @@ namespace ImageViewerControl.Tests
                 Radius1 = 10,
                 Center2 = new PointD(3, 4),
                 Radius2 = 10,
-                Tolerance = new MeasurementTolerance { Nominal = 10, TolerancePlus = 0.5, ToleranceMinus = 0.5 }
+                Tolerance = new MeasurementTolerance { Nominal = 5, TolerancePlus = 0.5, ToleranceMinus = 0.5 }
             };
 
             Assert.Equal(5.0, roi.CenterDistance, precision: 10);
 
-            RoiInspectionResult result = RoiInspectionEvaluator.Evaluate(roi, pixelSize: 1);
+            RoiInspectionResult result = RoiInspectionEvaluator.Evaluate(roi, pixelSize: 0.5);
 
-            Assert.Equal(10.0, result.MeasuredValue!.Value, precision: 10);
+            Assert.Equal(5.0, result.MeasuredValue!.Value, precision: 10);
             Assert.Equal(RoiSpecificationStatus.Passed, result.SpecificationStatus);
         }
 
@@ -413,7 +413,7 @@ namespace ImageViewerControl.Tests
 
             string info = RoiInfoService.BuildInfo(roi, bitmap: null, pixelSize: 1, physicalUnit: "mm", pluginRegistry: RoiPluginRegistry.CreateBuiltIn(), includeStatistics: false, calibration: calibration);
 
-            // 非法标定不宜静默：必须明确标注已按恒等处理，且不得给出标定身份（那是"可用"的信号）。
+            // 非法标定必须明确告知尺寸不可评估，不能显示正常测量值或标定身份。
             Assert.Contains(UiText.Get("InfoLineCalibrationInvalid"), info);
             Assert.DoesNotContain(UiText.Get("InfoLineCalibrationIdentity").Replace("{0}", string.Empty, StringComparison.Ordinal), info);
         }

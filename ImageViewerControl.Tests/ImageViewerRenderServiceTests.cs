@@ -77,6 +77,7 @@ namespace ImageViewerControl.Tests
                     P2 = new PointD(50, 110),
                     HasDetectedEdges = true
                 };
+                caliper.ApplyWidthMeasurement(new CaliperWidthMeasurementResult([100], centerDistance: 100));
                 var context = CreateRenderContext(new Canvas(), new Canvas());
                 string summary = DualEdgeCaliperRenderHelper.BuildSummaryText(context, caliper);
                 Point anchor = DualEdgeCaliperRenderHelper.GetSummaryAnchor(context, caliper, summary);

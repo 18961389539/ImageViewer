@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -130,63 +129,48 @@ namespace ImageViewer.Services
             var rows = new List<RoiAnalysisBatchCsvRow>();
             var errors = new List<string>();
             var inputTraces = new List<BatchInputTrace>(sources.Length);
-            int processedFileCount = 0;
-            int decodedFileCount = 0;
-            int fullySuccessfulFileCount = 0;
-            int partiallySuccessfulFileCount = 0;
-            int allRoiFailedFileCount = 0;
-            int inputFailedFileCount = 0;
             bool canceled = false;
 
             for (int sourceIndex = 0; sourceIndex < sources.Length; sourceIndex++)
             {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    canceled = true;
+                    break;
+                }
+
                 string sourcePath = sources[sourceIndex];
+                var inputTrace = new BatchInputTrace(sourceIndex, sourcePath);
                 bool bitmapLoaded = false;
+                RoiAnalysisBatchCsvRow[] sourceRows;
+                progress?.Report(new BatchRoiAnalysisExportProgress(sources.Length, inputTraces.Count, sourcePath, "Preparing", rows.Count));
                 try
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    progress?.Report(new BatchRoiAnalysisExportProgress(sources.Length, sourceIndex, sourcePath, "Preparing", rows.Count));
-                    BatchInputTrace inputTrace = await CaptureInputTraceAsync(sourceIndex, sourcePath, cancellationToken).ConfigureAwait(false);
-                    inputTraces.Add(inputTrace);
-                    if (!inputTrace.Exists)
-                    {
-                        throw new FileNotFoundException("找不到输入图像。", sourcePath);
-                    }
-
-                    BitmapSource bitmap = await ImageViewerImageDecoder.LoadFromFileAsync(sourcePath, cancellationToken: cancellationToken).ConfigureAwait(false);
+                    BitmapSource bitmap = await ImageViewerImageDecoder.LoadBatchImageAsync(
+                        sourcePath, inputTrace.SetFileTrace, cancellationToken).ConfigureAwait(false);
                     bitmapLoaded = true;
-                    decodedFileCount++;
                     inputTrace.PixelWidth = bitmap.PixelWidth;
                     inputTrace.PixelHeight = bitmap.PixelHeight;
-                    RoiAnalysisBatchCsvRow[] sourceRows = await Task.Run(
+                    sourceRows = await Task.Run(
                         () => AnalyzeSource(sourceIndex, sourcePath, bitmap, templates, pixelSize, physicalUnit, calibration, quality, cancellationToken),
                         cancellationToken).ConfigureAwait(false);
-                    rows.AddRange(sourceRows);
-                    inputTrace.RowCount = sourceRows.Length;
                     inputTrace.RowErrors.AddRange(sourceRows
                         .Where(row => !string.IsNullOrWhiteSpace(row.Error))
                         .Select(row => $"{row.RoiLabel}: {row.Error}"));
-                    bool allRowsSuccessful = sourceRows.All(row => string.IsNullOrWhiteSpace(row.Error));
-                    bool anyRowsSuccessful = sourceRows.Any(row => string.IsNullOrWhiteSpace(row.Error));
-                    if (allRowsSuccessful)
+                    if (inputTrace.RowErrors.Count == 0)
                     {
-                        fullySuccessfulFileCount++;
-                        processedFileCount++;
-                        inputTrace.Status = "Processed";
+                        inputTrace.Status = BatchInputStatus.Processed;
                     }
-                    else if (anyRowsSuccessful)
+                    else if (inputTrace.RowErrors.Count < sourceRows.Length)
                     {
-                        partiallySuccessfulFileCount++;
-                        inputTrace.Status = "PartiallyProcessed";
+                        inputTrace.Status = BatchInputStatus.PartiallyProcessed;
                         inputTrace.Error = "部分 ROI 分析失败。";
                     }
                     else
                     {
-                        allRoiFailedFileCount++;
-                        inputTrace.Status = "AnalysisFailed";
+                        inputTrace.Status = BatchInputStatus.AnalysisFailed;
                         inputTrace.Error = "所有 ROI 分析失败。";
                     }
-                    progress?.Report(new BatchRoiAnalysisExportProgress(sources.Length, sourceIndex + 1, sourcePath, "Completed", rows.Count));
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
@@ -195,31 +179,27 @@ namespace ImageViewer.Services
                 }
                 catch (Exception ex)
                 {
-                    BatchInputTrace? inputTrace = inputTraces.LastOrDefault(trace => trace.InputIndex == sourceIndex);
-                    if (inputTrace is null)
-                    {
-                        inputTrace = new BatchInputTrace(sourceIndex, sourcePath);
-                        inputTraces.Add(inputTrace);
-                    }
-                    string status = bitmapLoaded ? "AnalysisFailed" : File.Exists(sourcePath) ? "DecodeFailed" : "InputMissing";
-                    string error = ex.Message;
-                    inputTrace.Status = status;
+                    bool missing = !inputTrace.Exists && (ex is FileNotFoundException or DirectoryNotFoundException || !File.Exists(sourcePath));
+                    inputTrace.Status = bitmapLoaded ? BatchInputStatus.AnalysisFailed
+                        : missing ? BatchInputStatus.InputMissing : BatchInputStatus.DecodeFailed;
+                    string error = missing ? "找不到输入图像。" : ex.Message;
+                    inputTrace.Exists = !missing;
                     inputTrace.Error = error;
-                    inputTrace.RowCount = templates.Length;
-                    rows.AddRange(CreateFailureRows(sourceIndex, sourcePath, status, error, templates, pixelSize, physicalUnit, calibration));
+                    sourceRows = CreateFailureRows(sourceIndex, sourcePath, inputTrace.Status.ToString(), error, templates, pixelSize, physicalUnit, calibration);
                     errors.Add($"{Path.GetFileName(sourcePath)}: {error}");
-                    if (bitmapLoaded)
-                    {
-                        allRoiFailedFileCount++;
-                    }
-                    else
-                    {
-                        inputFailedFileCount++;
-                    }
-                    progress?.Report(new BatchRoiAnalysisExportProgress(sources.Length, sourceIndex + 1, sourcePath, "Completed", rows.Count));
                 }
+
+                // An interrupted input has no published rows and must not count as completed.
+                inputTrace.RowCount = sourceRows.Length;
+                inputTraces.Add(inputTrace);
+                rows.AddRange(sourceRows);
+                progress?.Report(new BatchRoiAnalysisExportProgress(sources.Length, inputTraces.Count, sourcePath, "Completed", rows.Count));
             }
 
+            int fullySuccessfulFileCount = inputTraces.Count(trace => trace.Status == BatchInputStatus.Processed);
+            int partiallySuccessfulFileCount = inputTraces.Count(trace => trace.Status == BatchInputStatus.PartiallyProcessed);
+            int allRoiFailedFileCount = inputTraces.Count(trace => trace.Status == BatchInputStatus.AnalysisFailed);
+            int decodedFileCount = fullySuccessfulFileCount + partiallySuccessfulFileCount + allRoiFailedFileCount;
             string csv = RoiAnalysisExportService.BuildBatchCsv(rows);
             // Persist completed work even when the user cancels. The summary is useful
             // for resuming or auditing a long batch and must not be blocked by the
@@ -241,6 +221,30 @@ namespace ImageViewer.Services
             }
             string csvHash = ImageViewerExportArtifactSet.ComputeSha256Utf8Text(csv);
             string repeatabilityHash = ImageViewerExportArtifactSet.ComputeSha256Utf8Text(repeatabilityMarkdown);
+            BatchRoiAnalysisExportSummary summary = new(
+                sources.Length,
+                fullySuccessfulFileCount,
+                inputTraces.Count - fullySuccessfulFileCount,
+                rows.Count,
+                errors)
+            {
+                DecodedFileCount = decodedFileCount,
+                FullySuccessfulFileCount = fullySuccessfulFileCount,
+                PartiallySuccessfulFileCount = partiallySuccessfulFileCount,
+                AllRoiFailedFileCount = allRoiFailedFileCount,
+                InputFailedFileCount = inputTraces.Count - decodedFileCount,
+                UnfinishedFileCount = sources.Length - inputTraces.Count,
+                IsCanceled = canceled,
+                MetadataPath = metadataPath,
+                SummaryPath = summaryPath,
+                RepeatabilityPath = repeatabilityPath,
+                RepeatabilitySourceCount = repeatabilityStudy.SourceCount,
+                RepeatabilityConclusiveItemCount = repeatabilityStudy.ConclusiveItemCount,
+                RepeatabilityToleranceConsumedItemCount = repeatabilityStudy.ToleranceConsumedCount,
+                BatchId = batchId,
+                CsvSha256 = csvHash,
+                RepeatabilitySha256 = repeatabilityHash
+            };
             var metadata = new Dictionary<string, object?>
             {
                 ["exportFormatVersion"] = 2,
@@ -252,20 +256,21 @@ namespace ImageViewer.Services
                 ["result"] = new Dictionary<string, object?>
                 {
                     ["csvSha256"] = csvHash,
-                    ["requestedFileCount"] = sources.Length,
-                    ["processedFileCount"] = processedFileCount,
-                    ["failedFileCount"] = sources.Length - processedFileCount,
-                    ["decodedFileCount"] = decodedFileCount,
-                    ["fullySuccessfulFileCount"] = fullySuccessfulFileCount,
-                    ["partiallySuccessfulFileCount"] = partiallySuccessfulFileCount,
-                    ["allRoiFailedFileCount"] = allRoiFailedFileCount,
-                    ["inputFailedFileCount"] = inputFailedFileCount,
-                    ["exportedRowCount"] = rows.Count,
-                    ["errors"] = errors
+                    ["requestedFileCount"] = summary.RequestedFileCount,
+                    ["processedFileCount"] = summary.ProcessedFileCount,
+                    ["failedFileCount"] = summary.FailedFileCount,
+                    ["unfinishedFileCount"] = summary.UnfinishedFileCount,
+                    ["decodedFileCount"] = summary.DecodedFileCount,
+                    ["fullySuccessfulFileCount"] = summary.FullySuccessfulFileCount,
+                    ["partiallySuccessfulFileCount"] = summary.PartiallySuccessfulFileCount,
+                    ["allRoiFailedFileCount"] = summary.AllRoiFailedFileCount,
+                    ["inputFailedFileCount"] = summary.InputFailedFileCount,
+                    ["exportedRowCount"] = summary.ExportedRowCount,
+                    ["errors"] = summary.Errors
                 },
                 // Keep the original path-only field for consumers of metadata version 2.
                 ["inputs"] = sources,
-                // Detailed records provide an auditable entry for every requested input,
+                // Detailed records provide an auditable entry for every completed input,
                 // including missing, unreadable, and successfully processed files.
                 ["inputRecords"] = inputTraces.Select(trace => trace.ToMetadata()).ToArray(),
                 ["calibration"] = new Dictionary<string, object?>
@@ -304,42 +309,12 @@ namespace ImageViewer.Services
                         ["shareOfTolerancePercent"] = item.RepeatabilityShareOfTolerancePercent
                     }).ToList()
                 },
-                ["artifacts"] = new Dictionary<string, object?>
-                {
-                    ["csvSha256"] = csvHash,
-                    ["repeatabilitySha256"] = repeatabilityHash,
-                    ["summarySha256"] = null
-                },
                 ["roiTypes"] = templates
                     .GroupBy(roi => roi.RoiTypeName)
                     .OrderBy(group => group.Key, StringComparer.Ordinal)
                     .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal),
                 ["renderSettings"] = renderSettings,
                 ["hasRoiPersistenceRegistry"] = pluginRegistry != null
-            };
-            string metadataJson = JsonSerializer.Serialize(metadata, MetadataJsonOptions);
-            BatchRoiAnalysisExportSummary summary = new(
-                sources.Length,
-                processedFileCount,
-                sources.Length - processedFileCount,
-                rows.Count,
-                errors)
-            {
-                DecodedFileCount = decodedFileCount,
-                FullySuccessfulFileCount = fullySuccessfulFileCount,
-                PartiallySuccessfulFileCount = partiallySuccessfulFileCount,
-                AllRoiFailedFileCount = allRoiFailedFileCount,
-                InputFailedFileCount = inputFailedFileCount,
-                IsCanceled = canceled,
-                MetadataPath = metadataPath,
-                SummaryPath = summaryPath,
-                RepeatabilityPath = repeatabilityPath,
-                RepeatabilitySourceCount = repeatabilityStudy.SourceCount,
-                RepeatabilityConclusiveItemCount = repeatabilityStudy.ConclusiveItemCount,
-                RepeatabilityToleranceConsumedItemCount = repeatabilityStudy.ToleranceConsumedCount,
-                BatchId = batchId,
-                CsvSha256 = csvHash,
-                RepeatabilitySha256 = repeatabilityHash
             };
             string summaryJson = JsonSerializer.Serialize(summary, MetadataJsonOptions);
             metadata["artifacts"] = new Dictionary<string, object?>
@@ -348,7 +323,7 @@ namespace ImageViewer.Services
                 ["repeatabilitySha256"] = repeatabilityHash,
                 ["summarySha256"] = ImageViewerExportArtifactSet.ComputeSha256Utf8Text(summaryJson)
             };
-            metadataJson = JsonSerializer.Serialize(metadata, MetadataJsonOptions);
+            string metadataJson = JsonSerializer.Serialize(metadata, MetadataJsonOptions);
             await ImageViewerExportArtifactSet.WriteAllTextAsync(
                 new Dictionary<string, string>(StringComparer.Ordinal)
                 {
@@ -409,15 +384,11 @@ namespace ImageViewer.Services
 
                 try
                 {
-                    ClearPreviousDetectionState(roi);
-                    if (roi is CaliperMeasureRoi or LineCaliperMeasureRoi or CircularCaliperMeasureRoi)
+                    if (CaliperRoiDetection.Supports(roi))
                     {
+                        CaliperRoiDetection.Clear(roi);
                         intensity ??= VisionAlgorithmEntryPoint.CreateIntensity(bitmap);
-                    }
-
-                    bool measured = TryDetectRoi(bitmap, roi, intensity, quality);
-                    if (roi is CaliperMeasureRoi or LineCaliperMeasureRoi or CircularCaliperMeasureRoi)
-                    {
+                        bool measured = CaliperRoiDetection.TryDetectAndApply(bitmap, roi, quality, intensity);
                         status = measured ? "Measured" : "DetectionFailed";
                         error = measured ? null : "未找到足够可靠的边缘。";
                     }
@@ -435,22 +406,6 @@ namespace ImageViewer.Services
 
             cancellationToken.ThrowIfCancellationRequested();
             return rows;
-        }
-
-        private static void ClearPreviousDetectionState(RoiBase roi)
-        {
-            switch (roi)
-            {
-                case CaliperMeasureRoi dualEdge:
-                    dualEdge.ClearDetectedEdges();
-                    break;
-                case LineCaliperMeasureRoi line:
-                    line.ClearDetectedLine();
-                    break;
-                case CircularCaliperMeasureRoi circular:
-                    circular.ClearDetectedEdges();
-                    break;
-            }
         }
 
         private static RoiAnalysisBatchCsvRow[] CreateFailureRows(
@@ -478,60 +433,14 @@ namespace ImageViewer.Services
                 .ToArray();
         }
 
-        private static bool TryDetectRoi(BitmapSource bitmap, RoiBase roi, IntensityImage? intensity, ImageAnalysisQualityProfile quality)
+        // Names are written to inputRecords and to CSV rows for file-level failures.
+        private enum BatchInputStatus
         {
-            switch (roi)
-            {
-                case CaliperMeasureRoi dualEdge when ImageAnalysisService.TryDetectLineMeasureEdgesCore(bitmap, dualEdge, out ImageViewer.Core.Analysis.LineMeasureGradientDetectionResult dualResult, quality, intensity):
-                    RoiDetectionResultMapper.Apply(dualEdge, dualResult);
-                    return true;
-                case LineCaliperMeasureRoi line when ImageAnalysisService.TryDetectLineCaliperEdgesCore(bitmap, line, out ImageViewer.Core.Analysis.LineCaliperDetectionResult lineResult, quality, intensity):
-                    RoiDetectionResultMapper.Apply(line, lineResult);
-                    return true;
-                case CircularCaliperMeasureRoi circular when ImageAnalysisService.TryDetectCircularCaliperEdgesCore(bitmap, circular, out ImageViewer.Core.Analysis.CircularCaliperDetectionResult circularResult, quality, intensity):
-                    RoiDetectionResultMapper.Apply(circular, circularResult, quality);
-                    return true;
-                case CaliperMeasureRoi:
-                case LineCaliperMeasureRoi:
-                case CircularCaliperMeasureRoi:
-                    return false;
-                default:
-                    return true;
-            }
-        }
-
-        private static async Task<BatchInputTrace> CaptureInputTraceAsync(int inputIndex, string path, CancellationToken cancellationToken)
-        {
-            var trace = new BatchInputTrace(inputIndex, path);
-            if (!File.Exists(path))
-            {
-                trace.Status = "InputMissing";
-                trace.Error = "找不到输入图像。";
-                return trace;
-            }
-
-            trace.Exists = true;
-            try
-            {
-                FileInfo info = new(path);
-                trace.LengthBytes = info.Length;
-                trace.LastWriteTimeUtc = info.LastWriteTimeUtc;
-                await using FileStream stream = File.OpenRead(path);
-                byte[] hash = await SHA256.HashDataAsync(stream, cancellationToken).ConfigureAwait(false);
-                trace.Sha256 = Convert.ToHexString(hash).ToLowerInvariant();
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                // Metadata collection must not hide the actual decode result. The
-                // failure is retained alongside the eventual input status.
-                trace.MetadataError = ex.Message;
-            }
-
-            return trace;
+            Processed,
+            PartiallyProcessed,
+            AnalysisFailed,
+            InputMissing,
+            DecodeFailed
         }
 
         private sealed class BatchInputTrace
@@ -548,17 +457,17 @@ namespace ImageViewer.Services
 
             public bool Exists { get; set; }
 
-            public string Status { get; set; } = "Pending";
+            public BatchInputStatus Status { get; set; }
 
             public string? Error { get; set; }
 
-            public string? MetadataError { get; set; }
+            public string? MetadataError { get; private set; }
 
-            public string? Sha256 { get; set; }
+            public string? Sha256 { get; private set; }
 
-            public long? LengthBytes { get; set; }
+            public long? LengthBytes { get; private set; }
 
-            public DateTime? LastWriteTimeUtc { get; set; }
+            public DateTime? LastWriteTimeUtc { get; private set; }
 
             public int? PixelWidth { get; set; }
 
@@ -568,6 +477,15 @@ namespace ImageViewer.Services
 
             public List<string> RowErrors { get; } = new();
 
+            public void SetFileTrace(ImageViewerImageDecoder.ImageFileTrace trace)
+            {
+                Exists = true;
+                Sha256 = trace.Sha256.ToLowerInvariant();
+                LengthBytes = trace.Length;
+                LastWriteTimeUtc = trace.LastWriteTimeUtc;
+                MetadataError = trace.MetadataError;
+            }
+
             public Dictionary<string, object?> ToMetadata()
             {
                 return new Dictionary<string, object?>
@@ -575,7 +493,7 @@ namespace ImageViewer.Services
                     ["inputIndex"] = InputIndex,
                     ["path"] = Path,
                     ["exists"] = Exists,
-                    ["status"] = Status,
+                    ["status"] = Status.ToString(),
                     ["sha256"] = Sha256,
                     ["lengthBytes"] = LengthBytes,
                     ["lastWriteTimeUtc"] = LastWriteTimeUtc,
@@ -602,7 +520,7 @@ namespace ImageViewer.Services
         IReadOnlyList<string> Errors)
     {
         /// <summary>
-        /// Number of inputs that were decoded successfully. This includes inputs whose ROI analysis was partially or entirely unsuccessful.
+        /// Number of completed inputs that decoded successfully, including inputs with some or all ROI analysis failures.
         /// </summary>
         public int DecodedFileCount { get; init; }
 
@@ -625,6 +543,9 @@ namespace ImageViewer.Services
         /// Number of inputs that could not be read or decoded.
         /// </summary>
         public int InputFailedFileCount { get; init; }
+
+        /// <summary>Number of inputs with no result because the batch was canceled before or during their processing.</summary>
+        public int UnfinishedFileCount { get; init; }
 
         /// <summary>用户在导出完成前取消了批次；已完成输入仍会保存到输出与摘要文件。</summary>
         public bool IsCanceled { get; init; }

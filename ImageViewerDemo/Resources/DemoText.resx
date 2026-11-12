@@ -13,12 +13,12 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="WindowTitle" xml:space="preserve"><value>ImageViewer Demo</value></data>
-  <data name="ToolbarHint" xml:space="preserve"><value>滚轮缩放；中键拖拽平移；左键选择或编辑 ROI；空白处右键打开菜单，ROI 上右键查看属性。</value></data>
+  <data name="WorkspaceTitle" xml:space="preserve"><value>图像测量工作台</value></data>
   <data name="OpenImageButton" xml:space="preserve"><value>打开图像文件</value></data>
   <data name="OpenVolumeButton" xml:space="preserve"><value>打开体数据</value></data>
   <data name="MeasurementSampleButton" xml:space="preserve"><value>测量示例</value></data>
   <data name="MeasurementSampleLoading" xml:space="preserve"><value>正在打开测量示例…</value></data>
-  <data name="MeasurementSampleGuide" xml:space="preserve"><value>测量练习：① 选中右上方 100 px 基准线，点“像素/物理尺寸校准”，输入 50 mm。② 选中圆内 80 px 检查线，确认长度为 40 mm。③ 右键检查线，打开“编辑属性…”，在“公差判定”中设标称值 40、上/下公差各 0.5。④ 导出分析 CSV，核对 MeasuredValue 为 40、SpecificationStatus 为 Passed。</value></data>
+  <data name="MeasurementSampleGuide" xml:space="preserve"><value>测量练习：① 选中 100 px 基准线，点“尺寸标定”，输入 50 mm。② 选中 80 px 检查线，确认长度为 40 mm。③ 在右侧属性的“公差判定”中设标称值 40、上/下公差各 0.5。④ 点“导出 CSV”，核对 MeasuredValue 为 40、SpecificationStatus 为 Passed。</value></data>
   <data name="CancelOpenButton" xml:space="preserve"><value>取消</value></data>
   <data name="ImageLoadingStatus" xml:space="preserve"><value>正在读取图像…</value></data>
   <data name="VolumeInspectingStatus" xml:space="preserve"><value>正在检查体数据切片和排序信息…</value></data>

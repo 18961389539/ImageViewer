@@ -149,10 +149,159 @@
             </Style>
         </ResourceDictionary>
     </UserControl.Resources>
-    <Grid x:Name="rootGrid" Background="{DynamicResource ViewerBackdropBrush}" ClipToBounds="True" SnapsToDevicePixels="True" AllowDrop="True">
+    <Grid x:Name="viewerLayout" Background="{DynamicResource ViewerBackdropBrush}" ClipToBounds="True">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.ColumnSpan="2" Background="{DynamicResource ViewerSurfaceBrush}"
+                BorderBrush="{DynamicResource ViewerPanelBorderBrush}" BorderThickness="0,0,0,1"
+                Padding="8,4">
+            <Border.Resources>
+                <Style x:Key="DockedToolbarButtonStyle" TargetType="Button" BasedOn="{StaticResource ViewerToolbarButtonStyle}">
+                    <Setter Property="Margin" Value="0,2,5,2" />
+                    <Setter Property="Padding" Value="8,5" />
+                    <Setter Property="MinHeight" Value="28" />
+                </Style>
+            </Border.Resources>
+            <DockPanel LastChildFill="True">
+                <WrapPanel DockPanel.Dock="Right" VerticalAlignment="Top">
+                    <Button x:Name="rightOverlayToggleButton" x:FieldModifier="internal"
+                            Content="{localization:UiText RoiSidebarButton}"
+                            Click="OnRightOverlayToggleClick"
+                            Style="{StaticResource DockedToolbarButtonStyle}" />
+                    <Button x:Name="moreCommandsButton" x:FieldModifier="internal"
+                            Content="{localization:UiText ToolbarMoreCommands}"
+                            Click="OnMoreCommandsClick"
+                            Style="{StaticResource DockedToolbarButtonStyle}" />
+                </WrapPanel>
+                <Button x:Name="toolbarCompactButton" x:FieldModifier="internal"
+                        HorizontalAlignment="Left"
+                        Content="{localization:UiText ToolbarRestoreButton}"
+                        Click="OnCompactToolbarClick"
+                        ToolTip="{localization:UiText ToolbarRestoreHint}"
+                        Style="{StaticResource DockedToolbarButtonStyle}"
+                        Visibility="Collapsed" />
+                <Border x:Name="toolbarPanel" x:FieldModifier="internal">
+                    <WrapPanel>
+                        <Button Content="{localization:UiText MenuOpenImageFile}"
+                            Click="OnToolbarFileCommandClick"
+                            Tag="{x:Static controls:ImageViewerFileMenuTags.OpenImage}"
+                            ToolTip="{localization:UiText ToolbarOpenImageTooltip}"
+                            automation:AutomationProperties.Name="{localization:UiText MenuOpenImageFile}"
+                            automation:AutomationProperties.HelpText="{localization:UiText ToolbarOpenImageTooltip}"
+                            Style="{StaticResource DockedToolbarButtonStyle}" />
+                        <Button Content="{localization:UiText MenuOpenProjectOrSession}"
+                            Click="OnToolbarFileCommandClick"
+                            Tag="{x:Static controls:ImageViewerFileMenuTags.LoadSession}"
+                            ToolTip="{localization:UiText MenuOpenProjectOrSession}"
+                            automation:AutomationProperties.Name="{localization:UiText MenuOpenProjectOrSession}"
+                            automation:AutomationProperties.HelpText="{localization:UiText MenuOpenProjectOrSession}"
+                            Style="{StaticResource DockedToolbarButtonStyle}" />
+                        <Button Content="{localization:UiText ToolbarSaveSession}"
+                            Click="OnToolbarFileCommandClick"
+                            Tag="{x:Static controls:ImageViewerFileMenuTags.SaveSession}"
+                            ToolTip="{localization:UiText MenuSaveSession}"
+                            automation:AutomationProperties.Name="{localization:UiText MenuSaveSession}"
+                            automation:AutomationProperties.HelpText="{localization:UiText MenuSaveSession}"
+                            IsEnabled="{Binding MenuState.File.SaveSessionEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            Style="{StaticResource DockedToolbarButtonStyle}" />
+                        <Button Content="{localization:UiText MenuFitToView}"
+                            Click="OnToolbarViewCommandClick"
+                            Tag="{x:Static controls:ImageViewerViewMenuTags.FitToView}"
+                            ToolTip="{localization:UiText ToolbarFitToViewTooltip}"
+                            automation:AutomationProperties.HelpText="{localization:UiText ToolbarFitToViewTooltip}"
+                            Style="{StaticResource DockedToolbarButtonStyle}" />
+                        <StackPanel x:Name="quickToolsPanel" Orientation="Horizontal" />
+                        <Button Content="{localization:UiText ToolbarCalibrate}"
+                            x:Name="toolbarCalibrateButton"
+                            ToolTipService.ShowOnDisabled="True"
+                            Click="OnRoiMenuCommandClick"
+                            Tag="{x:Static controls:ImageViewerRoiMenuTags.CalibratePixels}"
+                            automation:AutomationProperties.Name="{localization:UiText MenuCalibratePixels}"
+                            automation:AutomationProperties.HelpText="{Binding ToolTip, RelativeSource={RelativeSource Self}}"
+                            IsEnabled="{Binding MenuState.Context.CalibratePixelsEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource DockedToolbarButtonStyle}">
+                                    <Setter Property="ToolTip" Value="{localization:UiText ToolbarCalibratePixelsTooltip}" />
+                                    <Style.Triggers>
+                                        <Trigger Property="IsEnabled" Value="False">
+                                            <Setter Property="ToolTip" Value="{localization:UiText MenuNeedCalibrationLine}" />
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                        <Button Content="{localization:UiText ToolbarExportCsv}"
+                            Click="OnFeatureMenuCommandClick"
+                            Tag="{x:Static controls:ImageViewerFeatureMenuTags.ExportAnalysisCsv}"
+                            ToolTip="{localization:UiText MenuExportAnalysisCsv}"
+                            automation:AutomationProperties.Name="{localization:UiText MenuExportAnalysisCsv}"
+                            automation:AutomationProperties.HelpText="{localization:UiText MenuExportAnalysisCsv}"
+                            IsEnabled="{Binding MenuState.Context.ExportAnalysisCsvEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            Style="{StaticResource DockedToolbarButtonStyle}" />
+                        <TextBlock x:Name="toolbarZoomLevel"
+                               Margin="6,0,6,0"
+                               Foreground="{DynamicResource ViewerTextSecondaryBrush}"
+                               VerticalAlignment="Center"
+                               Text="{Binding Scale, RelativeSource={RelativeSource AncestorType=UserControl}, StringFormat={}{0:P0}}"
+                               automation:AutomationProperties.Name="{localization:UiText ZoomLevelDisplayAccessibleName}"
+                               ToolTip="{localization:UiText ToolbarZoomLevelTooltip}" />
+                        <Button x:Name="toolbarHideButton" x:FieldModifier="internal"
+                            Click="OnToolbarHideClick"
+                            Content="&#x2212;"
+                            ToolTip="{localization:UiText ToolbarHideHint}"
+                            automation:AutomationProperties.Name="{localization:UiText ToolbarHideButton}"
+                            Style="{StaticResource DockedToolbarButtonStyle}" />
+                    </WrapPanel>
+                </Border>
+            </DockPanel>
+        </Border>
+
+        <Border x:Name="recoveryBanner" Grid.Row="1" Grid.ColumnSpan="2"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Top"
+                Margin="8,3"
+                Padding="10,4"
+                Background="{DynamicResource ViewerSurfaceBrush}"
+                BorderBrush="{DynamicResource ViewerAccentBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="10"
+                Visibility="{Binding HasRecoverySnapshot, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <WrapPanel VerticalAlignment="Center">
+                <TextBlock VerticalAlignment="Center"
+                           Margin="0,0,10,0"
+                           Foreground="{DynamicResource ViewerTextPrimaryBrush}"
+                           Text="{localization:UiText RecoveryBannerText}"
+                           automation:AutomationProperties.LiveSetting="Polite" />
+                <Button Padding="10,4"
+                        Content="{localization:UiText RecoveryRestoreButton}"
+                        Click="OnRecoverAutoSaveClick"
+                        Background="{DynamicResource ViewerAccentSoftBrush}"
+                        BorderBrush="{DynamicResource ViewerAccentBorderBrush}"
+                        Foreground="{DynamicResource ViewerTextPrimaryBrush}" />
+                <Button Margin="6,0,0,0"
+                        Padding="8,4"
+                        Content="{localization:UiText RecoveryDismissButton}"
+                        Click="OnDismissRecoveryClick"
+                        Background="Transparent"
+                        BorderBrush="{DynamicResource ViewerPanelBorderBrush}"
+                        Foreground="{DynamicResource ViewerTextSecondaryBrush}" />
+            </WrapPanel>
+        </Border>
+
+    <Grid Grid.Row="2" x:Name="rootGrid" Background="{DynamicResource ViewerBackdropBrush}" ClipToBounds="True" SnapsToDevicePixels="True" AllowDrop="True">
         <Grid.ContextMenu>
-            <ContextMenu x:Name="mainContextMenu" x:FieldModifier="internal" Opened="OnContextMenuOpened">
+            <ContextMenu x:Name="mainContextMenu" x:FieldModifier="internal" Opened="OnContextMenuOpened" Closed="OnContextMenuClosed">
                 <ContextMenu.Resources>
+                    <controls:ImageViewerViewShortcutTextConverter x:Key="ViewShortcutText" />
                     <Style TargetType="ContextMenu">
                         <Setter Property="Background" Value="{DynamicResource ViewerMenuPopupBrush}" />
                         <Setter Property="Foreground" Value="{DynamicResource ViewerTextPrimaryBrush}" />
@@ -208,6 +357,7 @@
                         </Setter>
                     </Style>
                     <Style TargetType="MenuItem">
+                        <Setter Property="InputGestureText" Value="{Binding Tag, RelativeSource={RelativeSource Self}, Converter={StaticResource ViewShortcutText}}" />
                         <Setter Property="HorizontalContentAlignment" Value="Left" />
                         <Setter Property="VerticalContentAlignment" Value="Center" />
                         <Setter Property="Foreground" Value="{DynamicResource ViewerTextPrimaryBrush}" />
@@ -300,10 +450,10 @@
                 <MenuItem x:Name="undoMenuItem" x:FieldModifier="internal" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.Undo}" Header="{localization:UiText MenuUndo}" InputGestureText="Ctrl+Z" IsEnabled="{Binding MenuState.Context.UndoEnabled}" />
                 <MenuItem x:Name="redoMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.Redo}" Header="{localization:UiText MenuRedo}" InputGestureText="Ctrl+Y" IsEnabled="{Binding MenuState.Context.RedoEnabled}" />
                 <Separator />
-                <MenuItem x:Name="fitToViewMenuItem" x:FieldModifier="internal" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.FitToView}" Header="{localization:UiText MenuFitToView}" InputGestureText="Ctrl+F" IsEnabled="{Binding MenuState.View.FitToViewEnabled}" />
+                <MenuItem x:Name="fitToViewMenuItem" x:FieldModifier="internal" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.FitToView}" Header="{localization:UiText MenuFitToView}" IsEnabled="{Binding MenuState.View.FitToViewEnabled}" />
                 <MenuItem x:Name="fillToViewMenuItem" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.FillToView}" Header="{localization:UiText MenuFillToView}" IsEnabled="{Binding MenuState.View.FitToViewEnabled}" />
                 <MenuItem x:Name="actualSizeMenuItem" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ActualSize}" Header="{localization:UiText MenuActualSize}" IsEnabled="{Binding MenuState.View.ActualSizeEnabled}" />
-                <MenuItem x:Name="resetViewMenuItem" x:FieldModifier="internal" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ResetView}" Header="{localization:UiText MenuResetView}" InputGestureText="Ctrl+0" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
+                <MenuItem x:Name="resetViewMenuItem" x:FieldModifier="internal" Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ResetView}" Header="{localization:UiText MenuResetView}" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
                 <MenuItem x:Name="editPropertiesMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.EditProperties}" Header="{localization:UiText MenuEditProperties}" IsEnabled="{Binding MenuState.Context.EditPropertiesEnabled}" Visibility="{Binding MenuState.Context.EditPropertiesEnabled, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 <MenuItem x:Name="contextRoiShortcutsMenuItem" Header="{localization:UiText MenuSelectedObjectShortcuts}">
                     <MenuItem x:Name="setLabelMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.SetLabel}" Header="{localization:UiText MenuSetLabel}" IsEnabled="{Binding MenuState.Context.SetLabelEnabled}" Visibility="{Binding MenuState.Context.SetLabelEnabled, Converter={StaticResource BooleanToVisibilityConverter}}" />
@@ -360,7 +510,7 @@
                     <MenuItem x:Name="loadRoisMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.LoadRois}" Header="{localization:UiText MenuLoadRois}" />
                     <Separator />
                     <MenuItem Header="{localization:UiText MenuCalibration}">
-                        <MenuItem x:Name="calibratePixelsMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.CalibratePixels}" Header="{localization:UiText MenuCalibratePixels}" IsEnabled="{Binding MenuState.Context.CalibratePixelsEnabled}" Visibility="{Binding MenuState.Context.CalibratePixelsEnabled, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        <MenuItem x:Name="calibratePixelsMenuItem" Click="OnRoiMenuCommandClick" Tag="{x:Static controls:ImageViewerRoiMenuTags.CalibratePixels}" Header="{localization:UiText MenuCalibratePixels}" IsEnabled="{Binding MenuState.Context.CalibratePixelsEnabled}" />
                         <MenuItem x:Name="checkCalibrationReadinessMenuItem" Click="OnFeatureMenuCommandClick" Tag="{x:Static controls:ImageViewerFeatureMenuTags.CheckCalibrationReadiness}" Header="{localization:UiText MenuCheckCalibrationReadiness}" ToolTip="{localization:UiText ToolbarCalibrationCheckTooltip}" />
                     </MenuItem>
                     <Separator />
@@ -368,10 +518,13 @@
                     <MenuItem x:Name="autoSaveMenuItem" Click="OnFileMenuCommandClick" Tag="{x:Static controls:ImageViewerFileMenuTags.ToggleAutoSave}" Header="{localization:UiText MenuAutoSave}" IsCheckable="True" IsChecked="{Binding MenuState.File.AutoSaveChecked}" />
                 </MenuItem>
                 <MenuItem Header="{localization:UiText MenuViewControl}">
-                    <MenuItem Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.RotateLeft}" Header="{localization:UiText MenuRotateLeft}" InputGestureText="Ctrl+Shift+R" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
-                    <MenuItem Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.RotateRight}" Header="{localization:UiText MenuRotateRight}" InputGestureText="Ctrl+R" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
-                    <MenuItem Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.FlipHorizontal}" Header="{localization:UiText MenuFlipHorizontal}" InputGestureText="Ctrl+H" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
-                    <MenuItem Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.FlipVertical}" Header="{localization:UiText MenuFlipVertical}" InputGestureText="Ctrl+Shift+H" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
+                    <MenuItem Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ZoomIn}" Header="{localization:UiText MenuZoomIn}" IsEnabled="{Binding MenuState.View.FitToViewEnabled}" />
+                    <MenuItem Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.ZoomOut}" Header="{localization:UiText MenuZoomOut}" IsEnabled="{Binding MenuState.View.FitToViewEnabled}" />
+                    <Separator />
+                    <MenuItem Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.RotateLeft}" Header="{localization:UiText MenuRotateLeft}" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
+                    <MenuItem Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.RotateRight}" Header="{localization:UiText MenuRotateRight}" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
+                    <MenuItem Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.FlipHorizontal}" Header="{localization:UiText MenuFlipHorizontal}" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
+                    <MenuItem Click="OnViewCommandMenuClick" Tag="{x:Static controls:ImageViewerViewMenuTags.FlipVertical}" Header="{localization:UiText MenuFlipVertical}" IsEnabled="{Binding MenuState.View.ResetViewEnabled}" />
                 </MenuItem>
                 <MenuItem Header="{localization:UiText MenuImageDisplay}">
                     <MenuItem Header="{localization:UiText MenuImageAdjustment}">
@@ -444,9 +597,9 @@
             <Canvas x:Name="imageContainer" x:FieldModifier="internal" SnapsToDevicePixels="True">
                 <Canvas.RenderTransform>
                     <TransformGroup>
-                        <ScaleTransform x:Name="scaleTransform" />
                         <ScaleTransform x:Name="orientationScaleTransform" />
                         <RotateTransform x:Name="orientationRotateTransform" />
+                        <ScaleTransform x:Name="scaleTransform" />
                         <TranslateTransform x:Name="translateTransform" />
                     </TransformGroup>
                 </Canvas.RenderTransform>
@@ -571,285 +724,14 @@
             <TextBlock x:Name="scaleBarText" Text="{localization:UiText ScaleBarDefault}" Foreground="{DynamicResource ViewerTextPrimaryBrush}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" Canvas.Left="30" Canvas.Top="-5"/>
         </Canvas>
 
-        <!-- 常驻状态栏：图像尺寸与文件路径（底部居中常驻显示） -->
-        <Border x:Name="statusBarBorder" x:FieldModifier="internal"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Bottom"
-                Margin="10,0,10,10"
-                MaxWidth="620"
-                Padding="10,6"
-                Background="{DynamicResource ViewerSurfaceOverlayBrush}"
-                BorderBrush="{DynamicResource ViewerPopupBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="12"
-                IsHitTestVisible="False"
-                Panel.ZIndex="5">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock x:Name="statusBarTextBlock" x:FieldModifier="internal"
-                           Grid.Column="0"
-                           Foreground="{DynamicResource ViewerTextPrimaryBrush}"
-                           FontWeight="SemiBold"
-                           FontSize="12"
-                           TextTrimming="CharacterEllipsis"
-                           automation:AutomationProperties.LiveSetting="Polite" />
-                <Border Grid.Column="1"
-                        Margin="8,0,0,0"
-                        Padding="7,2"
-                        Background="{DynamicResource ViewerAccentSoftBrush}"
-                        BorderBrush="{DynamicResource ViewerAccentBorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="7"
-                        ToolTip="{Binding InteractionModeHint, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                        automation:AutomationProperties.LiveSetting="Polite">
-                    <TextBlock Text="{Binding InteractionModeText, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                               Foreground="{DynamicResource ViewerTextPrimaryBrush}"
-                               FontWeight="Bold"
-                               FontSize="11" />
-                </Border>
-                <TextBlock Grid.Column="2"
-                           Margin="8,0,0,0"
-                           Text="{localization:UiText StatusUnsavedMarker}"
-                           Foreground="{DynamicResource ViewerAccentBrush}"
-                           FontWeight="Bold"
-                           Visibility="{Binding IsDirty, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}"
-                           automation:AutomationProperties.Name="{localization:UiText StatusUnsavedAccessibleName}" />
-                <Border x:Name="calibrationBadge"
-                        x:FieldModifier="internal"
-                        Grid.Column="3"
-                        Margin="10,0,0,0"
-                        Padding="8,3"
-                        Background="{DynamicResource ViewerAccentSoftBrush}"
-                        BorderBrush="{DynamicResource ViewerAccentBorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="8"
-                        Visibility="Collapsed"
-                        automation:AutomationProperties.Name="{localization:UiText CalibrationBadgeAccessibleName}"
-                        automation:AutomationProperties.LiveSetting="Polite">
-                    <TextBlock x:Name="calibrationBadgeTextBlock"
-                               x:FieldModifier="internal"
-                               MaxWidth="300"
-                               Foreground="{DynamicResource ViewerTextPrimaryBrush}"
-                               FontWeight="Bold"
-                               FontSize="12"
-                               TextTrimming="CharacterEllipsis"
-                               automation:AutomationProperties.LiveSetting="Polite" />
-                </Border>
-            </Grid>
-        </Border>
-
-        <Border x:Name="recoveryBanner"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Top"
-                Margin="10"
-                Padding="10,7"
-                Background="{DynamicResource ViewerSurfaceBrush}"
-                BorderBrush="{DynamicResource ViewerAccentBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="10"
-                Panel.ZIndex="125"
-                Visibility="{Binding HasRecoverySnapshot, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <DockPanel LastChildFill="False">
-                <TextBlock VerticalAlignment="Center"
-                           Margin="0,0,10,0"
-                           Foreground="{DynamicResource ViewerTextPrimaryBrush}"
-                           Text="{localization:UiText RecoveryBannerText}"
-                           automation:AutomationProperties.LiveSetting="Polite" />
-                <Button Padding="10,4"
-                        Content="{localization:UiText RecoveryRestoreButton}"
-                        Click="OnRecoverAutoSaveClick"
-                        Background="{DynamicResource ViewerAccentSoftBrush}"
-                        BorderBrush="{DynamicResource ViewerAccentBorderBrush}"
-                        Foreground="{DynamicResource ViewerTextPrimaryBrush}" />
-                <Button Margin="6,0,0,0"
-                        Padding="8,4"
-                        Content="{localization:UiText RecoveryDismissButton}"
-                        Click="OnDismissRecoveryClick"
-                        Background="Transparent"
-                        BorderBrush="{DynamicResource ViewerPanelBorderBrush}"
-                        Foreground="{DynamicResource ViewerTextSecondaryBrush}" />
-            </DockPanel>
-        </Border>
-
-        <!-- 右侧信息区按垂直顺序排列，避免结果、ROI 列表和属性编辑器相互覆盖。 -->
-        <StackPanel x:Name="rightOverlayPanel"
-                    HorizontalAlignment="Right"
-                    VerticalAlignment="Top"
-                    Margin="10"
-                    Width="340"
-                    Panel.ZIndex="95">
-            <!-- 信息面板 -->
-            <Border x:Name="infoPanel"
-                    x:FieldModifier="internal"
-                    Margin="0,0,0,8"
-                    Padding="5"
-                    HorizontalAlignment="Right"
-                    Style="{StaticResource ViewerFloatingPanelStyle}"
-                    IsHitTestVisible="False"
-                    Visibility="Visible">
-                <TextBlock x:Name="infoTextBlock" Foreground="{DynamicResource ViewerTextPrimaryBrush}" TextWrapping="Wrap" MaxWidth="320" />
-            </Border>
-
-            <Border x:Name="roiListPanel"
-                    x:FieldModifier="internal"
-                    Margin="0,0,0,8"
-                    Padding="6"
-                    HorizontalAlignment="Right"
-                    Width="240"
-                    MaxHeight="320"
-                    Style="{StaticResource ViewerFloatingPanelStyle}"
-                    Visibility="Visible">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <DockPanel Grid.Row="0" LastChildFill="True" Margin="0,0,0,6">
-                        <TextBlock DockPanel.Dock="Left"
-                                   Text="{localization:UiText RoiListTitle}"
-                                   Foreground="{DynamicResource ViewerTextPrimaryBrush}"
-                                   FontWeight="Bold" />
-                        <TextBlock x:Name="roiListCountText"
-                                   Margin="8,0,0,0"
-                                   Foreground="{DynamicResource ViewerTextSecondaryBrush}"
-                                   Text="{Binding ViewerState.AllRois.Count, RelativeSource={RelativeSource AncestorType=UserControl}, StringFormat={}({0})}" />
-                    </DockPanel>
-                    <TextBox x:Name="roiFilterTextBox"
-                             Grid.Row="1"
-                             Margin="0,0,0,6"
-                             Padding="7,4"
-                             TextChanged="OnRoiFilterTextChanged"
-                             ToolTip="{localization:UiText RoiListFilterTooltip}"
-                             automation:AutomationProperties.Name="{localization:UiText RoiListFilterAccessibleName}" />
-                    <ListBox Grid.Row="2"
-                             x:Name="roiListBox" x:FieldModifier="internal"
-                             Background="Transparent"
-                             BorderThickness="0"
-                             Foreground="{DynamicResource ViewerTextPrimaryBrush}"
-                             automation:AutomationProperties.Name="{localization:UiText RoiListAccessibleName}"
-                             ItemsSource="{Binding ViewerState.AllRois, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                             SelectedItem="{Binding ViewerState.SelectedRoi, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Grid Margin="0,2">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                        <TextBlock Foreground="{DynamicResource ViewerTextPrimaryBrush}"
-                                                   Text="{Binding DisplayName}"
-                                                   TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Foreground="{DynamicResource ViewerTextSecondaryBrush}"
-                                                   FontSize="10"
-                                                   Text="{Binding DisplayTypeName}"
-                                                   TextTrimming="CharacterEllipsis" />
-                                    </StackPanel>
-                                    <CheckBox Grid.Column="1"
-                                              Margin="8,0,0,0"
-                                              VerticalAlignment="Center"
-                                              Foreground="{DynamicResource ViewerTextPrimaryBrush}"
-                                              IsChecked="{Binding IsVisible, Mode=TwoWay}"
-                                              ToolTip="{localization:UiText RoiListToggleVisibleTooltip}"
-                                              Content="{localization:UiText RoiListToggleVisible}" />
-                                    <CheckBox Grid.Column="2"
-                                              Margin="6,0,0,0"
-                                              VerticalAlignment="Center"
-                                              Foreground="{DynamicResource ViewerTextPrimaryBrush}"
-                                              IsChecked="{Binding IsLocked, Mode=TwoWay}"
-                                              ToolTip="{localization:UiText RoiListToggleLockedTooltip}"
-                                              Content="{localization:UiText RoiListToggleLocked}" />
-                                </Grid>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                    <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,6,0,0">
-                        <Button Padding="8,3"
-                                Margin="0,0,6,0"
-                                Content="{localization:UiText RoiListZoomButton}"
-                                Click="OnRoiListZoomClick"
-                                IsEnabled="{Binding MenuState.View.ZoomToSelectionEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                ToolTip="{localization:UiText RoiListZoomTooltip}" />
-                        <Button Padding="8,3"
-                                Content="{localization:UiText RoiListDeleteButton}"
-                                Click="OnRoiListDeleteClick"
-                                IsEnabled="{Binding MenuState.Context.DeleteSelectedEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                ToolTip="{localization:UiText RoiListDeleteTooltip}" />
-                    </StackPanel>
-                </Grid>
-            </Border>
-
-            <Border x:Name="roiPropertyPanel"
-                    Margin="0"
-                    Padding="6"
-                    HorizontalAlignment="Right"
-                    Width="320"
-                    MaxHeight="420"
-                    Style="{StaticResource ViewerFloatingPanelStyle}"
-                    Visibility="Collapsed">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-                    <Grid Grid.Row="0" Margin="0,0,0,6">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0"
-                                   Text="{localization:UiText PropertyPanelTitle}"
-                                   Foreground="{DynamicResource ViewerTextPrimaryBrush}"
-                                   FontWeight="Bold"
-                                   VerticalAlignment="Center" />
-                        <Button x:Name="circularCaliperSettingsButton"
-                                x:FieldModifier="internal"
-                                Grid.Column="1"
-                                Padding="8,3"
-                                Margin="8,0,0,0"
-                                Content="{localization:UiText QuickCircularCaliperSettings}"
-                                ToolTip="{localization:UiText QuickCircularCaliperSettingsTooltip}"
-                                Click="OnQuickCircularCaliperSettingsClick"
-                                Style="{StaticResource ViewerToolbarPrimaryButtonStyle}"
-                                Visibility="Collapsed"
-                                automation:AutomationProperties.Name="{localization:UiText QuickCircularCaliperSettings}" />
-                    </Grid>
-                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                        <ContentControl x:Name="roiPropertyEditorHost" />
-                    </ScrollViewer>
-                </Grid>
-            </Border>
-        </StackPanel>
-
-        <Button x:Name="rightOverlayToggleButton"
-                x:FieldModifier="internal"
+        <!-- Analysis overlays stay inside the image viewport. -->
+        <Border x:Name="histogramPanel"
+                Margin="10,0,10,40"
+                Padding="5"
                 HorizontalAlignment="Right"
-                VerticalAlignment="Top"
-                Margin="0,10,10,0"
-                Padding="7,4"
-                Panel.ZIndex="96"
-                Content="◀"
-                Click="OnRightOverlayToggleClick"
-                ToolTip="{localization:UiText FloatingPanelsToggleTooltip}"
-                automation:AutomationProperties.Name="{localization:UiText FloatingPanelsToggleAccessibleName}"
-                Style="{StaticResource ViewerToolbarPrimaryButtonStyle}" />
-
-        <!-- 直方图面板 -->
-        <Border x:Name="histogramPanel" 
-                Margin="10,0,10,40" 
-                Padding="5" 
-                HorizontalAlignment="Right" 
-                VerticalAlignment="Bottom" 
+                VerticalAlignment="Bottom"
                 Style="{StaticResource ViewerFloatingPanelStyle}"
-                Width="266" 
+                Width="266"
                 Height="160"
                 Visibility="Collapsed"
                 IsHitTestVisible="False">
@@ -860,13 +742,13 @@
         </Border>
 
         <!-- 灰度剖面图面板 -->
-        <Border x:Name="profilePanel" 
-                Margin="10,0,10,40" 
-                Padding="5" 
-                HorizontalAlignment="Left" 
-                VerticalAlignment="Bottom" 
+        <Border x:Name="profilePanel"
+                Margin="10,0,10,40"
+                Padding="5"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Bottom"
                 Style="{StaticResource ViewerFloatingPanelStyle}"
-                Width="266" 
+                Width="266"
                 Height="160"
                 Visibility="Collapsed"
                 IsHitTestVisible="False">
@@ -955,241 +837,12 @@
             </StackPanel>
         </Border>
 
-        <Border x:Name="toolbarPanel" x:FieldModifier="internal"
-                HorizontalAlignment="Left"
-                VerticalAlignment="Top"
-                Margin="16"
-                Width="460"
-                MaxHeight="540"
-                Panel.ZIndex="100"
-                Visibility="Collapsed"
-                Style="{StaticResource ViewerFloatingPanelStyle}">
-            <StackPanel Width="440">
-                <Grid Margin="0,0,0,2">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0"
-                               Text="{localization:UiText MenuPrimaryActions}"
-                               Style="{StaticResource ViewerSectionTitleStyle}"
-                               VerticalAlignment="Center" />
-                    <Button x:Name="toolbarHideButton"
-                            x:FieldModifier="internal"
-                            Grid.Column="1"
-                            Content="{localization:UiText ToolbarHideButton}"
-                            ToolTip="{localization:UiText ToolbarHideHint}"
-                            automation:AutomationProperties.Name="{localization:UiText ToolbarHideButton}"
-                            automation:AutomationProperties.HelpText="{localization:UiText ToolbarHideHint}"
-                            Click="OnToolbarHideClick"
-                            Margin="8,0,0,6"
-                            Padding="8,3"
-                            FontSize="11"
-                            Style="{StaticResource ViewerToolbarButtonStyle}" />
-                </Grid>
-                <WrapPanel MaxWidth="420">
-                    <Button Content="{localization:UiText MenuOpenImageFile}"
-                            Click="OnToolbarFileCommandClick"
-                            Tag="{x:Static controls:ImageViewerFileMenuTags.OpenImage}"
-                            ToolTip="{localization:UiText ToolbarOpenImageTooltip}"
-                            automation:AutomationProperties.Name="{localization:UiText MenuOpenImageFile}"
-                            automation:AutomationProperties.HelpText="{localization:UiText ToolbarOpenImageTooltip}"
-                            Style="{StaticResource ViewerToolbarPrimaryButtonStyle}" />
-                    <Button Content="{localization:UiText MenuOpenProjectOrSession}"
-                            Click="OnToolbarFileCommandClick"
-                            Tag="{x:Static controls:ImageViewerFileMenuTags.LoadSession}"
-                            ToolTip="{localization:UiText MenuOpenProjectOrSession}"
-                            automation:AutomationProperties.Name="{localization:UiText MenuOpenProjectOrSession}"
-                            automation:AutomationProperties.HelpText="{localization:UiText MenuOpenProjectOrSession}"
-                            Style="{StaticResource ViewerToolbarButtonStyle}" />
-                    <Button Content="{localization:UiText MenuSaveSession}"
-                            Click="OnToolbarFileCommandClick"
-                            Tag="{x:Static controls:ImageViewerFileMenuTags.SaveSession}"
-                            ToolTip="{localization:UiText MenuSaveSession}"
-                            automation:AutomationProperties.Name="{localization:UiText MenuSaveSession}"
-                            automation:AutomationProperties.HelpText="{localization:UiText MenuSaveSession}"
-                            IsEnabled="{Binding MenuState.File.SaveSessionEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                            Style="{StaticResource ViewerToolbarButtonStyle}" />
-                    <Button Content="{localization:UiText MenuUndo}"
-                            Click="OnRoiMenuCommandClick"
-                            Tag="{x:Static controls:ImageViewerRoiMenuTags.Undo}"
-                            ToolTip="Ctrl+Z"
-                            automation:AutomationProperties.Name="{localization:UiText MenuUndo}"
-                            automation:AutomationProperties.HelpText="Ctrl+Z"
-                            IsEnabled="{Binding MenuState.Context.UndoEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                            Style="{StaticResource ViewerToolbarButtonStyle}" />
-                    <Button Content="{localization:UiText MenuRedo}"
-                            Click="OnRoiMenuCommandClick"
-                            Tag="{x:Static controls:ImageViewerRoiMenuTags.Redo}"
-                            ToolTip="Ctrl+Y"
-                            automation:AutomationProperties.Name="{localization:UiText MenuRedo}"
-                            automation:AutomationProperties.HelpText="Ctrl+Y"
-                            IsEnabled="{Binding MenuState.Context.RedoEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                            Style="{StaticResource ViewerToolbarButtonStyle}" />
-                    <Button Content="{localization:UiText MenuExportCurrentViewPng}"
-                            Click="OnFeatureMenuCommandClick"
-                            Tag="{x:Static controls:ImageViewerFeatureMenuTags.ExportSnapshot}"
-                            ToolTip="{localization:UiText MenuExportCurrentViewPng}"
-                            automation:AutomationProperties.Name="{localization:UiText MenuExportCurrentViewPng}"
-                            automation:AutomationProperties.HelpText="{localization:UiText MenuExportCurrentViewPng}"
-                            IsEnabled="{Binding MenuState.Context.ExportSnapshotEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                            Style="{StaticResource ViewerToolbarButtonStyle}" />
-                </WrapPanel>
-
-                <TextBlock Text="{localization:UiText MenuAnalysisAndExport}" Style="{StaticResource ViewerSectionTitleStyle}" Margin="0,4,0,8" />
-                <WrapPanel MaxWidth="420">
-                    <Button Content="{localization:UiText AdvancedMeasurementDialogTitle}" Click="OnAdvancedMeasurementsClick"
-                            automation:AutomationProperties.Name="{localization:UiText AdvancedMeasurementDialogTitle}"
-                            ToolTip="{localization:UiText AdvancedMeasurementDialogDescription}"
-                            Style="{StaticResource ViewerToolbarButtonStyle}" />
-                    <Button Content="{localization:UiText MenuCalibratePixels}"
-                            Click="OnRoiMenuCommandClick"
-                            Tag="{x:Static controls:ImageViewerRoiMenuTags.CalibratePixels}"
-                            ToolTip="{localization:UiText ToolbarCalibratePixelsTooltip}"
-                            automation:AutomationProperties.Name="{localization:UiText MenuCalibratePixels}"
-                            automation:AutomationProperties.HelpText="{localization:UiText ToolbarCalibratePixelsTooltip}"
-                            IsEnabled="{Binding MenuState.Context.CalibratePixelsEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                            Style="{StaticResource ViewerToolbarButtonStyle}" />
-                    <Button Content="{localization:UiText MenuCheckCalibrationReadiness}"
-                            Click="OnFeatureMenuCommandClick"
-                            Tag="{x:Static controls:ImageViewerFeatureMenuTags.CheckCalibrationReadiness}"
-                            ToolTip="{localization:UiText ToolbarCalibrationCheckTooltip}"
-                            automation:AutomationProperties.Name="{localization:UiText DialogCalibrationCheckAccessibleName}"
-                            automation:AutomationProperties.HelpText="{localization:UiText ToolbarCalibrationCheckTooltip}"
-                            Style="{StaticResource ViewerToolbarButtonStyle}" />
-                    <Button Content="{localization:UiText MenuExportAnalysisCsv}"
-                            Click="OnFeatureMenuCommandClick"
-                            Tag="{x:Static controls:ImageViewerFeatureMenuTags.ExportAnalysisCsv}"
-                            ToolTip="{localization:UiText MenuExportAnalysisCsv}"
-                            automation:AutomationProperties.Name="{localization:UiText MenuExportAnalysisCsv}"
-                            automation:AutomationProperties.HelpText="{localization:UiText MenuExportAnalysisCsv}"
-                            IsEnabled="{Binding MenuState.Context.ExportAnalysisCsvEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                            Style="{StaticResource ViewerToolbarButtonStyle}" />
-                    <Button Content="{localization:UiText MenuExportBatchAnalysisCsv}"
-                            Click="OnFeatureMenuCommandClick"
-                            Tag="{x:Static controls:ImageViewerFeatureMenuTags.ExportBatchAnalysisCsv}"
-                            ToolTip="{localization:UiText MenuExportBatchAnalysisCsvTooltip}"
-                            automation:AutomationProperties.Name="{localization:UiText MenuExportBatchAnalysisCsv}"
-                            automation:AutomationProperties.HelpText="{localization:UiText MenuExportBatchAnalysisCsvTooltip}"
-                            IsEnabled="{Binding MenuState.Context.ExportAnalysisCsvEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                            Style="{StaticResource ViewerToolbarButtonStyle}" />
-                </WrapPanel>
-
-                <TextBlock Text="{localization:UiText MenuQuickTools}" Style="{StaticResource ViewerSectionTitleStyle}" Margin="0,4,0,8" />
-                <WrapPanel x:Name="quickToolsPanel" MaxWidth="420" />
-
-                <TextBlock Text="{localization:UiText MenuViewControl}" Style="{StaticResource ViewerSectionTitleStyle}" Margin="0,4,0,8" />
-                <WrapPanel>
-                    <Button Content="{localization:UiText MenuZoomOut}"
-                        Click="OnToolbarViewCommandClick"
-                        Tag="{x:Static controls:ImageViewerViewMenuTags.ZoomOut}"
-                        ToolTip="{localization:UiText ToolbarZoomOutTooltip}"
-                        automation:AutomationProperties.HelpText="{localization:UiText ToolbarZoomOutTooltip}"
-                        Style="{StaticResource ViewerToolbarButtonStyle}" />
-                    <Button Content="{localization:UiText MenuZoomIn}"
-                        Click="OnToolbarViewCommandClick"
-                        Tag="{x:Static controls:ImageViewerViewMenuTags.ZoomIn}"
-                        ToolTip="{localization:UiText ToolbarZoomInTooltip}"
-                        automation:AutomationProperties.HelpText="{localization:UiText ToolbarZoomInTooltip}"
-                        Style="{StaticResource ViewerToolbarButtonStyle}" />
-                    <Border Margin="0,0,8,8" Padding="10,7" Background="{DynamicResource ViewerSurfaceAltBrush}" BorderBrush="{DynamicResource ViewerChipBorderBrush}" BorderThickness="1" CornerRadius="10">
-                    <TextBlock Text="{Binding Scale, RelativeSource={RelativeSource AncestorType=UserControl}, StringFormat={}{0:P0}}"
-                           Foreground="{DynamicResource ViewerTextPrimaryBrush}"
-                           FontWeight="SemiBold"
-                           VerticalAlignment="Center"
-                           automation:AutomationProperties.Name="{localization:UiText ZoomLevelDisplayAccessibleName}"
-                           ToolTip="{localization:UiText ToolbarZoomLevelTooltip}" />
-                    </Border>
-                    <Button Content="{localization:UiText MenuFitToView}"
-                            Click="OnToolbarViewCommandClick"
-                            Tag="{x:Static controls:ImageViewerViewMenuTags.FitToView}"
-                            ToolTip="{localization:UiText ToolbarFitToViewTooltip}"
-                            automation:AutomationProperties.HelpText="{localization:UiText ToolbarFitToViewTooltip}"
-                            Style="{StaticResource ViewerToolbarButtonStyle}" />
-                    <Button Content="{localization:UiText MenuFillToView}"
-                            Click="OnToolbarViewCommandClick"
-                            Tag="{x:Static controls:ImageViewerViewMenuTags.FillToView}"
-                            ToolTip="{localization:UiText ToolbarFillToViewTooltip}"
-                            automation:AutomationProperties.HelpText="{localization:UiText ToolbarFillToViewTooltip}"
-                            Style="{StaticResource ViewerToolbarButtonStyle}" />
-                    <Button Content="{localization:UiText MenuActualSize}"
-                            Click="OnToolbarViewCommandClick"
-                            Tag="{x:Static controls:ImageViewerViewMenuTags.ActualSize}"
-                            ToolTip="{localization:UiText ToolbarActualSizeTooltip}"
-                            automation:AutomationProperties.HelpText="{localization:UiText ToolbarActualSizeTooltip}"
-                            Style="{StaticResource ViewerToolbarButtonStyle}" />
-                    <Button Content="{localization:UiText MenuResetView}"
-                            Click="OnToolbarViewCommandClick"
-                            Tag="{x:Static controls:ImageViewerViewMenuTags.ResetView}"
-                            ToolTip="{localization:UiText ToolbarResetViewTooltip}"
-                            automation:AutomationProperties.HelpText="{localization:UiText ToolbarResetViewTooltip}"
-                            Style="{StaticResource ViewerToolbarButtonStyle}" />
-                </WrapPanel>
-
-                <TextBlock Text="{localization:UiText MenuDisplaySettings}" Style="{StaticResource ViewerSectionTitleStyle}" Margin="0,4,0,8" />
-                <WrapPanel>
-                    <ToggleButton Content="{localization:UiText MenuShowInfoPanel}"
-                                  IsChecked="{Binding ShowInfoPanel, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
-                                  Checked="OnToolbarPanelToggleChanged"
-                                  Unchecked="OnToolbarPanelToggleChanged"
-                                  ToolTip="{localization:UiText ToolbarToggleInfoPanelTooltip}"
-                                  automation:AutomationProperties.HelpText="{localization:UiText ToolbarToggleInfoPanelTooltip}"
-                                  Style="{StaticResource ViewerToolbarToggleButtonStyle}" />
-                    <ToggleButton Content="{localization:UiText MenuShowHistogram}"
-                                  IsChecked="{Binding ShowHistogram, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
-                                  Checked="OnToolbarPanelToggleChanged"
-                                  Unchecked="OnToolbarPanelToggleChanged"
-                                  ToolTip="{localization:UiText ToolbarToggleHistogramTooltip}"
-                                  automation:AutomationProperties.HelpText="{localization:UiText ToolbarToggleHistogramTooltip}"
-                                  Style="{StaticResource ViewerToolbarToggleButtonStyle}" />
-                    <ToggleButton Content="{localization:UiText MenuShowProfile}"
-                                  IsChecked="{Binding ShowProfile, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
-                                  Checked="OnToolbarPanelToggleChanged"
-                                  Unchecked="OnToolbarPanelToggleChanged"
-                                  ToolTip="{localization:UiText ToolbarToggleProfileTooltip}"
-                                  automation:AutomationProperties.HelpText="{localization:UiText ToolbarToggleProfileTooltip}"
-                                  Style="{StaticResource ViewerToolbarToggleButtonStyle}" />
-                    <ToggleButton Content="{localization:UiText MenuShowScaleBar}"
-                                  IsChecked="{Binding ShowScaleBar, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
-                                  Checked="OnToolbarPanelToggleChanged"
-                                  Unchecked="OnToolbarPanelToggleChanged"
-                                  ToolTip="{localization:UiText ToolbarToggleScaleBarTooltip}"
-                                  automation:AutomationProperties.HelpText="{localization:UiText ToolbarToggleScaleBarTooltip}"
-                                  Style="{StaticResource ViewerToolbarToggleButtonStyle}" />
-                    <ToggleButton Content="{localization:UiText MenuShowRoiList}"
-                                  IsChecked="{Binding ShowRoiList, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
-                                  Checked="OnToolbarPanelToggleChanged"
-                                  Unchecked="OnToolbarPanelToggleChanged"
-                                  ToolTip="{localization:UiText ToolbarToggleRoiListTooltip}"
-                                  automation:AutomationProperties.HelpText="{localization:UiText ToolbarToggleRoiListTooltip}"
-                                  Style="{StaticResource ViewerToolbarToggleButtonStyle}" />
-                </WrapPanel>
-            </StackPanel>
-        </Border>
-
-        <Button x:Name="toolbarCompactButton"
-                x:FieldModifier="internal"
-                HorizontalAlignment="Left"
-                VerticalAlignment="Top"
-                Margin="16"
-                MinWidth="40"
-                Height="40"
-                Padding="10,0"
-                Panel.ZIndex="101"
-                Content="{localization:UiText ToolbarRestoreButton}"
-                ToolTip="{localization:UiText ToolbarRestoreHint}"
-                automation:AutomationProperties.Name="{localization:UiText MenuShowToolbar}"
-                automation:AutomationProperties.HelpText="{localization:UiText ToolbarRestoreHint}"
-                Click="OnCompactToolbarClick"
-                Style="{StaticResource ViewerToolbarPrimaryButtonStyle}"
-                Visibility="Collapsed" />
-
         <!-- 当前工具状态（绘制期间持续显示，直到完成或取消） -->
         <Border x:Name="activeToolBanner" x:FieldModifier="internal"
                 MaxWidth="680"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Bottom"
-                Margin="16,0,16,54"
+                Margin="16,0,16,12"
                 Padding="12,8"
                 Background="{DynamicResource ViewerAccentSoftBrush}"
                 BorderBrush="{DynamicResource ViewerAccentBorderBrush}"
@@ -1392,5 +1045,274 @@
                            FontWeight="SemiBold" />
             </StackPanel>
         </Border>
+    </Grid>
+
+        <Grid x:Name="rightOverlayPanel" Grid.Row="2" Grid.Column="1"
+              Width="300" Background="{DynamicResource ViewerSurfaceBrush}"
+              ClipToBounds="True">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition>
+                    <RowDefinition.Style>
+                        <Style TargetType="RowDefinition">
+                            <Setter Property="Height" Value="2*" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Visibility, ElementName=roiListPanel}" Value="Collapsed">
+                                    <Setter Property="Height" Value="0" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </RowDefinition.Style>
+                </RowDefinition>
+                <RowDefinition>
+                    <RowDefinition.Style>
+                        <Style TargetType="RowDefinition">
+                            <Setter Property="Height" Value="3*" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Visibility, ElementName=roiPropertyPanel}" Value="Collapsed">
+                                    <Setter Property="Height" Value="0" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </RowDefinition.Style>
+                </RowDefinition>
+            </Grid.RowDefinitions>
+            <Border x:Name="infoPanel"
+                    x:FieldModifier="internal"
+                    BorderBrush="{DynamicResource ViewerPanelBorderBrush}"
+                    BorderThickness="1,0,0,0"
+                    Visibility="Visible">
+                <ScrollViewer MaxHeight="90" VerticalScrollBarVisibility="Auto">
+                    <ScrollViewer.Style>
+                        <Style TargetType="ScrollViewer">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Text, ElementName=infoTextBlock}" Value="">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ScrollViewer.Style>
+                    <TextBlock x:Name="infoTextBlock" Margin="10,8" Foreground="{DynamicResource ViewerTextPrimaryBrush}" TextWrapping="Wrap" />
+                </ScrollViewer>
+            </Border>
+
+            <Border x:Name="roiListPanel"
+                    x:FieldModifier="internal"
+                    Grid.Row="1"
+                    Padding="10,8"
+                    BorderBrush="{DynamicResource ViewerPanelBorderBrush}"
+                    BorderThickness="1,0,0,0"
+                    Visibility="Visible">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <DockPanel Grid.Row="0" LastChildFill="True" Margin="0,0,0,6">
+                        <TextBlock DockPanel.Dock="Left"
+                                   Text="{localization:UiText RoiListTitle}"
+                                   Foreground="{DynamicResource ViewerTextPrimaryBrush}"
+                                   FontWeight="Bold" />
+                        <TextBlock x:Name="roiListCountText"
+                                   Margin="8,0,0,0"
+                                   Foreground="{DynamicResource ViewerTextSecondaryBrush}"
+                                   Text="{Binding ViewerState.AllRois.Count, RelativeSource={RelativeSource AncestorType=UserControl}, StringFormat={}({0})}" />
+                    </DockPanel>
+                    <Grid Grid.Row="1" Margin="0,0,0,6">
+                        <TextBox x:Name="roiFilterTextBox"
+                                 Padding="7,4"
+                                 Background="{DynamicResource ViewerSurfaceAltBrush}"
+                                 Foreground="{DynamicResource ViewerTextPrimaryBrush}"
+                                 BorderBrush="{DynamicResource ViewerChipBorderBrush}"
+                                 TextChanged="OnRoiFilterTextChanged"
+                                 ToolTip="{localization:UiText RoiListFilterTooltip}"
+                                 automation:AutomationProperties.Name="{localization:UiText RoiListFilterAccessibleName}" />
+                        <TextBlock Margin="8,0" VerticalAlignment="Center" IsHitTestVisible="False"
+                                   Foreground="{DynamicResource ViewerTextSecondaryBrush}"
+                                   Text="{localization:UiText RoiListFilterAccessibleName}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Text, ElementName=roiFilterTextBox}" Value="">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+                    <ListBox Grid.Row="2"
+                             x:Name="roiListBox" x:FieldModifier="internal"
+                             HorizontalContentAlignment="Stretch"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             Foreground="{DynamicResource ViewerTextPrimaryBrush}"
+                             automation:AutomationProperties.Name="{localization:UiText RoiListAccessibleName}"
+                             ItemsSource="{Binding ViewerState.AllRois, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                             SelectedItem="{Binding ViewerState.SelectedRoi, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <TextBlock Foreground="{DynamicResource ViewerTextPrimaryBrush}"
+                                                   Text="{Binding DisplayName}" ToolTip="{Binding DisplayName}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Foreground="{DynamicResource ViewerTextSecondaryBrush}"
+                                                   FontSize="10"
+                                                   Text="{Binding DisplayTypeName}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                    <CheckBox Grid.Column="1"
+                                              Margin="8,0,0,0"
+                                              VerticalAlignment="Center"
+                                              Foreground="{DynamicResource ViewerTextPrimaryBrush}"
+                                              IsChecked="{Binding IsVisible, Mode=TwoWay}"
+                                              ToolTip="{localization:UiText RoiListToggleVisibleTooltip}"
+                                              Content="{localization:UiText RoiListToggleVisible}" />
+                                    <CheckBox Grid.Column="2"
+                                              Margin="6,0,0,0"
+                                              VerticalAlignment="Center"
+                                              Foreground="{DynamicResource ViewerTextPrimaryBrush}"
+                                              IsChecked="{Binding IsLocked, Mode=TwoWay}"
+                                              ToolTip="{localization:UiText RoiListToggleLockedTooltip}"
+                                              Content="{localization:UiText RoiListToggleLocked}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,6,0,0">
+                        <Button Padding="8,3"
+                                Margin="0,0,6,0"
+                                Content="{localization:UiText RoiListZoomButton}"
+                                Click="OnRoiListZoomClick"
+                                IsEnabled="{Binding MenuState.View.ZoomToSelectionEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                Style="{StaticResource ViewerToolbarButtonStyle}"
+                                ToolTip="{localization:UiText RoiListZoomTooltip}" />
+                        <Button Padding="8,3"
+                                Content="{localization:UiText RoiListDeleteButton}"
+                                Click="OnRoiListDeleteClick"
+                                IsEnabled="{Binding MenuState.Context.DeleteSelectedEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                Style="{StaticResource ViewerToolbarButtonStyle}"
+                                ToolTip="{localization:UiText RoiListDeleteTooltip}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Border x:Name="roiPropertyPanel"
+                    Grid.Row="2"
+                    Padding="10,8"
+                    BorderBrush="{DynamicResource ViewerPanelBorderBrush}"
+                    BorderThickness="1,1,0,0"
+                    Visibility="Collapsed">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid Grid.Row="0" Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="{localization:UiText PropertyPanelTitle}"
+                                   Foreground="{DynamicResource ViewerTextPrimaryBrush}"
+                                   FontWeight="Bold"
+                                   VerticalAlignment="Center" />
+                        <Button x:Name="circularCaliperSettingsButton"
+                                x:FieldModifier="internal"
+                                Grid.Column="1"
+                                Padding="8,3"
+                                Margin="8,0,0,0"
+                                Content="{localization:UiText QuickCircularCaliperSettings}"
+                                ToolTip="{localization:UiText QuickCircularCaliperSettingsTooltip}"
+                                Click="OnQuickCircularCaliperSettingsClick"
+                                Style="{StaticResource ViewerToolbarPrimaryButtonStyle}"
+                                Visibility="Collapsed"
+                                automation:AutomationProperties.Name="{localization:UiText QuickCircularCaliperSettings}" />
+                    </Grid>
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ContentControl x:Name="roiPropertyEditorHost" />
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <Border x:Name="statusBarBorder" x:FieldModifier="internal"
+                Grid.Row="3" Grid.ColumnSpan="2"
+                Padding="10,4"
+                Background="{DynamicResource ViewerSurfaceBrush}"
+                BorderBrush="{DynamicResource ViewerPanelBorderBrush}"
+                BorderThickness="0,1,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="statusBarTextBlock" x:FieldModifier="internal"
+                           Grid.Column="0"
+                           Foreground="{DynamicResource ViewerTextPrimaryBrush}"
+                           VerticalAlignment="Center"
+                           FontWeight="SemiBold"
+                           FontSize="12"
+                           TextTrimming="CharacterEllipsis"
+                           automation:AutomationProperties.LiveSetting="Polite" />
+                <Border Grid.Column="1"
+                        Margin="8,0,0,0"
+                        Padding="7,2"
+                        Background="{DynamicResource ViewerAccentSoftBrush}"
+                        BorderBrush="{DynamicResource ViewerAccentBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="7"
+                        ToolTip="{Binding InteractionModeHint, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                        automation:AutomationProperties.LiveSetting="Polite">
+                    <TextBlock Text="{Binding InteractionModeText, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                               Foreground="{DynamicResource ViewerTextPrimaryBrush}"
+                               FontWeight="Bold"
+                               FontSize="11" />
+                </Border>
+                <TextBlock Grid.Column="2"
+                           VerticalAlignment="Center"
+                           Margin="8,0,0,0"
+                           Text="{localization:UiText StatusUnsavedMarker}"
+                           Foreground="{DynamicResource ViewerAccentBrush}"
+                           FontWeight="Bold"
+                           Visibility="{Binding IsDirty, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}"
+                           automation:AutomationProperties.Name="{localization:UiText StatusUnsavedAccessibleName}" />
+                <Border x:Name="calibrationBadge"
+                        x:FieldModifier="internal"
+                        Grid.Column="3"
+                        Margin="10,0,0,0"
+                        Padding="8,3"
+                        Background="{DynamicResource ViewerAccentSoftBrush}"
+                        BorderBrush="{DynamicResource ViewerAccentBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Visibility="Collapsed"
+                        automation:AutomationProperties.Name="{localization:UiText CalibrationBadgeAccessibleName}"
+                        automation:AutomationProperties.LiveSetting="Polite">
+                    <TextBlock x:Name="calibrationBadgeTextBlock"
+                               x:FieldModifier="internal"
+                               MaxWidth="300"
+                               Foreground="{DynamicResource ViewerTextPrimaryBrush}"
+                               FontWeight="Bold"
+                               FontSize="12"
+                               TextTrimming="CharacterEllipsis"
+                               automation:AutomationProperties.LiveSetting="Polite" />
+                </Border>
+            </Grid>
+        </Border>
+
     </Grid>
 </UserControl>

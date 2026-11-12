@@ -69,19 +69,29 @@ namespace ImageViewerControl.Tests
             });
         }
 
-        [Fact]
-        public void ViewShortcut_CtrlF_MapsToFitToView()
+        [Theory]
+        [InlineData(Key.F, false, (int)ImageViewerViewCommand.FitToView)]
+        [InlineData(Key.F, true, (int)ImageViewerViewCommand.FitToView)]
+        [InlineData(Key.R, false, (int)ImageViewerViewCommand.RotateRight)]
+        [InlineData(Key.R, true, (int)ImageViewerViewCommand.RotateLeft)]
+        [InlineData(Key.H, false, (int)ImageViewerViewCommand.FlipHorizontal)]
+        [InlineData(Key.H, true, (int)ImageViewerViewCommand.FlipVertical)]
+        [InlineData(Key.Add, false, (int)ImageViewerViewCommand.ZoomIn)]
+        [InlineData(Key.OemPlus, true, (int)ImageViewerViewCommand.ZoomIn)]
+        [InlineData(Key.Subtract, false, (int)ImageViewerViewCommand.ZoomOut)]
+        [InlineData(Key.OemMinus, false, (int)ImageViewerViewCommand.ZoomOut)]
+        public void ViewShortcut_ResolvesShiftVariantsAndKeyAliases(Key key, bool shiftPressed, int expectedCommand)
         {
-            bool handled = InteractionController.TryGetViewShortcut(Key.F, isShiftPressed: false, out ImageViewerViewCommand command);
+            bool handled = ImageViewerViewShortcuts.TryGetCommand(key, shiftPressed, out ImageViewerViewCommand command);
 
             Assert.True(handled);
-            Assert.Equal(ImageViewerViewCommand.FitToView, command);
+            Assert.Equal((ImageViewerViewCommand)expectedCommand, command);
         }
 
         [Fact]
         public void ViewShortcut_UnmappedKey_ReturnsFalse()
         {
-            bool handled = InteractionController.TryGetViewShortcut(Key.A, isShiftPressed: false, out ImageViewerViewCommand command);
+            bool handled = ImageViewerViewShortcuts.TryGetCommand(Key.A, shiftPressed: false, out _);
 
             Assert.False(handled);
         }

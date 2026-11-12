@@ -10,17 +10,12 @@ namespace ImageViewerControl.Tests
     public class ImageViewerCommandHostAdapterTests
     {
         [Fact]
-        public void ViewCommandHostAdapter_ToggleInfoPanel_UpdatesViewerProperty()
+        public void ViewCommandController_ToggleInfoPanel_UpdatesViewerProperty()
         {
             WpfTestRunner.Run(() =>
             {
                 using var viewer = new ImageViewer.Controls.ImageViewer();
-                ImageViewerControlComposition composition = GetComposition(viewer);
-                var controller = new ImageViewerViewCommandController(
-                    new ImageViewerViewCommandHostAdapter(
-                        new ImageViewerViewOptionsAdapter(viewer),
-                        new ImageViewerViewportOperationsAdapter(viewer, composition.ViewportController),
-                        new ImageViewerImageTransformOperationsAdapter(viewer)));
+                ImageViewerViewCommandController controller = GetComposition(viewer).ViewCommandController;
                 bool initial = viewer.ShowInfoPanel;
 
                 controller.Execute(ImageViewerViewCommand.ToggleInfoPanel);
@@ -114,7 +109,7 @@ namespace ImageViewerControl.Tests
                 ImageViewerControlComposition composition = GetComposition(viewer);
                 var controller = new ImageViewerFileMenuCommandController(
                     new ImageViewerFileMenuCommandHostAdapter(
-                        new ImageViewerFileDialogCapability(composition.DialogWorkflowService),
+                        new ImageViewerFileDialogCapability(composition.DialogWorkflowService.OpenImageAsync),
                         new ImageViewerFileOperationsCapability(composition.SessionController, composition.RoiPersistenceController),
                         new NoOpContextMenuCapability()));
                 bool initial = composition.SessionController.IsAutoSaveEnabled;

@@ -143,11 +143,8 @@ namespace ImageViewer.Controls
         public IReadOnlyList<RoiPersistenceData> UnresolvedRois { get; set; } = [];
 
         /// <summary>
-        /// 采集当前需要落盘的一整份状态。
-        /// Chinese: 供保存会话 / 导出项目包复用。ROI→DTO 的转换必须在这里（UI 线程）一次完成，
-        /// 之后序列化可以在后台线程跑而不与编辑器竞争：快照不再引用活 ROI 集合。
-        /// English: Captures the full state to persist. The ROI-to-DTO conversion happens here, on the UI thread,
-        /// so the serialization step can run off-thread without racing the editor.
+        /// Captures the document on the UI thread for session saves, package exports, and recovery snapshots.
+        /// Converting ROIs to DTOs here lets the writer run off-thread without reading live editor state.
         /// </summary>
         public ImageViewerPersistenceSnapshot CaptureSnapshot()
         {
@@ -183,74 +180,9 @@ namespace ImageViewer.Controls
 
         public required Func<bool> HasContent { get; init; }
 
-        public required Func<ImageViewerViewportState> GetCurrentViewportState { get; init; }
-
-        public required Func<string?> TryGetCurrentImagePath { get; init; }
-
-        public Func<BitmapSource?> GetCurrentBitmap { get; init; } = static () => null;
-
-        public required Func<IReadOnlyList<RoiBase>> GetAllRois { get; init; }
-
-        public required Func<double> GetPixelSize { get; init; }
-
-        public required Func<string> GetPhysicalUnit { get; init; }
-
-        public required Func<CameraCalibration?> GetCalibration { get; init; }
-
-        public Func<DisplayAdjustment> GetDisplay { get; init; } = static () => DisplayAdjustment.Identity;
-
-        public Func<WorkpieceCoordinateSystem?> GetWorkpieceCoordinateSystem { get; init; } = static () => null;
-
-        public Func<IReadOnlyList<RecipeDatumPoint>> GetRecipeDatumPoints { get; init; } = static () => [];
-
-        public Func<IReadOnlyList<RecipeDatumPoint>> GetCurrentRecipeDatumPoints { get; init; } = static () => [];
-
-        public Func<ImageAnalysisQualityProfile> GetQualityProfile { get; init; } = static () => ImageAnalysisQualityProfile.Default;
-
-        public required IImageViewerSessionService SessionService { get; init; }
-
-        public required Func<RoiPluginRegistry> GetPluginRegistry { get; init; }
-
         public required Action<string, Exception> LogNonCriticalError { get; init; }
 
         public required Action<string, StatusHintKind> ShowStatusHint { get; init; }
-
-        /// <summary>
-        /// 加载时未能识别的 ROI 载荷（与手动保存共用同一份来源）。
-        /// </summary>
-        public IReadOnlyList<RoiPersistenceData> UnresolvedRois { get; set; } = [];
-
-        /// <summary>
-        /// 采集当前需要落盘的一整份状态。
-        /// Chinese: 自动保存与手动保存共用同一份载荷契约；同样在 UI 线程上完成 ROI→DTO 转换。
-        /// English: Auto save and manual save share the same payload contract; the ROI-to-DTO conversion also happens here.
-        /// </summary>
-        public ImageViewerPersistenceSnapshot CaptureSnapshot()
-        {
-            ImageViewerViewportState viewportState = GetCurrentViewportState();
-            var image = ImageViewerSnapshotImage.Capture(TryGetCurrentImagePath(), GetCurrentBitmap);
-            return new ImageViewerPersistenceSnapshot(
-                image.Path,
-                RoiPersistenceService.CreateDocument(
-                    GetAllRois(),
-                    GetPixelSize(),
-                    GetPhysicalUnit(),
-                    GetPluginRegistry(),
-                    UnresolvedRois,
-                    GetQualityProfile()),
-                viewportState.Scale,
-                viewportState.TranslateX,
-                viewportState.TranslateY,
-                GetCalibration()?.Clone())
-            {
-                Display = GetDisplay(),
-                CoordinateSystem = GetWorkpieceCoordinateSystem(),
-                ReferenceDatumPoints = ImageViewerSessionService.CloneDatumPoints(GetRecipeDatumPoints()),
-                CurrentDatumPoints = ImageViewerSessionService.CloneDatumPoints(GetCurrentRecipeDatumPoints()),
-                InMemoryImage = image.Bitmap,
-                ImageSha256 = image.Sha256
-            };
-        }
     }
 
     internal sealed class ImageViewerSessionController : IDisposable
@@ -305,7 +237,11 @@ namespace ImageViewer.Controls
             _autoSaveDirectory = sessionStoragePolicy.AutoSaveDirectory;
             _recoveryIndex = new ImageViewerRecoveryIndex(_autoSaveDirectory);
             _recentProjectCatalog = new ImageViewerRecentProjectCatalog(_persistence.RecentProjectService, sessionStoragePolicy.RecentProjectsFilePath);
-            _autoSaveController = new ImageViewerAutoSaveController(dependencies.AutoSave, periodicTaskSchedulerFactory, sessionStoragePolicy, documentId, _recoveryIndex);
+            _autoSaveController = new ImageViewerAutoSaveController(
+                _autoSave,
+                _persistence.CaptureSnapshot,
+                (path, snapshot, token) => _persistence.SessionService.SaveRecoveryToFileAsync(path, snapshot, _persistence.GetPluginRegistry(), token),
+                periodicTaskSchedulerFactory, sessionStoragePolicy, documentId, _recoveryIndex);
             _sessionInstanceId = _autoSaveController.SessionInstanceId;
             _liveHeartbeatWindow = ComputeLiveHeartbeatWindow(sessionStoragePolicy.AutoSaveInterval);
             RefreshRecoverySnapshot();
@@ -361,6 +297,11 @@ namespace ImageViewer.Controls
 
         internal async Task SaveSessionAsync(Func<string?> choosePath)
         {
+            if (ShowInvalidToleranceDraft())
+            {
+                return;
+            }
+
             try
             {
                 string? filePath = choosePath();
@@ -447,7 +388,7 @@ namespace ImageViewer.Controls
         internal Task<Action?> PrepareImageDocumentAsync(Action applyImage, bool markDirty, CancellationToken cancellationToken) =>
             PrepareImageDocumentAsync(_ => Task.FromResult<Action?>(applyImage), markDirty, cancellationToken);
 
-        private async Task<Action?> PrepareImageDocumentAsync(
+        internal async Task<Action?> PrepareImageDocumentAsync(
             Func<CancellationToken, Task<Action?>> prepareContent, bool markDirty, CancellationToken cancellationToken)
         {
             if (!await ConfirmSessionReplacementAsync(cancellationToken))
@@ -510,6 +451,11 @@ namespace ImageViewer.Controls
 
         public async Task ExportProjectPackageAsync()
         {
+            if (ShowInvalidToleranceDraft())
+            {
+                return;
+            }
+
             string? filePath = _persistence.ShowSaveProjectPackageDialog();
             if (string.IsNullOrWhiteSpace(filePath))
             {
@@ -558,6 +504,11 @@ namespace ImageViewer.Controls
         /// </summary>
         public async Task SaveRecipeAsync()
         {
+            if (ShowInvalidToleranceDraft())
+            {
+                return;
+            }
+
             string? filePath = _persistence.ShowSaveRecipeDialog();
             if (string.IsNullOrWhiteSpace(filePath))
             {
@@ -598,6 +549,17 @@ namespace ImageViewer.Controls
                     UiText.Get("ErrorSaveRecipeMessage"),
                     ex);
             }
+        }
+
+        private bool ShowInvalidToleranceDraft()
+        {
+            if (!RoiToleranceDrafts.TryGetError(_persistence.GetAllRois(), out string? message))
+            {
+                return false;
+            }
+
+            _persistence.ShowStatusHint(message, StatusHintKind.Error);
+            return true;
         }
 
         public void CaptureRecipeDatumPoint(int index, bool currentImage)
@@ -1366,13 +1328,11 @@ namespace ImageViewer.Controls
             var merged = new List<RoiPersistenceData>(_persistence.UnresolvedRois);
             merged.AddRange(payloads);
             _persistence.UnresolvedRois = merged;
-            _autoSave.UnresolvedRois = merged;
         }
 
         private void ReportUnresolvedRois(IReadOnlyList<RoiPersistenceData> unresolvedRois)
         {
             _persistence.UnresolvedRois = unresolvedRois;
-            _autoSave.UnresolvedRois = unresolvedRois;
             if (unresolvedRois.Count == 0)
             {
                 return;

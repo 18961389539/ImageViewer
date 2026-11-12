@@ -32,6 +32,8 @@ namespace ImageViewer.Controls
 
         public required Func<ImageSource, CancellationToken, Task<Action?>> PrepareReplacementAsync { get; init; }
 
+        public Func<IDisposable?>? SuspendReplacementWrites { get; init; }
+
         public required Action<bool, string, double, bool> SetImageLoadState { get; init; }
 
         public required Action<string, string, Exception> ShowNonCriticalError { get; init; }
@@ -51,11 +53,7 @@ namespace ImageViewer.Controls
 
         public required Action<IUndoRedoCommand> ExecuteUndoRedoCommand { get; init; }
 
-        public required Func<CaliperMeasureRoi, bool> TryApplyCaliperDetection { get; init; }
-
-        public required Func<LineCaliperMeasureRoi, bool> TryApplyLineCaliperDetection { get; init; }
-
-        public required Func<CircularCaliperMeasureRoi, bool> TryApplyCircularCaliperDetection { get; init; }
+        public required Action<RoiBase> ApplyCaliperDetection { get; init; }
     }
 
     internal sealed class ImageViewerDialogCalibrationWorkflow
@@ -65,9 +63,12 @@ namespace ImageViewer.Controls
         /// <summary>当前已生效的畸变标定，用于预填对话框。</summary>
         public required Func<CameraCalibration?> GetCalibration { get; init; }
 
+        public Func<CameraCalibration?, CameraCalibration?>? NormalizeCalibration { get; init; }
+
+        public Action<string>? ShowCalibrationError { get; init; }
+
         /// <summary>
-        /// 应用标定。第 4 个参数是对话框采集到的完整畸变模型（可能为 null 表示不校正）。
-        /// Chinese: 主点/归一化半径若对话框未提供（&lt;= 0），由实现方按图像尺寸补齐。
+        /// 应用比例与同一套已归一化的畸变模型（可能为 null 表示不校正）。
         /// </summary>
         public required Action<double, string, CameraCalibration?> ApplyCalibration { get; init; }
     }
@@ -182,6 +183,7 @@ namespace ImageViewer.Controls
                             return;
                         }
 
+                        using var writeSuspension = imageLoading.SuspendReplacementWrites?.Invoke();
                         Action? replace = await imageLoading.PrepareReplacementAsync(bitmap, cancellation.Token);
                         if (!IsCurrentImageLoad(cancellation, generation))
                         {
@@ -195,8 +197,11 @@ namespace ImageViewer.Controls
 
                         imageLoading.SetImageLoadState(true, UiText.Get("ImageLoadStatusApplying"), 85, false);
                         replace();
-                        imageLoading.SetImageLoadState(false, UiText.Get("ImageLoadStatusReady"), 100, false);
-                        _lastFailedImagePath = null;
+                        if (IsCurrentImageLoad(cancellation, generation))
+                        {
+                            imageLoading.SetImageLoadState(false, UiText.Get("ImageLoadStatusReady"), 100, false);
+                            _lastFailedImagePath = null;
+                        }
                         return;
                     }
                     catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
@@ -460,13 +465,23 @@ namespace ImageViewer.Controls
             var calibration = _adapter.ShowCalibrationDialog(
                 _dependencies.Calibration.GetPhysicalUnit(),
                 _dependencies.Calibration.GetCalibration());
-            if (calibration != null)
+            if (calibration is not { } result)
             {
-                _dependencies.Calibration.ApplyCalibration(
-                    calibration.Value.Length / pixelDistance,
-                    calibration.Value.Unit,
-                    calibration.Value.Distortion);
+                return;
             }
+
+            var workflow = _dependencies.Calibration;
+            CameraCalibration? model = workflow.NormalizeCalibration?.Invoke(result.Distortion) ?? result.Distortion;
+            var reference = new LineMeasureRoi { P1 = p1.ToPointD(), P2 = p2.ToPointD() };
+            // Use exactly the same audited pixel length as later measurements of this reference.
+            double? correctedPixels = RoiInspectionEvaluator.Evaluate(reference, pixelSize: 1, model).MeasuredValue;
+            double pixelSize = correctedPixels is double pixels && pixels > 0 ? result.Length / pixels : double.NaN;
+            if (!double.IsFinite(pixelSize) || pixelSize <= 0)
+            {
+                workflow.ShowCalibrationError?.Invoke(UiText.Get("CalibrationReferenceCorrectionFailed"));
+                return;
+            }
+            workflow.ApplyCalibration(pixelSize, result.Unit, model);
         }
 
         private void ShowCaliperSettingsDialogCore<TCaliper>(
@@ -512,47 +527,30 @@ namespace ImageViewer.Controls
 
         private CaliperMeasureRoi CreateConfiguredCaliperState(CaliperMeasureRoi geometrySource, CaliperMeasureRoi configuredLine)
         {
-            var state = (CaliperMeasureRoi)configuredLine.Clone();
-            CopyLineGeometry(geometrySource, state);
-            CopyCommonRoiState(geometrySource, state);
-            state.ClearDetectedEdges();
-            _dependencies.RoiEditing.TryApplyCaliperDetection(state);
-            return state;
+            return CreateConfiguredCaliperState(geometrySource, configuredLine, CopyLineGeometry);
         }
 
         private CircularCaliperMeasureRoi CreateConfiguredCircularCaliperState(CircularCaliperMeasureRoi geometrySource, CircularCaliperMeasureRoi configuredCaliper)
         {
-            return CreateConfiguredSingleEdgeCaliperState(
-                geometrySource,
-                configuredCaliper,
-                static (source, target) => CopyCircleGeometry(source, target),
-                static roi => roi.ClearDetectedEdges(),
-                _dependencies.RoiEditing.TryApplyCircularCaliperDetection);
+            return CreateConfiguredCaliperState(geometrySource, configuredCaliper, CopyCircleGeometry);
         }
 
         private LineCaliperMeasureRoi CreateConfiguredLineCaliperState(LineCaliperMeasureRoi geometrySource, LineCaliperMeasureRoi configuredLine)
         {
-            return CreateConfiguredSingleEdgeCaliperState(
-                geometrySource,
-                configuredLine,
-                static (source, target) => CopyLineGeometry(source, target),
-                static roi => roi.ClearDetectedLine(),
-                _dependencies.RoiEditing.TryApplyLineCaliperDetection);
+            return CreateConfiguredCaliperState(geometrySource, configuredLine, CopyLineGeometry);
         }
 
-        private static TCaliper CreateConfiguredSingleEdgeCaliperState<TCaliper>(
+        private TCaliper CreateConfiguredCaliperState<TCaliper>(
             TCaliper geometrySource,
             TCaliper configuredCaliper,
-            Action<TCaliper, TCaliper> copyGeometry,
-            Action<TCaliper> clearDetection,
-            Func<TCaliper, bool> tryApplyDetection)
-            where TCaliper : RoiBase, ISingleEdgeCaliperRoi
+            Action<TCaliper, TCaliper> copyGeometry)
+            where TCaliper : RoiBase
         {
             var state = (TCaliper)configuredCaliper.Clone();
             copyGeometry(geometrySource, state);
             CopyCommonRoiState(geometrySource, state);
-            clearDetection(state);
-            tryApplyDetection(state);
+            CaliperRoiDetection.Clear(state);
+            _dependencies.RoiEditing.ApplyCaliperDetection(state);
             return state;
         }
 

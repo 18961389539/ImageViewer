@@ -89,25 +89,36 @@ namespace ImageViewer.Controls
         /// </summary>
         internal Rect GetVisibleImageRect(Size imageSize)
         {
-            var vm = ViewModel;
-            double scale = vm.Scale;
-            if (!double.IsFinite(scale) || scale <= 0)
-            {
-                return new Rect(0, 0, imageSize.Width, imageSize.Height);
-            }
+            Rect bounds = GetImageViewportBounds(margin: 32);
+            return bounds.IsEmpty ? new Rect(imageSize) : bounds;
+        }
 
-            const double screenMargin = 32;
-            double margin = screenMargin / Math.Max(scale, 0.1);
-            double left = Math.Max(-margin, -vm.OffsetX / scale - margin);
-            double top = Math.Max(-margin, -vm.OffsetY / scale - margin);
-            double right = Math.Min(imageSize.Width + margin, (ActualWidth - vm.OffsetX) / scale + margin);
-            double bottom = Math.Min(imageSize.Height + margin, (ActualHeight - vm.OffsetY) / scale + margin);
-            if (right <= left || bottom <= top)
+        private Rect GetImageViewportBounds(double margin = 0)
+        {
+            var imageToScreen = imageContainer.RenderTransform.Value;
+            Size viewport = rootGrid.RenderSize;
+            if (!imageToScreen.HasInverse || viewport.Width <= 0 || viewport.Height <= 0)
             {
                 return Rect.Empty;
             }
+            var viewportRect = new Rect(viewport);
+            viewportRect.Inflate(margin, margin);
+            imageToScreen.Invert();
+            return new MatrixTransform(imageToScreen).TransformBounds(viewportRect);
+        }
 
-            return new Rect(left, top, right - left, bottom - top);
+        // The tile renderer accepts a scale/translation viewport. Feed it the
+        // equivalent image-space rectangle before the WPF transform rotates or mirrors the tile.
+        private Point GetTileRenderTranslation()
+        {
+            Rect bounds = GetImageViewportBounds();
+            return bounds.IsEmpty ? new Point(translateTransform.X, translateTransform.Y) : new Point(-bounds.X * Scale, -bounds.Y * Scale);
+        }
+
+        private Size GetTileRenderViewportSize()
+        {
+            Rect bounds = GetImageViewportBounds();
+            return bounds.IsEmpty ? rootGrid.RenderSize : new Size(bounds.Width * Scale, bounds.Height * Scale);
         }
 
         private void RefreshViewportOverlay()

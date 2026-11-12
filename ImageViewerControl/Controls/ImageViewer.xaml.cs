@@ -115,21 +115,21 @@ namespace ImageViewer.Controls
         internal void FlipImageHorizontal()
         {
             _flipImageHorizontally = !_flipImageHorizontally;
-            ApplyImageOrientation();
+            RefreshImageOrientation();
             ShowStatusHint(UiText.Get("StatusFlippedHorizontal"), StatusHintKind.Success);
         }
 
         internal void FlipImageVertical()
         {
             _flipImageVertically = !_flipImageVertically;
-            ApplyImageOrientation();
+            RefreshImageOrientation();
             ShowStatusHint(UiText.Get("StatusFlippedVertical"), StatusHintKind.Success);
         }
 
         private void SetImageRotation(int angle)
         {
             _imageRotation = ((angle % 360) + 360) % 360;
-            ApplyImageOrientation();
+            RefreshImageOrientation();
         }
 
         internal void ResetImageOrientation()
@@ -137,13 +137,20 @@ namespace ImageViewer.Controls
             _imageRotation = 0;
             _flipImageHorizontally = false;
             _flipImageVertically = false;
+            RefreshImageOrientation();
+        }
+
+        private void RefreshImageOrientation()
+        {
             ApplyImageOrientation();
+            _imageViewStateController.RefreshImageOverlays();
+            UpdateRenderedImage();
         }
 
         internal void ApplyImageOrientation()
         {
-            double centerX = imageContainer.Width / 2;
-            double centerY = imageContainer.Height / 2;
+            double centerX = double.IsFinite(imageContainer.Width) ? imageContainer.Width / 2 : 0;
+            double centerY = double.IsFinite(imageContainer.Height) ? imageContainer.Height / 2 : 0;
             orientationScaleTransform.CenterX = centerX;
             orientationScaleTransform.CenterY = centerY;
             orientationScaleTransform.ScaleX = _flipImageHorizontally ? -1 : 1;
@@ -151,6 +158,7 @@ namespace ImageViewer.Controls
             orientationRotateTransform.CenterX = centerX;
             orientationRotateTransform.CenterY = centerY;
             orientationRotateTransform.Angle = _imageRotation;
+            RequestViewportOverlayRefresh();
         }
 
         public void SetImage(ImageSource source)
@@ -213,14 +221,22 @@ namespace ImageViewer.Controls
             CanRetryImageLoad = canRetry;
             CanCancelImageLoad = isLoading && !canRetry;
             ImageLoadHasError = canRetry && isLoading;
+            ImageLoadStateChanged?.Invoke(isLoading, statusText, ImageLoadProgress, canRetry);
         }
 
-        public Task RetryLastImageLoadAsync() => _controlComposition.DialogWorkflowService.RetryLastImageLoadAsync();
+        public Task RetryLastImageLoadAsync() => FileImageWorkflow.RetryLastImageLoadAsync();
 
         /// <summary>
         /// 取消当前图像加载，不影响当前已经显示的图像。
         /// </summary>
-        public void CancelImageLoad() => _controlComposition.DialogWorkflowService.CancelImageLoad();
+        public void CancelImageLoad()
+        {
+            _dialogWorkflowService.CancelImageLoad();
+            SharedFileImageWorkflow?.CancelImageLoad();
+        }
+
+        /// <summary>Centers and scales the current image to fit the drawable viewport.</summary>
+        public void FitImageToView() => _controlComposition.ViewportController.FitToView();
 
         /// <summary>
         /// 请求宿主保存当前会话；用户取消保存对话框时任务仍会正常完成，宿主可通过

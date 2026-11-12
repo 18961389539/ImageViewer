@@ -35,8 +35,7 @@ namespace ImageViewer.Rendering
 
         public static string BuildSummaryText(RoiRenderContext context, CaliperMeasureRoi caliper)
         {
-            (PointD p1, PointD p2) = GetMeasuredSegmentPoints(caliper);
-            string geometryText = $"宽度：{context.FormatLength(GeometryUtils.Distance(p1.ToWpfPoint(), p2.ToWpfPoint()))}";
+            string geometryText = $"宽度：{context.Measure(caliper).FormatPrimary()}";
             return SingleEdgeCaliperRenderHelper.BuildSummaryText(caliper, geometryText, "宽度测量", context.ShowCaliperScores);
         }
 

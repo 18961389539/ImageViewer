@@ -174,6 +174,9 @@ namespace ImageViewerControl.Tests
 
             public double TranslateY { get; set; }
 
+            public Rect GetVisibleImageRect(Size imageSize) =>
+                ImageViewerImageSourceUtilities.GetVisibleImageRect(imageSize, ViewerSize, Scale, TranslateX, TranslateY);
+
             public double GridSpacing { get; set; } = 8;
 
             public ImageSource? ImageSource { get; set; }

@@ -18,6 +18,7 @@
     <Grid Background="{DynamicResource ViewerBackdropSolidBrush}" Focusable="True" KeyDown="OnKeyDown">
         <Grid.Resources>
             <ResourceDictionary>
+                <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
                 <!-- 只放本控件私有的样式。主题画刷一律来自 UserControl.Resources 里的统一主题字典，
                      否则子级 Grid.Resources 会遮蔽外层主题，导致 Theme 属性切换后界面不变。 -->
                 <Style x:Key="AdaptiveBarButtonStyle" TargetType="Button">
@@ -52,17 +53,45 @@
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-        <Border Padding="8" Background="{DynamicResource ViewerSurfaceBrush}" BorderBrush="{DynamicResource ViewerPanelBorderBrush}" BorderThickness="0,0,0,1">
+        <Border x:Name="volumeControls" x:FieldModifier="internal" Visibility="Collapsed"
+                Padding="8" Background="{DynamicResource ViewerSurfaceBrush}" BorderBrush="{DynamicResource ViewerPanelBorderBrush}" BorderThickness="0,0,0,1">
             <StackPanel>
-                <TextBlock Text="{localization:UiText AdaptiveViewGroup}" Style="{StaticResource AdaptiveGroupTitleStyle}" />
-                <WrapPanel>
-                    <Button x:Name="autoButton" Content="{localization:UiText AdaptiveAuto}" Click="OnAutoClick" Margin="0,0,6,0" ToolTip="{localization:UiText AdaptiveAutoTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
-                    <Button x:Name="twoDimensionalButton" Content="{localization:UiText Adaptive2D}" Click="OnTwoDimensionalClick" Margin="0,0,6,0" ToolTip="{localization:UiText Adaptive2DTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
-                    <Button x:Name="threeDimensionalButton" Content="{localization:UiText Adaptive3D}" Click="OnThreeDimensionalClick" Margin="0,0,6,0" ToolTip="{localization:UiText Adaptive3DTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
-                    <Button x:Name="axialButton" Content="{localization:UiText AdaptiveAxial}" Click="OnAxialClick" Margin="0,0,6,0" ToolTip="{localization:UiText AdaptiveAxialTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
-                    <Button x:Name="coronalButton" Content="{localization:UiText AdaptiveCoronal}" Click="OnCoronalClick" Margin="0,0,6,0" ToolTip="{localization:UiText AdaptiveCoronalTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
-                    <Button x:Name="sagittalButton" Content="{localization:UiText AdaptiveSagittal}" Click="OnSagittalClick" Margin="0,0,6,0" ToolTip="{localization:UiText AdaptiveSagittalTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
-                </WrapPanel>
+                <DockPanel>
+                    <Border x:Name="operationStatusPanel" DockPanel.Dock="Right" VerticalAlignment="Top" Margin="8,0,0,0" Padding="8,5" MaxWidth="360">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background" Value="{DynamicResource ViewerSurfaceOverlayMenuBrush}" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource ViewerOverlayBorderBrush}" />
+                                <Setter Property="BorderThickness" Value="1" />
+                                <Setter Property="CornerRadius" Value="8" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Visibility, ElementName=retryButton}" Value="Visible">
+                                        <Setter Property="Background" Value="{DynamicResource ViewerErrorSoftBrush}" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource ViewerErrorBorderBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel>
+                            <DockPanel LastChildFill="True">
+                                <TextBlock Text="⚠" Foreground="{DynamicResource ViewerErrorBrush}" FontSize="15" FontWeight="Bold" Margin="0,0,7,0" Visibility="{Binding Visibility, ElementName=retryButton}" />
+                                <TextBlock x:Name="statusText" TextWrapping="Wrap" Foreground="{DynamicResource ViewerTextPrimaryBrush}" automation:AutomationProperties.Name="{localization:UiText AdaptiveViewerStatusName}" automation:AutomationProperties.LiveSetting="Polite" />
+                            </DockPanel>
+                            <ProgressBar x:Name="operationProgress" Height="5" Width="180" Margin="0,6,0,0" Visibility="Collapsed" IsIndeterminate="True" />
+                        </StackPanel>
+                    </Border>
+                    <StackPanel>
+                        <TextBlock Text="{localization:UiText AdaptiveViewGroup}" Style="{StaticResource AdaptiveGroupTitleStyle}" />
+                        <WrapPanel>
+                            <Button x:Name="autoButton" Content="{localization:UiText AdaptiveAuto}" Click="OnAutoClick" Margin="0,0,6,0" ToolTip="{localization:UiText AdaptiveAutoTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
+                            <Button x:Name="twoDimensionalButton" Content="{localization:UiText Adaptive2D}" Click="OnTwoDimensionalClick" Margin="0,0,6,0" ToolTip="{localization:UiText Adaptive2DTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
+                            <Button x:Name="threeDimensionalButton" Content="{localization:UiText Adaptive3D}" Click="OnThreeDimensionalClick" Margin="0,0,6,0" ToolTip="{localization:UiText Adaptive3DTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
+                            <Button x:Name="axialButton" Content="{localization:UiText AdaptiveAxial}" Click="OnAxialClick" Margin="0,0,6,0" ToolTip="{localization:UiText AdaptiveAxialTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
+                            <Button x:Name="coronalButton" Content="{localization:UiText AdaptiveCoronal}" Click="OnCoronalClick" Margin="0,0,6,0" ToolTip="{localization:UiText AdaptiveCoronalTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
+                            <Button x:Name="sagittalButton" Content="{localization:UiText AdaptiveSagittal}" Click="OnSagittalClick" Margin="0,0,6,0" ToolTip="{localization:UiText AdaptiveSagittalTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
+                        </WrapPanel>
+                    </StackPanel>
+                </DockPanel>
                 <TextBlock Text="{localization:UiText AdaptiveAnalysisGroup}" Style="{StaticResource AdaptiveGroupTitleStyle}" Margin="0,7,0,5" />
                 <WrapPanel>
                     <Button x:Name="qualityButton" Content="{localization:UiText AdaptiveQuality}" Click="OnQualityClick" Margin="0,0,6,0" ToolTip="{localization:UiText AdaptiveQualityTooltip}" Style="{StaticResource AdaptiveBarButtonStyle}" />
@@ -115,8 +144,29 @@
             </Border>
             </StackPanel>
         </Border>
-        <Grid Grid.Row="1" PreviewMouseWheel="OnPreviewMouseWheel">
+        <Grid Grid.Row="1">
             <ContentControl x:Name="contentHost" />
+            <Grid x:Name="volumeImageLoadHost" Panel.ZIndex="1" Visibility="Collapsed"
+                  HorizontalAlignment="Right" VerticalAlignment="Top" Margin="12">
+                <Border Padding="12" CornerRadius="6"
+                        Background="{DynamicResource ViewerSurfaceBrush}"
+                        BorderBrush="{DynamicResource ViewerPanelBorderBrush}" BorderThickness="1"
+                        Visibility="{Binding IsImageLoading, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <StackPanel Width="240">
+                        <TextBlock Text="{Binding ImageLoadStatusText}" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource ViewerTextPrimaryBrush}"
+                                   automation:AutomationProperties.LiveSetting="Polite" />
+                        <ProgressBar Height="5" Margin="0,8" Maximum="100" Value="{Binding ImageLoadProgress, Mode=OneWay}"
+                                     Visibility="{Binding CanCancelImageLoad, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        <Button HorizontalAlignment="Right" Style="{StaticResource AdaptiveBarButtonStyle}"
+                                Click="OnCancelVolumeImageLoadClick" Content="{localization:UiText ImageLoadCancel}"
+                                Visibility="{Binding CanCancelImageLoad, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        <Button HorizontalAlignment="Right" Style="{StaticResource AdaptiveBarButtonStyle}"
+                                Click="OnRetryVolumeImageLoadClick" Content="{localization:UiText ImageLoadRetry}"
+                                Visibility="{Binding CanRetryImageLoad, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    </StackPanel>
+                </Border>
+            </Grid>
             <Border x:Name="mprRebuildOverlay"
                     Background="{DynamicResource ViewerSurfaceOverlayAltBrush}"
                     Visibility="Collapsed"
@@ -139,29 +189,6 @@
                                      IsIndeterminate="True" />
                     </StackPanel>
                 </Border>
-            </Border>
-            <Border x:Name="operationStatusPanel" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10" Padding="8">
-                <Border.Style>
-                    <Style TargetType="Border">
-                        <Setter Property="Background" Value="{DynamicResource ViewerSurfaceOverlayMenuBrush}" />
-                        <Setter Property="BorderBrush" Value="{DynamicResource ViewerOverlayBorderBrush}" />
-                        <Setter Property="BorderThickness" Value="1" />
-                        <Setter Property="CornerRadius" Value="8" />
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding Visibility, ElementName=retryButton}" Value="Visible">
-                                <Setter Property="Background" Value="{DynamicResource ViewerErrorSoftBrush}" />
-                                <Setter Property="BorderBrush" Value="{DynamicResource ViewerErrorBorderBrush}" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Border.Style>
-                <StackPanel>
-                    <DockPanel LastChildFill="True">
-                        <TextBlock Text="⚠" Foreground="{DynamicResource ViewerErrorBrush}" FontSize="15" FontWeight="Bold" Margin="0,0,7,0" Visibility="{Binding Visibility, ElementName=retryButton}" />
-                        <TextBlock x:Name="statusText" Foreground="{DynamicResource ViewerTextPrimaryBrush}" automation:AutomationProperties.Name="{localization:UiText AdaptiveViewerStatusName}" automation:AutomationProperties.LiveSetting="Polite" />
-                    </DockPanel>
-                    <ProgressBar x:Name="operationProgress" Height="5" Width="180" Margin="0,6,0,0" Visibility="Collapsed" IsIndeterminate="True" />
-                </StackPanel>
             </Border>
             <Border x:Name="dataQualityPanel" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="10" Padding="8" MaxWidth="360" Visibility="Collapsed">
                 <Border.Style>

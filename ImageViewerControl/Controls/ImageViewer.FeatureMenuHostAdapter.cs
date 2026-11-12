@@ -133,6 +133,10 @@ namespace ImageViewer.Controls
 
         public async Task ExportAnalysisCsvAsync()
         {
+            if (ShowInvalidToleranceDraft())
+            {
+                return;
+            }
             string? filePath = _dialogs.ShowSaveAnalysisCsvDialog();
             if (string.IsNullOrWhiteSpace(filePath))
             {
@@ -164,6 +168,10 @@ namespace ImageViewer.Controls
 
         public async Task ExportBatchAnalysisCsvAsync()
         {
+            if (ShowInvalidToleranceDraft())
+            {
+                return;
+            }
             string[] imagePaths = _dialogs.ShowOpenBatchImageFilesDialog();
             if (imagePaths.Length == 0)
             {
@@ -252,6 +260,16 @@ namespace ImageViewer.Controls
             }
         }
 
+        private bool ShowInvalidToleranceDraft()
+        {
+            if (!RoiToleranceDrafts.TryGetError(_data.AllRois, out string? message))
+            {
+                return false;
+            }
+            _feedback.ShowStatusHint(message, StatusHintKind.Error);
+            return true;
+        }
+
         public bool CancelBatchAnalysisExport()
         {
             if (_batchExportCancellation is not { IsCancellationRequested: false } cancellation)
@@ -260,17 +278,27 @@ namespace ImageViewer.Controls
             }
 
             cancellation.Cancel();
-            _feedback.ShowStatusHint("正在取消批量导出，当前文件完成后会保存已有结果。", StatusHintKind.Info);
+            _feedback.ShowStatusHint("正在取消批量导出，将保存已完成的结果。", StatusHintKind.Info);
             return true;
         }
 
         public void ShowAnalysisSummary()
         {
+            if (ShowInvalidToleranceDraft())
+            {
+                return;
+            }
             string summary = RoiAnalysisExportService.BuildSummary(_data.AllRois, _analysis.AnalysisBitmapSource, _data.PixelSize, _data.PhysicalUnit, _data.Calibration);
             _dialogs.ShowReadOnlyText(UiText.Get("DialogAnalysisSummaryTitle"), summary);
         }
 
-        public void ShowProcessCapability() => _dialogs.ShowProcessCapability();
+        public void ShowProcessCapability()
+        {
+            if (!ShowInvalidToleranceDraft())
+            {
+                _dialogs.ShowProcessCapability();
+            }
+        }
 
         public void ShowPrintableReport() => _dialogs.ShowPrintableReport();
 
@@ -284,6 +312,10 @@ namespace ImageViewer.Controls
         /// </summary>
         public void CheckCalibrationReadiness()
         {
+            if (ShowInvalidToleranceDraft())
+            {
+                return;
+            }
             IReadOnlyList<RoiBase> rois = _data.AllRois;
             int toleranced = 0;
             int unmeasured = 0;

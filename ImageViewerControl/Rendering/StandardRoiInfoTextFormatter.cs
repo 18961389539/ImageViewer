@@ -11,9 +11,10 @@ namespace ImageViewer.Rendering
     {
         public static string BuildRotatedRectText(RotatedRect rect, RoiRenderContext context)
         {
+            var measurement = context.Measure(rect);
             return BuildMultiline(
                 rect.Label,
-                $"W:{context.FormatLength(rect.Width)} H:{context.FormatLength(rect.Height)} Area:{context.FormatArea(rect.Width * rect.Height)} Angle:{rect.Angle:F1}°");
+                $"W:{measurement.FormatLength(rect.Width)} H:{measurement.FormatLength(rect.Height)} Area:{measurement.FormatArea(rect.Width * rect.Height)} Angle:{rect.Angle:F1}°");
         }
 
         public static string BuildBlobAnalysisText(BlobAnalysisRoi roi)
@@ -31,29 +32,34 @@ namespace ImageViewer.Rendering
                 return BuildEllipseText(ellipse, context);
             }
 
-            return BuildMultiline(ellipse.Label, $"Fit RX:{context.FormatLength(ellipse.RadiusX)} RY:{context.FormatLength(ellipse.RadiusY)} Pts:{ellipse.SourcePointCount}");
+            var measurement = context.Measure(ellipse);
+            return BuildMultiline(ellipse.Label, $"Fit RX:{measurement.FormatLength(ellipse.RadiusX)} RY:{measurement.FormatLength(ellipse.RadiusY)} Pts:{ellipse.SourcePointCount}");
         }
 
         public static string BuildRingText(RingRoi ring, RoiRenderContext context)
         {
-            return BuildMultiline(ring.Label, $"Inner:{context.FormatLength(ring.InnerRadius)} Outer:{context.FormatLength(ring.OuterRadius)}");
+            var measurement = context.Measure(ring);
+            return BuildMultiline(ring.Label, $"Inner:{measurement.FormatLength(ring.InnerRadius)} Outer:{measurement.FormatLength(ring.OuterRadius)}");
         }
 
         public static string BuildEllipseText(EllipseRoi ellipse, RoiRenderContext context)
         {
+            var measurement = context.Measure(ellipse);
             return BuildMultiline(
                 ellipse.Label,
-                $"RX:{context.FormatLength(ellipse.RadiusX)} RY:{context.FormatLength(ellipse.RadiusY)} Area:{context.FormatArea(Math.PI * ellipse.RadiusX * ellipse.RadiusY)} Angle:{ellipse.Angle:F1}°");
+                $"RX:{measurement.FormatLength(ellipse.RadiusX)} RY:{measurement.FormatLength(ellipse.RadiusY)} Area:{measurement.FormatArea(Math.PI * ellipse.RadiusX * ellipse.RadiusY)} Angle:{ellipse.Angle:F1}°");
         }
 
         public static string BuildCircleText(CircleRoi circle, RoiRenderContext context)
         {
-            return BuildMultiline(circle.Label, $"R:{context.FormatLength(circle.Radius)} Area:{context.FormatArea(Math.PI * circle.Radius * circle.Radius)}");
+            var measurement = context.Measure(circle);
+            return BuildMultiline(circle.Label, $"R:{measurement.FormatPrimary()} Area:{measurement.FormatArea(Math.PI * circle.Radius * circle.Radius)}");
         }
 
         public static string BuildPolygonText(PolygonRoi polygon, (double Area, double Perimeter, Point Centroid) metrics, RoiRenderContext context)
         {
-            return BuildMultiline(polygon.Label, $"Area:{context.FormatArea(metrics.Area)} Peri:{context.FormatPerimeter(metrics.Perimeter)}", $"Vertices:{polygon.Points.Count}");
+            var measurement = context.Measure(polygon);
+            return BuildMultiline(polygon.Label, $"Area:{measurement.FormatArea(metrics.Area)} Peri:{measurement.FormatLength(metrics.Perimeter)}", $"Vertices:{polygon.Points.Count}");
         }
 
         public static string BuildPolylineText(PolylineRoi polyline, RoiRenderContext context)
@@ -65,10 +71,11 @@ namespace ImageViewer.Rendering
                 return polyline.Label ?? string.Empty;
             }
 
+            var measurement = context.Measure(polyline);
             return BuildMultiline(
                 polyline.Label,
-                $"Length:{context.FormatLength(GeometryUtils.PolylineLength(points))}",
-                $"Segments:{segments.Count} Min:{context.FormatLength(segments.Min())} Max:{context.FormatLength(segments.Max())}");
+                $"Length:{measurement.FormatLength(GeometryUtils.PolylineLength(points))}",
+                $"Segments:{segments.Count} Min:{measurement.FormatLength(segments.Min())} Max:{measurement.FormatLength(segments.Max())}");
         }
 
         public static string BuildPointAnnotationText(PointAnnotationRoi annotation)
@@ -99,7 +106,7 @@ namespace ImageViewer.Rendering
 
         public static string BuildLineMeasureText(LineMeasureRoi line, RoiRenderContext context)
         {
-            return BuildInline(line.Label, $"长度：{context.FormatLength(GeometryUtils.Distance(line.P1.ToWpfPoint(), line.P2.ToWpfPoint()))}");
+            return BuildInline(line.Label, $"长度：{context.Measure(line).FormatPrimary()}");
         }
 
         public static string BuildAngleMeasureText(AngleMeasureRoi angle, double angleValue)
@@ -109,22 +116,24 @@ namespace ImageViewer.Rendering
 
         public static string BuildArcMeasureText(ArcMeasureRoi arc, RoiRenderContext context)
         {
+            var measurement = context.Measure(arc);
             return BuildMultiline(
                 arc.Label,
-                $"R:{context.FormatLength(arc.Radius)} Arc:{context.FormatLength(arc.ArcLength)} Angle:{arc.CentralAngle:F1}°");
+                $"R:{measurement.FormatPrimary()} Arc:{measurement.FormatLength(arc.ArcLength)} Angle:{arc.CentralAngle:F1}°");
         }
 
         public static string BuildPointToLineDistanceText(PointToLineDistanceRoi roi, RoiRenderContext context)
         {
-            return BuildMultiline(roi.Label, $"Distance: {context.FormatLength(roi.Distance)}");
+            return BuildMultiline(roi.Label, $"Distance: {context.Measure(roi).FormatLength(roi.Distance)}");
         }
 
         public static string BuildPointToCircleDistanceText(PointToCircleDistanceRoi roi, RoiRenderContext context)
         {
+            var measurement = context.Measure(roi);
             return BuildMultiline(
                 roi.Label,
-                $"To Circle: {context.FormatLength(roi.DistanceToCircle)}",
-                $"To Center: {context.FormatLength(roi.DistanceToCenter)}");
+                $"To Circle: {measurement.FormatLength(roi.DistanceToCircle)}",
+                $"To Center: {measurement.FormatLength(roi.DistanceToCenter)}");
         }
 
         public static string BuildParallelismText(ParallelismMeasureRoi roi, RoiRenderContext context)
@@ -132,7 +141,7 @@ namespace ImageViewer.Rendering
             return BuildMultiline(
                 roi.Label,
                 $"Angle Diff: {roi.AngleDifference:F2}°",
-                $"Avg Dist: {context.FormatLength(roi.AverageDistance)}");
+                $"Avg Dist: {context.Measure(roi).FormatLength(roi.AverageDistance)}");
         }
 
         public static string BuildPerpendicularityText(PerpendicularityMeasureRoi roi)
@@ -145,21 +154,23 @@ namespace ImageViewer.Rendering
 
         public static string BuildConcentricityText(ConcentricityMeasureRoi roi, RoiRenderContext context)
         {
+            var measurement = context.Measure(roi);
             return BuildMultiline(
                 roi.Label,
-                $"Center Dist: {context.FormatLength(roi.CenterDistance)}",
-                $"R1: {context.FormatLength(roi.Radius1)} R2: {context.FormatLength(roi.Radius2)}");
+                $"公差带直径：{measurement.FormatPrimary()}",
+                $"Center Dist: {measurement.FormatLength(roi.CenterDistance)}",
+                $"R1: {measurement.FormatLength(roi.Radius1)} R2: {measurement.FormatLength(roi.Radius2)}");
         }
 
         public static string BuildCenterDistanceText(CenterDistanceMeasureRoi roi, RoiRenderContext context)
         {
-            return BuildInline(roi.Label, $"中心距离：{context.FormatLength(roi.CenterDistance)}");
+            return BuildInline(roi.Label, $"中心距离：{context.Measure(roi).FormatPrimary()}");
         }
 
         public static string BuildThreePointCircleText(ThreePointCircleMeasureRoi roi, RoiRenderContext context)
         {
             return roi.IsValid
-                ? BuildMultiline(roi.Label, $"R:{context.FormatLength(roi.Radius)} 3 Points")
+                ? BuildMultiline(roi.Label, $"R:{context.Measure(roi).FormatPrimary()} 3 Points")
                 : BuildInline(roi.Label, "Invalid 3-point circle");
         }
 

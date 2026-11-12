@@ -99,7 +99,7 @@ namespace ImageViewer.Controls
 
         public static readonly DependencyProperty ShowToolbarProperty =
             DependencyProperty.Register(nameof(ShowToolbar), typeof(bool), typeof(ImageViewer),
-                new PropertyMetadata(false, OnShowToolbarChanged));
+                new PropertyMetadata(true, OnShowToolbarChanged));
 
         public static readonly DependencyProperty ShowSnapGridProperty =
             DependencyProperty.Register(nameof(ShowSnapGrid), typeof(bool), typeof(ImageViewer),
@@ -488,14 +488,7 @@ namespace ImageViewer.Controls
 
         private static void OnScaleChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            WithViewer<double>(d, e, (viewer, value) =>
-            {
-                viewer._imageViewStateController.HandleScaleChanged(value);
-                if (viewer.IsLoaded)
-                {
-                    viewer.MarkDocumentDirty();
-                }
-            });
+            WithViewer<double>(d, e, (viewer, value) => viewer._imageViewStateController.HandleScaleChanged(value));
         }
     }
 }

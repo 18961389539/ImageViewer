@@ -1,5 +1,4 @@
 using System;
-using ImageViewer.Localization;
 
 namespace ImageViewer.Controls
 {
@@ -46,11 +45,10 @@ namespace ImageViewer.Controls
             public ImageViewerViewCommandController CreateViewCommandController(ViewportController viewportController)
             {
                 ArgumentNullException.ThrowIfNull(viewportController);
-                var options = new ImageViewerViewOptionsAdapter(_owner);
-                var viewport = new ImageViewerViewportOperationsAdapter(_owner, viewportController);
-                var imageTransform = new ImageViewerImageTransformOperationsAdapter(_owner);
-                var host = new ImageViewerViewCommandHostAdapter(options, viewport, imageTransform);
-                return new ImageViewerViewCommandController(host);
+                return new ImageViewerViewCommandController(
+                    new ImageViewerViewOptionsAdapter(_owner),
+                    new ImageViewerViewportOperationsAdapter(_owner, viewportController),
+                    new ImageViewerImageTransformOperationsAdapter(_owner));
             }
 
             public ImageViewerModeCommandController CreateModeCommandController()

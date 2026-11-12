@@ -170,6 +170,26 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
+        public void VolumeControls_OnlyTakeSpaceWhileVolumeIsLoaded()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                using var viewer = new AdaptiveImageViewer { ImageSource = CreateBitmap(9) };
+                viewer.DisplayMode = AdaptiveDisplayMode.ThreeDimensional;
+                Assert.Equal(Visibility.Collapsed, viewer.volumeControls.Visibility);
+                Assert.Same(viewer.ImageViewer, viewer.contentHost.Content);
+
+                viewer.Volume = new VolumeData([CreateBitmap(9), CreateBitmap(18)]);
+                Assert.Equal(Visibility.Visible, viewer.volumeControls.Visibility);
+                Assert.Same(viewer.Volume3DViewer, viewer.contentHost.Content);
+
+                viewer.Volume = null;
+                Assert.Equal(Visibility.Collapsed, viewer.volumeControls.Visibility);
+                Assert.Same(viewer.ImageViewer, viewer.contentHost.Content);
+            });
+        }
+
+        [Fact]
         public void GestureHint_UsesModeSpecificConventionsFor2D_MprAnd3D()
         {
             WpfTestRunner.Run(() =>

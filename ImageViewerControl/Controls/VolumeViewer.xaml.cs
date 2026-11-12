@@ -36,6 +36,7 @@ namespace ImageViewer.Controls
         {
             InitializeComponent();
             sliceViewer = createImageViewer();
+            sliceViewer.rootGrid.PreviewMouseWheel += OnPreviewMouseWheel;
             sliceViewerHost.Content = sliceViewer;
             ApplyTheme();
             UpdateSliceState();
@@ -118,6 +119,7 @@ namespace ImageViewer.Controls
             }
 
             _isDisposed = true;
+            sliceViewer.rootGrid.PreviewMouseWheel -= OnPreviewMouseWheel;
             sliceViewer.Dispose();
             _volume = null;
             GC.SuppressFinalize(this);

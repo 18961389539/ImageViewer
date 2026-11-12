@@ -44,13 +44,6 @@ namespace ImageViewer.Controls
         void FlipVertical();
     }
 
-    internal interface IImageViewerViewCommandHost :
-        IImageViewerViewOptions,
-        IImageViewerViewportOperations,
-        IImageViewerImageTransformOperations
-    {
-    }
-
     internal interface IImageViewerModeCommandHost
     {
         void StartRectangleMode();

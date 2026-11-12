@@ -15,13 +15,7 @@ namespace ImageViewer.Dialogs
     internal sealed class CircularCaliperSettingsDialog : CaliperSettingsDialogBase
     {
         private readonly CircularCaliperMeasureRoi _model;
-        private readonly TextBox _caliperCountTextBox;
-        private readonly TextBox _searchRangeTextBox;
-        private readonly TextBox _samplingHalfWidthTextBox;
-        private readonly TextBox _edgeSigmaTextBox;
-        private readonly TextBox _minimumGradientTextBox;
-        private readonly TextBox _minimumValidCalipersTextBox;
-        private readonly TextBox _outlierThresholdTextBox;
+        private readonly CommonFields _commonFields;
         private readonly TextBox _edgeSelectionTextBox;
         private readonly ComboBox _polarityComboBox;
         private readonly ComboBox _lineFitModeComboBox;
@@ -38,14 +32,11 @@ namespace ImageViewer.Dialogs
         {
             _model = model;
 
-            _caliperCountTextBox = AddField(PrimaryPanel, UiText.Get("CaliperFieldCount"), _model.CaliperCount.ToString(CultureInfo.InvariantCulture));
-            _searchRangeTextBox = AddField(PrimaryPanel, UiText.Get("CaliperFieldSearchRange"), _model.CaliperSearchRange.ToString(CultureInfo.InvariantCulture));
+            _commonFields = new CommonFields(this, new CommonInputs(
+                _model.CaliperCount, _model.CaliperSearchRange, _model.CaliperSamplingHalfWidth,
+                _model.CaliperEdgeSigma, _model.CaliperMinimumGradient, _model.MinimumValidCalipers,
+                _model.CaliperOutlierThreshold));
 
-            _samplingHalfWidthTextBox = AddField(AdvancedPanel, UiText.Get("CaliperFieldSamplingHalfWidth"), _model.CaliperSamplingHalfWidth.ToString(CultureInfo.InvariantCulture));
-            _edgeSigmaTextBox = AddField(AdvancedPanel, UiText.Get("CaliperFieldEdgeSigma"), _model.CaliperEdgeSigma.ToString(CultureInfo.InvariantCulture));
-            _minimumGradientTextBox = AddField(AdvancedPanel, UiText.Get("CaliperFieldMinimumGradient"), _model.CaliperMinimumGradient.ToString(CultureInfo.InvariantCulture));
-            _minimumValidCalipersTextBox = AddField(AdvancedPanel, UiText.Get("CaliperFieldMinimumValid"), _model.MinimumValidCalipers.ToString(CultureInfo.InvariantCulture));
-            _outlierThresholdTextBox = AddField(AdvancedPanel, UiText.Get("CaliperFieldOutlierThreshold"), _model.CaliperOutlierThreshold.ToString(CultureInfo.InvariantCulture));
             _edgeSelectionTextBox = AddField(AdvancedPanel, UiText.Get("CaliperFieldEdgeSelection"), _model.EdgeSelection.ToString(CultureInfo.InvariantCulture));
 
             AdvancedPanel.Children.Add(new TextBlock { Text = UiText.Get("CaliperFieldPolarity"), Margin = new Thickness(0, 8, 0, 2) });
@@ -66,13 +57,6 @@ namespace ImageViewer.Dialogs
             };
             AdvancedPanel.Children.Add(_lineFitModeComboBox);
 
-            EnableLivePreview(_caliperCountTextBox);
-            EnableLivePreview(_searchRangeTextBox);
-            EnableLivePreview(_samplingHalfWidthTextBox);
-            EnableLivePreview(_edgeSigmaTextBox);
-            EnableLivePreview(_minimumGradientTextBox);
-            EnableLivePreview(_minimumValidCalipersTextBox);
-            EnableLivePreview(_outlierThresholdTextBox);
             EnableLivePreview(_edgeSelectionTextBox);
             EnableLivePreview(_polarityComboBox);
             EnableLivePreview(_lineFitModeComboBox);
@@ -85,13 +69,7 @@ namespace ImageViewer.Dialogs
         protected override bool TryApplyInputs(out string errorMessage)
         {
             errorMessage = UiText.Get("CircularCaliperDialogInvalidMessage");
-            if (!TryParsePositiveInt(_caliperCountTextBox.Text, out int caliperCount, minValue: 6) ||
-                !TryParsePositiveInt(_searchRangeTextBox.Text, out int searchRange, minValue: 1) ||
-                !TryParseNonNegativeInt(_samplingHalfWidthTextBox.Text, out int samplingHalfWidth) ||
-                !TryParseNonNegativeDouble(_edgeSigmaTextBox.Text, out double edgeSigma) || edgeSigma < 0.5 || edgeSigma > 5.0 ||
-                !TryParseNonNegativeDouble(_minimumGradientTextBox.Text, out double minimumGradient) ||
-                !TryParsePositiveInt(_minimumValidCalipersTextBox.Text, out int minimumValidCalipers, minValue: 3) ||
-                !TryParseNonNegativeDouble(_outlierThresholdTextBox.Text, out double outlierThreshold) ||
+            if (!_commonFields.TryRead(minimumCount: 6, minimumValidCount: 3, out CommonInputs common) ||
                 !TryParsePositiveInt(_edgeSelectionTextBox.Text, out int edgeSelection, minValue: 1) ||
                 _polarityComboBox.SelectedItem is not CaliperEdgePolarity polarity ||
                 _lineFitModeComboBox.SelectedItem is not LineFitMode lineFitMode)
@@ -99,13 +77,13 @@ namespace ImageViewer.Dialogs
                 return false;
             }
 
-            _model.CaliperCount = caliperCount;
-            _model.CaliperSearchRange = searchRange;
-            _model.CaliperSamplingHalfWidth = samplingHalfWidth;
-            _model.CaliperEdgeSigma = edgeSigma;
-            _model.CaliperMinimumGradient = minimumGradient;
-            _model.MinimumValidCalipers = minimumValidCalipers;
-            _model.CaliperOutlierThreshold = outlierThreshold;
+            _model.CaliperCount = common.Count;
+            _model.CaliperSearchRange = common.SearchRange;
+            _model.CaliperSamplingHalfWidth = common.SamplingHalfWidth;
+            _model.CaliperEdgeSigma = common.EdgeSigma;
+            _model.CaliperMinimumGradient = common.MinimumGradient;
+            _model.MinimumValidCalipers = common.MinimumValidCalipers;
+            _model.CaliperOutlierThreshold = common.OutlierThreshold;
             _model.EdgeSelection = Math.Clamp(edgeSelection, 1, 8);
             _model.CaliperEdgePolarity = polarity;
             _model.CaliperLineFitMode = lineFitMode;

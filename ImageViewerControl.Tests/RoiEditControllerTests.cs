@@ -113,9 +113,7 @@ namespace ImageViewerControl.Tests
                         HandleRoiEdited = _ => { },
                         CreateStateCommand = (_, _, _) => null,
                         ExecuteUndoRedoCommand = _ => { },
-                        TryApplyCaliperDetection = _ => true,
-                        TryApplyLineCaliperDetection = _ => true,
-                        TryApplyCircularCaliperDetection = _ => true
+                        ApplyCaliperDetection = _ => { }
                     },
                     Calibration = new ImageViewerDialogCalibrationWorkflow
                     {

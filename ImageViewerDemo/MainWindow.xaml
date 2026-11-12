@@ -35,7 +35,8 @@
                         Foreground="#F5F8FC"
                         FontSize="14"
                         TextWrapping="Wrap"
-                        Text="{localization:DemoText ToolbarHint}" />
+                        FontWeight="SemiBold"
+                        Text="{localization:DemoText WorkspaceTitle}" />
                     <StackPanel x:Name="openProgressPanel" Margin="0,6,0,0" Visibility="Collapsed">
                         <TextBlock x:Name="openStatusText" Foreground="#AAB5C3" FontSize="12" />
                         <ProgressBar x:Name="openProgressBar" Height="5" Margin="0,4,0,0" Minimum="0" Maximum="100" />

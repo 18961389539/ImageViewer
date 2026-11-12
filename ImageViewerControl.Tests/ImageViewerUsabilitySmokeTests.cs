@@ -9,6 +9,8 @@ using System.Windows.Media.Imaging;
 using ImageViewer.Controls;
 using ImageViewer.Localization;
 using ImageViewer.Models;
+using ImageViewer.Plugins;
+using ImageViewer.Services;
 using Xunit;
 
 namespace ImageViewerControl.Tests
@@ -168,7 +170,7 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
-        public void ShowToolbar_DefaultsHiddenAndTogglesVisible()
+        public void ShowToolbar_DefaultsVisibleAndCanBeHiddenAndRestored()
         {
             WpfTestRunner.Run(() =>
             {
@@ -176,14 +178,18 @@ namespace ImageViewerControl.Tests
                 var toolbarPanel = viewer.toolbarPanel;
                 var toolbarMenuItem = viewer.showToolbarMenuItem;
 
-                Assert.False(viewer.ShowToolbar);
-                Assert.Equal(Visibility.Collapsed, toolbarPanel.Visibility);
+                Assert.True(viewer.ShowToolbar);
+                Assert.Equal(Visibility.Visible, toolbarPanel.Visibility);
 
                 WpfTestRunner.InvokePrivate(viewer, "OnViewCommandMenuClick", new MenuItem { Tag = ImageViewerViewMenuTags.ToggleToolbar }, new RoutedEventArgs());
                 WpfTestRunner.DrainDispatcher();
 
-                Assert.True(viewer.ShowToolbar);
-                Assert.Equal(Visibility.Visible, toolbarPanel.Visibility);
+                Assert.False(viewer.ShowToolbar);
+                Assert.Equal(Visibility.Collapsed, toolbarPanel.Visibility);
+                Assert.False(toolbarMenuItem.IsChecked);
+
+                viewer.toolbarCompactButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                WpfTestRunner.DrainDispatcher();
                 Assert.True(toolbarMenuItem.IsChecked);
 
                 viewer.toolbarHideButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
@@ -204,7 +210,7 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
-        public void Toolbar_CollapsesToCompactLauncher_WhenViewportIsNarrow()
+        public void DockedLayout_LeavesRoomForCanvasAndKeepsToolbarOnNarrowWindows()
         {
             WpfTestRunner.Run(() =>
             {
@@ -225,16 +231,27 @@ namespace ImageViewerControl.Tests
                     WpfTestRunner.DrainDispatcher();
                     window.UpdateLayout();
 
-                    Assert.Equal(Visibility.Collapsed, viewer.toolbarPanel.Visibility);
-                    Assert.Equal(Visibility.Visible, viewer.toolbarCompactButton.Visibility);
+                    var sidebar = Assert.IsType<Grid>(viewer.FindName("rightOverlayPanel"));
+                    Assert.True(viewer.toolbarPanel.IsVisible);
+                    Assert.False(viewer.toolbarCompactButton.IsVisible);
+                    Assert.False(sidebar.IsVisible);
+
+                    viewer.rightOverlayToggleButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                    window.UpdateLayout();
+                    Assert.True(sidebar.IsVisible);
 
                     window.Width = 1100;
                     window.Height = 720;
                     window.UpdateLayout();
                     WpfTestRunner.DrainDispatcher();
 
-                    Assert.Equal(Visibility.Visible, viewer.toolbarPanel.Visibility);
-                    Assert.Equal(Visibility.Collapsed, viewer.toolbarCompactButton.Visibility);
+                    Rect canvas = viewer.rootGrid.TransformToAncestor(viewer).TransformBounds(new Rect(viewer.rootGrid.RenderSize));
+                    Rect toolbar = viewer.toolbarPanel.TransformToAncestor(viewer).TransformBounds(new Rect(viewer.toolbarPanel.RenderSize));
+                    Rect side = sidebar.TransformToAncestor(viewer).TransformBounds(new Rect(sidebar.RenderSize));
+                    Rect status = viewer.statusBarBorder.TransformToAncestor(viewer).TransformBounds(new Rect(viewer.statusBarBorder.RenderSize));
+                    Assert.True(toolbar.Bottom <= canvas.Top);
+                    Assert.True(canvas.Right <= side.Left);
+                    Assert.True(side.Bottom <= status.Top);
                 }
                 finally
                 {
@@ -270,11 +287,11 @@ namespace ImageViewerControl.Tests
                 WpfTestRunner.DrainDispatcher();
 
                 var buttons = FindVisualDescendants<Button>(viewer.toolbarPanel);
-                Button saveSession = Assert.Single(buttons.Where(button => Equals(button.Content, UiText.Get("MenuSaveSession"))));
+                Button saveSession = Assert.Single(buttons.Where(button => Equals(button.Content, UiText.Get("ToolbarSaveSession"))));
                 Assert.Contains(buttons, button => Equals(button.Content, UiText.Get("MenuOpenImageFile")));
-                Assert.Contains(buttons, button => Equals(button.Content, UiText.Get("MenuUndo")));
-                Assert.Contains(buttons, button => Equals(button.Content, UiText.Get("MenuRedo")));
-                Assert.Contains(buttons, button => Equals(button.Content, UiText.Get("MenuExportCurrentViewPng")));
+                Assert.Contains(buttons, button => Equals(button.Content, UiText.Get("MenuFitToView")));
+                Assert.Contains(buttons, button => Equals(button.Content, UiText.Get("ToolbarExportCsv")));
+                Assert.Equal(UiText.Get("ToolLineMeasure"), Assert.IsType<ToggleButton>(Assert.Single(viewer.quickToolsPanel.Children.Cast<object>())).Content);
                 Assert.False(saveSession.IsEnabled);
 
                 viewer.ImageSource = CreateBitmap(9);
@@ -357,13 +374,44 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
+        public void BrowsingKeepsDocumentCleanButCalibrationStillRequiresSaving()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                using var viewer = new ImageViewer.Controls.ImageViewer { ImageSource = CreateBitmap(9) };
+                var window = new Window { Width = 900, Height = 620, Content = viewer };
+                try
+                {
+                    window.Show();
+                    window.UpdateLayout();
+                    viewer.MarkDocumentClean();
+                    double originalScale = viewer.Scale;
+                    viewer.ZoomAtViewportCenter(1.25);
+                    Assert.True(viewer.Scale > originalScale);
+                    viewer.rightOverlayToggleButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                    window.UpdateLayout();
+                    viewer.FitImageToView();
+                    Assert.False(viewer.IsDirty);
+
+                    viewer.PixelSize = 0.5;
+                    viewer.PhysicalUnit = "mm";
+                    Assert.True(viewer.IsDirty);
+                }
+                finally
+                {
+                    window.Close();
+                }
+            });
+        }
+
+        [Fact]
         public void ToolbarQuickTool_StaysHighlightedWhileActive()
         {
             WpfTestRunner.Run(() =>
             {
                 using var viewer = new ImageViewer.Controls.ImageViewer
                 {
-                    ShowToolbar = true
+                    ImageSource = CreateBitmap(9)
                 };
                 WpfTestRunner.DrainDispatcher();
 
@@ -435,7 +483,7 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
-        public void StatusBar_WithPathImage_ShowsFilePath()
+        public void StatusBar_WithPathImage_ShowsFileNameAndOffersFullPath()
         {
             WpfTestRunner.Run(() =>
             {
@@ -456,13 +504,52 @@ namespace ImageViewerControl.Tests
                     viewer.ImageSource = bitmap;
                     WpfTestRunner.DrainDispatcher();
 
-                    Assert.Contains(System.IO.Path.GetFullPath(path), statusText.Text);
+                    Assert.Contains(System.IO.Path.GetFileName(path), statusText.Text);
+                    Assert.DoesNotContain(System.IO.Path.GetFullPath(path), statusText.Text);
+                    Assert.Equal(System.IO.Path.GetFullPath(path), statusText.ToolTip);
                     Assert.Contains("2 × 2", statusText.Text);
                 }
                 finally
                 {
                     System.IO.File.Delete(path);
                 }
+            });
+        }
+
+        [Fact]
+        public void CalibrationEntry_ExplainsMissingReferenceAndEnablesWhenLineIsSelected()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                using var viewer = new ImageViewer.Controls.ImageViewer { ImageSource = CreateBitmap(9) };
+                var button = Assert.IsType<Button>(viewer.FindName("toolbarCalibrateButton"));
+                var menuItem = viewer.calibratePixelsMenuItem;
+                WpfTestRunner.DrainDispatcher();
+
+                Assert.Equal(Visibility.Visible, menuItem.Visibility);
+                Assert.False(menuItem.IsEnabled);
+                Assert.False(button.IsEnabled);
+                Assert.Equal(UiText.Get("MenuNeedCalibrationLine"), button.ToolTip);
+                Assert.Equal(UiText.Get("CalibrationBadgePixels"), viewer.calibrationBadgeTextBlock.Text);
+
+                var line = new LineMeasureRoi { P1 = new PointD(0, 0), P2 = new PointD(1, 0) };
+                Assert.True(viewer.AddRoi(line));
+                viewer.ViewerState.SelectedRoi = null;
+                viewer.MarkDocumentClean();
+                viewer.ViewerState.SelectedRoi = line;
+                WpfTestRunner.DrainDispatcher();
+                Assert.True(button.IsEnabled);
+                Assert.True(menuItem.IsEnabled);
+                Assert.False(viewer.IsDirty);
+                Assert.Null(line.Tolerance);
+
+                var editorHost = Assert.IsType<ContentControl>(viewer.FindName("roiPropertyEditorHost"));
+                var editor = Assert.IsAssignableFrom<FrameworkElement>(editorHost.Content);
+                TextBox nominal = Assert.Single(FindVisualDescendants<TextBox>(editor)
+                    .Where(field => AutomationProperties.GetName(field) == UiText.Get("EditorToleranceNominal")));
+                nominal.Text = "40";
+                Assert.Equal(40, line.Tolerance?.Nominal);
+                Assert.True(viewer.IsDirty);
             });
         }
 
@@ -481,9 +568,9 @@ namespace ImageViewerControl.Tests
                 WpfTestRunner.DrainDispatcher();
 
                 Assert.Equal(Visibility.Visible, viewer.calibrationBadge.Visibility);
-                Assert.Equal(UiText.FormatInvariant("CalibrationBadgeText", 0.5, "mm"), viewer.calibrationBadgeTextBlock.Text);
-                // 无畸变模型时 ToolTip 只包含标定比例（精度档案从 ①-1 起才出现在 ToolTip 里）。
-                Assert.Equal(UiText.FormatInvariant("CalibrationBadgeTooltipScale", 0.5, "mm"), viewer.calibrationBadgeTextBlock.ToolTip);
+                Assert.Contains(UiText.FormatInvariant("CalibrationBadgeText", 0.5, "mm"), viewer.calibrationBadgeTextBlock.Text);
+                Assert.Contains(UiText.Get("CalibrationBadgeScaleOnlySuffix"), viewer.calibrationBadgeTextBlock.Text);
+                Assert.Contains(UiText.Get("CalibrationBadgeTooltipNoDistortion"), (string)viewer.calibrationBadgeTextBlock.ToolTip);
 
                 viewer.PixelSize = 1.0;
                 viewer.PhysicalUnit = "px";
@@ -491,6 +578,96 @@ namespace ImageViewerControl.Tests
 
                 Assert.Equal(Visibility.Collapsed, viewer.calibrationBadge.Visibility);
             });
+        }
+
+        [Fact]
+        public void LineLabel_UsesTheSameCalibratedLengthAsInfoAndCsv_AndSuppressesFailedCorrection()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                using var viewer = new ImageViewer.Controls.ImageViewer
+                {
+                    ImageSource = CreateUniformBitmap(160, 120, 0),
+                    PixelSize = 0.5,
+                    PhysicalUnit = "mm",
+                    Calibration = new CameraCalibration { NormalizationRadius = 100, MeasurementUncertaintyPixels = 0.2 }
+                };
+                var line = new LineMeasureRoi { P1 = new PointD(20, 0), P2 = new PointD(100, 0) };
+                Assert.True(viewer.AddRoi(line));
+                var overlay = Assert.IsType<Canvas>(viewer.FindName("screenOverlayCanvas"));
+                string Label()
+                {
+                    viewer.DrawRois(immediate: true);
+                    return Assert.Single(overlay.Children.OfType<TextBlock>()).Text;
+                }
+
+                Assert.Contains("40.00 mm", Label());
+                Assert.Contains(UiText.Get("CalibrationBadgeScaleOnlySuffix"), viewer.calibrationBadgeTextBlock.Text);
+                Assert.DoesNotContain(UiText.Get("CalibrationBadgeDistortionSuffix"), viewer.calibrationBadgeTextBlock.Text);
+
+                viewer.Calibration = new CameraCalibration { NormalizationRadius = 100, K1 = 0.35 };
+                double expected = viewer.Calibration.CorrectPixelLength(line.P1, line.P2) * 0.5;
+                Assert.NotEqual(40.0, expected, precision: 2);
+                string formatted = FormattableString.Invariant($"{expected:F2} mm");
+                Assert.Contains(formatted, Label());
+                Assert.Contains(formatted, RoiInfoService.BuildInfo(line, null, 0.5, "mm", RoiPluginRegistry.CreateBuiltIn(), calibration: viewer.Calibration));
+                Assert.Contains($"Length={formatted}", RoiAnalysisExportService.BuildCsv([line], null, 0.5, "mm", viewer.Calibration));
+                Assert.Contains(UiText.Get("CalibrationBadgeDistortionSuffix"), viewer.calibrationBadgeTextBlock.Text);
+
+                viewer.Calibration = new CameraCalibration { NormalizationRadius = 100, K1 = -1 };
+                Assert.Contains(UiText.Get("MeasurementUnavailable"), Label());
+                string failedCsv = RoiAnalysisExportService.BuildCsv([line], null, 0.5, "mm", viewer.Calibration);
+                Assert.Contains("NotEvaluable", failedCsv);
+                Assert.DoesNotContain("Length=", failedCsv);
+
+                viewer.Calibration = new CameraCalibration { NormalizationRadius = 0, K1 = 0.1 };
+                Assert.Contains(UiText.Get("MeasurementUnavailable"), Label());
+                Assert.Contains(UiText.Get("CalibrationBadgeInvalidDistortionSuffix"), viewer.calibrationBadgeTextBlock.Text);
+            });
+        }
+
+        [Fact]
+        public void RotatedAndMirroredImage_KeepsSelectedLineHandlesAndLabelOnImageCoordinates()
+        {
+            WpfTestRunner.Run(() =>
+            {
+                using var viewer = new ImageViewer.Controls.ImageViewer { ImageSource = CreateUniformBitmap(160, 100, 0) };
+                var window = new Window { Width = 900, Height = 620, Content = viewer };
+                try
+                {
+                    window.Show();
+                    WpfTestRunner.DrainDispatcher();
+                    viewer.FitImageToView();
+                    var line = new LineMeasureRoi { P1 = new PointD(35, 25), P2 = new PointD(95, 40) };
+                    Assert.True(viewer.AddRoi(line));
+                    var overlay = Assert.IsType<Canvas>(viewer.FindName("screenOverlayCanvas"));
+                    Point imageCenter = new(80, 50);
+                    Point fixedCenter = viewer.imageContainer.TranslatePoint(imageCenter, overlay);
+
+                    viewer.RotateImageRight();
+                    viewer.FlipImageHorizontal();
+                    WpfTestRunner.DrainDispatcher();
+                    viewer.DrawRois(immediate: true);
+                    AssertClose(fixedCenter, viewer.imageContainer.TranslatePoint(imageCenter, overlay));
+
+                    var handle = Assert.Single(overlay.Children.OfType<System.Windows.Shapes.Shape>().Where(shape => Equals(shape.Tag, ResizeHandle.P1)));
+                    Point handleCenter = new(Canvas.GetLeft(handle) + handle.Width / 2, Canvas.GetTop(handle) + handle.Height / 2);
+                    Point first = new(line.P1.X, line.P1.Y);
+                    AssertClose(viewer.imageContainer.TranslatePoint(first, overlay), handleCenter);
+                    Assert.Equal(ResizeHandle.P1, viewer.GetHandleAt(overlay.TranslatePoint(handleCenter, viewer.imageContainer)));
+
+                    TextBlock label = Assert.Single(overlay.Children.OfType<TextBlock>());
+                    AssertClose(viewer.imageContainer.TranslatePoint(new Point(65, 32.5), overlay),
+                        new Point(Canvas.GetLeft(label) + label.DesiredSize.Width / 2, Canvas.GetTop(label) + label.DesiredSize.Height / 2));
+                }
+                finally
+                {
+                    window.Close();
+                }
+            });
+
+            static void AssertClose(Point expected, Point actual)
+                => Assert.InRange((expected - actual).Length, 0, 1);
         }
 
         /// <summary>

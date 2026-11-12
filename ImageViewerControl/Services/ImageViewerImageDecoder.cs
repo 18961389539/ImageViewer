@@ -58,10 +58,17 @@ namespace ImageViewer.Services
                 return bitmap;
             }, cancellationToken);
 
+        // Report the input identity before decoding so rejected images still have a trace.
+        internal static Task<BitmapSource> LoadBatchImageAsync(
+            string filePath, Action<ImageFileTrace> captureTrace, CancellationToken cancellationToken)
+            => Task.Run(() => LoadFromFileCore(filePath, null, DefaultMaxPixelCount,
+                applyExifOrientation: true, trackIdentity: true, expectedSha256: null, verifiedHeader: null,
+                cancellationToken, captureTrace), cancellationToken);
+
         private static BitmapSource LoadFromFileCore(
             string filePath, IProgress<double>? progress,
             long maxPixelCount, bool applyExifOrientation, bool trackIdentity, string? expectedSha256,
-            ImageHeader? verifiedHeader, CancellationToken cancellationToken)
+            ImageHeader? verifiedHeader, CancellationToken cancellationToken, Action<ImageFileTrace>? captureTrace = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
             cancellationToken.ThrowIfCancellationRequested();
@@ -69,12 +76,18 @@ namespace ImageViewer.Services
             FileStream? cacheLease = ImageViewerProjectPackageCache.TryLeaseAsset(filePath, cancellationToken);
             try
             {
+                // Keep the read-only handle open from hashing through decoding. On Windows it
+                // denies both writes and replacement of the file being measured.
                 using FileStream stream = File.OpenRead(filePath);
                 string? sha256 = null;
                 if (trackIdentity)
                 {
                     sha256 = ReadSha256(stream, cancellationToken);
                     ImageViewerSessionImageIdentity.Verify(expectedSha256, sha256, filePath);
+                    if (captureTrace != null)
+                    {
+                        captureTrace(ReadFileTrace(stream, sha256));
+                    }
                     stream.Position = 0;
                 }
                 // Preflight read this header from the file whose bytes we have just verified.
@@ -96,6 +109,19 @@ namespace ImageViewer.Services
             finally
             {
                 cacheLease?.Dispose();
+            }
+        }
+
+        private static ImageFileTrace ReadFileTrace(FileStream stream, string sha256)
+        {
+            long length = stream.Length;
+            try
+            {
+                return new ImageFileTrace(sha256, length, File.GetLastWriteTimeUtc(stream.SafeFileHandle), null);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return new ImageFileTrace(sha256, length, null, ex.Message);
             }
         }
 
@@ -173,6 +199,8 @@ namespace ImageViewer.Services
         }
 
         internal readonly record struct ImageHeader(int PixelWidth, int PixelHeight, int BitsPerPixel, int Orientation);
+
+        internal readonly record struct ImageFileTrace(string Sha256, long Length, DateTime? LastWriteTimeUtc, string? MetadataError);
 
         private sealed class DecodeProgressStream : Stream
         {

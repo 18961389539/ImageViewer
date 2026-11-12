@@ -389,24 +389,67 @@ namespace ImageViewer.Plugins
         /// </summary>
         private static void AppendToleranceEditor(StackPanel panel, RoiBase roi)
         {
-            roi.Tolerance ??= new ImageViewer.Models.MeasurementTolerance();
             panel.Children.Add(CreateLabel(UiText.Get("EditorToleranceGroup")));
-            AddNullableTextEditor(panel, UiText.Get("EditorToleranceNominal"), "Tolerance.Nominal");
-            AddNullableTextEditor(panel, UiText.Get("EditorTolerancePlus"), "Tolerance.TolerancePlus");
-            AddNullableTextEditor(panel, UiText.Get("EditorToleranceMinus"), "Tolerance.ToleranceMinus");
+            AddToleranceField(panel, "EditorToleranceNominal", roi, t => t.Nominal, (t, value) => t.Nominal = value, nonNegative: false);
+            AddToleranceField(panel, "EditorTolerancePlus", roi, t => t.TolerancePlus, (t, value) => t.TolerancePlus = value, nonNegative: true);
+            AddToleranceField(panel, "EditorToleranceMinus", roi, t => t.ToleranceMinus, (t, value) => t.ToleranceMinus = value, nonNegative: true);
         }
 
-        private static void AddNullableTextEditor(StackPanel panel, string header, string propertyPath)
+        private static void AddToleranceField(
+            StackPanel panel, string field, RoiBase roi,
+            Func<MeasurementTolerance, double?> getValue, Action<MeasurementTolerance, double?> setValue, bool nonNegative)
         {
+            string header = UiText.Get(field);
+            string? invalidText = RoiToleranceDrafts.GetText(roi, field);
+            string errorMessage = UiText.Get(nonNegative ? "EditorToleranceInvalidLimit" : "EditorToleranceInvalidNumber");
             panel.Children.Add(CreateLabel(header));
-            var textBox = new TextBox();
-            textBox.SetBinding(TextBox.TextProperty, new Binding(propertyPath)
+            var textBox = new TextBox
             {
-                Mode = BindingMode.TwoWay,
-                UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged,
-                Converter = new NullableDoubleToStringConverter()
-            });
+                Text = invalidText ?? (roi.Tolerance is { } existing ? getValue(existing)?.ToString("G", CultureInfo.CurrentCulture) : null) ?? string.Empty
+            };
+            var error = new TextBlock { Text = errorMessage, TextWrapping = TextWrapping.Wrap };
+            error.SetResourceReference(TextBlock.ForegroundProperty, "ViewerErrorBrush");
+            void ShowError(bool visible)
+            {
+                error.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+                System.Windows.Automation.AutomationProperties.SetHelpText(textBox, visible ? errorMessage : string.Empty);
+            }
+
+            ShowError(invalidText != null);
+            System.Windows.Automation.AutomationProperties.SetName(textBox, header);
+            textBox.TextChanged += (_, _) =>
+            {
+                double? value = null;
+                if (!string.IsNullOrWhiteSpace(textBox.Text))
+                {
+                    if ((!double.TryParse(textBox.Text, NumberStyles.Float, CultureInfo.CurrentCulture, out double parsed) &&
+                         !double.TryParse(textBox.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out parsed)) ||
+                        !double.IsFinite(parsed) || (nonNegative && parsed < 0))
+                    {
+                        RoiToleranceDrafts.SetText(roi, field, textBox.Text);
+                        ShowError(true);
+                        return;
+                    }
+                    value = parsed;
+                }
+
+                RoiToleranceDrafts.SetText(roi, field, null);
+                ShowError(false);
+                MeasurementTolerance? previous = roi.Tolerance;
+                if ((previous is null ? null : getValue(previous)) == value)
+                {
+                    return;
+                }
+
+                // Only replace the persisted value when a field is edited. Opening an editor is read-only.
+                MeasurementTolerance updated = previous?.Clone() ?? new MeasurementTolerance();
+                setValue(updated, value);
+                roi.Tolerance = updated.Nominal.HasValue || updated.TolerancePlus.HasValue || updated.ToleranceMinus.HasValue
+                    ? updated
+                    : null;
+            };
             panel.Children.Add(textBox);
+            panel.Children.Add(error);
         }
 
         private static Binding CreateTwoWayBinding(string propertyPath) => new(propertyPath)
@@ -415,24 +458,5 @@ namespace ImageViewer.Plugins
             UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged
         };
 
-        /// <summary>
-        /// double? ↔ 文本 双向转换器（公差输入复用）。
-        /// Chinese: 空文本解析为 null（未设置），数值按不变区域性格式化，避免本地化小数点干扰。
-        /// English: Converts between double? and text for tolerance inputs using the invariant culture.
-        /// </summary>
-        private sealed class NullableDoubleToStringConverter : IValueConverter
-        {
-            public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-            {
-                return value is double number ? number.ToString("G", CultureInfo.InvariantCulture) : string.Empty;
-            }
-
-            public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
-            {
-                return value is string text && double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double number)
-                    ? number
-                    : null;
-            }
-        }
     }
 }

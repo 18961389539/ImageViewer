@@ -6,7 +6,7 @@
     xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
     automation:AutomationProperties.Name="{localization:UiText VolumeViewerName}"
     Background="Transparent">
-    <Grid PreviewMouseWheel="OnPreviewMouseWheel">
+    <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />

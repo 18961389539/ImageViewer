@@ -145,7 +145,7 @@ namespace ImageViewer.Controls
         {
             bool isCtrlPressed = Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl);
             bool isShiftPressed = Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift);
-            if (isCtrlPressed && TryGetViewShortcut(e.Key, isShiftPressed, out ImageViewerViewCommand command) && _host.HasImage)
+            if (isCtrlPressed && ImageViewerViewShortcuts.TryGetCommand(e.Key, isShiftPressed, out ImageViewerViewCommand command) && _host.HasImage)
             {
                 _host.ExecuteViewCommand(command);
                 e.Handled = true;
@@ -161,27 +161,6 @@ namespace ImageViewer.Controls
             {
                 e.Handled = true;
             }
-        }
-
-        internal static bool TryGetViewShortcut(Key key, bool isShiftPressed, out ImageViewerViewCommand command)
-        {
-            command = key switch
-            {
-                Key.Add or Key.OemPlus => ImageViewerViewCommand.ZoomIn,
-                Key.Subtract or Key.OemMinus => ImageViewerViewCommand.ZoomOut,
-                Key.D0 => ImageViewerViewCommand.ResetView,
-                Key.F => ImageViewerViewCommand.FitToView,
-                Key.R when isShiftPressed => ImageViewerViewCommand.RotateLeft,
-                Key.R => ImageViewerViewCommand.RotateRight,
-                Key.H when isShiftPressed => ImageViewerViewCommand.FlipVertical,
-                Key.H => ImageViewerViewCommand.FlipHorizontal,
-                _ => default
-            };
-
-            // 命中任意快捷键即返回 true；未命中时 command 为 default（枚举值 0，
-            // 当前无任何快捷键映射到值为 0 的 TogglePixelGrid）。若未来新增映射，
-            // 需确认新命令的枚举值非 0，否则应与 default 区分显式哨兵值。
-            return command != default;
         }
 
         public void HandleMouseRightButtonDown(MouseButtonEventArgs e)

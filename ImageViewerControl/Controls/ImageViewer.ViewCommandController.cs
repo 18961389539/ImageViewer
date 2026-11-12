@@ -3,38 +3,44 @@ using System.Collections.Generic;
 
 namespace ImageViewer.Controls
 {
-    internal sealed class ImageViewerViewCommandController : ImageViewerCommandControllerBase<IImageViewerViewCommandHost>
+    internal sealed class ImageViewerViewCommandController
     {
         private readonly IReadOnlyDictionary<ImageViewerViewCommand, Action> _actions;
 
-        public ImageViewerViewCommandController(IImageViewerViewCommandHost host)
-            : base(host)
+        public ImageViewerViewCommandController(
+            IImageViewerViewOptions options,
+            IImageViewerViewportOperations viewport,
+            IImageViewerImageTransformOperations imageTransform)
         {
+            ArgumentNullException.ThrowIfNull(options);
+            ArgumentNullException.ThrowIfNull(viewport);
+            ArgumentNullException.ThrowIfNull(imageTransform);
+
             _actions = new Dictionary<ImageViewerViewCommand, Action>
             {
-                [ImageViewerViewCommand.TogglePixelGrid] = () => Host.ShowPixelGrid = !Host.ShowPixelGrid,
-                [ImageViewerViewCommand.ToggleCrosshair] = () => Host.ShowCrosshair = !Host.ShowCrosshair,
-                [ImageViewerViewCommand.ToggleCaliperScores] = () => Host.ShowCaliperScores = !Host.ShowCaliperScores,
-                [ImageViewerViewCommand.ToggleInfoPanel] = () => Host.ShowInfoPanel = !Host.ShowInfoPanel,
-                [ImageViewerViewCommand.ToggleHistogram] = () => Host.ShowHistogram = !Host.ShowHistogram,
-                [ImageViewerViewCommand.ToggleProfile] = () => Host.ShowProfile = !Host.ShowProfile,
-                [ImageViewerViewCommand.ToggleScaleBar] = () => Host.ShowScaleBar = !Host.ShowScaleBar,
-                [ImageViewerViewCommand.ToggleRoiList] = () => Host.ShowRoiList = !Host.ShowRoiList,
-                [ImageViewerViewCommand.ToggleToolbar] = () => Host.ShowToolbar = !Host.ShowToolbar,
-                [ImageViewerViewCommand.ToggleSnapGrid] = () => Host.ShowSnapGrid = !Host.ShowSnapGrid,
-                [ImageViewerViewCommand.ToggleSnapToGrid] = () => Host.EnableSnapToGrid = !Host.EnableSnapToGrid,
-                [ImageViewerViewCommand.FitToView] = Host.FitToView,
-                [ImageViewerViewCommand.FillToView] = Host.FillToView,
-                [ImageViewerViewCommand.ActualSize] = Host.SetActualSize,
-                [ImageViewerViewCommand.ZoomIn] = Host.ZoomIn,
-                [ImageViewerViewCommand.ZoomOut] = Host.ZoomOut,
-                [ImageViewerViewCommand.ZoomToSelection] = Host.ZoomToSelection,
-                [ImageViewerViewCommand.ResetView] = Host.ResetView,
-                [ImageViewerViewCommand.ShowFullImage] = Host.ShowFullImage,
-                [ImageViewerViewCommand.RotateLeft] = Host.RotateLeft,
-                [ImageViewerViewCommand.RotateRight] = Host.RotateRight,
-                [ImageViewerViewCommand.FlipHorizontal] = Host.FlipHorizontal,
-                [ImageViewerViewCommand.FlipVertical] = Host.FlipVertical
+                [ImageViewerViewCommand.TogglePixelGrid] = () => options.ShowPixelGrid = !options.ShowPixelGrid,
+                [ImageViewerViewCommand.ToggleCrosshair] = () => options.ShowCrosshair = !options.ShowCrosshair,
+                [ImageViewerViewCommand.ToggleCaliperScores] = () => options.ShowCaliperScores = !options.ShowCaliperScores,
+                [ImageViewerViewCommand.ToggleInfoPanel] = () => options.ShowInfoPanel = !options.ShowInfoPanel,
+                [ImageViewerViewCommand.ToggleHistogram] = () => options.ShowHistogram = !options.ShowHistogram,
+                [ImageViewerViewCommand.ToggleProfile] = () => options.ShowProfile = !options.ShowProfile,
+                [ImageViewerViewCommand.ToggleScaleBar] = () => options.ShowScaleBar = !options.ShowScaleBar,
+                [ImageViewerViewCommand.ToggleRoiList] = () => options.ShowRoiList = !options.ShowRoiList,
+                [ImageViewerViewCommand.ToggleToolbar] = () => options.ShowToolbar = !options.ShowToolbar,
+                [ImageViewerViewCommand.ToggleSnapGrid] = () => options.ShowSnapGrid = !options.ShowSnapGrid,
+                [ImageViewerViewCommand.ToggleSnapToGrid] = () => options.EnableSnapToGrid = !options.EnableSnapToGrid,
+                [ImageViewerViewCommand.FitToView] = viewport.FitToView,
+                [ImageViewerViewCommand.FillToView] = viewport.FillToView,
+                [ImageViewerViewCommand.ActualSize] = viewport.SetActualSize,
+                [ImageViewerViewCommand.ZoomIn] = viewport.ZoomIn,
+                [ImageViewerViewCommand.ZoomOut] = viewport.ZoomOut,
+                [ImageViewerViewCommand.ZoomToSelection] = viewport.ZoomToSelection,
+                [ImageViewerViewCommand.ResetView] = viewport.ResetView,
+                [ImageViewerViewCommand.ShowFullImage] = viewport.ShowFullImage,
+                [ImageViewerViewCommand.RotateLeft] = imageTransform.RotateLeft,
+                [ImageViewerViewCommand.RotateRight] = imageTransform.RotateRight,
+                [ImageViewerViewCommand.FlipHorizontal] = imageTransform.FlipHorizontal,
+                [ImageViewerViewCommand.FlipVertical] = imageTransform.FlipVertical
             };
 
             if (_actions.Count != Enum.GetValues<ImageViewerViewCommand>().Length)

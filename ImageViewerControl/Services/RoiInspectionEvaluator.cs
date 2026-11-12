@@ -29,21 +29,24 @@ namespace ImageViewer.Services
         public static RoiInspectionResult Evaluate(RoiBase roi, double pixelSize, CameraCalibration? calibration = null)
         {
             ArgumentNullException.ThrowIfNull(roi);
+            return Evaluate(roi, pixelSize, calibration, RoiCalibrationHelper.AuditRoi(roi, calibration));
+        }
 
+        internal static RoiInspectionResult Evaluate(RoiBase roi, double pixelSize, CameraCalibration? calibration, DistortionAudit audit)
+        {
             RoiDetectionStatus detectionStatus = GetDetectionStatus(roi);
-            DistortionAudit audit = RoiCalibrationHelper.AuditRoi(roi, calibration);
-            double? measuredValue = audit.HasNonConvergedPoints ? null : GetMeasuredValue(roi, pixelSize, calibration, detectionStatus);
+            bool canMeasure = RoiCalibrationHelper.CanUseMeasurements(calibration, audit);
+            double? measuredValue = canMeasure ? GetMeasuredValue(roi, pixelSize, calibration, detectionStatus) : null;
             MeasurementTolerance? tolerance = roi.Tolerance is { IsEnabled: true } configured
                 ? configured
                 : null;
 
             RoiSpecificationStatus specificationStatus;
-            if (audit.HasNonConvergedPoints || calibration is { IsEnabled: true, IsValid: false })
+            if (!canMeasure)
             {
                 // A configured but malformed calibration must never silently fall
                 // back to raw pixels for a dimensional pass/fail decision.
                 specificationStatus = RoiSpecificationStatus.NotEvaluable;
-                measuredValue = null;
             }
             else if (tolerance is { IsValid: false })
             {
@@ -113,11 +116,6 @@ namespace ImageViewer.Services
                 return null;
             }
 
-            if (calibration is { IsEnabled: true, IsValid: false })
-            {
-                return null;
-            }
-
             double correction = RoiCalibrationHelper.GetLengthCorrection(roi, calibration);
             if (!double.IsFinite(correction) || correction <= 0)
             {
@@ -145,6 +143,7 @@ namespace ImageViewer.Services
                 ThreePointCircleMeasureRoi threePointCircle when threePointCircle.IsValid => threePointCircle.Radius,
                 CircleRoi circle => circle.Radius,
                 CenterDistanceMeasureRoi centerDistance => centerDistance.CenterDistance,
+                ConcentricityMeasureRoi concentricity => MeasureZones.ConcentricityZoneDiameter(concentricity),
                 _ => null
             };
 
@@ -160,10 +159,6 @@ namespace ImageViewer.Services
 
         /// <summary>
         /// 角度类 ROI 的主测量值（单位：度）。
-        /// Chinese: 过去这五类 ROI 不在测量值分支里，测得值恒为 null，导致"配了公差也永远 NotEvaluable"。
-        /// 这里补齐它们的**主测量值**定义（与信息面板显示的量一致），使其公差判定真正生效。
-        /// English: Angular ROIs previously produced no measured value at all, so a configured tolerance was
-        /// silently ignored. These branches give each one the same primary quantity the info panel shows.
         /// </summary>
         private static double? GetAngularMeasuredValue(RoiBase roi)
         {
@@ -171,7 +166,6 @@ namespace ImageViewer.Services
             {
                 ParallelismMeasureRoi parallelism => parallelism.AngleDifference,
                 PerpendicularityMeasureRoi perpendicularity => perpendicularity.PerpendicularityError,
-                ConcentricityMeasureRoi concentricity => MeasureZones.ConcentricityZoneDiameter(concentricity),
                 AngleMeasureRoi angle => GeometryUtils.SmallestAngle(
                     angle.P1.ToWpfPoint(),
                     angle.Vertex.ToWpfPoint(),

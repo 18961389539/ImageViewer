@@ -8,18 +8,18 @@ namespace ImageViewer.Controls
 {
     internal sealed class DroppedContentController
     {
-        private readonly ImageViewerDialogWorkflowService _dialogWorkflowService;
+        private readonly Func<string, Task> _openImageFromPathAsync;
         private readonly ImageViewerSessionController _sessionController;
         private readonly Action _refreshSelectedRoiPropertyPanel;
         private readonly Action<string, StatusHintKind> _showStatusHint;
 
         public DroppedContentController(
-            ImageViewerDialogWorkflowService dialogWorkflowService,
+            Func<string, Task> openImageFromPathAsync,
             ImageViewerSessionController sessionController,
             Action refreshSelectedRoiPropertyPanel,
             Action<string, StatusHintKind> showStatusHint)
         {
-            _dialogWorkflowService = dialogWorkflowService ?? throw new ArgumentNullException(nameof(dialogWorkflowService));
+            _openImageFromPathAsync = openImageFromPathAsync ?? throw new ArgumentNullException(nameof(openImageFromPathAsync));
             _sessionController = sessionController ?? throw new ArgumentNullException(nameof(sessionController));
             _refreshSelectedRoiPropertyPanel = refreshSelectedRoiPropertyPanel ?? throw new ArgumentNullException(nameof(refreshSelectedRoiPropertyPanel));
             _showStatusHint = showStatusHint ?? throw new ArgumentNullException(nameof(showStatusHint));
@@ -60,7 +60,7 @@ namespace ImageViewer.Controls
             switch (kind)
             {
                 case DroppedFileKind.Image:
-                    await _dialogWorkflowService.OpenImageFromPathAsync(path);
+                    await _openImageFromPathAsync(path);
                     break;
                 case DroppedFileKind.Session:
                 case DroppedFileKind.ProjectPackage:

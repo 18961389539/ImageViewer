@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -103,6 +104,9 @@ namespace ImageViewerControl.Tests
                 Assert.Equal(1, summary.ProcessedFileCount);
                 Assert.Equal(1, summary.FailedFileCount);
                 Assert.Equal(2, summary.ExportedRowCount);
+                Assert.Equal(1, summary.DecodedFileCount);
+                Assert.Equal(1, summary.FullySuccessfulFileCount);
+                Assert.Equal(1, summary.InputFailedFileCount);
                 Assert.Single(summary.Errors);
                 string csv = File.ReadAllText(csvPath);
                 string metadataPath = Path.ChangeExtension(csvPath, ".metadata.json");
@@ -123,7 +127,8 @@ namespace ImageViewerControl.Tests
                 Assert.Equal("Processed", firstRecord.GetProperty("status").GetString());
                 Assert.Equal(20, firstRecord.GetProperty("pixelWidth").GetInt32());
                 Assert.Equal(16, firstRecord.GetProperty("pixelHeight").GetInt32());
-                Assert.False(string.IsNullOrWhiteSpace(firstRecord.GetProperty("sha256").GetString()));
+                Assert.Equal(Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(firstPath))).ToLowerInvariant(),
+                    firstRecord.GetProperty("sha256").GetString());
                 JsonElement missingRecord = inputRecords.EnumerateArray().First(record =>
                     record.GetProperty("path").GetString()!.EndsWith("missing.png", StringComparison.OrdinalIgnoreCase));
                 Assert.Equal("InputMissing", missingRecord.GetProperty("status").GetString());
@@ -162,6 +167,8 @@ namespace ImageViewerControl.Tests
                 Assert.Equal(0, summary.ProcessedFileCount);
                 Assert.Equal(1, summary.FailedFileCount);
                 Assert.Equal(2, summary.ExportedRowCount);
+                Assert.Equal(0, summary.DecodedFileCount);
+                Assert.Equal(1, summary.InputFailedFileCount);
                 string csv = File.ReadAllText(csvPath);
                 Assert.Equal(2, csv.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries).Length - 1);
                 Assert.Equal(2, csv.Split("DecodeFailed", StringSplitOptions.None).Length - 1);
@@ -170,7 +177,8 @@ namespace ImageViewerControl.Tests
                 JsonElement record = Assert.Single(metadata.RootElement.GetProperty("inputRecords").EnumerateArray());
                 Assert.Equal("DecodeFailed", record.GetProperty("status").GetString());
                 Assert.Equal(2, record.GetProperty("rowCount").GetInt32());
-                Assert.False(string.IsNullOrWhiteSpace(record.GetProperty("sha256").GetString()));
+                Assert.Equal(Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(invalidPath))).ToLowerInvariant(),
+                    record.GetProperty("sha256").GetString());
                 Assert.True(record.GetProperty("lengthBytes").GetInt64() > 0);
                 Assert.False(record.GetProperty("error").GetString() is null or "");
             }
@@ -181,7 +189,76 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
-        public async Task ExportAsync_ClearsTemplateDetectionBeforeEachImage()
+        public async Task ExportAsync_WhenCanceledSeparatesUnfinishedInputsFromCompletedFailures()
+        {
+            string root = Path.Combine(Path.GetTempPath(), $"image-viewer-batch-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(root);
+            try
+            {
+                string[] paths =
+                [
+                    Path.Combine(root, "missing.png"), Path.Combine(root, "completed.png"),
+                    Path.Combine(root, "interrupted.png"), Path.Combine(root, "unstarted.png")
+                ];
+                foreach (string path in paths.Skip(1))
+                {
+                    SaveBitmap(path, CreateBitmap(20, 16, 80));
+                }
+                string csvPath = Path.Combine(root, "batch.csv");
+                var roi = new CircleRoi { Center = new PointD(8, 7), Radius = 3 };
+                using var cancellation = new CancellationTokenSource();
+                BatchRoiAnalysisExportProgress? finalProgress = null;
+                var progress = new CallbackProgress(update =>
+                {
+                    finalProgress = update;
+                    if (update.Phase == "Preparing" && update.CurrentPath == paths[2])
+                    {
+                        cancellation.Cancel();
+                    }
+                });
+
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => BatchRoiAnalysisExportService.ExportAsync(
+                    csvPath, paths, [roi], pixelSize: 1, physicalUnit: null, progress: progress,
+                    cancellationToken: cancellation.Token));
+
+                Assert.Equal(("Canceled", 2, 2), (finalProgress!.Phase, finalProgress.CompletedFileCount, finalProgress.ExportedRowCount));
+                string csv = await File.ReadAllTextAsync(csvPath);
+                Assert.Contains("missing.png", csv);
+                Assert.Contains("completed.png", csv);
+                Assert.DoesNotContain("interrupted.png", csv);
+                Assert.DoesNotContain("unstarted.png", csv);
+                using JsonDocument metadata = JsonDocument.Parse(await File.ReadAllTextAsync(Path.ChangeExtension(csvPath, ".metadata.json")));
+                JsonElement rootElement = metadata.RootElement;
+                Assert.Equal("Canceled", rootElement.GetProperty("status").GetString());
+                Assert.Equal(4, rootElement.GetProperty("inputs").GetArrayLength());
+                Assert.Collection(rootElement.GetProperty("inputRecords").EnumerateArray(),
+                    record => Assert.Equal("InputMissing", record.GetProperty("status").GetString()),
+                    record => Assert.Equal("Processed", record.GetProperty("status").GetString()));
+                Assert.Equal(2, rootElement.GetProperty("repeatability").GetProperty("sourceCount").GetInt32());
+                JsonElement result = rootElement.GetProperty("result");
+                Assert.Equal(1, result.GetProperty("failedFileCount").GetInt32());
+                Assert.Equal(1, result.GetProperty("decodedFileCount").GetInt32());
+                Assert.Equal(2, result.GetProperty("unfinishedFileCount").GetInt32());
+                using JsonDocument summary = JsonDocument.Parse(await File.ReadAllTextAsync(Path.ChangeExtension(csvPath, ".summary.json")));
+                Assert.True(summary.RootElement.GetProperty("IsCanceled").GetBoolean());
+                Assert.Equal(1, summary.RootElement.GetProperty("FailedFileCount").GetInt32());
+                Assert.Equal(2, summary.RootElement.GetProperty("UnfinishedFileCount").GetInt32());
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        private sealed class CallbackProgress(Action<BatchRoiAnalysisExportProgress> report) : IProgress<BatchRoiAnalysisExportProgress>
+        {
+            public void Report(BatchRoiAnalysisExportProgress value) => report(value);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task ExportAsync_ClearsTemplateDetectionAndCountsRoiFailures(bool includeSuccessfulRoi)
         {
             string root = Path.Combine(Path.GetTempPath(), $"image-viewer-batch-{Guid.NewGuid():N}");
             Directory.CreateDirectory(root);
@@ -199,13 +276,22 @@ namespace ImageViewerControl.Tests
                 roi.SetDetectedEdges(new PointD(10, 15), new PointD(10, 20), new PointD(20, 15), new PointD(20, 20));
                 roi.ApplyWidthMeasurement(new CaliperWidthMeasurementResult([10], centerDistance: 10));
 
-                await BatchRoiAnalysisExportService.ExportAsync(
+                RoiBase[] templates = includeSuccessfulRoi
+                    ? [roi, new CircleRoi { Center = new PointD(18, 15), Radius = 3 }]
+                    : [roi];
+                BatchRoiAnalysisExportSummary summary = await BatchRoiAnalysisExportService.ExportAsync(
                     csvPath,
                     [imagePath],
-                    [roi],
+                    templates,
                     pixelSize: 1,
                     physicalUnit: "mm");
 
+                Assert.Equal(0, summary.ProcessedFileCount);
+                Assert.Equal(1, summary.FailedFileCount);
+                Assert.Equal(1, summary.DecodedFileCount);
+                Assert.Equal(0, summary.InputFailedFileCount);
+                Assert.Equal(includeSuccessfulRoi ? 1 : 0, summary.PartiallySuccessfulFileCount);
+                Assert.Equal(includeSuccessfulRoi ? 0 : 1, summary.AllRoiFailedFileCount);
                 string csv = File.ReadAllText(csvPath);
                 Assert.Contains("DetectionFailed", csv);
                 Assert.Contains("\"NotMeasured\",\"NotEvaluable\",,10", csv, StringComparison.Ordinal);

@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows;
 using ImageViewer.Core.Analysis;
 using ImageViewer.Dialogs;
+using ImageViewer.Plugins;
 using ImageViewer.Services;
 
 namespace ImageViewer.Controls;
@@ -20,6 +21,11 @@ public partial class ImageViewer
     public void ShowPrintableReport()
     {
         ObjectDisposedException.ThrowIf(_printableReportDisposed, this);
+        if (RoiToleranceDrafts.TryGetError(ViewerState.AllRois, out string? message))
+        {
+            ShowStatusHint(message, StatusHintKind.Error);
+            return;
+        }
         if (_printableReportDialog != null)
         {
             _printableReportDialog.Activate();

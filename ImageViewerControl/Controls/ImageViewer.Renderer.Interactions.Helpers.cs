@@ -16,16 +16,5 @@ namespace ImageViewer.Controls
             var vm = ViewModel;
             vm.UndoRedo.Execute(new AddRoiCommand(roi, vm));
         }
-
-        private void ApplyCircularCaliperDetection(CircularCaliperMeasureRoi caliper)
-        {
-            if (caliper is ArcCaliperMeasureRoi arcCaliper)
-            {
-                TryApplyArcCaliperDetection(arcCaliper);
-                return;
-            }
-
-            TryApplyCircularCaliperDetection(caliper);
-        }
     }
 }

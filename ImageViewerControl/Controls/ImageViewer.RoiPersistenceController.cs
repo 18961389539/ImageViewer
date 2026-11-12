@@ -53,6 +53,12 @@ namespace ImageViewer.Controls
 
         public async Task SaveRoisAsync()
         {
+            if (RoiToleranceDrafts.TryGetError(_host.AllRois, out string? message))
+            {
+                _host.ShowStatusHint(message, StatusHintKind.Error);
+                return;
+            }
+
             string? filePath = _host.ShowSaveRoiDialog();
             if (string.IsNullOrWhiteSpace(filePath))
             {

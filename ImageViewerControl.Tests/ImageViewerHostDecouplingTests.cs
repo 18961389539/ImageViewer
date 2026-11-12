@@ -14,7 +14,9 @@ namespace ImageViewerControl.Tests
             Type[] interfaces = typeof(ImageViewer.Controls.ImageViewer).GetInterfaces();
 
             Assert.DoesNotContain(typeof(IImageViewerFeatureMenuCommandHost), interfaces);
-            Assert.DoesNotContain(typeof(IImageViewerViewCommandHost), interfaces);
+            Assert.DoesNotContain(typeof(IImageViewerViewOptions), interfaces);
+            Assert.DoesNotContain(typeof(IImageViewerViewportOperations), interfaces);
+            Assert.DoesNotContain(typeof(IImageViewerImageTransformOperations), interfaces);
             Assert.DoesNotContain(typeof(IImageViewerModeCommandHost), interfaces);
             Assert.DoesNotContain(typeof(IImageViewerAnalysisCommandHost), interfaces);
             Assert.DoesNotContain(typeof(IImageViewerRoiMenuCommandHost), interfaces);

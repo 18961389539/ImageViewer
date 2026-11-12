@@ -28,13 +28,12 @@ namespace ImageViewer.Services
                 return false;
             }
 
-            if (!ImageAnalysisService.TryDetectLineCaliperEdgesCore(bitmap, lineCaliper, out result, qualityProfile))
+            if (!CaliperRoiDetection.TryDetectAndApply(bitmap, lineCaliper, out result, qualityProfile))
             {
                 lineCaliper.ClearDetectedLine();
                 return false;
             }
 
-            RoiDetectionResultMapper.Apply(lineCaliper, result);
             return true;
         }
     }

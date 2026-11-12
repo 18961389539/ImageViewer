@@ -10,26 +10,20 @@ namespace ImageViewer.Controls
         private readonly ImageViewer _owner;
         private readonly ContentControl _propertyEditorHost;
         private readonly FrameworkElement _propertyPanel;
-        private readonly Action<CaliperMeasureRoi> _applyCaliperDetection;
-        private readonly Action<LineCaliperMeasureRoi> _applyLineCaliperDetection;
-        private readonly Action<CircularCaliperMeasureRoi> _applyCircularCaliperDetection;
+        private readonly Action<RoiBase> _applyCaliperDetection;
         private readonly Action _drawRois;
 
         public ImageViewerRoiSelectionStateHost(
             ImageViewer owner,
             ContentControl propertyEditorHost,
             FrameworkElement propertyPanel,
-            Action<CaliperMeasureRoi> applyCaliperDetection,
-            Action<LineCaliperMeasureRoi> applyLineCaliperDetection,
-            Action<CircularCaliperMeasureRoi> applyCircularCaliperDetection,
+            Action<RoiBase> applyCaliperDetection,
             Action drawRois)
         {
             _owner = owner ?? throw new ArgumentNullException(nameof(owner));
             _propertyEditorHost = propertyEditorHost ?? throw new ArgumentNullException(nameof(propertyEditorHost));
             _propertyPanel = propertyPanel ?? throw new ArgumentNullException(nameof(propertyPanel));
             _applyCaliperDetection = applyCaliperDetection ?? throw new ArgumentNullException(nameof(applyCaliperDetection));
-            _applyLineCaliperDetection = applyLineCaliperDetection ?? throw new ArgumentNullException(nameof(applyLineCaliperDetection));
-            _applyCircularCaliperDetection = applyCircularCaliperDetection ?? throw new ArgumentNullException(nameof(applyCircularCaliperDetection));
             _drawRois = drawRois ?? throw new ArgumentNullException(nameof(drawRois));
         }
 
@@ -51,20 +45,7 @@ namespace ImageViewer.Controls
             _owner.UpdateInteractionModeVisuals();
         }
 
-        public void ApplyCaliperDetection(CaliperMeasureRoi roi)
-        {
-            _applyCaliperDetection(roi);
-        }
-
-        public void ApplyLineCaliperDetection(LineCaliperMeasureRoi roi)
-        {
-            _applyLineCaliperDetection(roi);
-        }
-
-        public void ApplyCircularCaliperDetection(CircularCaliperMeasureRoi roi)
-        {
-            _applyCircularCaliperDetection(roi);
-        }
+        public void ApplyCaliperDetection(RoiBase roi) => _applyCaliperDetection(roi);
 
         public void DrawRois()
         {

@@ -22,10 +22,8 @@ namespace ImageViewerControl.Tests
     [Trait("Category", "Wpf")]
     public class ImageViewerSessionControllerTests
     {
-        [Theory]
-        [InlineData(false)]
-        [InlineData(true)]
-        public void PersistenceSnapshots_KeepCapturedCalibrationWhenTheLiveCalibrationChanges(bool autoSave)
+        [Fact]
+        public void PersistenceSnapshot_KeepsCapturedCalibrationWhenTheLiveCalibrationChanges()
         {
             var calibration = new CameraCalibration
             {
@@ -40,9 +38,7 @@ namespace ImageViewerControl.Tests
                 Calibration = calibration
             };
             var dependencies = CreateDependencies(host);
-            ImageViewerPersistenceSnapshot snapshot = autoSave
-                ? dependencies.AutoSave.CaptureSnapshot()
-                : dependencies.Persistence.CaptureSnapshot();
+            ImageViewerPersistenceSnapshot snapshot = dependencies.Persistence.CaptureSnapshot();
             var service = new ImageViewerSessionService();
             string capturedJson = service.SerializeSession("captured", snapshot, host.PluginRegistry);
 
@@ -64,7 +60,7 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
-        public void PersistenceSnapshots_DetachReferenceAndCurrentDatumPoints()
+        public void PersistenceSnapshot_DetachesReferenceAndCurrentDatumPoints()
         {
             WpfTestRunner.Run(() =>
             {
@@ -78,18 +74,14 @@ namespace ImageViewerControl.Tests
                     CurrentRecipeDatumPoints = [current]
                 };
                 var workflows = CreateDependencies(host);
-                ImageViewerPersistenceSnapshot manual = workflows.Persistence.CaptureSnapshot();
-                ImageViewerPersistenceSnapshot recovery = workflows.AutoSave.CaptureSnapshot();
+                ImageViewerPersistenceSnapshot snapshot = workflows.Persistence.CaptureSnapshot();
 
                 reference.X = 999;
                 current.Y = 999;
 
-                Assert.Equal(coordinates, manual.CoordinateSystem);
-                Assert.Equal(coordinates, recovery.CoordinateSystem);
-                Assert.Equal(12, Assert.Single(manual.ReferenceDatumPoints).X);
-                Assert.Equal(12, Assert.Single(recovery.ReferenceDatumPoints).X);
-                Assert.Equal(78, Assert.Single(manual.CurrentDatumPoints).Y);
-                Assert.Equal(78, Assert.Single(recovery.CurrentDatumPoints).Y);
+                Assert.Equal(coordinates, snapshot.CoordinateSystem);
+                Assert.Equal(12, Assert.Single(snapshot.ReferenceDatumPoints).X);
+                Assert.Equal(78, Assert.Single(snapshot.CurrentDatumPoints).Y);
             });
         }
 
@@ -322,7 +314,7 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
-        public void AutoSave_WithoutProjectPath_StillWritesSessionUsingFallbackName()
+        public void AutoSave_WithoutProjectPath_PreservesUnresolvedRoisInRecoverySnapshot()
         {
             WpfTestRunner.Run(() =>
             {
@@ -338,10 +330,14 @@ namespace ImageViewerControl.Tests
                     var schedulerFactory = new RecordingPeriodicTaskSchedulerFactory();
 
                     using var controller = CreateController(host, schedulerFactory, rootPath);
+                    var unresolved = new RoiPersistenceData { Type = "missing-plugin", Label = "inspection" };
+                    controller.AppendUnresolvedRois([unresolved]);
 
                     schedulerFactory.Scheduler.InvokeCallbackAsync().GetAwaiter().GetResult();
 
                     Assert.NotNull(sessionService.LastSaveFilePath);
+                    RoiPersistenceData saved = Assert.Single(sessionService.LastSavedSnapshot!.RoiDocument.Items);
+                    Assert.Equal((unresolved.Type, unresolved.Label), (saved.Type, saved.Label));
                     Assert.Empty(host.LoggedErrors);
                     Assert.Empty(host.StatusHints);
                 }
@@ -1883,17 +1879,6 @@ namespace ImageViewerControl.Tests
                 {
                     Dispatcher = host.Dispatcher,
                     HasContent = () => host.HasContent,
-                    GetCurrentViewportState = () => host.CurrentViewportState,
-                    TryGetCurrentImagePath = () => host.CurrentImagePath,
-                    GetAllRois = () => host.AllRois,
-                    GetPixelSize = () => host.PixelSize,
-                    GetPhysicalUnit = () => host.PhysicalUnit,
-                    GetCalibration = () => host.Calibration,
-                    GetWorkpieceCoordinateSystem = () => host.CoordinateSystem,
-                    GetRecipeDatumPoints = () => host.RecipeDatumPoints,
-                    GetCurrentRecipeDatumPoints = () => host.CurrentRecipeDatumPoints,
-                    SessionService = host.SessionService,
-                    GetPluginRegistry = () => host.PluginRegistry,
                     LogNonCriticalError = host.LogNonCriticalError,
                     ShowStatusHint = (message, _) => host.StatusHints.Add(message)
                 }
@@ -2036,6 +2021,8 @@ namespace ImageViewerControl.Tests
         {
             public string? LastSaveFilePath { get; private set; }
 
+            public ImageViewerPersistenceSnapshot? LastSavedSnapshot { get; private set; }
+
             public RoiPluginRegistry? LastSavePluginRegistry { get; private set; }
 
             public string? LastLoadFilePath { get; private set; }
@@ -2071,6 +2058,7 @@ namespace ImageViewerControl.Tests
                 }
 
                 LastSaveFilePath = filePath;
+                LastSavedSnapshot = snapshot;
                 LastSavePluginRegistry = pluginRegistry;
                 Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
                 File.WriteAllText(filePath, "session");

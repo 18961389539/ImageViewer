@@ -20,9 +20,9 @@ namespace ImageViewer.Controls
 {
     public partial class ImageViewer
     {
-        private const double ToolbarCompactWidthThreshold = 760;
-        private const double ToolbarCompactHeightThreshold = 420;
-        private bool _rightOverlayPanelsCollapsed;
+        private const double RoiSidebarAutoHideWidth = 680;
+        private const double RoiSidebarWidth = 300;
+        private bool? _rightOverlayVisibilityOverride;
         private ICollectionView? _roiListView;
 
         private void InitializeEventHandlers()
@@ -38,6 +38,7 @@ namespace ImageViewer.Controls
             rootGrid.Drop += OnDrop;
             KeyDown += OnKeyDown;
             rootGrid.SizeChanged += OnRootGridSizeChanged;
+            viewerLayout.SizeChanged += OnViewerLayoutSizeChanged;
         }
 
         private void UnregisterEventHandlers()
@@ -52,45 +53,55 @@ namespace ImageViewer.Controls
             rootGrid.DragLeave -= OnDragLeave;
             rootGrid.Drop -= OnDrop;
             rootGrid.SizeChanged -= OnRootGridSizeChanged;
+            viewerLayout.SizeChanged -= OnViewerLayoutSizeChanged;
             KeyDown -= OnKeyDown;
         }
 
         private void OnRootGridSizeChanged(object sender, SizeChangedEventArgs e)
         {
-            UpdateToolbarLayout();
+            if (ImageSource != null && e.PreviousSize.Width > 0 && e.PreviousSize.Height > 0
+                && e.NewSize.Width > 0 && e.NewSize.Height > 0)
+            {
+                // Resizing or docking a panel should keep the same image point at the viewport center.
+                _controlComposition.ViewportController.TranslateBy(new Vector(
+                    (e.NewSize.Width - e.PreviousSize.Width) / 2,
+                    (e.NewSize.Height - e.PreviousSize.Height) / 2));
+            }
+
             _imageViewStateController.HandleRootGridSizeChanged();
+        }
+
+        private void OnViewerLayoutSizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (e.WidthChanged)
+            {
+                UpdateRightOverlayPanelLayout();
+            }
         }
 
         private void UpdateToolbarLayout()
         {
-            double width = rootGrid.ActualWidth;
-            double height = rootGrid.ActualHeight;
-            bool isCompactViewport = width > 0 && (width < ToolbarCompactWidthThreshold || height > 0 && height < ToolbarCompactHeightThreshold);
-
-            toolbarPanel.Visibility = ShowToolbar && !isCompactViewport ? Visibility.Visible : Visibility.Collapsed;
-            // 工具栏被用户隐藏后仍保留一个固定入口，避免只能依赖右键菜单才能恢复。
-            toolbarCompactButton.Visibility = !ShowToolbar || isCompactViewport ? Visibility.Visible : Visibility.Collapsed;
-
-            string launcherHint = ShowToolbar
-                ? UiText.Get("ToolbarCompactHint")
-                : UiText.Get("ToolbarRestoreHint");
-            toolbarCompactButton.Content = ShowToolbar
-                ? UiText.Get("ToolbarCommandMenuButton")
-                : UiText.Get("ToolbarRestoreButton");
-            toolbarCompactButton.ToolTip = launcherHint;
-            toolbarCompactButton.SetValue(System.Windows.Automation.AutomationProperties.HelpTextProperty, launcherHint);
+            toolbarPanel.Visibility = ShowToolbar ? Visibility.Visible : Visibility.Collapsed;
+            toolbarCompactButton.Visibility = ShowToolbar ? Visibility.Collapsed : Visibility.Visible;
         }
 
-        private void OnCompactToolbarClick(object sender, RoutedEventArgs e)
-        {
-            if (!ShowToolbar)
-            {
-                ShowToolbar = true;
-                return;
-            }
+        private void OnCompactToolbarClick(object sender, RoutedEventArgs e) => ShowToolbar = true;
 
-            mainContextMenu.PlacementTarget = toolbarCompactButton;
+        private void OnMoreCommandsClick(object sender, RoutedEventArgs e)
+        {
+            CaptureContextualPathVertex(null, null);
+            mainContextMenu.PlacementTarget = moreCommandsButton;
+            mainContextMenu.Placement = PlacementMode.Bottom;
             mainContextMenu.IsOpen = true;
+        }
+
+        private void OnContextMenuClosed(object sender, RoutedEventArgs e)
+        {
+            if (ReferenceEquals(mainContextMenu.PlacementTarget, moreCommandsButton))
+            {
+                mainContextMenu.ClearValue(ContextMenu.PlacementTargetProperty);
+                mainContextMenu.ClearValue(ContextMenu.PlacementProperty);
+            }
         }
 
         private void OnToolbarHideClick(object sender, RoutedEventArgs e)
@@ -173,39 +184,22 @@ namespace ImageViewer.Controls
         {
             quickToolsPanel.Children.Clear();
 
-            IEnumerable<RoiToolDescriptor> quickTools = AvailableDrawingTools
-                .Where(tool => !tool.IsMeasurement)
-                .Take(5)
-                .Concat(AvailableDrawingTools.Where(tool => tool.IsMeasurement).Take(3));
-
-            foreach (RoiToolDescriptor tool in quickTools)
+            RoiToolDescriptor? tool = AvailableDrawingTools.FirstOrDefault(
+                tool => ReferenceEquals(tool.DrawController, BuiltInDrawControllers.LineMeasure));
+            if (tool is not null)
             {
                 var button = new ToggleButton
                 {
                     ToolTip = tool.Header,
                     Tag = new ImageViewerRoiToolMenuTag(tool.Header, tool.Activate),
                     Style = (Style)FindResource("ViewerToolbarToggleButtonStyle"),
+                    Margin = new Thickness(0, 2, 5, 2),
+                    Padding = new Thickness(8, 5, 8, 5),
+                    MinHeight = 28,
                     IsChecked = IsToolInteractionActive && string.Equals(tool.Header, ActiveToolName, StringComparison.Ordinal)
                 };
-
-                if (tool.CreateIcon is Func<FrameworkElement> createIcon)
-                {
-                    var content = new StackPanel { Orientation = Orientation.Horizontal };
-                    FrameworkElement icon = createIcon();
-                    icon.Margin = new Thickness(0, 0, 5, 0);
-                    content.Children.Add(icon);
-                    content.Children.Add(new TextBlock
-                    {
-                        Text = tool.Header,
-                        VerticalAlignment = VerticalAlignment.Center
-                    });
-                    button.Content = content;
-                }
-                else
-                {
-                    button.Content = tool.Header;
-                }
-
+                button.Content = tool.Header;
+                button.SetBinding(IsEnabledProperty, new Binding("MenuState.View.FitToViewEnabled") { Source = this });
                 button.Click += OnToolbarRoiToolClick;
                 quickToolsPanel.Children.Add(button);
             }
@@ -365,7 +359,7 @@ namespace ImageViewer.Controls
             ApplyMenuAvailabilityHints();
         }
 
-        public Task ShowOpenImageDialogAsync() => _imageSourceController.OpenImageAsync();
+        public Task ShowOpenImageDialogAsync() => FileImageWorkflow.OpenImageAsync();
 
         [EditorBrowsable(EditorBrowsableState.Never)]
         [Obsolete("Use ShowOpenImageDialogAsync() instead.", false)]

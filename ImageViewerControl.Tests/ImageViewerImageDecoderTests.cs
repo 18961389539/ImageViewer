@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Media;
@@ -22,6 +23,38 @@ namespace ImageViewerControl.Tests
         private const uint White = 0xFFFFFFFF;
         private const uint Black = 0xFF000000;
         private const uint Yellow = 0xFF00FFFF;
+
+        [Fact]
+        public async Task BatchDecode_BlocksReplacementAfterHashingAndReleasesFileAfterDecoding()
+        {
+            string path = Path.Combine(Path.GetTempPath(), $"imageviewer-batch-input-{Guid.NewGuid():N}.png");
+            string replacement = path + ".replacement";
+            try
+            {
+                WpfTestRunner.Run(() => SaveGray16Slice(path, 3, 1234));
+                byte[] original = await File.ReadAllBytesAsync(path);
+                string sha256 = Convert.ToHexString(SHA256.HashData(original));
+                ImageViewerImageDecoder.ImageFileTrace? captured = null;
+                BitmapSource bitmap = await ImageViewerImageDecoder.LoadBatchImageAsync(path, trace =>
+                {
+                    captured = trace;
+                    Assert.Throws<IOException>(() => File.Move(path, replacement));
+                }, CancellationToken.None);
+
+                Assert.Equal(sha256, captured?.Sha256);
+                Assert.Equal(original.LongLength, captured?.Length);
+                Assert.Equal(File.GetLastWriteTimeUtc(path), captured?.LastWriteTimeUtc);
+                var pixels = new ushort[12];
+                bitmap.CopyPixels(pixels, 6, 0);
+                Assert.All(pixels, pixel => Assert.Equal((ushort)1234, pixel));
+                File.Move(path, replacement);
+            }
+            finally
+            {
+                File.Delete(path);
+                File.Delete(replacement);
+            }
+        }
 
         [Fact]
         public async Task VolumePreflight_ChecksAllDimensionsAndBudgetsForDecodedFormat()

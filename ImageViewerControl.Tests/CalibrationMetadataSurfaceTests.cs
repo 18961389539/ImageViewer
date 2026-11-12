@@ -154,12 +154,13 @@ namespace ImageViewerControl.Tests
         {
             WpfTestRunner.Run(() =>
             {
-                var dialog = new CalibrationDialog("mm");
+                var dialog = new CalibrationDialog("px");
                 Realize(dialog);
                 SetFieldByLabel(dialog, "CalibrationDialogActualLengthLabel", "10");
 
                 Assert.True(dialog.TryCommit());
 
+                Assert.Equal("mm", dialog.Unit);
                 Assert.Null(dialog.Distortion);
                 Assert.Equal(0, dialog.K1);
                 Assert.Equal(0, dialog.K2);

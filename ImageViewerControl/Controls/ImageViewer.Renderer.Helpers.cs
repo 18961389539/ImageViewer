@@ -12,7 +12,7 @@ namespace ImageViewer.Controls
             return new RoiRenderContext(
                 targetCanvas,
                 ScreenOverlayCanvas,
-                ImageToScreen,
+                imageContainer.RenderTransform.Value.Transform,
                 Scale,
                 PixelSize,
                 PhysicalUnit,
@@ -22,12 +22,7 @@ namespace ImageViewer.Controls
                 AngleArcRadius,
                 PointAnnotationSize,
                 PolygonResizeHandlePadding,
-                PolygonCloseHighlightPadding);
-        }
-
-        private Point ImageToScreen(Point point)
-        {
-            return new Point(point.X * Scale + translateTransform.X, point.Y * Scale + translateTransform.Y);
+                PolygonCloseHighlightPadding) { Calibration = Calibration };
         }
 
         /// <summary>

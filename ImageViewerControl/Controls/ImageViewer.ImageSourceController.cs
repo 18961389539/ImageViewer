@@ -6,7 +6,6 @@ namespace ImageViewer.Controls
 {
     internal sealed class ImageSourceController
     {
-        private readonly ImageViewerDialogWorkflowService _dialogWorkflowService;
         private readonly Func<bool> _isLoadedProvider;
         private readonly Func<ImageSource?> _imageSourceProvider;
         private readonly Func<ImageSource?, Task> _prepareAnalysisResourcesAsync;
@@ -17,7 +16,6 @@ namespace ImageViewer.Controls
         private bool _pendingInitialization;
 
         public ImageSourceController(
-            ImageViewerDialogWorkflowService dialogWorkflowService,
             Func<bool> isLoadedProvider,
             Func<ImageSource?> imageSourceProvider,
             Func<ImageSource?, Task> prepareAnalysisResourcesAsync,
@@ -26,7 +24,6 @@ namespace ImageViewer.Controls
             Action refreshAllCaliperDetections,
             Action drawRois)
         {
-            _dialogWorkflowService = dialogWorkflowService ?? throw new ArgumentNullException(nameof(dialogWorkflowService));
             _isLoadedProvider = isLoadedProvider ?? throw new ArgumentNullException(nameof(isLoadedProvider));
             _imageSourceProvider = imageSourceProvider ?? throw new ArgumentNullException(nameof(imageSourceProvider));
             _prepareAnalysisResourcesAsync = prepareAnalysisResourcesAsync ?? throw new ArgumentNullException(nameof(prepareAnalysisResourcesAsync));
@@ -34,11 +31,6 @@ namespace ImageViewer.Controls
             _imageViewStateController = imageViewStateController ?? throw new ArgumentNullException(nameof(imageViewStateController));
             _refreshAllCaliperDetections = refreshAllCaliperDetections ?? throw new ArgumentNullException(nameof(refreshAllCaliperDetections));
             _drawRois = drawRois ?? throw new ArgumentNullException(nameof(drawRois));
-        }
-
-        public async Task OpenImageAsync()
-        {
-            await _dialogWorkflowService.OpenImageAsync();
         }
 
         public void HandleLoaded()

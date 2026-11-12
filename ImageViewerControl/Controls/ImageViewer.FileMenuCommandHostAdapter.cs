@@ -66,11 +66,11 @@ namespace ImageViewer.Controls
 
     internal sealed class ImageViewerFileDialogCapability : IImageViewerFileDialogCapability
     {
-        private readonly ImageViewerDialogWorkflowService _dialogWorkflowService;
+        private readonly Func<Task> _showOpenImageDialogAsync;
 
-        public ImageViewerFileDialogCapability(ImageViewerDialogWorkflowService dialogWorkflowService) => _dialogWorkflowService = dialogWorkflowService ?? throw new ArgumentNullException(nameof(dialogWorkflowService));
+        public ImageViewerFileDialogCapability(Func<Task> showOpenImageDialogAsync) => _showOpenImageDialogAsync = showOpenImageDialogAsync ?? throw new ArgumentNullException(nameof(showOpenImageDialogAsync));
 
-        public Task ShowOpenImageDialogAsync() => _dialogWorkflowService.OpenImageAsync();
+        public Task ShowOpenImageDialogAsync() => _showOpenImageDialogAsync();
     }
 
     internal sealed class ImageViewerFileOperationsCapability : IImageViewerFileOperationsCapability

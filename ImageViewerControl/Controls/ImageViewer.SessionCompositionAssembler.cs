@@ -30,10 +30,10 @@ namespace ImageViewer.Controls
                         Persistence = new ImageViewerSessionPersistenceWorkflow
                         {
                             ShowSaveSessionDialog = dialogWorkflowService.ShowSaveSessionDialog,
-                            ConfirmUnsavedChanges = () => _owner.DialogService.ConfirmUnsavedDocumentChanges(Window.GetWindow(_owner)),
+                            ConfirmUnsavedChanges = () => _owner.DialogService.ConfirmUnsavedDocumentChanges(_owner.GetDocumentDialogWindow()),
                             ShowOpenSessionDialog = dialogWorkflowService.ShowOpenSessionDialog,
                             LocateSessionImage = (imagePath, sessionPath) =>
-                                _owner.RuntimeServices.FileDialogService.ShowLocateSessionImageDialog(Window.GetWindow(_owner), imagePath, sessionPath),
+                                _owner.RuntimeServices.FileDialogService.ShowLocateSessionImageDialog(_owner.GetDocumentDialogWindow(), imagePath, sessionPath),
                             ShowSaveProjectPackageDialog = dialogWorkflowService.ShowSaveProjectPackageDialog,
                             ShowSaveRecipeDialog = dialogWorkflowService.ShowSaveRecipeDialog,
                             ShowOpenRecipeDialog = dialogWorkflowService.ShowOpenRecipeDialog,
@@ -101,20 +101,6 @@ namespace ImageViewer.Controls
                         {
                             Dispatcher = _owner.Dispatcher,
                             HasContent = () => _owner.ImageSource != null || _owner.ViewerState.AllRois.Count > 0,
-                            GetCurrentViewportState = () => viewportController.CurrentState,
-                            TryGetCurrentImagePath = viewportController.TryGetCurrentImagePath,
-                            GetCurrentBitmap = () => _owner.ImageSource as BitmapSource,
-                            GetAllRois = () => _owner.ViewerState.AllRois,
-                            GetPixelSize = () => _owner.PixelSize,
-                            GetPhysicalUnit = () => _owner.PhysicalUnit,
-                            GetCalibration = () => _owner.Calibration,
-                            GetDisplay = () => _owner.DisplayAdjustment,
-                            GetWorkpieceCoordinateSystem = () => _owner.WorkpieceCoordinateSystem,
-                            GetRecipeDatumPoints = _owner.GetRecipeReferenceDatums,
-                            GetCurrentRecipeDatumPoints = _owner.GetRecipeCurrentDatums,
-                            GetQualityProfile = () => _owner.QualityProfile,
-                            SessionService = _owner.RuntimeServices.SessionService,
-                            GetPluginRegistry = () => _owner.PluginRegistry,
                             LogNonCriticalError = _owner.LogNonCriticalError,
                             ShowStatusHint = (message, kind) => _owner.ShowStatusHint(message, kind)
                         }
@@ -123,7 +109,7 @@ namespace ImageViewer.Controls
                     _owner.HostServices.SessionStoragePolicy);
 
                 ImageViewerRoiPersistenceController roiPersistenceController = CreateRoiPersistenceController(dialogWorkflowService);
-                ImageViewerFileMenuCommandController fileMenuCommandController = CreateFileMenuCommandController(dialogWorkflowService, sessionController, roiPersistenceController);
+                ImageViewerFileMenuCommandController fileMenuCommandController = CreateFileMenuCommandController(sessionController, roiPersistenceController);
 
                 return new ImageViewerSessionComposition(sessionController, roiPersistenceController, fileMenuCommandController);
             }
@@ -143,17 +129,15 @@ namespace ImageViewer.Controls
             }
 
             private ImageViewerFileMenuCommandController CreateFileMenuCommandController(
-                ImageViewerDialogWorkflowService dialogWorkflowService,
                 ImageViewerSessionController sessionController,
                 ImageViewerRoiPersistenceController roiPersistenceController)
             {
-                ArgumentNullException.ThrowIfNull(dialogWorkflowService);
                 ArgumentNullException.ThrowIfNull(sessionController);
                 ArgumentNullException.ThrowIfNull(roiPersistenceController);
 
                 return new ImageViewerFileMenuCommandController(
                     new ImageViewerFileMenuCommandHostAdapter(
-                        new ImageViewerFileDialogCapability(dialogWorkflowService),
+                        new ImageViewerFileDialogCapability(_owner.ShowOpenImageDialogAsync),
                         new ImageViewerFileOperationsCapability(sessionController, roiPersistenceController),
                         new ImageViewerContextMenuCapability(_owner)));
             }

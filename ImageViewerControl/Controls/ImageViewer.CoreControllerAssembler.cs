@@ -51,8 +51,6 @@ namespace ImageViewer.Controls
                         _owner.roiPropertyEditorHost,
                         _owner.roiPropertyPanel,
                         roi => _owner.TryApplyCaliperDetection(roi),
-                        roi => _owner.TryApplyLineCaliperDetection(roi),
-                        roi => _owner.TryApplyCircularCaliperDetection(roi),
                         () => _owner.DrawRois()));
             }
 
@@ -100,7 +98,7 @@ namespace ImageViewer.Controls
                 ArgumentNullException.ThrowIfNull(roiSelectionStateController);
                 ArgumentNullException.ThrowIfNull(viewportController);
 
-                IImageViewerDialogWorkflowAdapter dialogWorkflowAdapter = _dependencies.CreateDialogWorkflowAdapter(() => Window.GetWindow(_owner));
+                IImageViewerDialogWorkflowAdapter dialogWorkflowAdapter = _dependencies.CreateDialogWorkflowAdapter(_owner.GetDocumentDialogWindow);
                 return _dependencies.CreateDialogWorkflowService(
                     new ImageViewerDialogWorkflowDependencies
                     {
@@ -108,8 +106,8 @@ namespace ImageViewer.Controls
                         {
                             GetRetryCount = () => _owner.RuntimeOptions.ImageLoadRetryCount,
                             GetRetryDelayMilliseconds = () => _owner.RuntimeOptions.ImageLoadRetryDelayMilliseconds,
-                            PrepareReplacementAsync = (source, token) => _owner._sessionController.PrepareImageDocumentAsync(
-                                () => _owner.SetCurrentValue(ImageSourceProperty, source), markDirty: true, token),
+                            PrepareReplacementAsync = _owner.PrepareOpenedImageAsync,
+                            SuspendReplacementWrites = () => _owner.SuspendImageReplacementWrites?.Invoke(),
                             SetImageLoadState = _owner.SetImageLoadState,
                             ShowNonCriticalError = _owner.ShowNonCriticalError
                         },
@@ -121,19 +119,19 @@ namespace ImageViewer.Controls
                             HandleRoiEdited = roiSelectionStateController.HandleRoiEdited,
                             CreateStateCommand = static (roi, oldState, newState) => ImageViewer.CreateStateCommand(roi, oldState, newState),
                             ExecuteUndoRedoCommand = command => _owner.ViewerState.UndoRedo.Execute(command),
-                            TryApplyCaliperDetection = roi => _owner.TryApplyCaliperDetection(roi),
-                            TryApplyLineCaliperDetection = roi => _owner.TryApplyLineCaliperDetection(roi),
-                            TryApplyCircularCaliperDetection = roi => _owner.TryApplyCircularCaliperDetection(roi)
+                            ApplyCaliperDetection = roi => _owner.TryApplyCaliperDetection(roi)
                         },
                         Calibration = new ImageViewerDialogCalibrationWorkflow
                         {
                             GetPhysicalUnit = () => _owner.PhysicalUnit,
                             GetCalibration = () => _owner.Calibration,
+                            NormalizeCalibration = distortion => NormalizeCalibration(distortion, _owner.ImageSource?.Width ?? 0, _owner.ImageSource?.Height ?? 0),
+                            ShowCalibrationError = message => _owner.ShowStatusHint(message, StatusHintKind.Error),
                             ApplyCalibration = (pixelSize, unit, distortion) =>
                             {
                                 _owner.PixelSize = pixelSize;
                                 _owner.PhysicalUnit = unit;
-                                _owner.Calibration = NormalizeCalibration(distortion, _owner.ImageSource?.Width ?? 0, _owner.ImageSource?.Height ?? 0);
+                                _owner.Calibration = distortion;
                             }
                         }
                     },
@@ -152,7 +150,8 @@ namespace ImageViewer.Controls
                     return null;
                 }
 
-                bool hasGeometry = calibration.NormalizationRadius > 0 && (calibration.PrincipalX != 0 || calibration.PrincipalY != 0);
+                bool hasGeometry = calibration.NormalizationRadius != 1 ||
+                    calibration.PrincipalX != 0 || calibration.PrincipalY != 0;
                 if (hasGeometry || imageWidth <= 0 || imageHeight <= 0)
                 {
                     return calibration;
@@ -176,13 +175,11 @@ namespace ImageViewer.Controls
             }
 
             public ImageSourceController CreateImageSourceController(
-                ImageViewerDialogWorkflowService dialogWorkflowService,
                 IImageViewStateController imageViewStateController)
-            {                ArgumentNullException.ThrowIfNull(dialogWorkflowService);
+            {
                 ArgumentNullException.ThrowIfNull(imageViewStateController);
 
                 return new ImageSourceController(
-                    dialogWorkflowService,
                     () => _owner.IsLoaded,
                     () => _owner.ImageSource,
                     source => _owner.PrepareAnalysisResourcesAsync(source),
@@ -212,14 +209,12 @@ namespace ImageViewer.Controls
             }
 
             public DroppedContentController CreateDroppedContentController(
-                ImageViewerDialogWorkflowService dialogWorkflowService,
                 ImageViewerSessionController sessionController)
             {
-                ArgumentNullException.ThrowIfNull(dialogWorkflowService);
                 ArgumentNullException.ThrowIfNull(sessionController);
 
                 return new DroppedContentController(
-                    dialogWorkflowService,
+                    path => _owner.FileImageWorkflow.OpenImageFromPathAsync(path),
                     sessionController,
                     () => _owner._roiSelectionStateController.RefreshPropertyPanel(),
                     (message, kind) => _owner.ShowStatusHint(message, kind));

@@ -43,7 +43,6 @@ namespace ImageViewer.Controls
 
             if (_volume == null)
             {
-                _imageViewer.SetVolumeSliceImage(null);
                 statusText.Text = UiText.Get("StatusLoadVolumeFirstMpr");
                 return Task.FromResult(false);
             }

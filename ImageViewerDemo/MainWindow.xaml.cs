@@ -28,6 +28,7 @@ public partial class MainWindow : Window, IDisposable
     {
         InitializeComponent();
         Loaded += OnMainWindowLoaded;
+        Viewer.ImageDocumentOpened += (_, _) => ClearOpenSummary();
     }
 
     /// <summary>
@@ -48,7 +49,12 @@ public partial class MainWindow : Window, IDisposable
             CancellationToken token = _openCancellation!.Token;
             BitmapSource bitmap = await LoadImageWithProgressAsync(path, token);
             token.ThrowIfCancellationRequested();
+            if (Viewer.ImageSource != null || Viewer.ImageViewer.IsImageLoading)
+            {
+                return;
+            }
             Viewer.ImageSource = bitmap;
+            Viewer.ImageViewer.FitImageToView();
             Viewer.MarkDocumentClean();
         }
         catch (OperationCanceledException)
@@ -66,52 +72,20 @@ public partial class MainWindow : Window, IDisposable
     }
 
 
-    private void OnOpenImageClick(object sender, RoutedEventArgs e)
+    private async void OnOpenImageClick(object sender, RoutedEventArgs e)
     {
-        var dialog = new OpenFileDialog
-        {
-            Title = DemoText.Get("OpenImageDialogTitle"),
-            Filter = DemoText.Get("OpenImageDialogFilter")
-        };
-
-        if (dialog.ShowDialog(this) != true)
-        {
-            return;
-        }
-
-        _ = OpenImageAsync(dialog.FileName);
-    }
-
-    private async Task OpenImageAsync(string path)
-    {
-        if (!TryBeginOpen(DemoText.Get("ImageLoadingStatus"), isIndeterminate: false))
+        if (_isOpeningData)
         {
             return;
         }
 
         try
         {
-            CancellationToken token = _openCancellation!.Token;
-            BitmapSource bitmap = await LoadImageWithProgressAsync(path, token);
-            token.ThrowIfCancellationRequested();
-            if (!await Viewer.ReplaceImageDocumentAsync(bitmap, token))
-            {
-                token.ThrowIfCancellationRequested();
-                return;
-            }
-            ClearOpenSummary();
-        }
-        catch (OperationCanceledException)
-        {
-            SetOpenStatus(DemoText.Get("OpenCancelledStatus"));
+            await Viewer.ShowOpenImageDialogAsync();
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, ex.Message, DemoText.Get("OpenImageErrorTitle"), MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-        finally
-        {
-            EndOpen();
+            MessageBox.Show(this, ex.GetBaseException().Message, DemoText.Get("OpenImageErrorTitle"), MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -130,8 +104,10 @@ public partial class MainWindow : Window, IDisposable
             string path = Path.Combine(AppContext.BaseDirectory, "Resources", "MeasurementSample.ivsession");
             if (await Viewer.OpenProjectFromFileAsync(path))
             {
-                Viewer.ImageViewer.ShowToolbar = true;
                 SetOpenSummary(DemoText.Get("MeasurementSampleGuide"));
+                // The bundled session can be opened in a window of any size.
+                Viewer.UpdateLayout();
+                Viewer.ImageViewer.FitImageToView();
             }
         }
         catch (OperationCanceledException)

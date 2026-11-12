@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using ImageViewer.Localization;
 using ImageViewer.Models;
@@ -26,8 +27,9 @@ namespace ImageViewer.Dialogs
         public CalibrationDialog(string currentUnit, CameraCalibration? currentCalibration = null)
         {
             Title = UiText.Get("CalibrationDialogTitle");
-            Width = 400;
-            Height = 660;
+            Width = 430;
+            SizeToContent = SizeToContent.Height;
+            MaxHeight = Math.Min(560, SystemParameters.WorkArea.Height);
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             ResizeMode = ResizeMode.NoResize;
 
@@ -36,44 +38,46 @@ namespace ImageViewer.Dialogs
             scrollViewer.Content = stackPanel;
 
             stackPanel.Children.Add(new TextBlock { Text = UiText.Get("CalibrationDialogPrompt"), Margin = new Thickness(0, 0, 0, 10), TextWrapping = TextWrapping.Wrap });
-            stackPanel.Children.Add(new TextBlock { Text = UiText.Get("CalibrationDialogHint"), Margin = new Thickness(0, 0, 0, 10), TextWrapping = TextWrapping.Wrap, Foreground = System.Windows.Media.Brushes.Gray });
-
             _lengthTextBox = new TextBox { Text = "1.0", Margin = new Thickness(0, 0, 0, 8) };
-            _unitTextBox = new TextBox { Text = string.IsNullOrWhiteSpace(currentUnit) ? UiText.Get("CalibrationDefaultUnit") : currentUnit };
+            _unitTextBox = new TextBox
+            {
+                Text = string.IsNullOrWhiteSpace(currentUnit) || string.Equals(currentUnit.Trim(), UiText.Get("InfoUnitPixels"), StringComparison.OrdinalIgnoreCase)
+                    ? UiText.Get("CalibrationDefaultUnit")
+                    : currentUnit
+            };
+            AutomationProperties.SetName(_lengthTextBox, UiText.Get("CalibrationDialogActualLengthLabel"));
+            AutomationProperties.SetName(_unitTextBox, UiText.Get("CalibrationDialogUnitLabel"));
 
             stackPanel.Children.Add(new TextBlock { Text = UiText.Get("CalibrationDialogActualLengthLabel"), Margin = new Thickness(0, 0, 0, 2) });
             stackPanel.Children.Add(_lengthTextBox);
             stackPanel.Children.Add(new TextBlock { Text = UiText.Get("CalibrationDialogUnitLabel"), Margin = new Thickness(0, 8, 0, 2) });
             stackPanel.Children.Add(_unitTextBox);
 
-            stackPanel.Children.Add(new TextBlock { Text = UiText.Get("CalibrationDialogDistortionHeader"), Margin = new Thickness(0, 10, 0, 4), FontWeight = FontWeights.SemiBold });
-            stackPanel.Children.Add(new TextBlock { Text = UiText.Get("CalibrationDialogDistortionHint"), Margin = new Thickness(0, 0, 0, 4), TextWrapping = TextWrapping.Wrap, Foreground = System.Windows.Media.Brushes.Gray });
+            StackPanel distortion = AddOptionalSection(stackPanel, "CalibrationDialogDistortionHeader", "CalibrationDialogDistortionHint");
 
-            _k1TextBox = AddLabeledField(stackPanel, "CalibrationDialogK1Label", Format(currentCalibration?.K1));
-            _k2TextBox = AddLabeledField(stackPanel, "CalibrationDialogK2Label", Format(currentCalibration?.K2));
-            _k3TextBox = AddLabeledField(stackPanel, "CalibrationDialogK3Label", Format(currentCalibration?.K3));
-            _p1TextBox = AddLabeledField(stackPanel, "CalibrationDialogP1Label", Format(currentCalibration?.TangentialP1, "G6"));
-            _p2TextBox = AddLabeledField(stackPanel, "CalibrationDialogP2Label", Format(currentCalibration?.TangentialP2, "G6"));
+            _k1TextBox = AddLabeledField(distortion, "CalibrationDialogK1Label", Format(currentCalibration?.K1));
+            _k2TextBox = AddLabeledField(distortion, "CalibrationDialogK2Label", Format(currentCalibration?.K2));
+            _k3TextBox = AddLabeledField(distortion, "CalibrationDialogK3Label", Format(currentCalibration?.K3));
+            _p1TextBox = AddLabeledField(distortion, "CalibrationDialogP1Label", Format(currentCalibration?.TangentialP1, "G6"));
+            _p2TextBox = AddLabeledField(distortion, "CalibrationDialogP2Label", Format(currentCalibration?.TangentialP2, "G6"));
 
-            stackPanel.Children.Add(new TextBlock { Text = UiText.Get("CalibrationDialogAccuracyHeader"), Margin = new Thickness(0, 12, 0, 4), FontWeight = FontWeights.SemiBold });
-            stackPanel.Children.Add(new TextBlock { Text = UiText.Get("CalibrationDialogAccuracyHint"), Margin = new Thickness(0, 0, 0, 4), TextWrapping = TextWrapping.Wrap, Foreground = System.Windows.Media.Brushes.Gray });
+            StackPanel accuracy = AddOptionalSection(stackPanel, "CalibrationDialogAccuracyHeader", "CalibrationDialogAccuracyHint");
 
-            _reprojectionErrorTextBox = AddLabeledField(stackPanel, "CalibrationDialogReprojectionErrorLabel", Format(currentCalibration?.ReprojectionErrorRms, "G6"));
-            _uncertaintyTextBox = AddLabeledField(stackPanel, "CalibrationDialogUncertaintyLabel", Format(currentCalibration?.MeasurementUncertaintyPixels, "G6"));
-            _calibrationIdTextBox = AddLabeledField(stackPanel, "CalibrationDialogIdLabel", currentCalibration?.CalibrationId ?? string.Empty);
+            _reprojectionErrorTextBox = AddLabeledField(accuracy, "CalibrationDialogReprojectionErrorLabel", Format(currentCalibration?.ReprojectionErrorRms, "G6"));
+            _uncertaintyTextBox = AddLabeledField(accuracy, "CalibrationDialogUncertaintyLabel", Format(currentCalibration?.MeasurementUncertaintyPixels, "G6"));
+            _calibrationIdTextBox = AddLabeledField(accuracy, "CalibrationDialogIdLabel", currentCalibration?.CalibrationId ?? string.Empty);
 
-            stackPanel.Children.Add(new TextBlock { Text = UiText.Get("CalibrationDialogGeometryHeader"), Margin = new Thickness(0, 12, 0, 4), FontWeight = FontWeights.SemiBold });
-            stackPanel.Children.Add(new TextBlock { Text = UiText.Get("CalibrationDialogGeometryHint"), Margin = new Thickness(0, 0, 0, 4), TextWrapping = TextWrapping.Wrap, Foreground = System.Windows.Media.Brushes.Gray });
+            StackPanel geometry = AddOptionalSection(stackPanel, "CalibrationDialogGeometryHeader", "CalibrationDialogGeometryHint");
 
-            _principalXTextBox = AddLabeledField(stackPanel, "CalibrationDialogPrincipalXLabel", Format(currentCalibration?.PrincipalX, "G8"));
-            _principalYTextBox = AddLabeledField(stackPanel, "CalibrationDialogPrincipalYLabel", Format(currentCalibration?.PrincipalY, "G8"));
-            _normalizationRadiusTextBox = AddLabeledField(stackPanel, "CalibrationDialogNormalizationRadiusLabel", Format(currentCalibration?.NormalizationRadius, "G8"));
+            _principalXTextBox = AddLabeledField(geometry, "CalibrationDialogPrincipalXLabel", Format(currentCalibration?.PrincipalX, "G8"));
+            _principalYTextBox = AddLabeledField(geometry, "CalibrationDialogPrincipalYLabel", Format(currentCalibration?.PrincipalY, "G8"));
+            _normalizationRadiusTextBox = AddLabeledField(geometry, "CalibrationDialogNormalizationRadiusLabel", Format(currentCalibration?.NormalizationRadius, "G8"));
 
             var buttonPanel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
                 HorizontalAlignment = HorizontalAlignment.Right,
-                Margin = new Thickness(0, 12, 0, 0)
+                Margin = new Thickness(10, 2, 10, 10)
             };
             var okButton = new Button { Content = UiText.Get("DialogButtonOk"), Width = 60, IsDefault = true, Margin = new Thickness(0, 0, 10, 0) };
             okButton.Click += OnOkClick;
@@ -82,9 +86,11 @@ namespace ImageViewer.Dialogs
 
             buttonPanel.Children.Add(okButton);
             buttonPanel.Children.Add(cancelButton);
-            stackPanel.Children.Add(buttonPanel);
-
-            Content = scrollViewer;
+            var layout = new DockPanel();
+            DockPanel.SetDock(buttonPanel, Dock.Bottom);
+            layout.Children.Add(buttonPanel);
+            layout.Children.Add(scrollViewer);
+            Content = layout;
             Loaded += (_, _) =>
             {
                 _lengthTextBox.Focus();
@@ -106,10 +112,29 @@ namespace ImageViewer.Dialogs
         /// </summary>
         public CameraCalibration? Distortion { get; private set; }
 
+        private static StackPanel AddOptionalSection(Panel parent, string headerKey, string hintKey)
+        {
+            var content = new StackPanel { Margin = new Thickness(18, 4, 0, 0) };
+            content.Children.Add(new TextBlock
+            {
+                Text = UiText.Get(hintKey),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 6)
+            });
+            parent.Children.Add(new Expander
+            {
+                Header = UiText.Get(headerKey),
+                Content = content,
+                Margin = new Thickness(0, 8, 0, 0)
+            });
+            return content;
+        }
+
         private static TextBox AddLabeledField(Panel panel, string labelKey, string initialText)
         {
             panel.Children.Add(new TextBlock { Text = UiText.Get(labelKey), Margin = new Thickness(0, 0, 0, 2) });
             var textBox = new TextBox { Text = initialText, Margin = new Thickness(0, 0, 0, 6), Width = 160, HorizontalAlignment = HorizontalAlignment.Left };
+            AutomationProperties.SetName(textBox, UiText.Get(labelKey));
             panel.Children.Add(textBox);
             return textBox;
         }
@@ -145,7 +170,7 @@ namespace ImageViewer.Dialogs
         /// </summary>
         internal bool TryCommit()
         {
-            if (!double.TryParse(_lengthTextBox.Text, out double length) || length <= 0)
+            if (!double.TryParse(_lengthTextBox.Text, out double length) || !double.IsFinite(length) || length <= 0)
             {
                 return false;
             }

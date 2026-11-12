@@ -35,10 +35,18 @@ namespace ImageViewer.Services
                 lines.Add($"- {group.Key}: {group.Count()}");
             }
 
-            var usable = roiList.Where(roi => !RoiCalibrationHelper.AuditRoi(roi, calibration).HasNonConvergedPoints).ToList();
+            var usable = roiList.Where(roi => RoiCalibrationHelper.CanUseMeasurements(calibration, RoiCalibrationHelper.AuditRoi(roi, calibration))).ToList();
+            string unit = string.IsNullOrWhiteSpace(physicalUnit) ? "px" : physicalUnit;
             if (usable.Count != roiList.Count)
             {
-                lines.Add($"ROIs excluded from measurement totals (undistortion did not converge): {roiList.Count - usable.Count}");
+                string reason = calibration is { IsValid: false } ? "invalid calibration" : "undistortion did not converge";
+                lines.Add($"ROIs excluded from measurement totals ({reason}): {roiList.Count - usable.Count}");
+                if (usable.Count == 0)
+                {
+                    lines.Add("Measurement totals: n/a");
+                    lines.AddRange(BuildPrecisionLines(roiList, pixelSize, unit, calibration));
+                    return string.Join(Environment.NewLine, lines);
+                }
             }
             double totalLineLength = usable.OfType<LineMeasureRoi>().Sum(line => GeometryUtils.Distance(line.P1.ToWpfPoint(), line.P2.ToWpfPoint()) * RoiCalibrationHelper.GetLengthCorrection(line, calibration) * pixelSize);
             double totalPolylineLength = usable.OfType<PolylineRoi>().Sum(poly => GeometryUtils.PolylineLength(poly.Points.ToWpfPointArray()) * RoiCalibrationHelper.GetLengthCorrection(poly, calibration)) * pixelSize;
@@ -48,7 +56,6 @@ namespace ImageViewer.Services
             double totalCircleArea = usable.OfType<CircleRoi>().Sum(circle => Math.PI * circle.Radius * circle.Radius * RoiCalibrationHelper.GetAreaCorrection(circle, calibration)) * pixelSize * pixelSize;
             totalCircleArea += usable.OfType<ThreePointCircleMeasureRoi>().Where(circle => circle.IsValid).Sum(circle => Math.PI * circle.Radius * circle.Radius * RoiCalibrationHelper.GetAreaCorrection(circle, calibration)) * pixelSize * pixelSize;
             double totalCenterDistance = usable.OfType<CenterDistanceMeasureRoi>().Sum(distance => distance.CenterDistance * RoiCalibrationHelper.GetLengthCorrection(distance, calibration)) * pixelSize;
-            string unit = string.IsNullOrWhiteSpace(physicalUnit) ? "px" : physicalUnit;
 
             lines.Add(string.Empty);
             lines.Add($"Line Length Total: {totalLineLength:F2} {unit}");
@@ -126,7 +133,7 @@ namespace ImageViewer.Services
             {
                 RoiInspectionResult inspection = RoiInspectionEvaluator.Evaluate(roi, pixelSize, calibration);
                 distortionAudit = distortionAudit.Combine(inspection.DistortionAudit);
-                string unit = IsAngularQuantity(roi) ? "°" : string.IsNullOrWhiteSpace(physicalUnit) ? "px" : physicalUnit!;
+                string unit = DescribeUnit(roi, physicalUnit);
                 items.Add(new MeasurementReportItem(
                     DescribeRoi(roi),
                     DescribeQuantity(roi),
@@ -251,9 +258,6 @@ namespace ImageViewer.Services
             _ => "测量值"
         };
 
-        private static bool IsAngularQuantity(RoiBase roi) =>
-            roi is ParallelismMeasureRoi or PerpendicularityMeasureRoi or ConcentricityMeasureRoi or AngleMeasureRoi;
-
         /// <summary>
         /// 追加精度摘要。
         /// Chinese: 单次测量的结果必须带上"这次测量能信到什么程度"；有公差配置的 ROI 会给出
@@ -302,7 +306,7 @@ namespace ImageViewer.Services
                 string distortionSuffix = roiAudit.HasNonConvergedPoints
                     ? $" undistortion=not-converged({roiAudit.NonConvergedPointCount}/{roiAudit.PointCount},maxResidual={roiAudit.MaximumResidualPixels:F4}px)"
                     : string.Empty;
-                yield return $"[Precision] {DescribeRoi(roi)}: measured={measured:F4} {unit} " +
+                yield return $"[Precision] {DescribeRoi(roi)}: measured={measured:F4} {DescribeUnit(roi, unit)} " +
                     $"combinedUncertainty(k=2)={(combined.HasValue ? $"{combined.Value:F4} {unit}" : "n/a")} " +
                     $"repeatability=1 sample{distortionSuffix}";
             }
@@ -580,7 +584,7 @@ namespace ImageViewer.Services
                     FormatNullable(inspection.NominalValue),
                     FormatNullable(inspection.TolerancePlus),
                     FormatNullable(inspection.ToleranceMinus),
-                    Escape(unit)));
+                    Escape(DescribeUnit(roi, unit))));
             }
 
             return builder.ToString();
@@ -589,7 +593,7 @@ namespace ImageViewer.Services
         private static (string Metric1, string Metric2, string Metric3) GetMetrics(RoiBase roi, double pixelSize, string unit, CameraCalibration? calibration)
         {
             double correction = RoiCalibrationHelper.GetLengthCorrection(roi, calibration);
-            double areaCorrection = correction * correction;
+            double areaCorrection = RoiCalibrationHelper.GetAreaCorrection(roi, calibration);
             return roi switch
             {
                 RotatedRect rect => ($"Width={rect.Width * correction * pixelSize:F2} {unit}", $"Height={rect.Height * correction * pixelSize:F2} {unit}", $"Angle={rect.Angle:F1}°"),
@@ -625,7 +629,7 @@ namespace ImageViewer.Services
 
         private static (string Metric1, string Metric2, string Metric3) GetAuditedMetrics(
             RoiBase roi, double pixelSize, string unit, CameraCalibration? calibration, RoiInspectionResult inspection)
-            => inspection.DistortionAudit is { HasNonConvergedPoints: true }
+            => !RoiCalibrationHelper.CanUseMeasurements(calibration, inspection.DistortionAudit)
                 ? (string.Empty, string.Empty, string.Empty)
                 : GetMetrics(roi, pixelSize, unit, calibration);
 

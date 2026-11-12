@@ -15,14 +15,8 @@ namespace ImageViewer.Dialogs
     internal sealed class LineMeasureCaliperSettingsDialog : CaliperSettingsDialogBase
     {
         private readonly CaliperMeasureRoi _model;
-        private readonly TextBox _caliperCountTextBox;
-        private readonly TextBox _searchRangeTextBox;
-        private readonly TextBox _samplingHalfWidthTextBox;
-        private readonly TextBox _edgeSigmaTextBox;
+        private readonly CommonFields _commonFields;
         private readonly TextBox _regionLengthTextBox;
-        private readonly TextBox _minimumGradientTextBox;
-        private readonly TextBox _minimumValidCalipersTextBox;
-        private readonly TextBox _outlierThresholdTextBox;
         private readonly TextBox _minimumEdgeGapTextBox;
         private readonly TextBox _nominalEdgeGapTextBox;
         private readonly TextBox _nominalEdgeGapToleranceTextBox;
@@ -42,15 +36,12 @@ namespace ImageViewer.Dialogs
         {
             _model = model;
 
-            _caliperCountTextBox = AddField(PrimaryPanel, UiText.Get("CaliperFieldCount"), _model.CaliperCount.ToString(CultureInfo.InvariantCulture));
-            _searchRangeTextBox = AddField(PrimaryPanel, UiText.Get("CaliperFieldSearchRange"), _model.CaliperSearchRange.ToString(CultureInfo.InvariantCulture));
+            _commonFields = new CommonFields(this, new CommonInputs(
+                _model.CaliperCount, _model.CaliperSearchRange, _model.CaliperSamplingHalfWidth,
+                _model.CaliperEdgeSigma, _model.CaliperMinimumGradient, _model.MinimumValidCalipers,
+                _model.CaliperOutlierThreshold));
             _regionLengthTextBox = AddField(PrimaryPanel, UiText.Get("CaliperFieldRegionLength"), _model.CaliperRegionLength.ToString(CultureInfo.InvariantCulture));
 
-            _samplingHalfWidthTextBox = AddField(AdvancedPanel, UiText.Get("CaliperFieldSamplingHalfWidth"), _model.CaliperSamplingHalfWidth.ToString(CultureInfo.InvariantCulture));
-            _edgeSigmaTextBox = AddField(AdvancedPanel, UiText.Get("CaliperFieldEdgeSigma"), _model.CaliperEdgeSigma.ToString(CultureInfo.InvariantCulture));
-            _minimumGradientTextBox = AddField(AdvancedPanel, UiText.Get("CaliperFieldMinimumGradient"), _model.CaliperMinimumGradient.ToString(CultureInfo.InvariantCulture));
-            _minimumValidCalipersTextBox = AddField(AdvancedPanel, UiText.Get("CaliperFieldMinimumValid"), _model.MinimumValidCalipers.ToString(CultureInfo.InvariantCulture));
-            _outlierThresholdTextBox = AddField(AdvancedPanel, UiText.Get("CaliperFieldOutlierThreshold"), _model.CaliperOutlierThreshold.ToString(CultureInfo.InvariantCulture));
             _minimumEdgeGapTextBox = AddField(AdvancedPanel, UiText.Get("CaliperFieldMinimumEdgeGap"), _model.MinimumEdgeGap.ToString(CultureInfo.InvariantCulture));
             _nominalEdgeGapTextBox = AddField(AdvancedPanel, UiText.Get("CaliperFieldNominalEdgeGap"), _model.NominalEdgeGap.ToString(CultureInfo.InvariantCulture));
             _nominalEdgeGapToleranceTextBox = AddField(AdvancedPanel, UiText.Get("CaliperFieldNominalEdgeGapTolerance"), _model.NominalEdgeGapTolerance.ToString(CultureInfo.InvariantCulture));
@@ -74,14 +65,7 @@ namespace ImageViewer.Dialogs
             };
             AdvancedPanel.Children.Add(_lineFitModeComboBox);
 
-            EnableLivePreview(_caliperCountTextBox);
-            EnableLivePreview(_searchRangeTextBox);
-            EnableLivePreview(_samplingHalfWidthTextBox);
-            EnableLivePreview(_edgeSigmaTextBox);
             EnableLivePreview(_regionLengthTextBox);
-            EnableLivePreview(_minimumGradientTextBox);
-            EnableLivePreview(_minimumValidCalipersTextBox);
-            EnableLivePreview(_outlierThresholdTextBox);
             EnableLivePreview(_minimumEdgeGapTextBox);
             EnableLivePreview(_nominalEdgeGapTextBox);
             EnableLivePreview(_nominalEdgeGapToleranceTextBox);
@@ -97,14 +81,8 @@ namespace ImageViewer.Dialogs
         protected override bool TryApplyInputs(out string errorMessage)
         {
             errorMessage = UiText.Get("LineMeasureCaliperDialogInvalidMessage");
-            if (!TryParsePositiveInt(_caliperCountTextBox.Text, out int caliperCount, minValue: 3) ||
-                !TryParsePositiveInt(_searchRangeTextBox.Text, out int searchRange, minValue: 1) ||
-                !TryParseNonNegativeInt(_samplingHalfWidthTextBox.Text, out int samplingHalfWidth) ||
-                !TryParseNonNegativeDouble(_edgeSigmaTextBox.Text, out double edgeSigma) || edgeSigma < 0.5 || edgeSigma > 5.0 ||
+            if (!_commonFields.TryRead(minimumCount: 3, minimumValidCount: 2, out CommonInputs common) ||
                 !TryParseNonNegativeDouble(_regionLengthTextBox.Text, out double regionLength) ||
-                !TryParseNonNegativeDouble(_minimumGradientTextBox.Text, out double minimumGradient) ||
-                !TryParsePositiveInt(_minimumValidCalipersTextBox.Text, out int minimumValidCalipers, minValue: 2) ||
-                !TryParseNonNegativeDouble(_outlierThresholdTextBox.Text, out double outlierThreshold) ||
                 !TryParseNonNegativeDouble(_minimumEdgeGapTextBox.Text, out double minimumEdgeGap) ||
                 !TryParseNonNegativeDouble(_nominalEdgeGapTextBox.Text, out double nominalEdgeGap) ||
                 !TryParseNonNegativeDouble(_nominalEdgeGapToleranceTextBox.Text, out double nominalEdgeGapTolerance) ||
@@ -115,14 +93,14 @@ namespace ImageViewer.Dialogs
                 return false;
             }
 
-            _model.CaliperCount = caliperCount;
-            _model.CaliperSearchRange = searchRange;
-            _model.CaliperSamplingHalfWidth = samplingHalfWidth;
-            _model.CaliperEdgeSigma = edgeSigma;
+            _model.CaliperCount = common.Count;
+            _model.CaliperSearchRange = common.SearchRange;
+            _model.CaliperSamplingHalfWidth = common.SamplingHalfWidth;
+            _model.CaliperEdgeSigma = common.EdgeSigma;
             _model.CaliperRegionLength = regionLength;
-            _model.CaliperMinimumGradient = minimumGradient;
-            _model.MinimumValidCalipers = minimumValidCalipers;
-            _model.CaliperOutlierThreshold = outlierThreshold;
+            _model.CaliperMinimumGradient = common.MinimumGradient;
+            _model.MinimumValidCalipers = common.MinimumValidCalipers;
+            _model.CaliperOutlierThreshold = common.OutlierThreshold;
             _model.MinimumEdgeGap = minimumEdgeGap;
             _model.NominalEdgeGap = nominalEdgeGap;
             _model.NominalEdgeGapTolerance = nominalEdgeGapTolerance;

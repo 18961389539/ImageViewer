@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -41,10 +42,11 @@ namespace ImageViewer.Controls
             else
             {
                 string? filePath = _controlComposition?.ViewportController.TryGetCurrentImagePath();
+                string dimensions = UiText.Format("StatusBarImageSizeOnly", (int)imageSize.Width, (int)imageSize.Height);
                 text = string.IsNullOrEmpty(filePath)
-                    ? UiText.Format("StatusBarImageSizeOnly", (int)imageSize.Width, (int)imageSize.Height)
-                    : UiText.Format("StatusBarImageSizeAndPath", (int)imageSize.Width, (int)imageSize.Height, filePath);
-                statusBarTextBlock.ToolTip = text;
+                    ? dimensions
+                    : UiText.Format("StatusBarImageSizeAndPath", (int)imageSize.Width, (int)imageSize.Height, Path.GetFileName(filePath));
+                statusBarTextBlock.ToolTip = filePath ?? dimensions;
             }
 
             if (!string.Equals(statusBarTextBlock.Text, text, StringComparison.Ordinal))
@@ -55,6 +57,7 @@ namespace ImageViewer.Controls
             }
 
             statusBarBorder.Visibility = Visibility.Visible;
+            UpdateCalibrationIndicator();
         }
 
         /// <summary>
@@ -90,10 +93,15 @@ namespace ImageViewer.Controls
 
             string text = isCalibrated
                 ? UiText.FormatInvariant("CalibrationBadgeText", PixelSize, unit)
-                : UiText.Get("CalibrationBadgeUncalibratedText");
-            if (isCalibrated && Calibration is not null)
+                : UiText.Get("CalibrationBadgePixels");
+            if (isCalibrated)
             {
-                text += " " + UiText.Get("CalibrationBadgeDistortionSuffix");
+                text += " " + UiText.Get(Calibration switch
+                {
+                    { IsValid: false } => "CalibrationBadgeInvalidDistortionSuffix",
+                    { IsEnabled: true } => "CalibrationBadgeDistortionSuffix",
+                    _ => "CalibrationBadgeScaleOnlySuffix"
+                });
             }
 
             // 标定精度元数据（重投影 RMS / 不确定度）之前没有任何出口，用户无法判断标定是否够用。
@@ -160,11 +168,15 @@ namespace ImageViewer.Controls
             builder.Append(UiText.FormatInvariant("CalibrationBadgeTooltipScale", PixelSize, unit));
             if (Calibration is not { } calibration)
             {
-                return builder.ToString();
+                return builder.AppendLine().Append(UiText.Get("CalibrationBadgeTooltipNoDistortion")).ToString();
             }
 
             builder.Append(Environment.NewLine);
-            if (calibration.HasExtendedDistortionModel)
+            if (!calibration.IsValid)
+            {
+                builder.Append(UiText.Get("CalibrationBadgeTooltipInvalidDistortion"));
+            }
+            else if (calibration.HasExtendedDistortionModel)
             {
                 builder.Append(UiText.FormatInvariant(
                     "CalibrationBadgeTooltipDistortionExtended",
@@ -203,12 +215,6 @@ namespace ImageViewer.Controls
                     calibration.CalibratedAtUtc.HasValue
                         ? calibration.CalibratedAtUtc.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.CurrentCulture)
                         : UiText.Get("CalibrationBadgeNoTimestamp")));
-            }
-
-            if (!calibration.IsValid)
-            {
-                builder.Append(Environment.NewLine);
-                builder.Append(UiText.Get("CalibrationBadgeInvalidWarning"));
             }
 
             return builder.ToString();

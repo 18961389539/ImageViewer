@@ -181,6 +181,58 @@ namespace ImageViewer.Dialogs
             return double.TryParse(text, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out value) && value >= 0;
         }
 
+        protected readonly record struct CommonInputs(
+            int Count, int SearchRange, int SamplingHalfWidth, double EdgeSigma,
+            double MinimumGradient, int MinimumValidCalipers, double OutlierThreshold);
+
+        protected sealed class CommonFields
+        {
+            private readonly TextBox _count;
+            private readonly TextBox _searchRange;
+            private readonly TextBox _samplingHalfWidth;
+            private readonly TextBox _edgeSigma;
+            private readonly TextBox _minimumGradient;
+            private readonly TextBox _minimumValidCalipers;
+            private readonly TextBox _outlierThreshold;
+
+            public CommonFields(CaliperSettingsDialogBase dialog, CommonInputs values)
+            {
+                _count = AddNumberField(dialog.PrimaryPanel, "CaliperFieldCount", values.Count);
+                _searchRange = AddNumberField(dialog.PrimaryPanel, "CaliperFieldSearchRange", values.SearchRange);
+                _samplingHalfWidth = AddNumberField(dialog.AdvancedPanel, "CaliperFieldSamplingHalfWidth", values.SamplingHalfWidth);
+                _edgeSigma = AddNumberField(dialog.AdvancedPanel, "CaliperFieldEdgeSigma", values.EdgeSigma);
+                _minimumGradient = AddNumberField(dialog.AdvancedPanel, "CaliperFieldMinimumGradient", values.MinimumGradient);
+                _minimumValidCalipers = AddNumberField(dialog.AdvancedPanel, "CaliperFieldMinimumValid", values.MinimumValidCalipers);
+                _outlierThreshold = AddNumberField(dialog.AdvancedPanel, "CaliperFieldOutlierThreshold", values.OutlierThreshold);
+
+                TextBox AddNumberField<T>(Panel panel, string labelKey, T value) where T : IFormattable
+                {
+                    TextBox textBox = AddField(panel, UiText.Get(labelKey), value.ToString(null, CultureInfo.InvariantCulture));
+                    dialog.EnableLivePreview(textBox);
+                    return textBox;
+                }
+            }
+
+            public bool TryRead(int minimumCount, int minimumValidCount, out CommonInputs values)
+            {
+                values = default;
+                if (!TryParsePositiveInt(_count.Text, out int count, minimumCount) ||
+                    !TryParsePositiveInt(_searchRange.Text, out int searchRange, minValue: 1) ||
+                    !TryParseNonNegativeInt(_samplingHalfWidth.Text, out int samplingHalfWidth) ||
+                    !TryParseNonNegativeDouble(_edgeSigma.Text, out double edgeSigma) || edgeSigma is < 0.5 or > 5.0 ||
+                    !TryParseNonNegativeDouble(_minimumGradient.Text, out double minimumGradient) ||
+                    !TryParsePositiveInt(_minimumValidCalipers.Text, out int minimumValidCalipers, minimumValidCount) ||
+                    !TryParseNonNegativeDouble(_outlierThreshold.Text, out double outlierThreshold))
+                {
+                    return false;
+                }
+
+                values = new CommonInputs(count, searchRange, samplingHalfWidth, edgeSigma,
+                    minimumGradient, minimumValidCalipers, outlierThreshold);
+                return true;
+            }
+        }
+
         private void OnOkClick(object? sender, RoutedEventArgs e)
         {
             if (!TryApplyInputs(out string errorMessage))

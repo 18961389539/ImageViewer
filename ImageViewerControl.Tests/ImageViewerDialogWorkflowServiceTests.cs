@@ -10,6 +10,7 @@ using ImageViewer.Controls;
 using ImageViewer.Localization;
 using ImageViewer.Models;
 using ImageViewer.Plugins;
+using ImageViewer.Services;
 using ImageViewer.ViewModels;
 using Xunit;
 
@@ -43,15 +44,20 @@ namespace ImageViewerControl.Tests
                 P1 = new PointD(0, 0),
                 P2 = new PointD(10, 0)
             };
-            adapter.CalibrationResult = new CalibrationDialogResult(25d, "mm", new CameraCalibration { K1 = 0.01, K2 = -0.002 });
+            adapter.CalibrationResult = new CalibrationDialogResult(25d, "mm", new CameraCalibration { K1 = 0.35, NormalizationRadius = 10 });
 
             service.CalibrateSelectedRoi(roi);
 
-            Assert.Equal(2.5d, state.PixelSize, 5);
+            Assert.NotEqual(2.5d, state.PixelSize);
             Assert.Equal("mm", state.PhysicalUnit);
             Assert.NotNull(state.Calibration);
-            Assert.Equal(0.01, state.Calibration!.K1, 6);
-            Assert.Equal(-0.002, state.Calibration.K2, 6);
+            Assert.Equal(0.35, state.Calibration!.K1, 6);
+            Assert.Equal(25d, RoiInspectionEvaluator.Evaluate(roi, state.PixelSize, state.Calibration).MeasuredValue!.Value, 7);
+
+            adapter.CalibrationResult = new CalibrationDialogResult(10d, "cm", new CameraCalibration { K1 = -1, NormalizationRadius = 10 });
+            service.CalibrateSelectedRoi(roi);
+            Assert.Equal("mm", state.PhysicalUnit);
+            Assert.Equal(0.35, state.Calibration.K1, 6);
         }
 
         [Fact]
@@ -136,20 +142,20 @@ namespace ImageViewerControl.Tests
                     HandleRoiEdited = roi => state.EditedRois.Add(roi),
                     CreateStateCommand = state.CreateStateCommand,
                     ExecuteUndoRedoCommand = command => state.ExecutedCommands.Add(command),
-                    TryApplyCaliperDetection = roi =>
+                    ApplyCaliperDetection = roi =>
                     {
-                        state.CaliperDetectionCount++;
-                        return true;
-                    },
-                    TryApplyLineCaliperDetection = roi =>
-                    {
-                        state.LineCaliperDetectionCount++;
-                        return true;
-                    },
-                    TryApplyCircularCaliperDetection = roi =>
-                    {
-                        state.CircularCaliperDetectionCount++;
-                        return true;
+                        switch (roi)
+                        {
+                            case CaliperMeasureRoi:
+                                state.CaliperDetectionCount++;
+                                break;
+                            case LineCaliperMeasureRoi:
+                                state.LineCaliperDetectionCount++;
+                                break;
+                            case CircularCaliperMeasureRoi:
+                                state.CircularCaliperDetectionCount++;
+                                break;
+                        }
                     }
                 },
                 Calibration = new ImageViewerDialogCalibrationWorkflow

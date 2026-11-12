@@ -119,6 +119,9 @@ namespace ImageViewer.Controls
         {
             bool hasVolume = _volume != null;
             bool operationActive = _operationCancellation != null;
+            volumeControls.Visibility = hasVolume ? Visibility.Visible : Visibility.Collapsed;
+            stateBarText.Visibility = hasVolume ? Visibility.Visible : Visibility.Collapsed;
+            operationStatusPanel.Visibility = hasVolume || operationActive ? Visibility.Visible : Visibility.Collapsed;
             threeDimensionalButton.IsEnabled = hasVolume && !operationActive;
             axialButton.IsEnabled = hasVolume && !operationActive;
             coronalButton.IsEnabled = hasVolume && !operationActive;
@@ -126,6 +129,7 @@ namespace ImageViewer.Controls
             qualityButton.IsEnabled = hasVolume && !operationActive;
             segmentButton.IsEnabled = hasVolume && !operationActive;
             cancelButton.IsEnabled = operationActive || _isMprRebuilding;
+            cancelButton.Visibility = cancelButton.IsEnabled ? Visibility.Visible : Visibility.Collapsed;
             bool isMpr = hasVolume && (_displayMode == AdaptiveDisplayMode.Coronal || _displayMode == AdaptiveDisplayMode.Sagittal);
             mprSliceSlider.IsEnabled = isMpr && !operationActive;
             mprPreviousButton.IsEnabled = isMpr && !operationActive && mprSliceSlider.Value > mprSliceSlider.Minimum;
@@ -172,9 +176,12 @@ namespace ImageViewer.Controls
 
         private AdaptiveDisplayMode ResolveMode()
         {
-            return _displayMode == AdaptiveDisplayMode.Auto
-                ? (_volume == null ? AdaptiveDisplayMode.TwoDimensional : AdaptiveDisplayMode.ThreeDimensional)
-                : _displayMode;
+            if (_volume == null)
+            {
+                return AdaptiveDisplayMode.TwoDimensional;
+            }
+
+            return _displayMode == AdaptiveDisplayMode.Auto ? AdaptiveDisplayMode.ThreeDimensional : _displayMode;
         }
     }
 }

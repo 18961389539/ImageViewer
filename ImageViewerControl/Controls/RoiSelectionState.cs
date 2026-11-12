@@ -12,11 +12,7 @@ namespace ImageViewer.Controls
 
         void ApplyPropertyPanel(FrameworkElement? editor, bool isVisible);
 
-        void ApplyCaliperDetection(CaliperMeasureRoi roi);
-
-        void ApplyLineCaliperDetection(LineCaliperMeasureRoi roi);
-
-        void ApplyCircularCaliperDetection(CircularCaliperMeasureRoi roi);
+        void ApplyCaliperDetection(RoiBase roi);
 
         void DrawRois();
     }

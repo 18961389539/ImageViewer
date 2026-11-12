@@ -43,9 +43,15 @@ namespace ImageViewer.Controls
             InitializeComponent();
             Loaded += OnLoaded;
             _imageViewer = createImageViewer();
-            // 自适应宿主默认收起工具栏，把画布留给图像；点击左上角“工具栏”入口即可打开完整命令面板。
-            _imageViewer.ShowToolbar = false;
+            volumeImageLoadHost.DataContext = _imageViewer;
+            _imageViewer.rootGrid.PreviewMouseWheel += OnPreviewMouseWheel;
             _volumeViewer = new VolumeViewer(createImageViewer);
+            _imageViewer.DocumentDialogOwner = this;
+            _volumeViewer.SliceViewer.DocumentDialogOwner = this;
+            _volumeViewer.SliceViewer.SharedFileImageWorkflow = _imageViewer.FileImageWorkflow;
+            _imageViewer.PrepareHostedImageReplacementAsync = PrepareOpenedImageAsync;
+            _imageViewer.SuspendImageReplacementWrites = SuspendImageReplacementWrites;
+            _imageViewer.ImageLoadStateChanged += _volumeViewer.SliceViewer.SetImageLoadState;
             _volume3DViewer = new Volume3DViewer();
             _volume3DViewer.SwitchToAxialSliceRequested += OnSwitchToAxialSliceRequested;
             _volumeViewer.CurrentSliceChanged += OnCurrentSliceChanged;
@@ -62,7 +68,7 @@ namespace ImageViewer.Controls
             {
                 ObjectDisposedException.ThrowIf(_isDisposed, this);
                 _imageSource = value;
-                if (!IsMprMode(_displayMode))
+                if (!IsMprModeActive)
                 {
                     _imageViewer.ImageSource = value;
                 }
@@ -83,7 +89,7 @@ namespace ImageViewer.Controls
                 _readyMprMode = null;
                 if (IsMprMode(_displayMode))
                 {
-                    _imageViewer.SetVolumeSliceImage(null);
+                    _imageViewer.SetVolumeSliceImage(value is null ? _imageSource : null);
                 }
                 _operationCancellation?.Cancel();
                 _volume = value;
@@ -148,6 +154,12 @@ namespace ImageViewer.Controls
 
         public ImageViewer ImageViewer => _imageViewer;
 
+        /// <summary>Raised after a new 2D image replaces the current document.</summary>
+        public event EventHandler? ImageDocumentOpened;
+
+        /// <summary>Opens the shared file dialog for a 2D image.</summary>
+        public Task ShowOpenImageDialogAsync() => _imageViewer.ShowOpenImageDialogAsync();
+
         public bool IsDirty => _imageViewer.IsDirty || _volumeViewer.SliceViewer.IsDirty;
 
         public Task SaveSessionAsync() => _imageViewer.SaveSessionAsync();
@@ -173,10 +185,15 @@ namespace ImageViewer.Controls
         }
 
         /// <summary>Opens a new image document after protecting unsaved edits.</summary>
-        public Task<bool> ReplaceImageDocumentAsync(ImageSource image, CancellationToken cancellationToken = default)
+        public async Task<bool> ReplaceImageDocumentAsync(ImageSource image, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(image);
-            return ReplaceDocumentContentAsync(image, null, cancellationToken);
+            bool opened = await ReplaceDocumentContentAsync(image, null, cancellationToken);
+            if (opened)
+            {
+                ImageDocumentOpened?.Invoke(this, EventArgs.Empty);
+            }
+            return opened;
         }
 
         /// <summary>Opens a new volume document after protecting unsaved edits.</summary>
@@ -207,6 +224,30 @@ namespace ImageViewer.Controls
 
         private async Task<bool> ReplaceDocumentContentAsync(ImageSource image, VolumeData? volume, CancellationToken cancellationToken)
         {
+            // Both viewers can prompt before the shared volume changes. While preparing the
+            // replacement, drain existing writes and keep their next timers from racing it.
+            using var writes = SuspendImageReplacementWrites();
+            return await _imageViewer.ReplaceDocumentContentAsync(
+                token => PrepareRelatedImageContentAsync(image, volume, token), cancellationToken);
+        }
+
+        private async Task<Action?> PrepareOpenedImageAsync(ImageSource image, CancellationToken token)
+        {
+            Action? apply = await _imageViewer.PrepareDocumentContentAsync(
+                ct => PrepareRelatedImageContentAsync(image, null, ct), token);
+            if (apply == null)
+            {
+                return null;
+            }
+            return () =>
+            {
+                apply();
+                ImageDocumentOpened?.Invoke(this, EventArgs.Empty);
+            };
+        }
+
+        private Task<Action?> PrepareRelatedImageContentAsync(ImageSource image, VolumeData? volume, CancellationToken token)
+        {
             void ApplyContent()
             {
                 DisplayMode = AdaptiveDisplayMode.Auto;
@@ -214,18 +255,21 @@ namespace ImageViewer.Controls
                 ImageSource = image;
             }
 
-            // Both viewers can prompt before the shared volume changes. While preparing the
-            // replacement, drain existing writes and keep their next timers from racing it.
-            using IDisposable primaryPause = _imageViewer.SuspendAutoSaveWrites();
-            using IDisposable axialPause = _volumeViewer.SliceViewer.SuspendAutoSaveWrites();
-            return await _imageViewer.ReplaceDocumentContentAsync(token =>
+            return _volume != null || volume != null
+                ? _volumeViewer.SliceViewer.PrepareDocumentContentAsync(ApplyContent, token)
+                : Task.FromResult<Action?>(ApplyContent);
+        }
+
+        private IDisposable SuspendImageReplacementWrites() => new ImageReplacementWriteSuspension(
+            _imageViewer.SuspendAutoSaveWrites(), _volumeViewer.SliceViewer.SuspendAutoSaveWrites());
+
+        private sealed class ImageReplacementWriteSuspension(IDisposable primary, IDisposable axial) : IDisposable
+        {
+            public void Dispose()
             {
-                if (_volume != null || volume != null)
-                {
-                    return _volumeViewer.SliceViewer.PrepareDocumentContentAsync(ApplyContent, token);
-                }
-                return Task.FromResult<Action?>(ApplyContent);
-            }, cancellationToken);
+                axial.Dispose();
+                primary.Dispose();
+            }
         }
 
         /// <summary>Marks host-provided initial content as the saved baseline.</summary>
@@ -250,6 +294,13 @@ namespace ImageViewer.Controls
 
             _isDisposed = true;
             AbandonMprRequest();
+            _imageViewer.ImageLoadStateChanged -= _volumeViewer.SliceViewer.SetImageLoadState;
+            _volumeViewer.SliceViewer.SharedFileImageWorkflow = null;
+            _imageViewer.DocumentDialogOwner = null;
+            _volumeViewer.SliceViewer.DocumentDialogOwner = null;
+            _imageViewer.PrepareHostedImageReplacementAsync = null;
+            _imageViewer.SuspendImageReplacementWrites = null;
+            _imageViewer.rootGrid.PreviewMouseWheel -= OnPreviewMouseWheel;
             _imageViewer.Dispose();
             _volumeViewer.Dispose();
             _volume3DViewer.SwitchToAxialSliceRequested -= OnSwitchToAxialSliceRequested;
@@ -311,18 +362,32 @@ namespace ImageViewer.Controls
             {
                 contentHost.Content = view;
             }
+            volumeImageLoadHost.Visibility = ReferenceEquals(view, _volume3DViewer) ? Visibility.Visible : Visibility.Collapsed;
         }
+
+        private async void OnRetryVolumeImageLoadClick(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                await _imageViewer.RetryLastImageLoadAsync();
+            }
+            catch (Exception)
+            {
+                statusText.Text = UiText.Get("StatusViewerOperationFailed");
+            }
+        }
+
+        private void OnCancelVolumeImageLoadClick(object sender, RoutedEventArgs e) => _imageViewer.CancelImageLoad();
 
         private UserControl ResolveView()
         {
-            return _displayMode switch
+            return ResolveMode() switch
             {
                 AdaptiveDisplayMode.TwoDimensional => _imageViewer,
                 AdaptiveDisplayMode.ThreeDimensional => _volume3DViewer,
                 AdaptiveDisplayMode.AxialSlice => _volumeViewer,
                 AdaptiveDisplayMode.Coronal => _imageViewer,
                 AdaptiveDisplayMode.Sagittal => _imageViewer,
-                _ when _volume != null => _volume3DViewer,
                 _ => _imageViewer
             };
         }
@@ -382,6 +447,10 @@ namespace ImageViewer.Controls
 
             switch (e.Key)
             {
+                case Key.O when Keyboard.Modifiers == ModifierKeys.Control:
+                    e.Handled = true;
+                    await ShowOpenImageDialogAsync();
+                    break;
                 case Key.D1 when _volume != null:
                     DisplayMode = AdaptiveDisplayMode.AxialSlice;
                     break;

@@ -13,8 +13,10 @@ namespace ImageViewer.Controls
     internal sealed class ImageViewerAutoSaveController : IDisposable
     {
         private readonly ImageViewerAutoSaveWorkflow _workflow;
+        private readonly Func<ImageViewerPersistenceSnapshot> _captureSnapshot;
+        private readonly Func<string, ImageViewerPersistenceSnapshot, CancellationToken, Task> _saveRecoveryAsync;
         private readonly IImageViewerPeriodicTaskScheduler _autoSaveScheduler;
-        private readonly ImageViewerRecoveryIndex? _recoveryIndex;
+        private readonly ImageViewerRecoveryIndex _recoveryIndex;
         private readonly string _autoSaveDirectory;
         private Task _pendingWrite = Task.CompletedTask;
         private FileStream? _ownerLease;
@@ -26,27 +28,22 @@ namespace ImageViewer.Controls
 
         public ImageViewerAutoSaveController(
             ImageViewerAutoSaveWorkflow workflow,
-            IImageViewerPeriodicTaskSchedulerFactory periodicTaskSchedulerFactory,
-            IImageViewerSessionStoragePolicy sessionStoragePolicy,
-            string documentId)
-            : this(workflow, periodicTaskSchedulerFactory, sessionStoragePolicy, documentId, recoveryIndex: null)
-        {
-        }
-
-        public ImageViewerAutoSaveController(
-            ImageViewerAutoSaveWorkflow workflow,
+            Func<ImageViewerPersistenceSnapshot> captureSnapshot,
+            Func<string, ImageViewerPersistenceSnapshot, CancellationToken, Task> saveRecoveryAsync,
             IImageViewerPeriodicTaskSchedulerFactory periodicTaskSchedulerFactory,
             IImageViewerSessionStoragePolicy sessionStoragePolicy,
             string documentId,
-            ImageViewerRecoveryIndex? recoveryIndex)
+            ImageViewerRecoveryIndex recoveryIndex)
         {
             _workflow = workflow ?? throw new ArgumentNullException(nameof(workflow));
+            _captureSnapshot = captureSnapshot ?? throw new ArgumentNullException(nameof(captureSnapshot));
+            _saveRecoveryAsync = saveRecoveryAsync ?? throw new ArgumentNullException(nameof(saveRecoveryAsync));
             ArgumentNullException.ThrowIfNull(periodicTaskSchedulerFactory);
             ArgumentNullException.ThrowIfNull(sessionStoragePolicy);
             ArgumentException.ThrowIfNullOrWhiteSpace(documentId);
 
             _autoSaveDirectory = sessionStoragePolicy.AutoSaveDirectory;
-            _recoveryIndex = recoveryIndex;
+            _recoveryIndex = recoveryIndex ?? throw new ArgumentNullException(nameof(recoveryIndex));
             DocumentId = documentId;
             SessionInstanceId = Guid.NewGuid().ToString("N");
             TimeSpan autoSaveInterval = sessionStoragePolicy.AutoSaveInterval;
@@ -171,7 +168,7 @@ namespace ImageViewer.Controls
             {
                 // File commits and this continuation do not require the dispatcher to stay alive.
                 await _pendingWrite.ConfigureAwait(false);
-                _recoveryIndex?.DeleteOwnedSnapshots(SessionInstanceId);
+                _recoveryIndex.DeleteOwnedSnapshots(SessionInstanceId);
             }
             finally
             {
@@ -200,15 +197,11 @@ namespace ImageViewer.Controls
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 Directory.CreateDirectory(_autoSaveDirectory);
-                _ownerLease ??= _recoveryIndex?.TryAcquireOwnerLease(SessionInstanceId);
+                _ownerLease ??= _recoveryIndex.TryAcquireOwnerLease(SessionInstanceId);
                 string filePath = GetAutoSaveFilePath();
                 string? projectName = Path.GetFileName(_currentProjectPath);
-                ImageViewerPersistenceSnapshot snapshot = _workflow.CaptureSnapshot();
-                await _workflow.SessionService.SaveRecoveryToFileAsync(
-                    filePath,
-                    snapshot,
-                    _workflow.GetPluginRegistry(),
-                    cancellationToken).ConfigureAwait(false);
+                ImageViewerPersistenceSnapshot snapshot = _captureSnapshot();
+                await _saveRecoveryAsync(filePath, snapshot, cancellationToken).ConfigureAwait(false);
                 _lastAutoSaveFailed = false;
                 // 登记到恢复索引：DocumentId 每次启动都变，不登记的话重启后找不到这份未保存文档。
                 // 同时带上所有者与心跳：另一个窗口据此判断"这份快照还在被使用"，不该提示恢复它。
@@ -216,7 +209,7 @@ namespace ImageViewer.Controls
                 string? imageName = snapshot.InMemoryImage != null
                     ? UiText.Get("RecoveryPickerInMemoryImage")
                     : Path.GetFileName(snapshot.ImagePath);
-                _recoveryIndex?.Register(filePath, now, SessionInstanceId, now, projectName,
+                _recoveryIndex.Register(filePath, now, SessionInstanceId, now, projectName,
                     imageName, hasOwnerLease: _ownerLease != null);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

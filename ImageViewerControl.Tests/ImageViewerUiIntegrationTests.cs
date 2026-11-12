@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -98,6 +99,48 @@ namespace ImageViewerControl.Tests
             });
         }
 
+        [Theory]
+        [InlineData("line-measure", 3)]
+        [InlineData("line", 6)]
+        [InlineData("circular", 6)]
+        public void CaliperDialogs_LivePreviewRequiresValidSigmaAndToolSpecificCount(string dialogKind, int minimumCount)
+        {
+            WpfTestRunner.Run(() =>
+            {
+                var previews = new List<RoiBase>();
+                Window dialog = CreateCaliperDialog(dialogKind, previews.Add);
+                try
+                {
+                    var root = (Panel)((ScrollViewer)dialog.Content).Content;
+                    var advanced = (Panel)root.Children.OfType<Expander>().Single().Content;
+                    TextBox count = FindCaliperField(root.Children.OfType<StackPanel>().First(), "CaliperFieldCount");
+                    TextBox sigma = FindCaliperField(advanced, "CaliperFieldEdgeSigma");
+
+                    sigma.Text = "0.49";
+                    count.Text = (minimumCount - 1).ToString(CultureInfo.InvariantCulture);
+                    sigma.Text = "0.5";
+                    Assert.Empty(previews);
+
+                    count.Text = minimumCount.ToString(CultureInfo.InvariantCulture);
+                    RoiBase preview = Assert.Single(previews);
+                    var values = preview switch
+                    {
+                        CaliperMeasureRoi dual => (dual.CaliperCount, dual.CaliperEdgeSigma),
+                        ISingleEdgeCaliperRoi single => (single.CaliperCount, single.CaliperEdgeSigma),
+                        _ => throw new InvalidOperationException("Expected a caliper ROI.")
+                    };
+                    Assert.Equal((minimumCount, 0.5), values);
+
+                    sigma.Text = "5.01";
+                    Assert.Single(previews);
+                }
+                finally
+                {
+                    dialog.Close();
+                }
+            });
+        }
+
         [Fact]
         public void RoiDisplayName_UsesLocalizedTypeNames()
         {
@@ -122,7 +165,7 @@ namespace ImageViewerControl.Tests
                     WpfTestRunner.DrainDispatcher();
 
                     Assert.Equal(DemoText.Get("WindowTitle"), window.Title);
-                    Assert.Contains(FindVisualDescendants<TextBlock>(window), textBlock => textBlock.Text == DemoText.Get("ToolbarHint"));
+                    Assert.Contains(FindVisualDescendants<TextBlock>(window), textBlock => textBlock.Text == DemoText.Get("WorkspaceTitle"));
                     Assert.Contains(FindVisualDescendants<Button>(window), button => Equals(button.Content, DemoText.Get("OpenImageButton")));
                 }
                 finally
@@ -133,13 +176,19 @@ namespace ImageViewerControl.Tests
             });
         }
 
-        private static Window CreateCaliperDialog(string dialogKind)
+        private static TextBox FindCaliperField(Panel panel, string labelKey)
+        {
+            TextBlock label = panel.Children.OfType<TextBlock>().Single(item => item.Text == UiText.Get(labelKey));
+            return (TextBox)panel.Children[panel.Children.IndexOf(label) + 1];
+        }
+
+        private static Window CreateCaliperDialog(string dialogKind, Action<RoiBase>? preview = null)
         {
             return dialogKind switch
             {
-                "line-measure" => new LineMeasureCaliperSettingsDialog(new CaliperMeasureRoi(), previewAction: null),
-                "line" => new LineCaliperSettingsDialog(new LineCaliperMeasureRoi(), previewAction: null),
-                "circular" => new CircularCaliperSettingsDialog(new CircularCaliperMeasureRoi(), previewAction: null),
+                "line-measure" => new LineMeasureCaliperSettingsDialog(new CaliperMeasureRoi(), preview),
+                "line" => new LineCaliperSettingsDialog(new LineCaliperMeasureRoi(), preview),
+                "circular" => new CircularCaliperSettingsDialog(new CircularCaliperMeasureRoi(), preview),
                 _ => throw new ArgumentOutOfRangeException(nameof(dialogKind), dialogKind, null)
             };
         }
