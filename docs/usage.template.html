@@ -32,8 +32,9 @@
       --radius: 10px;
     }
 
+    /* 跟随系统，但手动选过浅色时以手动为准 */
     @media (prefers-color-scheme: dark) {
-      :root {
+      :root:not([data-theme="light"]) {
         --ink: #dbe7ed;
         --ink-soft: #bccfd8;
         --muted: #8ba1ad;
@@ -57,9 +58,33 @@
       }
     }
 
+    :root[data-theme="dark"] {
+        --ink: #dbe7ed;
+        --ink-soft: #bccfd8;
+        --muted: #8ba1ad;
+        --paper: #0d161c;
+        --surface: #14212a;
+        --surface-sunken: #111c23;
+        --th-bg: #1e2f39;
+        --zebra: rgba(255, 255, 255, 0.055);
+        --meta-ink: #9db3bf;
+        --line: #24343d;
+        --line-strong: #33474f;
+        --teal: #4fbdb4;
+        --teal-dark: #6fd0c7;
+        --link: #6fd0c7;
+        --gold: #d9a441;
+        --soft-teal: rgba(79, 189, 180, 0.14);
+        --soft-gold: rgba(217, 164, 65, 0.14);
+        --code: #081117;
+        --code-ink: #d7e9e6;
+        --shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+    }
+
     * { box-sizing: border-box; }
 
     html {
+      font-size: calc(16px * var(--scale, 1));
       scroll-behavior: smooth;
       scroll-padding-top: 20px;
       -webkit-text-size-adjust: 100%;
@@ -76,7 +101,7 @@
       background-image:
         linear-gradient(90deg, rgba(11, 122, 116, 0.045) 1px, transparent 1px) 0 0 / 26px 26px;
       font-family: "Segoe UI", "Microsoft YaHei", "Noto Sans CJK SC", "PingFang SC", sans-serif;
-      font-size: 16px;
+      font-size: 1rem;
       line-height: 1.75;
       text-rendering: optimizeLegibility;
     }
@@ -572,6 +597,118 @@
       white-space: pre;
     }
 
+    .toc-search { margin-bottom: 10px; }
+
+    .toc-search input {
+      width: 100%;
+      padding: 7px 10px;
+      color: var(--ink);
+      background: var(--surface);
+      border: 1px solid var(--line-strong);
+      border-radius: 7px;
+      font: inherit;
+      font-size: 0.88rem;
+    }
+
+    .toc-search input::placeholder { color: var(--muted); }
+
+    .toc-search input:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
+
+    .toc.is-searching .toc-title,
+    .toc.is-searching .toc-group,
+    .toc.is-searching .toc-nav { display: none; }
+
+    #toc-results { display: grid; gap: 2px; }
+
+    #toc-results a {
+      display: block;
+      padding: 7px 8px;
+      border-left: 0;
+      border-radius: 6px;
+      text-decoration: none;
+    }
+
+    #toc-results a:hover { background: var(--soft-teal); }
+
+    .toc-result-chapter {
+      display: block;
+      color: var(--teal-dark);
+      font-size: 0.72rem;
+      letter-spacing: 0.04em;
+    }
+
+    .toc-result-text {
+      display: block;
+      margin-top: 2px;
+      color: var(--ink-soft);
+      font-size: 0.84rem;
+      line-height: 1.5;
+    }
+
+    #toc-results mark {
+      padding: 0 0.12em;
+      color: inherit;
+      background: color-mix(in srgb, var(--gold) 34%, transparent);
+      border-radius: 2px;
+      box-shadow: inset 0 -0.3em 0 color-mix(in srgb, var(--gold) 20%, transparent);
+    }
+
+    .toc-empty { margin: 6px 8px; color: var(--muted); font-size: 0.85rem; }
+
+    .toc-nav {
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--line);
+    }
+
+    .toc-nav a {
+      padding: 4px 6px;
+      color: var(--muted);
+      border-left: 0;
+      border-radius: 5px;
+      font-size: 0.82rem;
+      text-decoration: none;
+    }
+
+    .toc-nav a:hover { color: var(--teal-dark); background: var(--soft-teal); }
+
+    .toc-nav a[aria-disabled="true"] { opacity: 0.4; pointer-events: none; }
+
+    .reader-tools {
+      position: fixed;
+      right: 22px;
+      bottom: 74px;
+      z-index: 10;
+      display: grid;
+      gap: 6px;
+      padding: 6px;
+      background: var(--surface);
+      border: 1px solid var(--line-strong);
+      border-radius: 999px;
+      box-shadow: var(--shadow);
+    }
+
+    .reader-tools button {
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      padding: 0;
+      color: var(--ink);
+      background: transparent;
+      border: 0;
+      border-radius: 50%;
+      font: inherit;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .reader-tools button:hover { color: var(--teal-dark); background: var(--soft-teal); }
+
     .to-top {
       position: fixed;
       right: 22px;
@@ -639,6 +776,7 @@
       /* 390 宽的屏幕上再保留 420px 最小宽度就会把整页撑出横向滚动 */
       .table-scroll table, .table-scroll table.wide { min-width: 0; }
       .to-top { right: 14px; bottom: 14px; }
+      .reader-tools { right: 14px; bottom: 66px; }
     }
 
     @media print {
@@ -663,14 +801,15 @@
         --soft-gold: #fbf2dd;
         --code-ink: #16262f;
       }
-      @page { margin: 14mm 12mm; }
+      @page { size: A4; margin: 14mm 12mm; }
       body { background: #fff; font-size: 10.5pt; }
       .page-header { color: #16262f; background: #fff; border-bottom: 2px solid var(--gold); }
       .eyebrow { color: var(--teal-dark); }
       .subtitle { color: var(--muted); }
       .header-inner { padding: 0 0 14px; }
       .layout { display: block; width: auto; padding: 14px 0 0; }
-      .skip-link, .to-top { display: none; }
+      .skip-link, .to-top, .reader-tools, .toc-search { display: none; }
+      .toc-nav { display: none; }
       /* 打印件也要目录：独立一页，排在正文之前 */
       .toc {
         position: static;
@@ -681,18 +820,19 @@
         background: none;
         border: 0;
         box-shadow: none;
+        line-height: 1.3;
         break-after: page;
       }
       .toc a {
         display: flex;
         gap: 10px;
         align-items: baseline;
-        padding: 2.5px 0;
+        padding: 2px 0;
         color: #16262f;
         border: 0;
       }
       .toc-sub { display: block; margin: 0 0 4px; }
-      .toc-sub a { padding: 1px 0 2px 40px; color: #5c6f7b; font-size: 9.5pt; }
+      .toc-sub a { padding: 1px 0 1px 40px; color: #5c6f7b; font-size: 9.5pt; }
       figure { break-inside: avoid; margin: 10px 0; }
       .toc a[aria-current="true"] { font-weight: 600; }
       .toc-title { margin: 0 0 10px; color: #5c6f7b; font-size: 0.78rem; }
@@ -703,7 +843,7 @@
       h1 { font-size: 22pt; }
       .subtitle { margin-top: 8px; font-size: 10pt; }
       /* 纸质件已有完整目录，正文末尾的卡片只是屏幕导航，打印时去掉 */
-      .chapter-index { display: none; }
+      .chapter-index, .footer { display: none; }
       section { padding-bottom: 16px; }
       section + section { padding-top: 18px; }
       .table-scroll { overflow: visible; border-radius: 0; }
@@ -733,13 +873,27 @@
 
   <div class="layout">
     <nav class="toc" aria-label="手册目录">
+      <div class="toc-search">
+        <input id="toc-search" type="search" placeholder="搜索手册…" aria-label="搜索手册" autocomplete="off">
+      </div>
       <p class="toc-title">目录</p>
 <!--{{TOC}}-->
+      <div id="toc-results" hidden></div>
+      <div class="toc-nav">
+        <a id="toc-prev" href="#">‹ 上一章</a>
+        <a id="toc-next" href="#">下一章 ›</a>
+      </div>
     </nav>
 
     <main id="main">
 <!--{{CONTENT}}-->
     </main>
+  </div>
+
+  <div class="reader-tools" role="group" aria-label="阅读设置">
+    <button type="button" data-action="font-smaller" aria-label="缩小字号">A−</button>
+    <button type="button" data-action="font-larger" aria-label="放大字号">A+</button>
+    <button type="button" data-action="toggle-theme" aria-label="切换深浅色">☾</button>
   </div>
 
   <a class="to-top" href="#main" aria-label="回到顶部">回到顶部</a>
@@ -748,23 +902,101 @@
 
   <script>
     (function () {
+      var root = document.documentElement;
       var links = Array.prototype.slice.call(document.querySelectorAll('.toc a[href^="#"]'));
       var byId = {};
       links.forEach(function (link) { byId[link.getAttribute('href').slice(1)] = link; });
       var sections = Array.prototype.slice.call(document.querySelectorAll('main section[id]'));
+
+      // ---- 阅读设置：字号与深浅色（存 localStorage，file:// 下可能被禁用，故都包了 try） ----
+      function readStore(key) {
+        try { return window.localStorage.getItem(key); } catch (error) { return null; }
+      }
+      function writeStore(key, value) {
+        try { window.localStorage.setItem(key, value); } catch (error) { /* 忽略 */ }
+      }
+
+      var scale = parseFloat(readStore('iv-scale') || '1');
+      if (isNaN(scale)) { scale = 1; }
+      function applyScale(value) {
+        scale = Math.min(1.3, Math.max(0.85, Math.round(value * 100) / 100));
+        root.style.setProperty('--scale', String(scale));
+        writeStore('iv-scale', String(scale));
+      }
+      applyScale(scale);
+
+      Array.prototype.forEach.call(document.querySelectorAll('[data-action="font-smaller"]'), function (button) {
+        button.addEventListener('click', function () { applyScale(scale - 0.05); });
+      });
+      Array.prototype.forEach.call(document.querySelectorAll('[data-action="font-larger"]'), function (button) {
+        button.addEventListener('click', function () { applyScale(scale + 0.05); });
+      });
+
+      var themeButton = document.querySelector('[data-action="toggle-theme"]');
+      var storedTheme = readStore('iv-theme');
+      if (storedTheme === 'dark' || storedTheme === 'light') {
+        root.setAttribute('data-theme', storedTheme);
+      }
+      function effectiveDark() {
+        var attr = root.getAttribute('data-theme');
+        if (attr === 'dark') { return true; }
+        if (attr === 'light') { return false; }
+        return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      }
+      function syncThemeButton() {
+        if (!themeButton) { return; }
+        var dark = effectiveDark();
+        themeButton.textContent = dark ? '☀' : '☾';
+        themeButton.setAttribute('aria-label', dark ? '切换到浅色' : '切换到深色');
+      }
+      syncThemeButton();
+      if (themeButton) {
+        themeButton.addEventListener('click', function () {
+          var next = effectiveDark() ? 'light' : 'dark';
+          root.setAttribute('data-theme', next);
+          writeStore('iv-theme', next);
+          syncThemeButton();
+        });
+      }
+
+      // ---- 目录高亮与上一章/下一章 ----
       var current = null;
+      var currentIndex = -1;
+
+      function setChapterLink(link, section) {
+        if (section) {
+          link.setAttribute('href', '#' + section.id);
+          link.removeAttribute('aria-disabled');
+        } else {
+          link.removeAttribute('href');
+          link.setAttribute('aria-disabled', 'true');
+        }
+      }
+
+      function updateChapterNav() {
+        var prev = document.getElementById('toc-prev');
+        var next = document.getElementById('toc-next');
+        if (!prev || !next) { return; }
+        setChapterLink(prev, sections[currentIndex - 1]);
+        setChapterLink(next, sections[currentIndex + 1]);
+      }
 
       function setCurrent(id) {
         if (!id || id === current) { return; }
+        var index = -1;
+        for (var i = 0; i < sections.length; i++) {
+          if (sections[i].id === id) { index = i; break; }
+        }
+        if (index < 0) { return; }
         current = id;
+        currentIndex = index;
         links.forEach(function (link) { link.removeAttribute('aria-current'); });
         var active = byId[id];
         if (active) {
           active.setAttribute('aria-current', 'true');
-          if (active.scrollIntoView) {
-            active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-          }
+          if (active.scrollIntoView) { active.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
         }
+        updateChapterNav();
       }
 
       if ('IntersectionObserver' in window && sections.length) {
@@ -776,8 +1008,107 @@
         sections.forEach(function (section) { observer.observe(section); });
       }
 
-      setCurrent((window.location.hash || '').slice(1));
+      setCurrent((window.location.hash || '').slice(1) || (sections[0] && sections[0].id));
 
+      // ---- 站内搜索：标题与正文做子串匹配，命中片段带高亮 ----
+      var searchInput = document.getElementById('toc-search');
+      var results = document.getElementById('toc-results');
+      var toc = document.querySelector('.toc');
+      var searchIndex = [];
+
+      sections.forEach(function (section) {
+        var heading = section.querySelector('h2');
+        var title = section.id;
+        if (heading) {
+          // h2 里的 "#" 是锚点链接的文字，搜索结果里不该带出来
+          var headingCopy = heading.cloneNode(true);
+          var headingAnchor = headingCopy.querySelector('.anchor');
+          if (headingAnchor) { headingAnchor.parentNode.removeChild(headingAnchor); }
+          title = headingCopy.textContent.replace(/\s+/g, ' ').trim() || section.id;
+        }
+        Array.prototype.forEach.call(section.querySelectorAll('h3, p, li, td, th'), function (node) {
+          var text = node.textContent.replace(/\s+/g, ' ').trim();
+          if (text.length >= 6) { searchIndex.push({ id: section.id, title: title, text: text }); }
+        });
+      });
+
+      function clearResults() {
+        if (!results) { return; }
+        results.textContent = '';
+        results.hidden = true;
+        if (toc) { toc.classList.remove('is-searching'); }
+      }
+
+      function buildResult(item, position, length) {
+        var link = document.createElement('a');
+        link.href = '#' + item.id;
+        var chapter = document.createElement('span');
+        chapter.className = 'toc-result-chapter';
+        chapter.textContent = item.title;
+        link.appendChild(chapter);
+        var snippet = document.createElement('span');
+        snippet.className = 'toc-result-text';
+        var start = Math.max(0, position - 16);
+        var end = Math.min(item.text.length, position + length + 28);
+        if (start > 0) { snippet.appendChild(document.createTextNode('…')); }
+        snippet.appendChild(document.createTextNode(item.text.slice(start, position)));
+        var mark = document.createElement('mark');
+        mark.textContent = item.text.slice(position, position + length);
+        snippet.appendChild(mark);
+        snippet.appendChild(document.createTextNode(item.text.slice(position + length, end)));
+        if (end < item.text.length) { snippet.appendChild(document.createTextNode('…')); }
+        link.appendChild(snippet);
+        link.addEventListener('click', function () {
+          if (searchInput) { searchInput.value = ''; }
+          clearResults();
+        });
+        return link;
+      }
+
+      function showResults(query) {
+        if (!results) { return; }
+        var needle = query.toLowerCase();
+        var seen = {};
+        var count = 0;
+        results.textContent = '';
+        for (var i = 0; i < searchIndex.length && count < 12; i++) {
+          var item = searchIndex[i];
+          var position = item.text.toLowerCase().indexOf(needle);
+          if (position < 0) { continue; }
+          var key = item.id + '|' + item.text.slice(0, 24);
+          if (seen[key]) { continue; }
+          seen[key] = 1;
+          count += 1;
+          results.appendChild(buildResult(item, position, needle.length));
+        }
+        if (count === 0) {
+          var empty = document.createElement('p');
+          empty.className = 'toc-empty';
+          empty.textContent = '没有匹配的内容';
+          results.appendChild(empty);
+        }
+        results.hidden = false;
+        if (toc) { toc.classList.add('is-searching'); }
+      }
+
+      if (searchInput && results) {
+        var timer = null;
+        searchInput.addEventListener('input', function () {
+          var value = searchInput.value.trim();
+          window.clearTimeout(timer);
+          if (!value) { clearResults(); return; }
+          timer = window.setTimeout(function () { showResults(value); }, 90);
+        });
+        searchInput.addEventListener('keydown', function (event) {
+          if (event.key === 'Escape') {
+            event.stopPropagation();
+            searchInput.value = '';
+            clearResults();
+          }
+        });
+      }
+
+      // ---- 回顶按钮与表格横向溢出提示 ----
       var toTop = document.querySelector('.to-top');
       function onScroll() {
         if (!toTop) { return; }
@@ -786,7 +1117,6 @@
       window.addEventListener('scroll', onScroll, { passive: true });
       onScroll();
 
-      // 表格真的溢出时才给右侧渐隐提示；滑到末尾就撤掉，免得内容永远被冲淡。
       var scrollers = Array.prototype.slice.call(document.querySelectorAll('.table-scroll'));
       function updateScroller(box) {
         var overflow = box.scrollWidth - box.clientWidth;

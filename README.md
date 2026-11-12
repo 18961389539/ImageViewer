@@ -168,7 +168,8 @@ dotnet test ImageViewer.Core.Tests/ImageViewer.Core.Tests.csproj `
 
 ## 文档索引
 
-- [使用手册](docs/usage.md) · [离线网页版（可打印）](docs/usage.html)
+- [使用手册](docs/usage.md) · [离线网页版（可打印、可搜索）](docs/usage.html) · [PDF 版](docs/usage.pdf)
+- [变更记录](CHANGELOG.md)
 - [集成指南（WPF 宿主）](docs/integration.md)
 - [高级测量](docs/advanced-measurements.md)
 - [右键菜单](docs/context-menu.md)
@@ -186,9 +187,12 @@ dotnet test ImageViewer.Core.Tests/ImageViewer.Core.Tests.csproj `
 ```powershell
 python build/docs.py            # 重新生成 docs/usage.html
 python build/docs.py --check    # 校验 HTML 与 md 同步，并检查工具/菜单覆盖度
+./build/docs-pdf.ps1            # 用本机 Edge 生成 docs/usage.pdf
 ```
 
-`--check` 会核对全部 ROI 工具、高级测量项与顶层菜单分组都在手册中出现；CI 的 `docs-check` 作业跑这个模式，所以新增工具后必须同步补手册，否则构建失败。
+`--check` 会核对全部 ROI 工具、高级测量项、顶层菜单分组、错误消息标题、标定字段与质量门限字段都在手册中出现，同时检查图片与本地文档链接是否存在；CI 的 `docs-check` 作业跑这个模式，所以新增工具或改动界面文案后必须同步补手册，否则构建失败。
+
+`docs/usage.pdf` 是交付物，不由 CI 生成（ubuntu runner 没有 Edge）。手册内容变化后手动跑一次 `build/docs-pdf.ps1` 并提交新的 PDF。
 
 ## 许可证
 
