@@ -48,7 +48,7 @@ ImageViewer 是一个面向 Windows 桌面应用的 WPF 图像查看、ROI 标�
 dotnet restore ImageViewer.sln --locked-mode
 dotnet build ImageViewer.sln --configuration Release --no-restore --nologo
 dotnet test ImageViewer.sln --configuration Release --no-build --nologo
-dotnet run --project ImageViewerDemo/ImageViewerDemo.csproj
+dotnet run --project ImageViewerDemo/ImageViewerDemo.csproj --framework net10.0-windows
 ```
 
 演示程序启动后，可点击“打开图像”或按 `Ctrl+O` 选择图像文件。右键菜单支持直接键入命令搜索；按 `Ctrl+F` 可将图像适应窗口。
@@ -168,7 +168,8 @@ dotnet test ImageViewer.Core.Tests/ImageViewer.Core.Tests.csproj `
 
 ## 文档索引
 
-- [使用说明](docs/usage.md)
+- [使用手册](docs/usage.md) · [离线网页版（可打印）](docs/usage.html)
+- [集成指南（WPF 宿主）](docs/integration.md)
 - [高级测量](docs/advanced-measurements.md)
 - [右键菜单](docs/context-menu.md)
 - [检测参数推荐](docs/detection-parameter-recommendations.md)
@@ -177,6 +178,17 @@ dotnet test ImageViewer.Core.Tests/ImageViewer.Core.Tests.csproj `
 - [NuGet 发布](docs/nuget-publishing.md)
 - [术语与本地化边界](docs/terminology.md)
 - [架构边界](docs/architecture-boundaries.md)
+
+### 手册的生成与校验
+
+`docs/usage.html` 由 `docs/usage.md` 生成，版式在 `docs/usage.template.html`，不要手改 HTML：
+
+```powershell
+python build/docs.py            # 重新生成 docs/usage.html
+python build/docs.py --check    # 校验 HTML 与 md 同步，并检查工具/菜单覆盖度
+```
+
+`--check` 会核对全部 ROI 工具、高级测量项与顶层菜单分组都在手册中出现；CI 的 `docs-check` 作业跑这个模式，所以新增工具后必须同步补手册，否则构建失败。
 
 ## 许可证
 

@@ -192,3 +192,21 @@ jobs:
           name: imageviewer-batch-performance
           path: artifacts/performance/batch/report.json
           if-no-files-found: ignore
+
+  docs-check:
+    name: Docs sync and coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # docs/usage.html 由 docs/usage.md 生成：这一步拦住“改了 md 忘了重新生成”，
+      # 同时检查 31 个 ROI 工具、18 项高级测量与顶层菜单分组都在手册里写到。
+      - name: Verify usage manual
+        run: python build/docs.py --check
