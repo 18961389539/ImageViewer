@@ -339,9 +339,22 @@ def build_html() -> str:
         f'      <a href="#{anchor}"><span class="toc-num">{number:02d}</span>{render_inline(text)}</a>'
         for number, (anchor, text) in enumerate(toc, start=1)
     )
+    # 文末再给一份"全部章节"索引：滚到底部想跳回某节时，不用先滚回顶部或用浏览器后退。
+    index_html = ""
+    if toc:
+        index_items = "\n".join(
+            f'          <li><a href="#{anchor}">{render_inline(text)}</a></li>'
+            for anchor, text in toc
+        )
+        index_html = (
+            '\n      <nav class="chapter-index" aria-label="全部章节">\n'
+            '        <p class="chapter-index-title">全部章节</p>\n'
+            f"        <ol>\n{index_items}\n        </ol>\n"
+            "      </nav>"
+        )
     return (
         template.replace("<!--{{TOC}}-->", toc_html)
-        .replace("<!--{{CONTENT}}-->", content)
+        .replace("<!--{{CONTENT}}-->", content + index_html)
         .replace("\r\n", "\n")
     )
 
