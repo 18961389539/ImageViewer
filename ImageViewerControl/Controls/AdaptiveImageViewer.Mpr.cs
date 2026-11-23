@@ -103,9 +103,8 @@ namespace ImageViewer.Controls
             {
                 VolumeSliceOrientation orientation = mode == AdaptiveDisplayMode.Coronal
                     ? VolumeSliceOrientation.Coronal : VolumeSliceOrientation.Sagittal;
-                slice = await Task.Run(
-                    () => VolumeSliceService.GetSlice(volume, orientation, sliceIndex, cancellation.Token),
-                    cancellation.Token).ConfigureAwait(false);
+                slice = await VolumeSliceService.GetSliceAsync(volume, orientation, sliceIndex, cancellation.Token)
+                    .ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
             {

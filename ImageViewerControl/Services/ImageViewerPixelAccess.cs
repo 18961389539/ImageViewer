@@ -1,4 +1,7 @@
 using System;
+using System.Security.Cryptography;
+using System.Threading;
+using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
@@ -6,6 +9,24 @@ namespace ImageViewer.Services
 {
     internal static class ImageViewerPixelAccess
     {
+        public static string ComputePixelBufferSha256(BitmapSource bitmap, CancellationToken cancellationToken)
+        {
+            const int targetBandBytes = 128 * 1024;
+            int stride = checked((int)(((long)bitmap.PixelWidth * bitmap.Format.BitsPerPixel + 7) / 8));
+            int bandHeight = Math.Clamp(targetBandBytes / stride, 1, bitmap.PixelHeight);
+            byte[] band = new byte[bandHeight * stride];
+            using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+            for (int y = 0; y < bitmap.PixelHeight; y += bandHeight)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                int rows = Math.Min(bandHeight, bitmap.PixelHeight - y);
+                bitmap.CopyPixels(new Int32Rect(0, y, bitmap.PixelWidth, rows), band, stride, 0);
+                hash.AppendData(band, 0, rows * stride);
+            }
+
+            return Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
+        }
+
         public static BitmapSource NormalizeForIntensity(BitmapSource bitmap)
         {
             ArgumentNullException.ThrowIfNull(bitmap);

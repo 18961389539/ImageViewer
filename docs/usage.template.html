@@ -927,6 +927,7 @@
       .layout { display: block; width: auto; padding: 14px 0 0; }
       .skip-link, .to-top, .reader-tools, .toc-search, .toc-toggle, .search-status { display: none; }
       .resume-link:not([hidden]), .copy-link, .copy-dialog { display: none; }
+      a[data-print-reference] { color: inherit; text-decoration: none; }
       .toc-nav, #toc-results { display: none; }
       /* 打印件也要目录：独立一页，排在正文之前 */
       .toc {
@@ -1458,6 +1459,26 @@
       window.addEventListener('resize', function () {
         scrollers.forEach(updateScroller);
       }, { passive: true });
+
+      // 跨文件相对链接在打印时会被 Chromium 写成本机绝对路径。
+      // 纸质与 PDF 仅保留页内目录和可独立访问的网页链接。
+      var printReferences = [];
+      window.addEventListener('beforeprint', function () {
+        document.querySelectorAll('a[href]').forEach(function (link) {
+          var href = link.getAttribute('href');
+          if (!href || href.charAt(0) === '#' || /^(?:https?:)?\/\//i.test(href)) { return; }
+          printReferences.push({ link: link, href: href });
+          link.removeAttribute('href');
+          link.setAttribute('data-print-reference', '');
+        });
+      });
+      window.addEventListener('afterprint', function () {
+        printReferences.forEach(function (reference) {
+          reference.link.setAttribute('href', reference.href);
+          reference.link.removeAttribute('data-print-reference');
+        });
+        printReferences = [];
+      });
     })();
   </script>
 </body>

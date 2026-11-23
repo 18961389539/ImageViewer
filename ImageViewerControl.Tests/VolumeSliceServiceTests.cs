@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using ImageViewer.Models;
 using ImageViewer.Services;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace ImageViewerControl.Tests
 {
@@ -16,7 +18,7 @@ namespace ImageViewerControl.Tests
     /// English: Guards single-flight reconstruction per (orientation, index). An abandoned caller must not affect the shared
     /// build, and repeated requests for the same plane must reuse it.
     /// </summary>
-    public class VolumeSliceServiceTests
+    public class VolumeSliceServiceTests(ITestOutputHelper output)
     {
         [Fact]
         public void GetSlice_ConcurrentRequestsForTheSamePlane_BuildOnce()
@@ -96,6 +98,8 @@ namespace ImageViewerControl.Tests
 
             Assert.ThrowsAny<OperationCanceledException>(() =>
                 VolumeSliceService.GetSlice(volume, VolumeSliceOrientation.Coronal, 2, cancellation.Token));
+            Assert.Equal(0, VolumeSliceService.GetSliceBuildCount(volume));
+            Assert.Equal(0, VolumeSliceService.GetSliceEntryCount(volume));
 
             BitmapSource slice = VolumeSliceService.GetSlice(volume, VolumeSliceOrientation.Coronal, 2);
 
@@ -118,33 +122,114 @@ namespace ImageViewerControl.Tests
         }
 
         [Fact]
-        public void GetSlice_AllCallersCancelled_ResultIsStillAccountedAgainstTheBudget()
+        public async Task GetSliceAsync_LastWaiterCancelsRunningBuild_ResultIsStillCached()
         {
             VolumeData volume = CreateVolume(depth: 32, width: 64, height: 48);
             using var cancellation = new CancellationTokenSource();
-            cancellation.Cancel();
+            using var started = new ManualResetEventSlim();
+            using var release = new ManualResetEventSlim();
+            TimeSpan timeout = TimeSpan.FromSeconds(15);
 
-            // 全部调用方都放弃：共享构建仍会完成，且结果必须立即入账（受 64MB 预算约束），
-            // 而不是只挂在条目上绕过预算。第一次调用时任务必然还在构建中（令牌取消 → 抛 OCE）；
-            // 注意构建完成后，WaitAsync 对已完成的任务会直接返回结果——拿到现成结果不该被扔掉。
-            Assert.ThrowsAny<OperationCanceledException>(() =>
-                VolumeSliceService.GetSlice(volume, VolumeSliceOrientation.Coronal, 2, cancellation.Token));
+            VolumeSliceService.SliceBuildFaultForTest = (source, _) =>
+            {
+                if (ReferenceEquals(volume, source))
+                {
+                    started.Set();
+                    if (!release.Wait(timeout))
+                    {
+                        return new TimeoutException("The test did not release the running slice.");
+                    }
+                }
+                return null;
+            };
 
-            Assert.True(
-                WaitForCondition(() => VolumeSliceService.GetSliceBuildCount(volume) >= 1),
-                "共享构建未在预期时间内完成。");
+            try
+            {
+                Task<BitmapSource> slice = VolumeSliceService.GetSliceAsync(volume, VolumeSliceOrientation.Coronal, 2, cancellation.Token);
+                Assert.True(started.Wait(timeout));
+                cancellation.Cancel();
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => slice);
+            }
+            finally
+            {
+                release.Set();
+                VolumeSliceService.SliceBuildFaultForTest = null;
+            }
+
+            // Completion must account for the bitmap even when no caller is waiting.
             Assert.True(
                 WaitForCondition(() => VolumeSliceService.GetSliceCacheBytes(volume) > 0),
                 "构建完成的结果没有入账——全部调用方取消时绕过了预算。");
+            Assert.Equal((long)64 * 32, VolumeSliceService.GetSliceCacheBytes(volume));
 
-            long bytes = VolumeSliceService.GetSliceCacheBytes(volume);
-            Assert.Equal((long)64 * 32, bytes);
-            Assert.True(bytes <= 64L * 1024 * 1024);
-
-            // 之后的成功调用直接命中已入账的结果，不再重建。
-            BitmapSource slice = VolumeSliceService.GetSlice(volume, VolumeSliceOrientation.Coronal, 2);
-            Assert.Equal(64, slice.PixelWidth);
+            BitmapSource cached = await VolumeSliceService.GetSliceAsync(volume, VolumeSliceOrientation.Coronal, 2);
+            Assert.Equal(64, cached.PixelWidth);
             Assert.Equal(1, VolumeSliceService.GetSliceBuildCount(volume));
+        }
+
+        [Fact]
+        [Trait("Category", "Performance")]
+        public async Task GetSliceAsync_AbandonedBacklog_DoesNotDelayTheLatestSharedRequest()
+        {
+            VolumeData volume = CreateVolume(depth: 64, width: 256, height: 256);
+            const int abandonedCount = 8;
+            const int latestIndex = abandonedCount + VolumeSliceService.MaxConcurrentSliceBuilds;
+            TimeSpan timeout = TimeSpan.FromSeconds(15);
+            using var started = new CountdownEvent(VolumeSliceService.MaxConcurrentSliceBuilds);
+            using var release = new ManualResetEventSlim();
+            using var abandoned = new CancellationTokenSource();
+            using var oneLatestCaller = new CancellationTokenSource();
+            VolumeSliceService.SliceBuildFaultForTest = (source, key) =>
+            {
+                if (ReferenceEquals(volume, source) && key.Index < VolumeSliceService.MaxConcurrentSliceBuilds)
+                {
+                    started.Signal();
+                    if (!release.Wait(timeout))
+                    {
+                        return new TimeoutException("The test did not release the active slices.");
+                    }
+                }
+                return null;
+            };
+
+            try
+            {
+                Task<BitmapSource>[] running = Enumerable.Range(0, VolumeSliceService.MaxConcurrentSliceBuilds)
+                    .Select(index => VolumeSliceService.GetSliceAsync(volume, VolumeSliceOrientation.Coronal, index))
+                    .ToArray();
+                Assert.True(started.Wait(timeout));
+                Task<BitmapSource>[] backlog = Enumerable.Range(running.Length, abandonedCount)
+                    .Select(index => VolumeSliceService.GetSliceAsync(volume, VolumeSliceOrientation.Coronal, index, abandoned.Token))
+                    .ToArray();
+                Assert.Equal(latestIndex, VolumeSliceService.GetSliceEntryCount(volume));
+
+                Task<BitmapSource> leaving = VolumeSliceService.GetSliceAsync(volume, VolumeSliceOrientation.Coronal, latestIndex, oneLatestCaller.Token);
+                Task<BitmapSource> latest = VolumeSliceService.GetSliceAsync(volume, VolumeSliceOrientation.Coronal, latestIndex);
+                abandoned.Cancel();
+                oneLatestCaller.Cancel();
+                foreach (Task<BitmapSource> obsolete in backlog)
+                {
+                    await Assert.ThrowsAnyAsync<OperationCanceledException>(() => obsolete);
+                }
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => leaving);
+                Assert.Equal(running.Length + 1, VolumeSliceService.GetSliceEntryCount(volume));
+
+                var stopwatch = Stopwatch.StartNew();
+                release.Set();
+                BitmapSource result = await latest.WaitAsync(timeout);
+                output.WriteLine($"Newest slice finished {stopwatch.Elapsed.TotalMilliseconds:F2} ms after releasing the active builds.");
+                await Task.WhenAll(running).WaitAsync(timeout);
+                Assert.Equal(running.Length + 1, VolumeSliceService.GetSliceBuildCount(volume));
+                Assert.Same(result, VolumeSliceService.GetSlice(volume, VolumeSliceOrientation.Coronal, latestIndex));
+
+                await VolumeSliceService.GetSliceAsync(volume, VolumeSliceOrientation.Coronal, running.Length).WaitAsync(timeout);
+                Assert.Equal(running.Length + 2, VolumeSliceService.GetSliceBuildCount(volume));
+            }
+            finally
+            {
+                release.Set();
+                VolumeSliceService.SliceBuildFaultForTest = null;
+            }
         }
 
         [Fact]

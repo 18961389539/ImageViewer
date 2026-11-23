@@ -18,22 +18,32 @@
 
     python build/docs.py            # 生成 docs/usage.html
     python build/docs.py --check    # 校验同步 + 覆盖度
+    python build/docs.py --offline  # 校验并打包离线手册
 """
 
 from __future__ import annotations
 
+import argparse
 import html
+import json
 import re
 import sys
+from hashlib import sha256
 from html.parser import HTMLParser
 from pathlib import Path
+from tempfile import NamedTemporaryFile
+from urllib.parse import unquote, urlsplit
 from xml.etree import ElementTree
+from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 ROOT = Path(__file__).resolve().parent.parent
 DOCS = ROOT / "docs"
 MD_PATH = DOCS / "usage.md"
 HTML_PATH = DOCS / "usage.html"
 TEMPLATE_PATH = DOCS / "usage.template.html"
+PDF_STAMP_PATH = DOCS / "usage.pdf.source.json"
+OFFLINE_ENTRY_PATH = ROOT / "build" / "docs-offline-start.html"
+OFFLINE_ZIP_PATH = ROOT / "artifacts" / "docs" / "imageviewer-manual.zip"
 UITEXT_PATH = ROOT / "ImageViewerControl" / "Resources" / "UiText.resx"
 PLUGIN_DIR = ROOT / "ImageViewerControl" / "Plugins"
 
@@ -489,6 +499,8 @@ class AnchorCheck(HTMLParser):
         self.ids: set[str] = set()
         self.duplicates: set[str] = set()
         self.targets: set[str] = set()
+        self.references: set[str] = set()
+        self.image_sources: set[str] = set()
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         for name, value in attrs:
@@ -500,6 +512,10 @@ class AnchorCheck(HTMLParser):
                 self.ids.add(value)
             if tag == "a" and name == "href" and value.startswith("#") and len(value) > 1:
                 self.targets.add(value[1:])
+            if (tag, name) in {("a", "href"), ("img", "src")}:
+                self.references.add(value)
+            if tag == "img" and name == "src":
+                self.image_sources.add(value)
 
     def problems(self) -> list[str]:
         return [
@@ -508,11 +524,147 @@ class AnchorCheck(HTMLParser):
         ]
 
 
+# --------------------------------------------------------------------------- 离线交付
+
+
+def pdf_source_hash(files: dict[str, bytes] | None = None) -> str:
+    """指纹包括生成 PDF 的 HTML 和其中直接引用的本地图片。"""
+    def read(name: str) -> bytes:
+        return files[name] if files is not None else (ROOT / name).read_bytes()
+
+    html_name = HTML_PATH.relative_to(ROOT).as_posix()
+    html_bytes = read(html_name).replace(b"\r\n", b"\n")
+    page = AnchorCheck()
+    page.feed(html_bytes.decode("utf-8"))
+    inputs = {html_name: sha256(html_bytes).hexdigest()}
+    for reference in page.image_sources:
+        url = urlsplit(reference)
+        if url.scheme == "data":
+            continue
+        if url.scheme or url.netloc or not url.path:
+            raise DocError(f"PDF 手册需要本地图片：{reference}")
+        image = (HTML_PATH.parent / unquote(url.path)).resolve()
+        if not image.is_relative_to(DOCS):
+            raise DocError(f"PDF 手册图片须位于 docs 目录：{reference}")
+        name = image.relative_to(ROOT).as_posix()
+        inputs[name] = sha256(read(name)).hexdigest()
+    return sha256(json.dumps(inputs, sort_keys=True).encode("utf-8")).hexdigest()
+
+
+def verify_manual_pdf(files: dict[str, bytes]) -> None:
+    pdf = files["docs/usage.pdf"]
+    try:
+        stamp = json.loads(PDF_STAMP_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise DocError("PDF 缺少有效的来源记录，请运行 build/docs-pdf.ps1 重新生成") from error
+
+    expected = {"sourceSha256": pdf_source_hash(files), "pdfSha256": sha256(pdf).hexdigest()}
+    if not pdf.startswith(b"%PDF-") or stamp != expected:
+        raise DocError("PDF 与当前手册或来源记录不一致，请运行 build/docs-pdf.ps1 重新生成")
+
+
+def collect_offline_manual() -> dict[str, bytes]:
+    """沿手册的相对链接收集文档和图片，不导出其它仓库文件。"""
+    files = {
+        "START.html": OFFLINE_ENTRY_PATH.read_bytes(),
+        "LICENSE": (ROOT / "LICENSE").read_bytes(),
+    }
+    pending = [Path("docs/usage.html"), Path("docs/usage.md"), Path("docs/usage.pdf"), Path("CHANGELOG.md")]
+    allowed_extensions = {".html", ".md", ".pdf", ".png", ".jpg", ".jpeg", ".svg", ".webp"}
+    while pending:
+        relative = pending.pop()
+        name = relative.as_posix()
+        if name in files:
+            continue
+        source = ROOT / relative
+        if not source.is_file():
+            raise DocError(f"离线包所需文件不存在：{name}")
+        data = source.read_bytes()
+        if not data:
+            raise DocError(f"离线包所需文件为空：{name}")
+        files[name] = data
+        if relative.suffix == ".html":
+            page = AnchorCheck()
+            page.feed(data.decode("utf-8"))
+            references = page.references
+            for image in page.image_sources:
+                url = urlsplit(image)
+                if (url.scheme or url.netloc) and url.scheme != "data":
+                    raise DocError(f"离线包需要本地图片：{name} → {image}")
+        elif relative.suffix == ".md":
+            text = re.sub(r"(?ms)^\s*```[^\n]*\n.*?^\s*```[^\n]*$", "", data.decode("utf-8"))
+            references = re.findall(r"\]\(([^)\s]+)\)", text)
+        else:
+            continue
+        for reference in references:
+            url = urlsplit(reference)
+            if url.scheme == "file":
+                raise DocError(f"离线包不能使用绝对文件地址：{name} → {reference}")
+            if url.scheme or url.netloc or not url.path:
+                continue
+            target = (source.parent / unquote(url.path)).resolve()
+            if target in {ROOT / "CHANGELOG.md", ROOT / "LICENSE"}:
+                pending.append(target.relative_to(ROOT))
+            elif target.is_relative_to(DOCS) and target.suffix.lower() in allowed_extensions and target != TEMPLATE_PATH:
+                pending.append(target.relative_to(ROOT))
+            else:
+                raise DocError(f"离线包无法携带此本地链接：{name} → {reference}")
+
+    verify_manual_pdf(files)
+
+    sample_folder = ROOT / "ImageViewerDemo" / "Resources"
+    session = (sample_folder / "MeasurementSample.ivsession").read_bytes()
+    if json.loads(session).get("ImagePath") != "TestImage.png":
+        raise DocError("测量示例的底图引用已变化，请更新离线包清单")
+    files["examples/measurement/MeasurementSample.ivsession"] = session
+    files["examples/measurement/TestImage.png"] = (sample_folder / "TestImage.png").read_bytes()
+
+    start = AnchorCheck()
+    start.feed(files["START.html"].decode("utf-8"))
+    for reference in start.references:
+        target = urlsplit(reference).path
+        if target and unquote(target) not in files:
+            raise DocError(f"离线入口引用了未打包的文件：{reference}")
+    return files
+
+
+def build_offline_zip() -> None:
+    files = collect_offline_manual()
+    OFFLINE_ZIP_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with NamedTemporaryFile(dir=OFFLINE_ZIP_PATH.parent, suffix=".zip", delete=False) as stream:
+        staged = Path(stream.name)
+    try:
+        with ZipFile(staged, "w") as archive:
+            for name, data in sorted(files.items()):
+                entry = ZipInfo(name)
+                entry.create_system = 3
+                entry.external_attr = 0o100644 << 16
+                archive.writestr(entry, data, compress_type=ZIP_DEFLATED, compresslevel=9)
+        staged.replace(OFFLINE_ZIP_PATH)
+    finally:
+        staged.unlink(missing_ok=True)
+    print(f"已生成 {OFFLINE_ZIP_PATH.relative_to(ROOT)}（{len(files)} 个文件）")
+
+
 # --------------------------------------------------------------------------- 入口
 
 
 def main(argv: list[str]) -> int:
-    check_only = "--check" in argv
+    parser = argparse.ArgumentParser(description="生成、检查或打包 ImageViewer 使用手册")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--check", action="store_true", help="检查手册是否同步")
+    mode.add_argument("--offline", action="store_true", help="检查手册并生成离线 ZIP")
+    mode.add_argument("--pdf-source-hash", action="store_true", help=argparse.SUPPRESS)
+    args = parser.parse_args(argv)
+    if args.pdf_source_hash:
+        try:
+            print(pdf_source_hash())
+        except (DocError, OSError, ValueError) as error:
+            print(f"无法读取 PDF 手册来源：{error}", file=sys.stderr)
+            return 1
+        return 0
+
+    check_only = args.check or args.offline
     try:
         html_text = build_html()
     except DocError as error:
@@ -537,6 +689,12 @@ def main(argv: list[str]) -> int:
         HTML_PATH.write_text(html_text, encoding="utf-8", newline="\n")
         print(f"已生成 {HTML_PATH.relative_to(ROOT)}（{len(html_text)} 字符）")
     print("手册检查通过：HTML 与 md 同步，工具、菜单和内部链接检查通过")
+    if args.offline:
+        try:
+            build_offline_zip()
+        except (DocError, OSError, ValueError) as error:
+            print(f"离线包生成失败：{error}", file=sys.stderr)
+            return 1
     return 0
 
 

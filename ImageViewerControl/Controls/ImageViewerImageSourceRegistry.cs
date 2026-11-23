@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
+using ImageViewer.Services;
 
 namespace ImageViewer.Controls
 {
@@ -15,13 +16,13 @@ namespace ImageViewer.Controls
     {
         private static readonly ConditionalWeakTable<ImageSource, PathHolder> Paths = new();
 
-        internal static void Register(ImageSource source, string filePath, FileStream? cacheLease = null, string? sha256 = null)
+        internal static void Register(ImageSource source, string filePath, FileStream? cacheLease, ImageViewerImageDecoder.ImageFileTrace? trace)
         {
             ArgumentNullException.ThrowIfNull(source);
             ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
 
             Paths.Remove(source);
-            Paths.Add(source, new PathHolder(filePath, cacheLease, sha256));
+            Paths.Add(source, new PathHolder(filePath, cacheLease, trace));
         }
 
         internal static bool TryGetPath(ImageSource? source, out string filePath)
@@ -37,23 +38,12 @@ namespace ImageViewer.Controls
         }
 
         internal static string? GetSha256(ImageSource? source) =>
-            source != null && Paths.TryGetValue(source, out PathHolder? holder) ? holder.Sha256 : null;
+            GetFileTrace(source)?.Sha256;
 
-        private sealed class PathHolder
-        {
-            public PathHolder(string path, FileStream? cacheLease, string? sha256)
-            {
-                Path = path;
-                CacheLease = cacheLease;
-                Sha256 = sha256;
-            }
+        internal static ImageViewerImageDecoder.ImageFileTrace? GetFileTrace(ImageSource? source) =>
+            source != null && Paths.TryGetValue(source, out PathHolder? holder) ? holder.Trace : null;
 
-            public string Path { get; }
-
-            public string? Sha256 { get; }
-
-            // Retain the cross-process lease for exactly as long as the bitmap is reachable.
-            public FileStream? CacheLease { get; }
-        }
+        // Retain the cross-process lease for exactly as long as the bitmap is reachable.
+        private sealed record PathHolder(string Path, FileStream? CacheLease, ImageViewerImageDecoder.ImageFileTrace? Trace);
     }
 }

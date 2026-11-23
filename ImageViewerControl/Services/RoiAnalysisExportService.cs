@@ -10,6 +10,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Media.Imaging;
 using ImageViewer.Core.Analysis;
+using ImageViewer.Core.Persistence;
+using ImageViewer.Controls;
 using ImageViewer.Models;
 using ImageViewer.Utils;
 
@@ -345,21 +347,60 @@ namespace ImageViewer.Services
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
             ArgumentNullException.ThrowIfNull(rois);
-            return SaveCsvWithMetadataAsync(filePath, rois.ToList(), bitmap, pixelSize, physicalUnit, calibration, exportContext, cancellationToken);
+            ImageViewerValidation.ValidatePixelSize(pixelSize);
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return Task.FromCanceled(cancellationToken);
+            }
+
+            filePath = Path.GetFullPath(filePath);
+            RoiBase[] capturedRois = CaptureRois(rois);
+            BitmapSource? capturedBitmap = bitmap == null || bitmap.IsFrozen
+                ? bitmap : (BitmapSource)bitmap.GetCurrentValueAsFrozen();
+            CameraCalibration? capturedCalibration = calibration?.Clone();
+            RoiDocument? roiDocument = null;
+            ImageViewerImageDecoder.ImageFileTrace? fileTrace = null;
+            if (exportContext != null)
+            {
+                fileTrace = ImageViewerImageSourceRegistry.GetFileTrace(bitmap);
+                exportContext = exportContext with
+                {
+                    SourcePath = ImageViewerImageSourceRegistry.TryGetPath(bitmap, out string registeredPath)
+                        ? registeredPath : exportContext.SourcePath,
+                    RenderSettings = exportContext.RenderSettings == null
+                        ? null : new Dictionary<string, string>(exportContext.RenderSettings, StringComparer.Ordinal)
+                };
+                if (exportContext.PluginRegistry != null)
+                {
+                    roiDocument = RoiPersistenceService.CreateDocument(
+                        capturedRois, pixelSize, physicalUnit, exportContext.PluginRegistry, qualityProfile: exportContext.QualityProfile);
+                }
+            }
+
+            var snapshot = new ExportSnapshot(
+                capturedRois, capturedBitmap, pixelSize, physicalUnit, capturedCalibration, exportContext, roiDocument, fileTrace);
+            return Task.Run(() => SaveCsvSnapshotAsync(filePath, snapshot, cancellationToken), cancellationToken);
         }
 
-        private static async Task SaveCsvWithMetadataAsync(
-            string filePath,
-            IReadOnlyList<RoiBase> rois,
-            BitmapSource? bitmap,
-            double pixelSize,
-            string? physicalUnit,
-            CameraCalibration? calibration,
-            RoiAnalysisExportContext? exportContext,
-            CancellationToken cancellationToken)
+        internal static RoiBase[] CaptureRois(IEnumerable<RoiBase> rois) =>
+            rois.Select(roi =>
+            {
+                RoiBase copy = roi.Clone();
+                if (ReferenceEquals(copy, roi))
+                {
+                    throw new InvalidOperationException("An ROI clone must be independent of its source before exporting.");
+                }
+
+                copy.MeasurementId = roi.MeasurementId;
+                copy.AdvancedMeasurements = roi.AdvancedMeasurements;
+                return copy;
+            }).ToArray();
+
+        private static async Task SaveCsvSnapshotAsync(string filePath, ExportSnapshot snapshot, CancellationToken cancellationToken)
         {
-            string csv = BuildCsv(rois, bitmap, pixelSize, physicalUnit, calibration);
-            if (exportContext == null)
+            BitmapSource? bitmap = snapshot.Bitmap == null ? null : ImageViewerPixelAccess.NormalizeForIntensity(snapshot.Bitmap);
+            string csv = BuildCsv(snapshot.Rois, bitmap, snapshot.PixelSize, snapshot.PhysicalUnit, snapshot.Calibration, cancellationToken);
+            if (snapshot.Context == null)
             {
                 await ImageViewerExportArtifactSet.WriteAllTextAsync(
                     new Dictionary<string, string> { [filePath] = csv }, cancellationToken).ConfigureAwait(false);
@@ -370,29 +411,36 @@ namespace ImageViewer.Services
             string reportPath = GetReportPath(filePath);
             string exportBatchId = Guid.NewGuid().ToString("N");
             string csvHash = ImageViewerExportArtifactSet.ComputeSha256Utf8Text(csv);
+            if (bitmap == null)
+            {
+                snapshot = snapshot with
+                {
+                    FileTrace = await ReadReferencedFileTraceAsync(snapshot.Context.SourcePath, cancellationToken).ConfigureAwait(false)
+                };
+            }
 
-            // 报告与人读的摘要一起产出：CSV 给机器，Markdown 给人，metadata 给复现。
+            string? fileHash = snapshot.FileTrace?.Sha256.ToLowerInvariant();
+            string? pixelHash = fileHash == null && bitmap != null
+                ? ImageViewerPixelAccess.ComputePixelBufferSha256(bitmap, cancellationToken) : null;
+            string? sourceName = string.IsNullOrWhiteSpace(snapshot.Context.SourcePath)
+                ? null : Path.GetFileName(snapshot.Context.SourcePath);
+            if (pixelHash != null)
+            {
+                sourceName = sourceName == null ? "内存图像（像素缓冲区）" : $"{sourceName}（像素缓冲区）";
+            }
+
             string report = BuildReport(
-                rois,
+                snapshot.Rois,
                 bitmap,
-                pixelSize,
-                physicalUnit,
-                calibration,
-                sourceName: string.IsNullOrWhiteSpace(exportContext.SourcePath) ? null : Path.GetFileName(exportContext.SourcePath),
-                sourceSha256: await TryComputeSourceHashAsync(exportContext.SourcePath, cancellationToken).ConfigureAwait(false));
+                snapshot.PixelSize,
+                snapshot.PhysicalUnit,
+                snapshot.Calibration,
+                sourceName: sourceName,
+                sourceSha256: fileHash ?? pixelHash);
             report += $"\n\n<!-- exportBatchId: {exportBatchId} -->\n";
             string reportHash = ImageViewerExportArtifactSet.ComputeSha256Utf8Text(report);
-            string metadata = await BuildMetadataJsonAsync(
-                rois,
-                bitmap,
-                pixelSize,
-                physicalUnit,
-                calibration,
-                exportContext,
-                csvHash,
-                exportBatchId,
-                reportHash,
-                cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            string metadata = BuildMetadataJson(snapshot, bitmap, fileHash, pixelHash, csvHash, exportBatchId, reportHash);
 
             await ImageViewerExportArtifactSet.WriteAllTextAsync(
                 new Dictionary<string, string>
@@ -404,50 +452,29 @@ namespace ImageViewer.Services
                 cancellationToken).ConfigureAwait(false);
         }
 
-        private static async Task<string?> TryComputeSourceHashAsync(string? sourcePath, CancellationToken cancellationToken)
+        // Geometry-only exports may explicitly reference a file even though no bitmap was analyzed.
+        private static async Task<ImageViewerImageDecoder.ImageFileTrace?> ReadReferencedFileTraceAsync(string? path, CancellationToken cancellationToken)
         {
-            if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
+            if (!File.Exists(path))
             {
                 return null;
             }
 
-            await using FileStream stream = File.OpenRead(sourcePath);
+            await using FileStream stream = File.OpenRead(path);
             byte[] hash = await SHA256.HashDataAsync(stream, cancellationToken).ConfigureAwait(false);
-            return Convert.ToHexString(hash).ToLowerInvariant();
+            return ImageViewerImageDecoder.ReadFileTrace(stream, Convert.ToHexString(hash));
         }
 
-        private static async Task<string> BuildMetadataJsonAsync(
-            IReadOnlyList<RoiBase> rois,
+        private static string BuildMetadataJson(
+            ExportSnapshot snapshot,
             BitmapSource? bitmap,
-            double pixelSize,
-            string? physicalUnit,
-            CameraCalibration? calibration,
-            RoiAnalysisExportContext exportContext,
+            string? fileHash,
+            string? pixelHash,
             string csvHash,
             string exportBatchId,
-            string reportHash,
-            CancellationToken cancellationToken)
+            string reportHash)
         {
-            string? sourceHash = null;
-            long? sourceLength = null;
-            DateTime? sourceLastWriteTimeUtc = null;
-            if (!string.IsNullOrWhiteSpace(exportContext.SourcePath) && File.Exists(exportContext.SourcePath))
-            {
-                FileInfo sourceInfo = new(exportContext.SourcePath);
-                sourceLength = sourceInfo.Length;
-                sourceLastWriteTimeUtc = sourceInfo.LastWriteTimeUtc;
-                await using FileStream stream = File.OpenRead(exportContext.SourcePath);
-                byte[] hash = await SHA256.HashDataAsync(stream, cancellationToken).ConfigureAwait(false);
-                sourceHash = Convert.ToHexString(hash).ToLowerInvariant();
-            }
-
-            object? roiDocument = null;
-            if (exportContext.PluginRegistry != null)
-            {
-                string roiJson = RoiPersistenceService.Serialize(rois, pixelSize, physicalUnit, exportContext.PluginRegistry, exportContext.QualityProfile);
-                using JsonDocument document = JsonDocument.Parse(roiJson);
-                roiDocument = document.RootElement.Clone();
-            }
+            var (rois, _, pixelSize, physicalUnit, calibration, exportContext, roiDocument, fileTrace) = snapshot;
 
             var metadata = new Dictionary<string, object?>
             {
@@ -486,7 +513,7 @@ namespace ImageViewer.Services
                         ["algorithm"] = ellipse.FitAlgorithm
                     }).ToList()
                 },
-                ["qualityThresholds"] = exportContext.QualityProfile ?? ImageAnalysisQualityProfile.Default,
+                ["qualityThresholds"] = exportContext?.QualityProfile ?? ImageAnalysisQualityProfile.Default,
                 ["result"] = new Dictionary<string, object?>
                 {
                     ["csvSha256"] = csvHash,
@@ -511,12 +538,14 @@ namespace ImageViewer.Services
                 },
                 ["source"] = new Dictionary<string, object?>
                 {
-                    ["path"] = exportContext.SourcePath,
-                    ["sha256"] = sourceHash,
-                    ["lengthBytes"] = sourceLength,
-                    ["lastWriteTimeUtc"] = sourceLastWriteTimeUtc,
+                    ["path"] = exportContext?.SourcePath,
+                    ["sha256"] = fileHash,
+                    ["lengthBytes"] = fileTrace?.Length,
+                    ["lastWriteTimeUtc"] = fileTrace?.LastWriteTimeUtc,
                     ["pixelWidth"] = bitmap?.PixelWidth,
-                    ["pixelHeight"] = bitmap?.PixelHeight
+                    ["pixelHeight"] = bitmap?.PixelHeight,
+                    ["pixelBufferSha256"] = pixelHash,
+                    ["pixelBufferFormat"] = pixelHash == null ? null : bitmap?.Format.ToString()
                 },
                 ["calibration"] = new Dictionary<string, object?>
                 {
@@ -532,14 +561,18 @@ namespace ImageViewer.Services
                 // 过程能力按"同一量名"聚合当前图像上的重复特征，与报告中的 SPC 章节同源。
                 ["processCapability"] = SpcReportFormatter.BuildMetadata(
                     SpcMeasurementSeriesBuilder.BuildFromRois(rois, pixelSize, physicalUnit, calibration)),
-                ["roiDocument"] = roiDocument,
-                ["renderSettings"] = exportContext.RenderSettings
+                ["roiDocument"] = roiDocument == null ? null
+                    : JsonSerializer.SerializeToElement(roiDocument, ImageViewerCoreJsonSerializationContext.Default.RoiDocument),
+                ["renderSettings"] = exportContext?.RenderSettings
             };
 
             return JsonSerializer.Serialize(metadata, MetadataJsonOptions);
         }
 
         public static string BuildCsv(IEnumerable<RoiBase> rois, BitmapSource? bitmap, double pixelSize, string? physicalUnit, CameraCalibration? calibration = null)
+            => BuildCsv(rois, bitmap, pixelSize, physicalUnit, calibration, CancellationToken.None);
+
+        private static string BuildCsv(IEnumerable<RoiBase> rois, BitmapSource? bitmap, double pixelSize, string? physicalUnit, CameraCalibration? calibration, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(rois);
             ImageViewerValidation.ValidatePixelSize(pixelSize);
@@ -550,6 +583,7 @@ namespace ImageViewer.Services
 
             foreach (var roi in rois)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 RoiInspectionResult inspection = RoiInspectionEvaluator.Evaluate(roi, pixelSize, calibration);
                 var metrics = GetAuditedMetrics(roi, pixelSize, unit, calibration, inspection);
                 string mean = string.Empty;
@@ -737,5 +771,15 @@ namespace ImageViewer.Services
                 ? number.ToString("G17", CultureInfo.InvariantCulture)
                 : string.Empty;
         }
+
+        private sealed record ExportSnapshot(
+            IReadOnlyList<RoiBase> Rois,
+            BitmapSource? Bitmap,
+            double PixelSize,
+            string? PhysicalUnit,
+            CameraCalibration? Calibration,
+            RoiAnalysisExportContext? Context,
+            RoiDocument? RoiDocument,
+            ImageViewerImageDecoder.ImageFileTrace? FileTrace);
     }
 }

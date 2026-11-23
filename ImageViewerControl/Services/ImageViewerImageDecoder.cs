@@ -79,15 +79,13 @@ namespace ImageViewer.Services
                 // Keep the read-only handle open from hashing through decoding. On Windows it
                 // denies both writes and replacement of the file being measured.
                 using FileStream stream = File.OpenRead(filePath);
-                string? sha256 = null;
+                ImageFileTrace? fileTrace = null;
                 if (trackIdentity)
                 {
-                    sha256 = ReadSha256(stream, cancellationToken);
+                    string sha256 = ReadSha256(stream, cancellationToken);
                     ImageViewerSessionImageIdentity.Verify(expectedSha256, sha256, filePath);
-                    if (captureTrace != null)
-                    {
-                        captureTrace(ReadFileTrace(stream, sha256));
-                    }
+                    fileTrace = ReadFileTrace(stream, sha256);
+                    captureTrace?.Invoke(fileTrace.Value);
                     stream.Position = 0;
                 }
                 // Preflight read this header from the file whose bytes we have just verified.
@@ -101,7 +99,7 @@ namespace ImageViewer.Services
                 // must save those pixels as an asset because opening the file would orient it.
                 if (applyExifOrientation || !trackIdentity || header.Orientation == ExifOrientationTransform.NormalOrientation)
                 {
-                    ImageViewerImageSourceRegistry.Register(oriented, filePath, cacheLease, sha256);
+                    ImageViewerImageSourceRegistry.Register(oriented, filePath, cacheLease, fileTrace);
                     cacheLease = null;
                 }
                 return oriented;
@@ -112,7 +110,7 @@ namespace ImageViewer.Services
             }
         }
 
-        private static ImageFileTrace ReadFileTrace(FileStream stream, string sha256)
+        internal static ImageFileTrace ReadFileTrace(FileStream stream, string sha256)
         {
             long length = stream.Length;
             try

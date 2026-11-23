@@ -180,6 +180,8 @@ dotnet test ImageViewer.Core.Tests/ImageViewer.Core.Tests.csproj `
 - [术语与本地化边界](docs/terminology.md)
 - [架构边界](docs/architecture-boundaries.md)
 
+发给没有仓库的读者时，请使用下方命令生成离线 ZIP。解压后从 `START.html` 进入；截图、参考资料和测量练习都随包提供。
+
 ### 手册的生成与校验
 
 `docs/usage.html` 由 `docs/usage.md` 生成，版式在 `docs/usage.template.html`，不要手改 HTML：
@@ -188,11 +190,12 @@ dotnet test ImageViewer.Core.Tests/ImageViewer.Core.Tests.csproj `
 python build/docs.py            # 重新生成 docs/usage.html
 python build/docs.py --check    # 校验 HTML 与 md 同步，并检查工具/菜单覆盖度
 ./build/docs-pdf.ps1            # 用本机 Edge 生成 docs/usage.pdf
+python build/docs.py --offline  # 生成 artifacts/docs/imageviewer-manual.zip
 ```
 
-`--check` 会核对全部 ROI 工具、高级测量项、顶层菜单分组、错误消息标题、标定字段与质量门限字段都在手册中出现，同时检查图片与本地文档链接是否存在；CI 的 `docs-check` 作业跑这个模式，所以新增工具或改动界面文案后必须同步补手册，否则构建失败。
+`--check` 会核对全部 ROI 工具、高级测量项、顶层菜单分组、错误消息标题、标定字段与质量门限字段都在手册中出现，同时检查图片与本地文档链接是否存在。`--offline` 先做相同检查，再收集离线包的引用文件；CI 的 `docs-check` 作业也会打包验证。
 
-`docs/usage.pdf` 是交付物，不由 CI 生成（ubuntu runner 没有 Edge）。手册内容变化后手动跑一次 `build/docs-pdf.ps1` 并提交新的 PDF。
+手册 HTML 或其中的图片变化后，运行 `build/docs-pdf.ps1` 并一并提交 `docs/usage.pdf` 与 `docs/usage.pdf.source.json`。离线打包和 CI 会核对来源及 PDF 的 SHA-256。
 
 ## 许可证
 

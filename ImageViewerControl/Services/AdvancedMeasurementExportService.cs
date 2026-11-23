@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.IO;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Windows.Media.Imaging;
@@ -34,17 +33,7 @@ public static class AdvancedMeasurementExportService
         ArgumentNullException.ThrowIfNull(rois);
         cancellationToken.ThrowIfCancellationRequested();
         RoiDocument roiDocument = RoiPersistenceService.CreateDocument(rois, pixelSize, unit, pluginRegistry);
-        RoiBase[] capturedRois = rois.Select(roi =>
-        {
-            RoiBase copy = roi.Clone();
-            if (ReferenceEquals(copy, roi))
-            {
-                throw new InvalidOperationException("An ROI clone must be independent of its source before exporting.");
-            }
-            copy.MeasurementId = roi.MeasurementId;
-            copy.AdvancedMeasurements = roi.AdvancedMeasurements;
-            return copy;
-        }).ToArray();
+        RoiBase[] capturedRois = RoiAnalysisExportService.CaptureRois(rois);
         BitmapSource? capturedBitmap = bitmap == null || bitmap.IsFrozen
             ? bitmap : (BitmapSource)bitmap.GetCurrentValueAsFrozen();
         CameraCalibration? capturedCalibration = calibration?.Clone();
@@ -63,20 +52,7 @@ public static class AdvancedMeasurementExportService
         cancellationToken.ThrowIfCancellationRequested();
         string csv = BuildCsv(definitions, results);
         string roiJson = JsonSerializer.Serialize(roiDocument, ImageViewerCoreJsonSerializationContext.Default.RoiDocument);
-        string? imageHash = null;
-        if (bitmap != null)
-        {
-            int stride = checked((bitmap.PixelWidth * bitmap.Format.BitsPerPixel + 7) / 8);
-            byte[] row = new byte[stride];
-            using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-            for (int y = 0; y < bitmap.PixelHeight; y++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                bitmap.CopyPixels(new System.Windows.Int32Rect(0, y, bitmap.PixelWidth, 1), row, stride, 0);
-                hash.AppendData(row);
-            }
-            imageHash = Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
-        }
+        string? imageHash = bitmap == null ? null : ImageViewerPixelAccess.ComputePixelBufferSha256(bitmap, cancellationToken);
         var metadata = new
         {
             schemaVersion = 1,

@@ -927,6 +927,7 @@
       .layout { display: block; width: auto; padding: 14px 0 0; }
       .skip-link, .to-top, .reader-tools, .toc-search, .toc-toggle, .search-status { display: none; }
       .resume-link:not([hidden]), .copy-link, .copy-dialog { display: none; }
+      a[data-print-reference] { color: inherit; text-decoration: none; }
       .toc-nav, #toc-results { display: none; }
       /* 打印件也要目录：独立一页，排在正文之前 */
       .toc {
@@ -2735,6 +2736,7 @@
     <section id="appendix-print">
       <h2><a class="anchor" href="#appendix-print" aria-label="链接到本节">#</a>附录 D：打印与另存 PDF</h2>
         <p>网页版每个章节和小节旁都有 <strong>复制链接</strong>，可以直接定位到该标题。浏览器若不允许自动复制，会显示可手动复制的地址。本地文件链接只在能访问该文件的地方可用。浏览器允许本地存储时，重新打开手册后可在页首点 <strong>继续阅读</strong>，返回上次读到的章节或小节。</p>
+        <p><strong>把手册发给别人。</strong> 分享离线 ZIP，对方解压后打开 <code>START.html</code>，就能阅读网页版和 PDF、查看截图和参考资料。练习会话和底图也在包里，按入口页的说明在 Demo 中打开即可。PDF 可点击页内目录；跨文档的参考资料请从网页版打开。</p>
         <p>手册为打印做了适配：目录单独排在正文之前，表格跨页重复表头，图片不跨页，隐藏浮动按钮。浏览器按 <kbd>Ctrl</kbd>+<kbd>P</kbd> 后建议选 A4、使用默认页边距、勾选“背景图形”以保留表格底色，并关闭浏览器的页眉页脚以免打印本地文件路径。</p>
         <p>需要一份现成的 PDF 时，仓库里有 <code>docs/usage.pdf</code>，它与 HTML 同源，由 <code>build/docs-pdf.ps1</code> 调用本机 Edge 的 headless 打印生成。换了手册内容后重新跑一次脚本即可，它会覆盖旧文件。</p>
     </section>
@@ -3199,6 +3201,26 @@
       window.addEventListener('resize', function () {
         scrollers.forEach(updateScroller);
       }, { passive: true });
+
+      // 跨文件相对链接在打印时会被 Chromium 写成本机绝对路径。
+      // 纸质与 PDF 仅保留页内目录和可独立访问的网页链接。
+      var printReferences = [];
+      window.addEventListener('beforeprint', function () {
+        document.querySelectorAll('a[href]').forEach(function (link) {
+          var href = link.getAttribute('href');
+          if (!href || href.charAt(0) === '#' || /^(?:https?:)?\/\//i.test(href)) { return; }
+          printReferences.push({ link: link, href: href });
+          link.removeAttribute('href');
+          link.setAttribute('data-print-reference', '');
+        });
+      });
+      window.addEventListener('afterprint', function () {
+        printReferences.forEach(function (reference) {
+          reference.link.setAttribute('href', reference.href);
+          reference.link.removeAttribute('data-print-reference');
+        });
+        printReferences = [];
+      });
     })();
   </script>
 </body>

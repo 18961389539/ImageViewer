@@ -5,6 +5,10 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using ImageViewer.Plugins;
 using ImageViewer.Services;
 using ImageViewer.Models;
 using Xunit;
@@ -275,6 +279,97 @@ namespace ImageViewerControl.Tests
                 Assert.Equal(HashFile(csv), secondMetadata.RootElement.GetProperty("artifactSet").GetProperty("csvSha256").GetString());
                 Assert.Equal(HashFile(reportPath), secondMetadata.RootElement.GetProperty("artifactSet").GetProperty("reportSha256").GetString());
                 Assert.Equal(3, Directory.GetFiles(root).Length);
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void SaveCsvAsync_UsesTheSameCapturedInputsForEveryArtifact()
+        {
+            WpfTestRunner.RunAsync(async () =>
+            {
+                string root = CreateTempDirectory();
+                try
+                {
+                    string csv = Path.Combine(root, "export.csv");
+                    string unrelatedPath = Path.Combine(root, "unverified.png");
+                    await File.WriteAllTextAsync(unrelatedPath, "unrelated file");
+                    var roi = new CircleRoi { Label = "snapshot-before", Center = new PointD(2, 2), Radius = 2 };
+                    var bitmap = new WriteableBitmap(4, 4, 96, 96, PixelFormats.Gray8, null);
+                    byte[] originalPixels = Enumerable.Repeat((byte)11, 16).ToArray();
+                    bitmap.WritePixels(new Int32Rect(0, 0, 4, 4), originalPixels, 4, 0);
+                    var calibration = new CameraCalibration { CalibrationId = "calibration-before" };
+                    var settings = new Dictionary<string, string> { ["window"] = "before" };
+                    var context = new RoiAnalysisExportContext(unrelatedPath, RoiPluginRegistry.CreateBuiltIn(), settings);
+
+                    Task export = RoiAnalysisExportService.SaveCsvAsync(csv, [roi], bitmap, 1, "mm", calibration, context);
+                    roi.Label = "snapshot-after";
+                    calibration.CalibrationId = "calibration-after";
+                    settings["window"] = "after";
+                    bitmap.WritePixels(new Int32Rect(0, 0, 4, 4), new byte[16], 4, 0);
+                    await export;
+
+                    string csvText = await File.ReadAllTextAsync(csv);
+                    string report = await File.ReadAllTextAsync(Path.ChangeExtension(csv, ".report.md"));
+                    using var metadata = JsonDocument.Parse(await File.ReadAllTextAsync(Path.ChangeExtension(csv, ".metadata.json")));
+                    JsonElement result = metadata.RootElement;
+                    JsonElement source = result.GetProperty("source");
+                    string pixelHash = Convert.ToHexString(SHA256.HashData(originalPixels)).ToLowerInvariant();
+                    Assert.Contains("snapshot-before", csvText, StringComparison.Ordinal);
+                    Assert.Contains(",11.00,11,11,0.00,", csvText, StringComparison.Ordinal);
+                    Assert.Contains("snapshot-before", report, StringComparison.Ordinal);
+                    Assert.Contains(pixelHash[..12], report, StringComparison.Ordinal);
+                    Assert.Equal("snapshot-before", result.GetProperty("result").GetProperty("inspectionResults")[0].GetProperty("label").GetString());
+                    Assert.Contains("snapshot-before", result.GetProperty("roiDocument").GetRawText(), StringComparison.Ordinal);
+                    Assert.Equal("calibration-before", result.GetProperty("calibration").GetProperty("camera").GetProperty(nameof(CameraCalibration.CalibrationId)).GetString());
+                    Assert.Equal("before", result.GetProperty("renderSettings").GetProperty("window").GetString());
+                    Assert.Equal(JsonValueKind.Null, source.GetProperty("sha256").ValueKind);
+                    Assert.Equal(pixelHash, source.GetProperty("pixelBufferSha256").GetString());
+                    Assert.Equal("Gray8", source.GetProperty("pixelBufferFormat").GetString());
+                }
+                finally
+                {
+                    Directory.Delete(root, recursive: true);
+                }
+            });
+        }
+
+        [Fact]
+        public async Task SaveCsvAsync_UsesDecodedFileTraceWhenThePathIsOverwritten()
+        {
+            string root = CreateTempDirectory();
+            try
+            {
+                string path = Path.Combine(root, "source.png");
+                WpfTestRunner.Run(() =>
+                {
+                    var encoder = new PngBitmapEncoder();
+                    var bitmap = BitmapSource.Create(2, 2, 96, 96, PixelFormats.Gray8, null, new byte[] { 1, 2, 3, 4 }, 2);
+                    encoder.Frames.Add(BitmapFrame.Create(bitmap));
+                    using FileStream stream = File.Create(path);
+                    encoder.Save(stream);
+                });
+                string expectedHash = HashFile(path);
+                long expectedLength = new FileInfo(path).Length;
+                DateTime expectedWriteTime = File.GetLastWriteTimeUtc(path);
+                BitmapSource original = await ImageViewerImageDecoder.LoadDocumentImageAsync(path, null, null, CancellationToken.None);
+                await File.WriteAllTextAsync(path, "replacement");
+
+                string csv = Path.Combine(root, "export.csv");
+                var context = new RoiAnalysisExportContext(path, null);
+                await RoiAnalysisExportService.SaveCsvAsync(csv, [], original, 1, "mm", null, context);
+
+                using var metadata = JsonDocument.Parse(await File.ReadAllTextAsync(Path.ChangeExtension(csv, ".metadata.json")));
+                JsonElement source = metadata.RootElement.GetProperty("source");
+                Assert.Equal(expectedHash, source.GetProperty("sha256").GetString());
+                Assert.Equal(expectedLength, source.GetProperty("lengthBytes").GetInt64());
+                Assert.Equal(expectedWriteTime, source.GetProperty("lastWriteTimeUtc").GetDateTime());
+                Assert.Equal(JsonValueKind.Null, source.GetProperty("pixelBufferSha256").ValueKind);
+                string report = await File.ReadAllTextAsync(Path.ChangeExtension(csv, ".report.md"));
+                Assert.Contains(expectedHash[..12], report, StringComparison.Ordinal);
             }
             finally
             {

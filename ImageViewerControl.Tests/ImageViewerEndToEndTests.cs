@@ -182,6 +182,7 @@ namespace ImageViewerControl.Tests
                     string csvPath = Path.Combine(root, "analysis.csv");
                     BitmapSource image = CreateBitmap(32, 24, 64);
                     SaveBitmap(sourcePath, image);
+                    image = ImageViewerImageDecoder.LoadDocumentImageAsync(sourcePath, null, null, CancellationToken.None).GetAwaiter().GetResult();
                     var roi = new CircleRoi
                     {
                         Center = new PointD(12, 10),
