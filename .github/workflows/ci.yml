@@ -27,7 +27,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           # The solution tests both target frameworks; install the .NET 8 runtime
           # explicitly instead of relying on the runner image shipping it.
@@ -82,7 +82,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           # The solution tests both target frameworks; install the .NET 8 runtime
           # explicitly instead of relying on the runner image shipping it.
@@ -134,7 +134,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           # The solution tests both target frameworks; install the .NET 8 runtime
           # explicitly instead of relying on the runner image shipping it.
